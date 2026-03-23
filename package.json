@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "npm start",
+    "dev:server": "npm run dev --prefix server",
     "start": "concurrently --kill-others-on-fail --names stellar,vite -c gray,green --pad-prefix \"stellar scaffold watch --build-clients\" \"vite\"",
     "build": "tsc -b && vite build",
     "install:contracts": "if ls packages/*/package.json > /dev/null 2>&1; then npm install --workspaces && npm run build --workspaces --if-present; else echo 'No contract client packages found. Run: stellar-scaffold build --build-clients'; fi",

@@ -84,5 +84,23 @@
 		"disconnectPrompt": ". Do you want to disconnect?",
 		"disconnect": "Disconnect",
 		"cancel": "Cancel"
+	},
+	"pages": {
+		"learn": {
+			"title": "Learn",
+			"desc": "This is the Learn page."
+		},
+		"dao": {
+			"title": "DAO",
+			"desc": "This is the DAO page."
+		},
+		"leaderboard": {
+			"title": "Leaderboard",
+			"desc": "This is the Leaderboard page."
+		},
+		"profile": {
+			"title": "My Profile",
+			"desc": "This is the My Profile page."
+		}
 	}
 }

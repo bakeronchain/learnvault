@@ -1,13 +1,15 @@
 import { Text } from "@stellar/design-system"
+import { useTranslation } from "react-i18next"
 
 export default function Leaderboard() {
+	const { t } = useTranslation()
 	return (
 		<div>
 			<Text as="h1" size="lg">
-				Leaderboard
+				{t("pages.leaderboard.title")}
 			</Text>
 			<Text as="p" size="md">
-				This is the Leaderboard page.
+				{t("pages.leaderboard.desc")}
 			</Text>
 		</div>
 	)

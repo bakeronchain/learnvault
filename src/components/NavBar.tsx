@@ -3,7 +3,6 @@ import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { NavLink } from "react-router-dom"
 import styles from "../App.module.css"
-import { LanguageSelector } from "./LanguageSelector"
 import { WalletButton } from "./WalletButton"
 
 export default function NavBar() {
@@ -44,11 +43,7 @@ export default function NavBar() {
 					))}
 				</nav>
 
-				<div
-					className={styles.NavRight}
-					style={{ display: "flex", gap: "10px", alignItems: "center" }}
-				>
-					<LanguageSelector />
+				<div className={styles.NavRight}>
 					<WalletButton />
 					<Button
 						variant="tertiary"

@@ -1,5 +1,6 @@
 import { Text } from "@stellar/design-system"
 import { useTranslation } from "react-i18next"
+import { LanguageSelector } from "./LanguageSelector"
 
 export default function Footer() {
 	const { t } = useTranslation()
@@ -12,7 +13,15 @@ export default function Footer() {
 				textAlign: "center",
 			}}
 		>
-			<div style={{ display: "flex", justifyContent: "center", gap: "2rem" }}>
+			<div
+				style={{
+					display: "flex",
+					justifyContent: "center",
+					alignItems: "center",
+					gap: "2rem",
+					flexWrap: "wrap",
+				}}
+			>
 				<a
 					href="https://github.com/bakeronchain/learnvault"
 					target="_blank"
@@ -37,6 +46,7 @@ export default function Footer() {
 						{t("nav.docs")}
 					</Text>
 				</a>
+				<LanguageSelector />
 			</div>
 		</footer>
 	)

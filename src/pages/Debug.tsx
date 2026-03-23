@@ -1,5 +1,6 @@
 import { Layout } from "@stellar/design-system"
 import { ContractExplorer, loadContracts } from "@theahaco/contract-explorer"
+import { useTranslation } from "react-i18next"
 import { network } from "../contracts/util"
 import { useWallet } from "../hooks/useWallet"
 
@@ -9,11 +10,12 @@ const contracts = await loadContracts(contractModules)
 
 const Debugger: React.FC = () => {
 	const { address, signTransaction } = useWallet()
+	const { t } = useTranslation()
 
 	return (
 		<Layout.Content>
 			<Layout.Inset>
-				<h2>Debug Contracts</h2>
+				<h2>{t("nav.debug")}</h2>
 
 				<ContractExplorer
 					contracts={contracts}

@@ -1,11 +1,13 @@
 import { Button, Tooltip } from "@stellar/design-system"
 import React, { useState, useTransition } from "react"
+import { useTranslation } from "react-i18next"
 import { useNotification } from "../hooks/useNotification.ts"
 import { useWallet } from "../hooks/useWallet.ts"
 import { getFriendbotUrl } from "../util/friendbot"
 
 const FundAccountButton: React.FC = () => {
 	const { addNotification } = useNotification()
+	const { t } = useTranslation()
 	const [isPending, startTransition] = useTransition()
 	const [isTooltipVisible, setIsTooltipVisible] = useState(false)
 	const { address } = useWallet()
@@ -18,7 +20,7 @@ const FundAccountButton: React.FC = () => {
 				const response = await fetch(getFriendbotUrl(address))
 
 				if (response.ok) {
-					addNotification("Account funded successfully!", "success")
+					addNotification(t("connect.funded"), "success")
 				} else {
 					const body: unknown = await response.json()
 					if (
@@ -27,13 +29,16 @@ const FundAccountButton: React.FC = () => {
 						"detail" in body &&
 						typeof body.detail === "string"
 					) {
-						addNotification(`Error funding account: ${body.detail}`, "error")
+						addNotification(
+							t("connect.fundErrorDetail", { detail: body.detail }),
+							"error",
+						)
 					} else {
-						addNotification("Error funding account: Unknown error", "error")
+						addNotification(t("connect.fundErrorUnknown"), "error")
 					}
 				}
 			} catch {
-				addNotification("Error funding account. Please try again.", "error")
+				addNotification(t("connect.fundErrorRetry"), "error")
 			}
 		})
 	}
@@ -46,7 +51,7 @@ const FundAccountButton: React.FC = () => {
 			<Tooltip
 				isVisible={isTooltipVisible}
 				isContrast
-				title="Fund Account"
+				title={t("connect.fund")}
 				placement="bottom"
 				triggerEl={
 					<Button
@@ -55,11 +60,11 @@ const FundAccountButton: React.FC = () => {
 						variant="primary"
 						size="md"
 					>
-						Fund Account
+						{t("connect.fund")}
 					</Button>
 				}
 			>
-				<div style={{ width: "13em" }}>Account is already funded</div>
+				<div style={{ width: "13em" }}>{t("connect.alreadyFunded")}</div>
 			</Tooltip>
 		</div>
 	)

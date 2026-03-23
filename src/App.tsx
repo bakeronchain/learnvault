@@ -23,8 +23,8 @@ function App() {
 const AppLayout: React.FC = () => (
 	<div className={styles.AppLayout}>
 		<Layout.Header
-			projectId="LearnVault"
-			projectTitle="LearnVault"
+			projectId="Scaffold"
+			projectTitle="Scaffold"
 			hasThemeSwitch={true}
 			contentCenter={
 				<>

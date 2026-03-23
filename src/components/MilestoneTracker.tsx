@@ -1,5 +1,6 @@
 import confetti from "canvas-confetti"
 import React, { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { useCourse } from "../hooks/useCourse"
 import styles from "./MilestoneTracker.module.css"
 
@@ -25,6 +26,7 @@ function MilestoneStep({
 		courseId,
 		milestone.id,
 	)
+	const { t, i18n } = useTranslation()
 
 	const [isCompleting, setIsCompleting] = useState(false)
 
@@ -70,26 +72,34 @@ function MilestoneStep({
 			<div className={styles.content}>
 				<div className={styles.header}>
 					<h3 className={styles.title}>{milestone.label}</h3>
-					<div className={styles.badge}>+{milestone.lrnReward} LRN</div>
+					<div className={styles.badge}>
+						{t("home.milestones.lrnReward", {
+							amount: new Intl.NumberFormat(i18n.language).format(
+								milestone.lrnReward,
+							),
+						})}
+					</div>
 				</div>
 
 				{status === "locked" && (
 					<p style={{ fontSize: "0.9rem", color: "#9ca3af", margin: 0 }}>
-						Complete previous milestones to unlock.
+						{t("home.milestones.locked")}
 					</p>
 				)}
 
 				{status === "in_progress" && (
 					<div>
 						<p style={{ fontSize: "0.9rem", color: "#d1d5db", margin: 0 }}>
-							Currently working on this milestone.
+							{t("home.milestones.inProgress")}
 						</p>
 						<button
 							className={styles.actionBtn}
 							onClick={handleComplete}
 							disabled={isCompleting}
 						>
-							{isCompleting ? "Submitting TX..." : "Mark as Complete"}
+							{isCompleting
+								? t("home.milestones.submittingText")
+								: t("home.milestones.markComplete")}
 						</button>
 					</div>
 				)}
@@ -104,7 +114,7 @@ function MilestoneStep({
 								fontWeight: 600,
 							}}
 						>
-							Completed successfully!
+							{t("home.milestones.completedText")}
 						</p>
 						{txHash && (
 							<a
@@ -113,7 +123,7 @@ function MilestoneStep({
 								rel="noopener noreferrer"
 								className={styles.txLink}
 							>
-								TX: {txHash} ↗
+								{t("home.milestones.tx")}: {txHash} ↗
 							</a>
 						)}
 					</div>

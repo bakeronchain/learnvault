@@ -7,6 +7,7 @@ import App from "./App.tsx"
 import { NotificationProvider } from "./providers/NotificationProvider.tsx"
 import { WalletProvider } from "./providers/WalletProvider.tsx"
 import "@stellar/design-system/build/styles.min.css"
+import "./i18n"
 
 const queryClient = new QueryClient({
 	defaultOptions: {

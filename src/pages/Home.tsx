@@ -2,67 +2,87 @@ import { Button, Card, Icon } from "@stellar/design-system"
 import React from "react"
 import { Link } from "react-router-dom"
 import { GuessTheNumber } from "../components/GuessTheNumber"
+import { MilestoneTracker } from "../components/MilestoneTracker"
 import { labPrefix } from "../contracts/util"
 import styles from "./Home.module.css"
 
 const Home: React.FC = () => (
 	<div className={styles.Home}>
-		<div>
-			<h1>Yay! You&apos;re on Stellar!</h1>
+		<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+			<div>
+				<h1>Yay! You&apos;re on Stellar!</h1>
 
-			<p>
-				A local development template designed to help you build dApps on the
-				Stellar network. This environment lets you easily test wallet
-				connections, smart contract interactions, transaction verifications,
-				etc.{" "}
-				<Link
-					to="https://scaffoldstellar.org/docs/intro"
-					className="Link Link--primary"
-					target="_blank"
-				>
-					View docs
-				</Link>
-			</p>
+				<p>
+					A local development template designed to help you build dApps on the
+					Stellar network. This environment lets you easily test wallet
+					connections, smart contract interactions, transaction verifications,
+					etc.{" "}
+					<Link
+						to="https://scaffoldstellar.org/docs/intro"
+						className="Link Link--primary"
+						target="_blank"
+					>
+						View docs
+					</Link>
+				</p>
+
+				<div className="mt-8">
+					<h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+						<Icon.BookOpen01 />
+						Course Progress: Stellar Basics
+					</h2>
+					<MilestoneTracker
+						courseId="stellar-basics"
+						milestones={[
+							{ id: 1, label: "Complete Lesson 1", lrnReward: 10, status: "completed", txHash: "43e8...f2a1" },
+							{ id: 2, label: "Pass Quiz 1", lrnReward: 20, status: "in-progress" },
+							{ id: 3, label: "Build your first contract", lrnReward: 50, status: "locked" },
+						]}
+					/>
+				</div>
+			</div>
+
+			<div className="space-y-8">
+				<Card>
+					<h2>
+						<Icon.File06 size="lg" />
+						Sample Contracts
+					</h2>
+
+					<p>
+						<strong>Guess The Number:</strong> Interact with the sample contract
+						from the{" "}
+						<Link
+							to="https://scaffoldstellar.org/docs/tutorial/overview"
+							className="Link Link--primary"
+							target="_blank"
+						>
+							Scaffold Tutorial
+						</Link>{" "}
+						using an automatically generated contract client.
+					</p>
+
+					<GuessTheNumber />
+
+					<p>Or take a look at other sample contracts to get you started:</p>
+
+					<nav>
+						<Link to="https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples">
+							<Button variant="tertiary" size="md">
+								OpenZeppelin sample contracts
+								<Icon.ArrowUpRight size="md" />
+							</Button>
+						</Link>
+						<Link to="https://github.com/stellar/soroban-examples">
+							<Button variant="tertiary" size="md">
+								Soroban sample contracts
+								<Icon.ArrowUpRight size="md" />
+							</Button>
+						</Link>
+					</nav>
+				</Card>
+			</div>
 		</div>
-
-		<Card>
-			<h2>
-				<Icon.File06 size="lg" />
-				Sample Contracts
-			</h2>
-
-			<p>
-				<strong>Guess The Number:</strong> Interact with the sample contract
-				from the{" "}
-				<Link
-					to="https://scaffoldstellar.org/docs/tutorial/overview"
-					className="Link Link--primary"
-					target="_blank"
-				>
-					Scaffold Tutorial
-				</Link>{" "}
-				using an automatically generated contract client.
-			</p>
-
-			<GuessTheNumber />
-
-			<p>Or take a look at other sample contracts to get you started:</p>
-
-			<nav>
-				<Link to="https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples">
-					<Button variant="tertiary" size="md">
-						OpenZeppelin sample contracts
-						<Icon.ArrowUpRight size="md" />
-					</Button>
-				</Link>
-				<Link to="https://github.com/stellar/soroban-examples">
-					<Button variant="tertiary" size="md">
-						Soroban sample contracts
-						<Icon.ArrowUpRight size="md" />
-					</Button>
-				</Link>
-			</nav>
-		</Card>
 
 		<Card>
 			<h2>

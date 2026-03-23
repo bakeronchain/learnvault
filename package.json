@@ -25,6 +25,7 @@
     "@tanstack/react-query": "^5.90.17",
     "@theahaco/contract-explorer": "^1.1.0",
     "@theahaco/ts-config": "^1.2.0",
+    "canvas-confetti": "^1.9.4",
     "lossless-json": "^4.3.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -32,6 +33,7 @@
     "zod": "^4.3.5"
   },
   "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0",
     "@types/lodash": "^4.17.23",
     "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",

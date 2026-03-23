@@ -2,11 +2,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { BrowserRouter } from "react-router-dom"
+import "@stellar/design-system/build/styles.min.css"
 import "./index.css"
 import App from "./App.tsx"
 import { NotificationProvider } from "./providers/NotificationProvider.tsx"
 import { WalletProvider } from "./providers/WalletProvider.tsx"
-import "@stellar/design-system/build/styles.min.css"
 
 const queryClient = new QueryClient({
 	defaultOptions: {

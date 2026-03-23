@@ -1,5 +1,5 @@
 [package]
-name = "fungible-allowlist-example"
+name = "governance-token"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

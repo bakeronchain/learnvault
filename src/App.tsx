@@ -5,12 +5,14 @@ import ConnectAccount from "./components/ConnectAccount"
 import { labPrefix } from "./contracts/util"
 import Debug from "./pages/Debug"
 import Home from "./pages/Home"
+import Treasury from "./pages/Treasury"
 
 function App() {
 	return (
 		<Routes>
 			<Route element={<AppLayout />}>
 				<Route path="/" element={<Home />} />
+				<Route path="/treasury" element={<Treasury />} />
 				<Route path="/debug" element={<Debug />} />
 				<Route path="/debug/:contractName" element={<Debug />} />
 			</Route>
@@ -21,11 +23,27 @@ function App() {
 const AppLayout: React.FC = () => (
 	<div className={styles.AppLayout}>
 		<Layout.Header
-			projectId="Scaffold"
-			projectTitle="Scaffold"
+			projectId="LearnVault"
+			projectTitle="LearnVault"
 			hasThemeSwitch={true}
 			contentCenter={
 				<>
+					<NavLink to="/">
+						{({ isActive }) => (
+							<Button variant="tertiary" size="md" disabled={isActive}>
+								<Icon.Home01 size="md" />
+								Home
+							</Button>
+						)}
+					</NavLink>
+					<NavLink to="/treasury">
+						{({ isActive }) => (
+							<Button variant="tertiary" size="md" disabled={isActive}>
+								<Icon.Coins01 size="md" />
+								Treasury
+							</Button>
+						)}
+					</NavLink>
 					<NavLink to="/debug">
 						{({ isActive }) => (
 							<Button variant="tertiary" size="md" disabled={isActive}>
@@ -33,12 +51,6 @@ const AppLayout: React.FC = () => (
 								Contract Explorer
 							</Button>
 						)}
-					</NavLink>
-					<NavLink to={labPrefix()}>
-						<Button variant="tertiary" size="md">
-							<Icon.SearchMd size="md" />
-							Transaction Explorer
-						</Button>
 					</NavLink>
 				</>
 			}

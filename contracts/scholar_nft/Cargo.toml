@@ -1,6 +1,5 @@
 [package]
-name = "scholarship-treasury"
-description = "Treasury contract for scholarship funding in USDC"
+name = "scholar-nft"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -13,7 +12,8 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
-stellar-registry = "0.0.4"
+stellar-access = { workspace = true }
+stellar-tokens = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }

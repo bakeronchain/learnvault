@@ -2,8 +2,15 @@ import { Button, Card, Icon } from "@stellar/design-system"
 import React from "react"
 import { Link } from "react-router-dom"
 import { GuessTheNumber } from "../components/GuessTheNumber"
+import { MilestoneTracker } from "../components/MilestoneTracker"
 import { labPrefix } from "../contracts/util"
 import styles from "./Home.module.css"
+
+const mockMilestones = [
+	{ id: 1, label: "Complete Lesson 1", lrnReward: 10 },
+	{ id: 2, label: "Pass Quiz 1", lrnReward: 20 },
+	{ id: 3, label: "Build your first contract", lrnReward: 50 },
+]
 
 const Home: React.FC = () => (
 	<div className={styles.Home}>
@@ -24,6 +31,18 @@ const Home: React.FC = () => (
 				</Link>
 			</p>
 		</div>
+
+		<Card>
+			<h2>
+				<Icon.Trophy01 size="lg" />
+				Course Progress (Testing Issue 55)
+			</h2>
+			<p>
+				Track your learning journey and earn LRN rewards by completing on-chain
+				milestones.
+			</p>
+			<MilestoneTracker courseId="stellar-basics" milestones={mockMilestones} />
+		</Card>
 
 		<Card>
 			<h2>

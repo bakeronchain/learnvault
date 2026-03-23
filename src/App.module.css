@@ -45,9 +45,70 @@ a[target]:has(button)::after {
 	justify-content: start;
 }
 
-/** FOOTER */
-.AppLayout :global(.Layout__footer__content) {
-	flex-direction: row-reverse;
+/** NAV BAR */
+.NavBar {
+	border-bottom: 1px solid var(--sds-clr-gray-06);
+	padding: 1rem 3rem;
+	background: var(--sds-clr-white);
+}
+
+.NavBarContent {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	max-width: 1200px;
+	margin: 0 auto;
+}
+
+.Logo {
+	text-decoration: none;
+	color: inherit;
+}
+
+.NavLinks {
+	display: flex;
+	gap: 2rem;
+	align-items: center;
+}
+
+.NavRight {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+}
+
+.Hamburger {
+	display: none;
+}
+
+/* Mobile styles */
+@media (max-width: 768px) {
+	.NavBar {
+		padding: 1rem;
+	}
+
+	.NavLinks {
+		display: none;
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		background: var(--sds-clr-white);
+		flex-direction: column;
+		justify-content: center;
+		align-items: center;
+		gap: 2rem;
+		z-index: 1000;
+	}
+
+	.NavLinksOpen {
+		display: flex;
+	}
+
+	.Hamburger {
+		display: block;
+	}
 }
 
 /** SDS FIXES */

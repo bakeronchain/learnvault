@@ -32,7 +32,7 @@ export const WalletButton = () => {
 			}}
 		>
 			<Text as="div" size="sm">
-				Wallet Balance: {balances?.xlm?.balance ?? "-"} XLM
+				Wallet Balance: {balances?.lrn?.balance ?? "-"} LRN
 			</Text>
 
 			<div id="modalContainer">

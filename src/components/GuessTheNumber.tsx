@@ -1,6 +1,6 @@
 import { Button, Card, Code, Icon, Input } from "@stellar/design-system"
 import { useState } from "react"
-import game from "../contracts/guess_the_number"
+// import game from "../contracts/guess_the_number"
 import { useWallet } from "../hooks/useWallet"
 import styles from "./GuessTheNumber.module.css"
 
@@ -26,23 +26,28 @@ export const GuessTheNumber = () => {
 		// Reset any previous success value
 		setResult("loading")
 
-		// Create a transaction using the contract client
-		const tx = await game.guess(
-			{ a_number: BigInt(guess), guesser: address },
-			// @ts-expect-error js-stellar-sdk has bad typings; publicKey is, in fact, allowed
-			{ publicKey: address },
-		)
+		// TODO: Create a transaction using the contract client
+		// const tx = await game.guess(
+		// 	{ a_number: BigInt(guess), guesser: address },
+		// 	// @ts-expect-error js-stellar-sdk has bad typings; publicKey is, in fact, allowed
+		// 	{ publicKey: address },
+		// )
 
-		// Send the transaction to the current network
-		const { result } = await tx.signAndSend({ signTransaction })
+		// // Send the transaction to the current network
+		// const { result } = await tx.signAndSend({ signTransaction })
 
-		// Handle result and update wallet balance
-		if (result.isErr()) {
-			console.error(result.unwrapErr())
-		} else {
-			setResult(result.unwrap() ? "success" : "failure")
-			await updateBalances()
-		}
+		// // Handle result and update wallet balance
+		// if (result.isErr()) {
+		// 	console.error(result.unwrapErr())
+		// } else {
+		// 	setResult(result.unwrap() ? "success" : "failure")
+		// 	await updateBalances()
+		// }
+
+		// Placeholder: simulate success
+		setTimeout(() => {
+			setResult(Math.random() > 0.5 ? "success" : "failure")
+		}, 1000)
 	}
 
 	const reset = () => setResult("idle")

@@ -43,19 +43,21 @@ export function useSubscription(
 		let stop = false
 
 		async function pollEvents(): Promise<void> {
+			const entry = paging[id]
+			if (!entry) return
 			try {
-				if (!paging[id].lastLedgerStart) {
+				if (!entry.lastLedgerStart) {
 					const latestLedgerState = await server.getLatestLedger()
-					paging[id].lastLedgerStart = latestLedgerState.sequence
+					entry.lastLedgerStart = latestLedgerState.sequence
 				}
 
 				// lastLedgerStart is now guaranteed to be a number
-				const lastLedger = paging[id].lastLedgerStart
+				const lastLedger = entry.lastLedgerStart
 
 				const response = await server.getEvents(
-					paging[id].pagingToken
+					entry.pagingToken
 						? {
-								cursor: paging[id].pagingToken,
+								cursor: entry.pagingToken,
 								filters: [
 									{
 										contractIds: [contractId],
@@ -79,9 +81,9 @@ export function useSubscription(
 							},
 				)
 
-				paging[id].pagingToken = undefined
+				entry.pagingToken = undefined
 				if (response.latestLedger) {
-					paging[id].lastLedgerStart = response.latestLedger
+					entry.lastLedgerStart = response.latestLedger
 				}
 				if (response.events && response.events.length > 0) {
 					response.events.forEach((event) => {
@@ -96,7 +98,7 @@ export function useSubscription(
 					})
 					// Store the cursor from the response for pagination
 					if (response.cursor) {
-						paging[id].pagingToken = response.cursor
+						entry.pagingToken = response.cursor
 					}
 				}
 			} catch (error) {

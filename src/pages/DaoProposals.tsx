@@ -150,7 +150,8 @@ const DaoProposals: React.FC = () => {
 		)
 
 		if (!stillVisible) {
-			setSelectedProposal(filteredProposals[0])
+			// FIXED: Added fallback to null to satisfy TypeScript SetStateAction
+			setSelectedProposal(filteredProposals[0] || null)
 		}
 	}, [filteredProposals, selectedProposal])
 

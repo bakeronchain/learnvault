@@ -134,6 +134,35 @@ export const initDb = async () => {
                     contract_tx_hash TEXT,
                     decided_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
+                CREATE TABLE IF NOT EXISTS ipfs_uploads (
+                    id SERIAL PRIMARY KEY,
+                    uploader_address TEXT NOT NULL,
+                    cid TEXT NOT NULL UNIQUE,
+                    gateway_url TEXT NOT NULL,
+                    original_filename TEXT NOT NULL,
+                    mimetype TEXT NOT NULL,
+                    context TEXT,
+                    ref_id TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE IF NOT EXISTS course_assets (
+                    course_id TEXT NOT NULL,
+                    asset_type TEXT NOT NULL DEFAULT 'cover_image',
+                    cid TEXT NOT NULL,
+                    gateway_url TEXT NOT NULL,
+                    uploaded_by TEXT NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (course_id, asset_type)
+                );
+                CREATE TABLE IF NOT EXISTS proposal_documents (
+                    id SERIAL PRIMARY KEY,
+                    proposal_id TEXT NOT NULL,
+                    uploader_address TEXT NOT NULL,
+                    cid TEXT NOT NULL,
+                    gateway_url TEXT NOT NULL,
+                    original_filename TEXT NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
             `);
             client.release();
             console.log("Postgres database initialized");

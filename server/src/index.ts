@@ -27,6 +27,9 @@ import { validatorRouter } from "./routes/validator.routes";
 import { globalLimiter } from "./middleware/rate-limit.middleware";
 import { commentsRouter } from "./routes/comments.routes";
 import { adminMilestonesRouter } from "./routes/admin-milestones.routes";
+import { uploadRouter } from "./routes/upload.routes";
+import { coursesRouter } from "./routes/courses.routes";
+import { eventsRouter } from "./routes/events.routes";
 import { initDb } from "./db/index";
 
 
@@ -84,6 +87,7 @@ app.use("/api", validatorRouter);
 app.use("/api", eventsRouter);
 app.use("/api", commentsRouter);
 app.use("/api", adminMilestonesRouter);
+app.use("/api", uploadRouter);
 
 
 app.get("/api/docs", (_req, res) => {

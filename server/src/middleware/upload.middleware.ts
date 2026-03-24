@@ -1,52 +1,33 @@
-import { v2 as cloudinary } from "cloudinary";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
 import multer from "multer";
-import e from "express";
 import { AppError } from "../errors/app-error-handler";
 
-// Setup cloudinary configuration using environment variables
-// You can get these credentials from your Cloudinary dashboard
+const ALLOWED_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "application/pdf",
+  "video/mp4",
+] as const;
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+type AllowedMimeType = (typeof ALLOWED_TYPES)[number];
 
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: async (_req, _file) => ({
-    folder: "your-folder-name", // Change this to the desired folder in Cloudinary
-    allowed_formats: ["jpg", "png", "jpeg"],
-  }),
-});
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
-// File filter function (allows only specific file types)
-const fileFilter = (
-  req: e.Request,
-  file: Express.Multer.File,
-  cb: multer.FileFilterCallback,
-) => {
-  const allowedTypes = ["image/png", "image/jpg", "application/pdf", "video/mp4"];
-  if (!allowedTypes.includes(file.mimetype)) {
+const fileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
+  if (!ALLOWED_TYPES.includes(file.mimetype as AllowedMimeType)) {
     return cb(
-      new AppError("Invalid input", 400, {
-        image: `${file.mimetype} not allowed`,
-      }),
-    );
-  }
-  if (file.size > 10 * 1024 * 1024) {
-    return cb(
-      new AppError("File too large", 400, {
-        avatar: "File size should not exceed 10MB",
+      new AppError("Invalid file type", 400, {
+        file: `${file.mimetype} is not allowed. Accepted: PNG, JPEG, PDF, MP4`,
       }),
     );
   }
   cb(null, true);
 };
 
+// Files are kept in memory so the controller can pass the buffer directly to
+// Pinata without writing anything to disk.
 export const upload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 },
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_FILE_SIZE },
   fileFilter,
 });

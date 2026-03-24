@@ -3,6 +3,7 @@
 		"heroTitle": "Yay! Tu es sur Stellar!"
 	},
 	"nav": {
-		"contractExplorer": "Explorateur de Contrats"
+		"contractExplorer": "Explorateur de Contrats",
+		"courses": "Cours"
 	}
 }

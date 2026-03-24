@@ -14,8 +14,8 @@
 //! Implements: https://github.com/bakeronchain/learnvault/issues/5
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, Address,
-    Env, String, Symbol,
+    contract, contracterror, contractevent, contractimpl, contracttype, panic_with_error,
+    symbol_short, Address, Env, String, Symbol,
 };
 
 // ---------------------------------------------------------------------------
@@ -52,6 +52,23 @@ pub enum DataKey {
 }
 
 // ---------------------------------------------------------------------------
+// Events
+// ---------------------------------------------------------------------------
+
+/// Emitted on every successful `mint` call.
+///
+/// Fields:
+/// - `learner`   — the address that received LRN
+/// - `amount`    — the number of LRN tokens minted
+/// - `course_id` — the course identifier that triggered the mint
+#[contractevent]
+pub struct MilestoneCompleted {
+    pub learner: Address,
+    pub amount: i128,
+    pub course_id: String,
+}
+
+// ---------------------------------------------------------------------------
 // Contract
 // ---------------------------------------------------------------------------
 
@@ -62,15 +79,19 @@ pub struct LearnToken;
 impl LearnToken {
     /// Initialise the contract.
     ///
-    /// Must be called once by the deployer.  `admin` should be set to the
+    /// Must be called once by the deployer. `admin` should be set to the
     /// `CourseMilestone` contract address once that is deployed.
     pub fn initialize(env: Env, admin: Address) {
         if env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(&env, LRNError::Unauthorized);
         }
         env.storage().instance().set(&ADMIN_KEY, &admin);
-        env.storage().instance().set(&NAME_KEY, &String::from_str(&env, "LearnToken"));
-        env.storage().instance().set(&SYMBOL_KEY, &String::from_str(&env, "LRN"));
+        env.storage()
+            .instance()
+            .set(&NAME_KEY, &String::from_str(&env, "LearnToken"));
+        env.storage()
+            .instance()
+            .set(&SYMBOL_KEY, &String::from_str(&env, "LRN"));
         env.storage().instance().set(&DECIMALS_KEY, &7_u32);
     }
 
@@ -78,31 +99,58 @@ impl LearnToken {
     // Admin
     // -----------------------------------------------------------------------
 
-    /// Mint `amount` LRN to `to`.  Only callable by the admin.
-    pub fn mint(env: Env, to: Address, amount: i128) {
-        let admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap_or_else(|| panic_with_error!(&env, LRNError::NotInitialized));
+    /// Mint `amount` LRN to `to` for completing `course_id`.
+    ///
+    /// Only callable by the admin. Emits a `MilestoneCompleted` event.
+    pub fn mint(env: Env, to: Address, amount: i128, course_id: String) {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&ADMIN_KEY)
+            .unwrap_or_else(|| panic_with_error!(&env, LRNError::NotInitialized));
         admin.require_auth();
 
         if amount <= 0 {
             panic_with_error!(&env, LRNError::ZeroAmount);
         }
 
+        // Update balance
         let balance_key = DataKey::Balance(to.clone());
-        let current_balance: i128 = env.storage().persistent().get(&balance_key).unwrap_or(0);
-        env.storage().persistent().set(&balance_key, &(current_balance + amount));
+        let current_balance: i128 = env
+            .storage()
+            .persistent()
+            .get(&balance_key)
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&balance_key, &(current_balance + amount));
 
-        let total_supply: i128 = env.storage().instance().get(&DataKey::TotalSupply).unwrap_or(0);
-        env.storage().instance().set(&DataKey::TotalSupply, &(total_supply + amount));
+        // Update total supply
+        let total_supply: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::TotalSupply)
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&DataKey::TotalSupply, &(total_supply + amount));
 
-        env.events().publish(
-            (symbol_short!("mint"), to),
+        // Emit MilestoneCompleted(learner, amount, course_id)
+        MilestoneCompleted {
+            learner: to,
             amount,
-        );
+            course_id,
+        }
+        .publish(&env);
     }
 
     /// Transfer the admin role to a new address (e.g. the CourseMilestone contract).
     pub fn set_admin(env: Env, new_admin: Address) {
-        let admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap_or_else(|| panic_with_error!(&env, LRNError::NotInitialized));
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&ADMIN_KEY)
+            .unwrap_or_else(|| panic_with_error!(&env, LRNError::NotInitialized));
         admin.require_auth();
         env.storage().instance().set(&ADMIN_KEY, &new_admin);
     }
@@ -112,23 +160,48 @@ impl LearnToken {
     // -----------------------------------------------------------------------
 
     pub fn balance(env: Env, account: Address) -> i128 {
-        env.storage().persistent().get(&DataKey::Balance(account)).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&DataKey::Balance(account))
+            .unwrap_or(0)
+    }
+
+    /// Returns the learner's on-chain reputation score.
+    ///
+    /// Mirrors `balance` — the LRN balance IS the reputation score.
+    pub fn reputation_score(env: Env, account: Address) -> i128 {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Balance(account))
+            .unwrap_or(0)
     }
 
     pub fn total_supply(env: Env) -> i128 {
-        env.storage().instance().get(&DataKey::TotalSupply).unwrap_or(0)
+        env.storage()
+            .instance()
+            .get(&DataKey::TotalSupply)
+            .unwrap_or(0)
     }
 
     pub fn decimals(env: Env) -> u32 {
-        env.storage().instance().get(&DECIMALS_KEY).unwrap_or(7)
+        env.storage()
+            .instance()
+            .get(&DECIMALS_KEY)
+            .unwrap_or(7)
     }
 
     pub fn name(env: Env) -> String {
-        env.storage().instance().get(&NAME_KEY).unwrap_or_else(|| String::from_str(&env, "LearnToken"))
+        env.storage()
+            .instance()
+            .get(&NAME_KEY)
+            .unwrap_or_else(|| String::from_str(&env, "LearnToken"))
     }
 
     pub fn symbol(env: Env) -> String {
-        env.storage().instance().get(&SYMBOL_KEY).unwrap_or_else(|| String::from_str(&env, "LRN"))
+        env.storage()
+            .instance()
+            .get(&SYMBOL_KEY)
+            .unwrap_or_else(|| String::from_str(&env, "LRN"))
     }
 
     // -----------------------------------------------------------------------
@@ -159,7 +232,7 @@ impl LearnToken {
         panic_with_error!(&env, LRNError::Soulbound)
     }
 
-    pub fn allowance(env: Env, _from: Address, _spender: Address) -> i128 {
+    pub fn allowance(_env: Env, _from: Address, _spender: Address) -> i128 {
         0
     }
 }

@@ -20,8 +20,9 @@
 9. [Governance](#governance)
 10. [Tech Stack](#tech-stack)
 11. [Roadmap](#roadmap)
-12. [Contributing](#contributing)
-13. [Contact](#contact)
+12. [Whitepaper Generation](#whitepaper-generation)
+13. [Contributing](#contributing)
+14. [Contact](#contact)
 
 ---
 
@@ -314,6 +315,24 @@ transfers to token holders.
 - Corporate sponsor portal with targeted funding
 - ZK-powered credential proofs (prove achievement without revealing identity)
 - API for third-party integrations
+
+---
+
+## Whitepaper Generation
+
+The LearnVault Technical Whitepaper is authored in Markdown and exported to PDF. To ensure Mermaid diagrams render correctly in the PDF export, follow this two-step build process:
+
+1. **Compile Diagrams to Images:**
+   Generate static PNGs from the Mermaid source files using the Mermaid CLI:
+   ```bash
+   npx @mermaid-js/mermaid-cli -i docs/architecture.mmd -o docs/architecture.png
+   ```
+
+2. **Generate the PDF:**
+   Once the diagrams are compiled and embedded as standard markdown image links, generate the final PDF using `md-to-pdf`:
+   ```bash
+   npx md-to-pdf docs/whitepaper.md
+   ```
 
 ---
 

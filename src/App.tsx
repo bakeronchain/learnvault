@@ -2,6 +2,7 @@ import { Routes, Route, Outlet } from "react-router-dom"
 import Footer from "./components/Footer"
 import NavBar from "./components/NavBar"
 import Admin from "./pages/Admin"
+import Courses from "./pages/Courses"
 import Credential from "./pages/Credential"
 import Dao from "./pages/Dao"
 import Debug from "./pages/Debug"
@@ -17,6 +18,7 @@ function App() {
 		<Routes>
 			<Route element={<AppLayout />}>
 				<Route path="/" element={<Home />} />
+				<Route path="/courses" element={<Courses />} />
 				<Route path="/learn" element={<Learn />} />
 				<Route path="/dao" element={<Dao />} />
 				<Route path="/leaderboard" element={<Leaderboard />} />

@@ -8,6 +8,7 @@ export default function NavBar() {
 	const { t } = useTranslation()
 
 	const navLinks = [
+		{ to: "/courses", label: t("nav.courses") },
 		{ to: "/learn", label: t("nav.learn") },
 		{ to: "/dao", label: t("nav.dao") },
 		{ to: "/leaderboard", label: t("nav.leaderboard") },
@@ -37,11 +38,10 @@ export default function NavBar() {
 							onClick={() => setMenuOpen(false)}
 							className={({ isActive }) => `
                                 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all
-                                ${
-																	isActive
-																		? "text-brand-cyan bg-brand-cyan/5 shadow-[0_0_20px_rgba(0,210,255,0.1)]"
-																		: "text-white/40 hover:text-white hover:bg-white/5"
-																}
+                                ${isActive
+									? "text-brand-cyan bg-brand-cyan/5 shadow-[0_0_20px_rgba(0,210,255,0.1)]"
+									: "text-white/40 hover:text-white hover:bg-white/5"
+								}
                             `}
 						>
 							{label}

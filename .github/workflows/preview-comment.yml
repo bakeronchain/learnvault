@@ -1,0 +1,34 @@
+# .github/workflows/preview-comment.yml
+name: Preview deployment comment
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  comment-preview-url:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Wait for Vercel preview
+        uses: patrickedqvist/wait-for-vercel-preview@v1.3.1
+        id: vercel_preview
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          environment: Preview
+          max_timeout: 120
+
+      - name: Post preview URL comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🚀 **Preview deployed!**\n\n${process.env.PREVIEW_URL}\n\n> Built against Stellar Testnet`
+            })
+        env:
+          PREVIEW_URL: ${{ steps.vercel_preview.outputs.url }}
+          

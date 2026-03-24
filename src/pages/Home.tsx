@@ -5,6 +5,7 @@ import { Link } from "react-router-dom"
 import { GuessTheNumber } from "../components/GuessTheNumber"
 import { MilestoneTracker } from "../components/MilestoneTracker"
 import OnboardingWizard from "../components/OnboardingWizard"
+import { WalletAddressPill } from "../components/WalletAddressPill"
 
 const Home: React.FC = () => {
 	const { t } = useTranslation()
@@ -29,6 +30,13 @@ const Home: React.FC = () => {
 					<div className="w-24 h-24 bg-linear-to-br from-brand-cyan to-brand-blue rounded-[2.5rem] flex items-center justify-center font-black text-3xl shadow-2xl shadow-brand-cyan/30 rotate-12 hover:rotate-0 transition-transform duration-500">
 						LV
 					</div>
+				</div>
+
+				<div className="flex justify-center mb-8">
+					<WalletAddressPill 
+						address="GABC1234567890ABCDEFGHWXYZ" 
+						showLink={true} 
+					/>
 				</div>
 
 				<h1 className="text-7xl md:text-8xl font-black mb-8 tracking-tighter text-gradient leading-[0.9] animate-in slide-in-from-bottom-12 duration-1000 delay-200">

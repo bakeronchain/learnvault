@@ -46,10 +46,48 @@ function App() {
 }
 
 const AppLayout: React.FC = () => (
-	<div className="min-h-screen flex flex-col pt-24">
-		<NavBar />
-		<main className="flex-1 relative z-10">
-			<Outlet />
+	<div className={styles.AppLayout}>
+		<Layout.Header
+			projectId="Scaffold"
+			projectTitle="Scaffold"
+			hasThemeSwitch={true}
+			contentCenter={
+				<>
+					<NavLink to="/">
+						{({ isActive }) => (
+							<Button variant="tertiary" size="md" disabled={isActive}>
+								<Icon.Home01 size="md" />
+								Home
+							</Button>
+						)}
+					</NavLink>
+					<NavLink to="/treasury">
+						{({ isActive }) => (
+							<Button variant="tertiary" size="md" disabled={isActive}>
+								<Icon.Coins01 size="md" />
+								Treasury
+							</Button>
+						)}
+					</NavLink>
+					<NavLink to="/debug">
+						{({ isActive }) => (
+							<Button variant="tertiary" size="md" disabled={isActive}>
+								<Icon.Code02 size="md" />
+								Contract Explorer
+							</Button>
+						)}
+					</NavLink>
+				</>
+			}
+			contentRight={<ConnectAccount />}
+		/>
+
+		<main>
+			<Layout.Content>
+				<Layout.Inset>
+					<Outlet />
+				</Layout.Inset>
+			</Layout.Content>
 		</main>
 		<Footer />
 	</div>

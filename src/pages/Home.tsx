@@ -4,78 +4,86 @@ import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import { GuessTheNumber } from "../components/GuessTheNumber"
 import { MilestoneTracker } from "../components/MilestoneTracker"
-import OnboardingWizard from "../components/OnboardingWizard"
+import { labPrefix } from "../contracts/util"
+import styles from "./Home.module.css"
 
-const Home: React.FC = () => {
-	const { t } = useTranslation()
+const Home: React.FC = () => (
+	<div className={styles.Home}>
+		<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+			<div>
+				<h1>Yay! You&apos;re on Stellar!</h1>
 
-	const mockMilestones = [
-		{ id: 1, label: t("home.milestones.1"), lrnReward: 10 },
-		{ id: 2, label: t("home.milestones.2"), lrnReward: 20 },
-		{ id: 3, label: t("home.milestones.3"), lrnReward: 50 },
-	]
-
-	return (
-		<div className="min-h-screen flex flex-col items-center py-20 px-6 relative overflow-hidden">
-			{/* Immersive Background Elements */}
-			<div className="absolute top-0 left-0 w-full h-full animate-mesh opacity-30 -z-20" />
-			<div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-brand-cyan/20 blur-[150px] rounded-full -z-10 animate-pulse" />
-			<div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-brand-purple/20 blur-[150px] rounded-full -z-10 animate-pulse delay-700" />
-
-			<OnboardingWizard />
-
-			<header className="text-center max-w-4xl mx-auto mb-24">
-				<div className="inline-block mb-10 animate-in fade-in zoom-in duration-1000">
-					<div className="w-24 h-24 bg-linear-to-br from-brand-cyan to-brand-blue rounded-[2.5rem] flex items-center justify-center font-black text-3xl shadow-2xl shadow-brand-cyan/30 rotate-12 hover:rotate-0 transition-transform duration-500">
-						LV
-					</div>
-				</div>
-
-				<h1 className="text-7xl md:text-8xl font-black mb-8 tracking-tighter text-gradient leading-[0.9] animate-in slide-in-from-bottom-12 duration-1000 delay-200">
-					{t("home.heroTitle")}
-				</h1>
-				<p className="text-xl md:text-2xl text-white/50 mb-12 max-w-2xl mx-auto font-medium leading-relaxed animate-in slide-in-from-bottom-12 duration-1000 delay-400">
-					{t("home.heroDesc")}
+				<p>
+					A local development template designed to help you build dApps on the
+					Stellar network. This environment lets you easily test wallet
+					connections, smart contract interactions, transaction verifications,
+					etc.{" "}
+					<Link
+						to="https://scaffoldstellar.org/docs/intro"
+						className="Link Link--primary"
+						target="_blank"
+					>
+						View docs
+					</Link>
 				</p>
-				<div className="flex flex-wrap justify-center gap-6 animate-in slide-in-from-bottom-12 duration-1000 delay-600">
-					<Link
-						to="/courses"
-						className="iridescent-border px-12 py-5 rounded-2xl font-black text-lg uppercase tracking-widest hover:scale-105 active:scale-95 transition-all group relative overflow-hidden shadow-2xl shadow-brand-cyan/20"
-					>
-						<span className="relative z-10">Browse Tracks</span>
-					</Link>
-					<Link
-						to="/learn"
-						className="px-12 py-5 glass text-white rounded-2xl font-black text-lg uppercase tracking-widest hover:bg-white/10 hover:scale-105 active:scale-95 transition-all border border-white/10"
-					>
-						{t("nav.learn")}
-					</Link>
-				</div>
-			</header>
 
-			<main className="w-full max-w-6xl flex flex-col gap-12 relative z-10 animate-in slide-in-from-bottom-12 duration-1000 delay-800">
-				{/* Upstream Content: Course Progress */}
-				<div className="iridescent-border p-[1px] rounded-[3.5rem] shadow-2xl">
-					<div className="glass-card p-12 rounded-[3.5rem] border border-white/5">
-						<div className="flex flex-col md:flex-row gap-12 items-start">
-							<div className="md:w-1/3">
-								<h2 className="text-3xl font-black mb-4 flex items-center gap-4">
-									<Icon.Trophy01 size="lg" className="text-brand-cyan" />
-									{t("home.courseProgress.title")}
-								</h2>
-								<p className="text-white/40 leading-relaxed">
-									{t("home.courseProgress.desc")}
-								</p>
-							</div>
-							<div className="md:w-2/3 w-full">
-								<MilestoneTracker
-									courseId="stellar-basics"
-									milestones={mockMilestones}
-								/>
-							</div>
-						</div>
-					</div>
+				<div className="mt-8">
+					<h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+						<Icon.BookOpen01 />
+						Course Progress: Stellar Basics
+					</h2>
+					<MilestoneTracker
+						courseId="stellar-basics"
+						milestones={[
+							{ id: 1, label: "Complete Lesson 1", lrnReward: 10, status: "completed", txHash: "43e8...f2a1" },
+							{ id: 2, label: "Pass Quiz 1", lrnReward: 20, status: "in-progress" },
+							{ id: 3, label: "Build your first contract", lrnReward: 50, status: "locked" },
+						]}
+					/>
 				</div>
+			</div>
+
+			<div className="space-y-8">
+				<Card>
+					<h2>
+						<Icon.File06 size="lg" />
+						Sample Contracts
+					</h2>
+
+					<p>
+						<strong>Guess The Number:</strong> Interact with the sample contract
+						from the{" "}
+						<Link
+							to="https://scaffoldstellar.org/docs/tutorial/overview"
+							className="Link Link--primary"
+							target="_blank"
+						>
+							Scaffold Tutorial
+						</Link>{" "}
+						using an automatically generated contract client.
+					</p>
+
+					<GuessTheNumber />
+
+					<p>Or take a look at other sample contracts to get you started:</p>
+
+					<nav>
+						<Link to="https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples">
+							<Button variant="tertiary" size="md">
+								OpenZeppelin sample contracts
+								<Icon.ArrowUpRight size="md" />
+							</Button>
+						</Link>
+						<Link to="https://github.com/stellar/soroban-examples">
+							<Button variant="tertiary" size="md">
+								Soroban sample contracts
+								<Icon.ArrowUpRight size="md" />
+							</Button>
+						</Link>
+					</nav>
+				</Card>
+			</div>
+		</div>
 
 				{/* Upstream Content: Sample Contracts */}
 				<div className="glass-card p-12 rounded-[3.5rem] border border-white/10 shadow-2xl">

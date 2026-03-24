@@ -1,5 +1,8 @@
 # LearnVault — Official Documentation
 
+[![Contracts CI](https://github.com/robertocarlous/learnvault/actions/workflows/contracts-ci.yml/badge.svg)](https://github.com/robertocarlous/learnvault/actions/workflows/contracts-ci.yml)
+[![Frontend CI](https://github.com/bakeronchain/learnvault/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/bakeronchain/learnvault/actions/workflows/frontend-ci.yml)
+
 > **Learning is the proof of work. The community is the bank.**
 
 ---

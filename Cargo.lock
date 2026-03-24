@@ -609,16 +609,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
-name = "fungible-allowlist-example"
-version = "0.0.1"
-dependencies = [
- "soroban-sdk",
- "stellar-access",
- "stellar-macros",
- "stellar-tokens",
-]
-
-[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -643,6 +633,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "governance-token"
+version = "0.0.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "group"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -651,15 +651,6 @@ dependencies = [
  "ff",
  "rand_core",
  "subtle",
-]
-
-[[package]]
-name = "guess-the-number"
-version = "0.0.1"
-dependencies = [
- "soroban-sdk",
- "stellar-registry",
- "stellar-xdr",
 ]
 
 [[package]]
@@ -818,6 +809,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "learn-token"
+version = "0.0.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.172"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -853,12 +854,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
-name = "nft-enumerable-example"
+name = "milestone-escrow"
 version = "0.0.1"
 dependencies = [
  "soroban-sdk",
- "stellar-macros",
- "stellar-tokens",
+ "stellar-registry",
 ]
 
 [[package]]
@@ -1091,6 +1091,23 @@ dependencies = [
  "dyn-clone",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "scholar-nft"
+version = "0.0.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "scholarship-treasury"
+version = "0.0.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-registry",
 ]
 
 [[package]]

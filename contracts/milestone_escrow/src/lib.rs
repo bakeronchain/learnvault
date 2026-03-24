@@ -114,6 +114,11 @@ impl MilestoneEscrow {
         record.tranches_released += 1;
         record.last_activity = env.ledger().timestamp();
         env.storage().persistent().set(&key, &record);
+
+        env.events().publish(
+            (symbol_short!("released"), record.scholar, proposal_id),
+            amount,
+        );
     }
 
     pub fn reclaim_inactive(env: Env, proposal_id: u32) {

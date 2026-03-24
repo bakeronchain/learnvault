@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: LearnVault Discord
+    url: https://discord.gg/learnvault
+    about: Ask questions and discuss implementation details with the community.

@@ -1,0 +1,42 @@
+name: Smart contract issue
+description: Report or request a smart contract change.
+title: "[Contract]: "
+labels:
+  - smart-contract
+  - triage
+body:
+  - type: input
+    id: contract_name
+    attributes:
+      label: Contract name
+      description: Which contract is affected?
+      placeholder: CourseMilestone
+    validations:
+      required: true
+  - type: input
+    id: function_name
+    attributes:
+      label: Function name
+      description: Which function is involved?
+      placeholder: complete_course_milestone
+    validations:
+      required: true
+  - type: textarea
+    id: rust_error
+    attributes:
+      label: Rust error (if any)
+      description: Paste compiler/runtime error output.
+      placeholder: error[E0XXX]: ...
+    validations:
+      required: false
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Minimal steps to reproduce the issue.
+      placeholder: |
+        1. Run ...
+        2. Submit transaction ...
+        3. Observe ...
+    validations:
+      required: true

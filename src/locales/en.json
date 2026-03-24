@@ -1,0 +1,106 @@
+{
+	"nav": {
+		"contractExplorer": "Contract Explorer",
+		"txExplorer": "Transaction Explorer",
+		"github": "GitHub",
+		"tutorial": "Tutorial",
+		"viewDocs": "View docs",
+		"debug": "Debug Contracts",
+		"learn": "Learn",
+		"dao": "DAO",
+		"leaderboard": "Leaderboard",
+		"profile": "My Profile",
+		"discord": "Discord",
+		"twitter": "Twitter",
+		"docs": "Docs"
+	},
+	"home": {
+		"heroTitle": "Yay! You're on Stellar!",
+		"heroDesc": "A local development template designed to help you build dApps on the Stellar network. This environment lets you easily test wallet connections, smart contract interactions, transaction verifications, etc. ",
+		"courseProgress": {
+			"title": "Course Progress (Testing Issue 55)",
+			"desc": "Track your learning journey and earn LRN rewards by completing on-chain milestones."
+		},
+		"milestones": {
+			"1": "Complete Lesson 1",
+			"2": "Pass Quiz 1",
+			"3": "Build your first contract",
+			"locked": "Complete previous milestones to unlock.",
+			"inProgress": "Currently working on this milestone.",
+			"submittingText": "Submitting TX...",
+			"markComplete": "Mark as Complete",
+			"completedText": "Completed successfully!",
+			"tx": "TX",
+			"lrnReward": "+{{amount}} LRN"
+		},
+		"sampleContracts": {
+			"title": "Sample Contracts",
+			"guess": "Guess The Number:",
+			"guessDesc1": "Interact with the sample contract from the ",
+			"guessLink": "Scaffold Tutorial",
+			"guessDesc2": " using an automatically generated contract client.",
+			"other": "Or take a look at other sample contracts to get you started:",
+			"oz": "OpenZeppelin sample contracts",
+			"soroban": "Soroban sample contracts"
+		},
+		"startBuilding": {
+			"title": "Start Building",
+			"step1": "Add your contract under ",
+			"step2": "Contracts are built by Scaffold when you run ",
+			"step3": "Changes are rebuilt automatically by ",
+			"step4": "Interact with your contract immediately in the Contract Explorer",
+			"watch": "Watch the full process in our ",
+			"youtube": "Youtube tutorial",
+			"inspired": "Get inspired by our showcase of ",
+			"examples": "Example frontends",
+			"deploy": "Ready to deploy? ",
+			"mainnet": "Read the mainnet deployment guide"
+		},
+		"footer": {
+			"invoke": "Invoke your smart contract using the ",
+			"contractLink": "Contract Explorer",
+			"browse": "Browse your local transactions with the ",
+			"txLink": "Transaction Explorer"
+		}
+	},
+	"connect": {
+		"connectWallet": "Connect Wallet",
+		"fund": "Fund Account",
+		"faucetLoading": "Funding...",
+		"funded": "Account funded successfully!",
+		"fundErrorDetail": "Error funding account: {{detail}}",
+		"fundErrorUnknown": "Error funding account: Unknown error",
+		"fundErrorRetry": "Error funding account. Please try again.",
+		"alreadyFunded": "Account is already funded",
+		"local": "Local",
+		"networkConnect": "Connect your wallet using this network.",
+		"networkMismatch": "Wallet is on {{wallet}}, connect to {{app}} instead."
+	},
+	"wallet": {
+		"loading": "Loading...",
+		"connect": "Connect Wallet",
+		"balance": "Wallet Balance: {{amount}} LRN",
+		"connectedAs": "Connected as ",
+		"disconnectPrompt": ". Do you want to disconnect?",
+		"disconnect": "Disconnect",
+		"cancel": "Cancel"
+	},
+	"pages": {
+		"learn": {
+			"title": "Learn",
+			"desc": "This is the Learn page."
+		},
+		"dao": {
+			"title": "DAO",
+			"desc": "This is the DAO page."
+		},
+		"leaderboard": {
+			"title": "Leaderboard",
+			"desc": "This is the Leaderboard page."
+		},
+		"profile": {
+			"title": "My Profile",
+			"desc": "This is the My Profile page."
+		}
+	}
+}

@@ -1,0 +1,29 @@
+name: Feature request
+description: Suggest a new capability or improvement for LearnVault.
+title: "[Feature]: "
+labels:
+  - enhancement
+  - triage
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What problem are you trying to solve?
+      placeholder: It is difficult to ... because ...
+    validations:
+      required: true
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed solution
+      description: Describe the ideal implementation or behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What alternatives did you evaluate and why were they insufficient?
+    validations:
+      required: false

@@ -4,6 +4,8 @@ import dotenv from "dotenv";
 import cors from "cors";
 import express from "express";
 import morgan from "morgan";
+import swaggerUi from "swagger-ui-express";
+import YAML from "yaml";
 import { z } from "zod";
 
 import { createNonceStore } from "./db/nonce-store";
@@ -57,6 +59,8 @@ const jwtService = createJwtService(jwtPrivateKey, jwtPublicKey);
 const authService = createAuthService(nonceStore, jwtService);
 
 const app = express();
+const openApiSpec = buildOpenApiSpec();
+const openApiYaml = YAML.stringify(openApiSpec);
 
 app.set("trust proxy", 1);
 

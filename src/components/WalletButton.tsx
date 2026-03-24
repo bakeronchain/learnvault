@@ -1,12 +1,14 @@
 import { Button, Icon, Text, Modal, Profile } from "@stellar/design-system"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { useWallet } from "../hooks/useWallet"
 import { connectWallet, disconnectWallet } from "../util/wallet"
 
 export const WalletButton = () => {
 	const [showDisconnectModal, setShowDisconnectModal] = useState(false)
 	const { address, isPending, balances } = useWallet()
-	const buttonLabel = isPending ? "Loading..." : "Connect Wallet"
+	const { t } = useTranslation()
+	const buttonLabel = isPending ? t("wallet.loading") : t("wallet.connect")
 
 	if (!address) {
 		return (
@@ -32,7 +34,7 @@ export const WalletButton = () => {
 			}}
 		>
 			<Text as="div" size="sm">
-				Wallet Balance: {balances?.lrn?.balance ?? "-"} LRN
+				{t("wallet.balance", { amount: balances?.lrn?.balance ?? "-" })}
 			</Text>
 
 			<div id="modalContainer">
@@ -42,9 +44,9 @@ export const WalletButton = () => {
 					parentId="modalContainer"
 				>
 					<Modal.Heading>
-						Connected as{" "}
-						<code style={{ lineBreak: "anywhere" }}>{address}</code>. Do you
-						want to disconnect?
+						{t("wallet.connectedAs")}{" "}
+						<code style={{ lineBreak: "anywhere" }}>{address}</code>
+						{t("wallet.disconnectPrompt")}
 					</Modal.Heading>
 					<Modal.Footer itemAlignment="stack">
 						<Button
@@ -56,7 +58,7 @@ export const WalletButton = () => {
 								)
 							}}
 						>
-							Disconnect
+							{t("wallet.disconnect")}
 						</Button>
 						<Button
 							size="md"
@@ -65,7 +67,7 @@ export const WalletButton = () => {
 								setShowDisconnectModal(false)
 							}}
 						>
-							Cancel
+							{t("wallet.cancel")}
 						</Button>
 					</Modal.Footer>
 				</Modal>

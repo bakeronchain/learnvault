@@ -7,6 +7,7 @@ use soroban_sdk::{
 };
 
 use crate::{Error, ScholarshipTreasury, ScholarshipTreasuryClient, token};
+use proptest::prelude::*;
 
 fn setup<'a>(
     env: &'a Env,
@@ -224,4 +225,31 @@ fn proposal_requires_three_milestones() {
             Error::InvalidAmount as u32
         )))
     );
+}
+
+// ---------------------------------------------------------------------------
+// Fuzz Testing
+// ---------------------------------------------------------------------------
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(256))]
+    
+    #[test]
+    #[ignore]
+    fn fuzz_deposit(amount in 1_i128..1_000_000_000_000_000_000) {
+        let env = Env::default();
+        let (client, _governance, donor, _recipient, token_id) = setup(&env);
+        
+        env.mock_all_auths();
+        
+        if amount > 1000 {
+            StellarAssetClient::new(&env, &token_id).mint(&donor, &(amount - 1000));
+        }
+        
+        client.deposit(&donor, &amount);
+
+        assert_eq!(client.get_donor_total(&donor), amount);
+        assert_eq!(client.get_balance(), amount);
+        assert_eq!(token_client(&env, &token_id).balance(&client.address), amount);
+    }
 }

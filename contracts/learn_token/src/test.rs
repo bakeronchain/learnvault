@@ -1,9 +1,8 @@
 extern crate std;
 
 use soroban_sdk::{testutils::{Address as _, Events as _}, Address, Env, IntoVal, String};
-use soroban_sdk::{Address, Env, testutils::Address as _};
-
 use crate::{LRNError, LearnToken, LearnTokenClient};
+use proptest::prelude::*;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -457,4 +456,28 @@ fn mint_to_fresh_address_is_credited_correctly() {
     client.mint(&fresh, &42, &cid(&e, "web3-101"));
     assert_eq!(client.balance(&fresh), 42);
     assert_eq!(client.total_supply(), 42);
+}
+
+// ---------------------------------------------------------------------------
+// Fuzz Testing
+// ---------------------------------------------------------------------------
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(256))]
+    
+    #[test]
+    #[ignore]
+    fn fuzz_mint(amounts in prop::collection::vec(1_i128..1_000_000_000_000_000_000, 1..10)) {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        let learner_address = Address::generate(&e);
+        
+        let mut expected_balance: i128 = 0;
+        for amount in amounts {
+            client.mint(&learner_address, &amount, &cid(&e, "fuzz-cid"));
+            expected_balance = expected_balance.checked_add(amount).unwrap();
+            assert_eq!(client.balance(&learner_address), expected_balance);
+        }
+        assert_eq!(client.total_supply(), expected_balance);
+    }
 }

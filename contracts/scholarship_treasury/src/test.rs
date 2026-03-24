@@ -1,14 +1,22 @@
 extern crate std;
 
 use soroban_sdk::{
+    Address, Env, IntoVal, String, Val, Vec,
     testutils::{Address as _, MockAuth, MockAuthInvoke},
     token::{StellarAssetClient, TokenClient},
-    Address, Env, IntoVal, Val, Vec,
 };
 
-use crate::{token, Error, ScholarshipTreasury, ScholarshipTreasuryClient};
+use crate::{Error, ScholarshipTreasury, ScholarshipTreasuryClient, token};
 
-fn setup<'a>(env: &'a Env) -> (ScholarshipTreasuryClient<'a>, Address, Address, Address, Address) {
+fn setup<'a>(
+    env: &'a Env,
+) -> (
+    ScholarshipTreasuryClient<'a>,
+    Address,
+    Address,
+    Address,
+    Address,
+) {
     let admin = Address::generate(env);
     let governance = Address::generate(env);
     let donor = Address::generate(env);
@@ -47,6 +55,27 @@ where
         address: caller,
         invoke,
     }]);
+}
+
+fn sample_milestones(env: &Env) -> (Vec<String>, Vec<String>) {
+    let titles = Vec::from_array(
+        env,
+        [
+            String::from_str(env, "Admissions + enrollment"),
+            String::from_str(env, "Mid-program progress report"),
+            String::from_str(env, "Final completion + credential"),
+        ],
+    );
+    let dates = Vec::from_array(
+        env,
+        [
+            String::from_str(env, "2026-06-01"),
+            String::from_str(env, "2026-08-01"),
+            String::from_str(env, "2026-10-01"),
+        ],
+    );
+
+    (titles, dates)
 }
 
 #[test]
@@ -99,6 +128,100 @@ fn disburse_more_than_balance_fails() {
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
             Error::InsufficientFunds as u32
+        )))
+    );
+}
+
+#[test]
+fn submitted_proposals_are_stored_per_applicant() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id) = setup(&env);
+    let (milestone_titles, milestone_dates) = sample_milestones(&env);
+
+    env.mock_all_auths();
+    let proposal_id = client.submit_proposal(
+        &donor,
+        &500,
+        &String::from_str(&env, "Stellar Builder Bootcamp"),
+        &String::from_str(&env, "https://bootcamp.example/apply"),
+        &String::from_str(
+            &env,
+            "An intensive Soroban engineering scholarship request.",
+        ),
+        &String::from_str(&env, "2026-05-15"),
+        &milestone_titles,
+        &milestone_dates,
+    );
+
+    assert_eq!(proposal_id, 1);
+    assert_eq!(client.get_proposal_count(), 1);
+    assert_eq!(
+        client.get_proposals_by_applicant(&donor),
+        Vec::from_array(&env, [1_u32])
+    );
+
+    let proposal = client
+        .get_proposal(&proposal_id)
+        .expect("proposal should exist");
+    assert_eq!(proposal.id, 1);
+    assert_eq!(proposal.applicant, donor);
+    assert_eq!(proposal.amount, 500);
+    assert_eq!(
+        proposal.program_name,
+        String::from_str(&env, "Stellar Builder Bootcamp")
+    );
+    assert_eq!(
+        proposal.program_url,
+        String::from_str(&env, "https://bootcamp.example/apply")
+    );
+    assert_eq!(
+        proposal.program_description,
+        String::from_str(
+            &env,
+            "An intensive Soroban engineering scholarship request."
+        ),
+    );
+    assert_eq!(proposal.start_date, String::from_str(&env, "2026-05-15"));
+    assert_eq!(proposal.milestone_titles, milestone_titles);
+    assert_eq!(proposal.milestone_dates, milestone_dates);
+}
+
+#[test]
+fn proposal_requires_three_milestones() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id) = setup(&env);
+
+    env.mock_all_auths();
+    let titles = Vec::from_array(
+        &env,
+        [
+            String::from_str(&env, "Milestone 1"),
+            String::from_str(&env, "Milestone 2"),
+        ],
+    );
+    let dates = Vec::from_array(
+        &env,
+        [
+            String::from_str(&env, "2026-06-01"),
+            String::from_str(&env, "2026-07-01"),
+        ],
+    );
+
+    let result = client.try_submit_proposal(
+        &donor,
+        &500,
+        &String::from_str(&env, "Scholarship"),
+        &String::from_str(&env, "https://example.com"),
+        &String::from_str(&env, "Program description"),
+        &String::from_str(&env, "2026-05-15"),
+        &titles,
+        &dates,
+    );
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidAmount as u32
         )))
     );
 }

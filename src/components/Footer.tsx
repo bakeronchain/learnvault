@@ -23,9 +23,14 @@ export default function Footer() {
 							label: t("nav.github"),
 							href: "https://github.com/bakeronchain/learnvault",
 						},
-						{ label: t("nav.discord"), href: "#" },
-						{ label: t("nav.twitter"), href: "#" },
-						{ label: t("nav.docs"), href: "#" },
+						{
+							label: t("nav.twitter"),
+							href: "https://twitter.com/LearnVaultDAO",
+						},
+						{
+							label: t("nav.discord"),
+							href: "https://discord.gg/learnvault",
+						},
 					].map((link) => (
 						<a
 							key={link.label}

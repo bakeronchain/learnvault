@@ -1,12 +1,12 @@
 extern crate std;
 
 use soroban_sdk::{
+    Address, Env,
     testutils::{Address as _, Ledger, LedgerInfo},
     token::{StellarAssetClient, TokenClient},
-    Address, Env,
 };
 
-use crate::{xlm, Error, MilestoneEscrow, MilestoneEscrowClient};
+use crate::{Error, MilestoneEscrow, MilestoneEscrowClient, xlm};
 
 const START_TS: u64 = 1_700_000_000;
 const THIRTY_DAYS: u64 = 30 * 24 * 60 * 60;

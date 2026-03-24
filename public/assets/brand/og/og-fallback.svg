@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#05070a"/>
+      <stop offset="100%" stop-color="#0d1117"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00d2ff"/>
+      <stop offset="50%" stop-color="#3a7bd5"/>
+      <stop offset="100%" stop-color="#00ff80"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#3a7bd5" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#3a7bd5" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <g opacity="0.03" stroke="#00d2ff" stroke-width="1">
+    <line x1="0" y1="105" x2="1200" y2="105"/><line x1="0" y1="210" x2="1200" y2="210"/>
+    <line x1="0" y1="315" x2="1200" y2="315"/><line x1="0" y1="420" x2="1200" y2="420"/>
+    <line x1="0" y1="525" x2="1200" y2="525"/>
+    <line x1="200" y1="0" x2="200" y2="630"/><line x1="400" y1="0" x2="400" y2="630"/>
+    <line x1="600" y1="0" x2="600" y2="630"/><line x1="800" y1="0" x2="800" y2="630"/>
+    <line x1="1000" y1="0" x2="1000" y2="630"/>
+  </g>
+
+  <rect x="16" y="16" width="1168" height="598" rx="16" fill="none" stroke="url(#accent)" stroke-width="1.5" opacity="0.4"/>
+
+  <!-- Centered logo icon -->
+  <g transform="translate(472, 160) scale(4.5)">
+    <path d="M28 2 L50 10 L50 30 C50 42 40 52 28 56 C16 52 6 42 6 30 L6 10 Z"
+          fill="url(#accent)" opacity="0.15" stroke="url(#accent)" stroke-width="1.5"/>
+    <path d="M28 8 L44 14 L44 30 C44 39 37 47 28 50 C19 47 12 39 12 30 L12 14 Z"
+          fill="none" stroke="url(#accent)" stroke-width="0.75" opacity="0.5"/>
+    <rect x="21" y="26" width="14" height="9" rx="1.5" fill="url(#accent)" opacity="0.9"/>
+    <polygon points="28,18 38,23 28,28 18,23" fill="url(#accent)"/>
+    <line x1="38" y1="23" x2="38" y2="30" stroke="url(#accent)" stroke-width="1.5" stroke-linecap="round"/>
+    <circle cx="38" cy="31" r="1.5" fill="#00ff80"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="600" y="450" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="64" font-weight="800" letter-spacing="-1.5" fill="white">LearnVault</text>
+
+  <!-- Tagline -->
+  <text x="600" y="510" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="20" font-weight="400" fill="white" opacity="0.5" letter-spacing="2">LEARN · EARN · GET FUNDED</text>
+
+  <text x="600" y="590" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="400" fill="white" opacity="0.25" letter-spacing="3">POWERED BY STELLAR</text>
+</svg>

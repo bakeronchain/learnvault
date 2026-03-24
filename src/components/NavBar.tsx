@@ -8,11 +8,10 @@ export default function NavBar() {
 	const { t } = useTranslation()
 
 	const navLinks = [
-		{ to: "/learn", label: t("nav.learn") },
+		{ to: "/courses", label: t("nav.learn") },
 		{ to: "/dao", label: t("nav.dao") },
-		{ to: "/leaderboard", label: t("nav.leaderboard") },
 		{ to: "/treasury", label: t("nav.treasury") },
-		{ to: "/profile", label: t("nav.profile") },
+		{ to: "/leaderboard", label: t("nav.leaderboard") },
 	]
 
 	return (

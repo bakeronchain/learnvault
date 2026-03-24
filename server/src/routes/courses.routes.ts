@@ -1,6 +1,8 @@
 import { Router } from "express";
 
 import { getCourseById, getCourses } from "../controllers/courses.controller";
+import { validate } from "../middleware/validation.middleware";
+import * as schemas from "../lib/zod-schemas";
 
 export const coursesRouter = Router();
 
@@ -63,4 +65,10 @@ coursesRouter.get("/courses", getCourses);
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-coursesRouter.get("/courses/:courseId", getCourseById);
+coursesRouter.get(
+  "/courses/:courseId", 
+  validate({
+    params: schemas.courseIdParamSchema,
+  }), 
+  getCourseById
+);

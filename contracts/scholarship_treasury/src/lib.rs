@@ -1,14 +1,15 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, Address, Env,
-    Symbol,
+    Address, Env, String, Symbol, Vec, contract, contracterror, contractevent, contractimpl,
+    contracttype, panic_with_error, symbol_short,
 };
 
 const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
 const GOV_KEY: Symbol = symbol_short!("GOV");
 const USDC_KEY: Symbol = symbol_short!("USDC");
 const TOTAL_KEY: Symbol = symbol_short!("TOTAL");
+const NEXT_PROPOSAL_KEY: Symbol = symbol_short!("NEXTPROP");
 const DISBURSED_KEY: Symbol = symbol_short!("DISBURSED");
 const SCHOLARS_KEY: Symbol = symbol_short!("SCHOLARS");
 const DONORS_KEY: Symbol = symbol_short!("DONORS");
@@ -17,7 +18,24 @@ const DONORS_KEY: Symbol = symbol_short!("DONORS");
 #[contracttype]
 pub enum DataKey {
     Donor(Address),
+    Proposal(u32),
+    ApplicantProposals(Address),
     Scholar(Address),
+}
+
+#[derive(Clone)]
+#[contracttype]
+pub struct Proposal {
+    pub id: u32,
+    pub applicant: Address,
+    pub amount: i128,
+    pub program_name: String,
+    pub program_url: String,
+    pub program_description: String,
+    pub start_date: String,
+    pub milestone_titles: Vec<String>,
+    pub milestone_dates: Vec<String>,
+    pub submitted_at: u64,
 }
 
 #[contracterror]
@@ -33,6 +51,32 @@ pub enum Error {
 #[contract]
 pub struct ScholarshipTreasury;
 
+#[contractevent(topics = ["deposit"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DepositRecorded {
+    #[topic]
+    pub donor: Address,
+    pub amount: i128,
+}
+
+#[contractevent(topics = ["disburse"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DisbursementRecorded {
+    #[topic]
+    pub recipient: Address,
+    pub amount: i128,
+}
+
+#[contractevent(topics = ["proposal"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProposalSubmitted {
+    #[topic]
+    pub applicant: Address,
+    #[topic]
+    pub proposal_id: u32,
+    pub amount: i128,
+}
+
 #[contractimpl]
 impl ScholarshipTreasury {
     pub fn initialize(env: Env, admin: Address, usdc_token: Address, governance_contract: Address) {
@@ -45,6 +89,7 @@ impl ScholarshipTreasury {
         env.storage().instance().set(&USDC_KEY, &usdc_token);
         env.storage().instance().set(&GOV_KEY, &governance_contract);
         env.storage().instance().set(&TOTAL_KEY, &0_i128);
+        env.storage().instance().set(&NEXT_PROPOSAL_KEY, &1_u32);
         env.storage().instance().set(&DISBURSED_KEY, &0_i128);
         env.storage().instance().set(&SCHOLARS_KEY, &0_u32);
         env.storage().instance().set(&DONORS_KEY, &0_u32);
@@ -65,21 +110,30 @@ impl ScholarshipTreasury {
             .persistent()
             .get::<_, i128>(&donor_key)
             .unwrap_or(0);
-        
-        if current == 0 {
-            let donors_count = env.storage().instance().get::<_, u32>(&DONORS_KEY).unwrap_or(0);
-            env.storage().instance().set(&DONORS_KEY, &(donors_count + 1));
-        }
-        
-        env.storage().persistent().set(&donor_key, &(current + amount));
 
-        let total = env.storage().instance().get::<_, i128>(&TOTAL_KEY).unwrap_or(0);
+        if current == 0 {
+            let donors_count = env
+                .storage()
+                .instance()
+                .get::<_, u32>(&DONORS_KEY)
+                .unwrap_or(0);
+            env.storage()
+                .instance()
+                .set(&DONORS_KEY, &(donors_count + 1));
+        }
+
+        env.storage()
+            .persistent()
+            .set(&donor_key, &(current + amount));
+
+        let total = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&TOTAL_KEY)
+            .unwrap_or(0);
         env.storage().instance().set(&TOTAL_KEY, &(total + amount));
 
-        env.events().publish(
-            (symbol_short!("deposit"), donor),
-            amount,
-        );
+        DepositRecorded { donor, amount }.publish(&env);
     }
 
     pub fn disburse(env: Env, recipient: Address, amount: i128) {
@@ -90,45 +144,69 @@ impl ScholarshipTreasury {
         let governance = Self::governance_contract(&env);
         governance.require_auth();
 
-        let total = env.storage().instance().get::<_, i128>(&TOTAL_KEY).unwrap_or(0);
+        let total = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&TOTAL_KEY)
+            .unwrap_or(0);
         if amount > total {
             panic_with_error!(&env, Error::InsufficientFunds);
         }
 
         token::client(&env).transfer(&env.current_contract_address(), &recipient, &amount);
-        
         env.storage().instance().set(&TOTAL_KEY, &(total - amount));
-        
-        let disbursed = env.storage().instance().get::<_, i128>(&DISBURSED_KEY).unwrap_or(0);
-        env.storage().instance().set(&DISBURSED_KEY, &(disbursed + amount));
+
+        let disbursed = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&DISBURSED_KEY)
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&DISBURSED_KEY, &(disbursed + amount));
 
         let scholar_key = DataKey::Scholar(recipient.clone());
         if !env.storage().persistent().has(&scholar_key) {
-            let scholars_count = env.storage().instance().get::<_, u32>(&SCHOLARS_KEY).unwrap_or(0);
-            env.storage().instance().set(&SCHOLARS_KEY, &(scholars_count + 1));
+            let scholars_count = env
+                .storage()
+                .instance()
+                .get::<_, u32>(&SCHOLARS_KEY)
+                .unwrap_or(0);
+            env.storage()
+                .instance()
+                .set(&SCHOLARS_KEY, &(scholars_count + 1));
             env.storage().persistent().set(&scholar_key, &true);
         }
 
-        env.events().publish(
-            (symbol_short!("disburse"), recipient),
-            amount,
-        );
+        DisbursementRecorded { recipient, amount }.publish(&env);
     }
 
     pub fn get_balance(env: Env) -> i128 {
-        env.storage().instance().get::<_, i128>(&TOTAL_KEY).unwrap_or(0)
+        env.storage()
+            .instance()
+            .get::<_, i128>(&TOTAL_KEY)
+            .unwrap_or(0)
     }
 
     pub fn get_total_disbursed(env: Env) -> i128 {
-        env.storage().instance().get::<_, i128>(&DISBURSED_KEY).unwrap_or(0)
+        env.storage()
+            .instance()
+            .get::<_, i128>(&DISBURSED_KEY)
+            .unwrap_or(0)
     }
 
     pub fn get_scholars_count(env: Env) -> u32 {
-        env.storage().instance().get::<_, u32>(&SCHOLARS_KEY).unwrap_or(0)
+        env.storage()
+            .instance()
+            .get::<_, u32>(&SCHOLARS_KEY)
+            .unwrap_or(0)
     }
 
     pub fn get_donors_count(env: Env) -> u32 {
-        env.storage().instance().get::<_, u32>(&DONORS_KEY).unwrap_or(0)
+        env.storage()
+            .instance()
+            .get::<_, u32>(&DONORS_KEY)
+            .unwrap_or(0)
     }
 
     pub fn get_donor_total(env: Env, donor: Address) -> i128 {
@@ -138,10 +216,112 @@ impl ScholarshipTreasury {
             .unwrap_or(0)
     }
 
+    #[allow(clippy::too_many_arguments)]
+    pub fn submit_proposal(
+        env: Env,
+        applicant: Address,
+        amount: i128,
+        program_name: String,
+        program_url: String,
+        program_description: String,
+        start_date: String,
+        milestone_titles: Vec<String>,
+        milestone_dates: Vec<String>,
+    ) -> u32 {
+        Self::assert_initialized(&env);
+
+        if amount <= 0 || milestone_titles.len() != 3 || milestone_dates.len() != 3 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
+
+        applicant.require_auth();
+
+        let proposal_id = env
+            .storage()
+            .instance()
+            .get::<_, u32>(&NEXT_PROPOSAL_KEY)
+            .unwrap_or(1);
+
+        let proposal = Proposal {
+            id: proposal_id,
+            applicant: applicant.clone(),
+            amount,
+            program_name,
+            program_url,
+            program_description,
+            start_date,
+            milestone_titles,
+            milestone_dates,
+            submitted_at: env.ledger().timestamp(),
+        };
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Proposal(proposal_id), &proposal);
+
+        let applicant_key = DataKey::ApplicantProposals(applicant.clone());
+        let mut proposal_ids = env
+            .storage()
+            .persistent()
+            .get::<_, Vec<u32>>(&applicant_key)
+            .unwrap_or(Vec::new(&env));
+        proposal_ids.push_back(proposal_id);
+        env.storage()
+            .persistent()
+            .set(&applicant_key, &proposal_ids);
+        env.storage()
+            .instance()
+            .set(&NEXT_PROPOSAL_KEY, &(proposal_id + 1));
+
+        ProposalSubmitted {
+            applicant,
+            proposal_id,
+            amount,
+        }
+        .publish(&env);
+
+        proposal_id
+    }
+
+    pub fn get_proposal(env: Env, proposal_id: u32) -> Option<Proposal> {
+        env.storage()
+            .persistent()
+            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+    }
+
+    pub fn get_proposals_by_applicant(env: Env, applicant: Address) -> Vec<u32> {
+        env.storage()
+            .persistent()
+            .get::<_, Vec<u32>>(&DataKey::ApplicantProposals(applicant))
+            .unwrap_or(Vec::new(&env))
+    }
+
+    pub fn get_proposal_count(env: Env) -> u32 {
+        env.storage()
+            .instance()
+            .get::<_, u32>(&NEXT_PROPOSAL_KEY)
+            .unwrap_or(1)
+            .saturating_sub(1)
+    }
+
     fn governance_contract(env: &Env) -> Address {
         if let Some(governance) = env.storage().instance().get::<_, Address>(&GOV_KEY) {
             governance
         } else {
+            panic_with_error!(env, Error::NotInitialized);
+        }
+    }
+
+    fn token_contract(env: &Env) -> Address {
+        if let Some(token) = env.storage().instance().get::<_, Address>(&USDC_KEY) {
+            token
+        } else {
+            panic_with_error!(env, Error::NotInitialized);
+        }
+    }
+
+    fn assert_initialized(env: &Env) {
+        if !env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(env, Error::NotInitialized);
         }
     }
@@ -150,7 +330,7 @@ impl ScholarshipTreasury {
 mod token {
     #[cfg(test)]
     mod test_token {
-        use soroban_sdk::{symbol_short, Address, Env, Symbol};
+        use soroban_sdk::{Address, Env, Symbol, symbol_short};
 
         const TOKEN_KEY: Symbol = symbol_short!("TOK");
 
@@ -172,7 +352,9 @@ mod token {
     }
 
     #[cfg(not(test))]
-    stellar_registry::import_asset!("usdc");
+    pub fn client<'a>(env: &soroban_sdk::Env) -> soroban_sdk::token::TokenClient<'a> {
+        soroban_sdk::token::TokenClient::new(env, &super::ScholarshipTreasury::token_contract(env))
+    }
 
     #[cfg(test)]
     pub use test_token::*;

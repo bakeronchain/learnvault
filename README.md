@@ -368,3 +368,4 @@ LearnVault, please reach out through our official channels.
 
 _LearnVault — Built for African learners. Powered by community. Governed by
 effort._
+\n## Architecture Decisions\n\n- [ADR-001.md](docs/adr/ADR-001.md)\n- [ADR-002.md](docs/adr/ADR-002.md)\n- [ADR-003.md](docs/adr/ADR-003.md)\n- [ADR-004.md](docs/adr/ADR-004.md)\n- [ADR-005.md](docs/adr/ADR-005.md)\n- [ADR-006.md](docs/adr/ADR-006.md)\n- [ADR-007.md](docs/adr/ADR-007.md)\n

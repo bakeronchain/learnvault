@@ -10,6 +10,7 @@
 		"dao": "DAO",
 		"leaderboard": "Leaderboard",
 		"profile": "My Profile",
+		"courses": "Courses",
 		"discord": "Discord",
 		"twitter": "Twitter",
 		"docs": "Docs"
@@ -37,7 +38,7 @@
 			"title": "Sample Contracts",
 			"guess": "Guess The Number:",
 			"guessDesc1": "Interact with the sample contract from the ",
-			"guessLink": "Scaffold Tutorial",
+			"guessLink": "LearnVault Tutorial",
 			"guessDesc2": " using an automatically generated contract client.",
 			"other": "Or take a look at other sample contracts to get you started:",
 			"oz": "OpenZeppelin sample contracts",
@@ -46,7 +47,7 @@
 		"startBuilding": {
 			"title": "Start Building",
 			"step1": "Add your contract under ",
-			"step2": "Contracts are built by Scaffold when you run ",
+			"step2": "Contracts are built by LearnVault when you run ",
 			"step3": "Changes are rebuilt automatically by ",
 			"step4": "Interact with your contract immediately in the Contract Explorer",
 			"watch": "Watch the full process in our ",

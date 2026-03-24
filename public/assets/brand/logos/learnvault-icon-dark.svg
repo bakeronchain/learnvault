@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 64" fill="none">
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00d2ff"/>
+      <stop offset="50%" stop-color="#3a7bd5"/>
+      <stop offset="100%" stop-color="#00ff80"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(3, 4)">
+    <path d="M25 2 L47 10 L47 30 C47 42 37 52 25 56 C13 52 3 42 3 30 L3 10 Z"
+          fill="url(#g1)" opacity="0.15" stroke="url(#g1)" stroke-width="1.5"/>
+    <path d="M25 8 L41 14 L41 30 C41 39 34 47 25 50 C16 47 9 39 9 30 L9 14 Z"
+          fill="none" stroke="url(#g1)" stroke-width="0.75" opacity="0.5"/>
+    <rect x="18" y="26" width="14" height="9" rx="1.5" fill="url(#g1)" opacity="0.9"/>
+    <polygon points="25,18 35,23 25,28 15,23" fill="url(#g1)"/>
+    <line x1="35" y1="23" x2="35" y2="30" stroke="url(#g1)" stroke-width="1.5" stroke-linecap="round"/>
+    <circle cx="35" cy="31" r="1.5" fill="#00ff80"/>
+    <text x="25" y="33" text-anchor="middle" font-family="Inter, sans-serif" font-size="5" font-weight="700" fill="#05070a" opacity="0.85">LRN</text>
+  </g>
+</svg>

@@ -13,6 +13,7 @@ const NEXT_PROPOSAL_KEY: Symbol = symbol_short!("NEXTPROP");
 const DISBURSED_KEY: Symbol = symbol_short!("DISBURSED");
 const SCHOLARS_KEY: Symbol = symbol_short!("SCHOLARS");
 const DONORS_KEY: Symbol = symbol_short!("DONORS");
+const PAUSED_KEY: Symbol = symbol_short!("PAUSED");
 
 #[derive(Clone)]
 #[contracttype]
@@ -46,6 +47,7 @@ pub enum Error {
     NotInitialized = 2,
     InvalidAmount = 3,
     InsufficientFunds = 4,
+    ContractPaused = 5,
 }
 
 #[contract]
@@ -93,9 +95,31 @@ impl ScholarshipTreasury {
         env.storage().instance().set(&DISBURSED_KEY, &0_i128);
         env.storage().instance().set(&SCHOLARS_KEY, &0_u32);
         env.storage().instance().set(&DONORS_KEY, &0_u32);
+        env.storage().instance().set(&PAUSED_KEY, &false);
+    }
+
+    pub fn pause(env: Env) {
+        let admin = Self::admin(&env);
+        admin.require_auth();
+        env.storage().instance().set(&PAUSED_KEY, &true);
+    }
+
+    pub fn unpause(env: Env) {
+        let admin = Self::admin(&env);
+        admin.require_auth();
+        env.storage().instance().set(&PAUSED_KEY, &false);
+    }
+
+    pub fn is_paused(env: Env) -> bool {
+        env.storage()
+            .instance()
+            .get::<_, bool>(&PAUSED_KEY)
+            .unwrap_or(false)
     }
 
     pub fn deposit(env: Env, donor: Address, amount: i128) {
+        Self::assert_not_paused(&env);
+        
         if amount <= 0 {
             panic_with_error!(&env, Error::InvalidAmount);
         }
@@ -137,6 +161,8 @@ impl ScholarshipTreasury {
     }
 
     pub fn disburse(env: Env, recipient: Address, amount: i128) {
+        Self::assert_not_paused(&env);
+        
         if amount <= 0 {
             panic_with_error!(&env, Error::InvalidAmount);
         }
@@ -229,6 +255,7 @@ impl ScholarshipTreasury {
         milestone_dates: Vec<String>,
     ) -> u32 {
         Self::assert_initialized(&env);
+        Self::assert_not_paused(&env);
 
         if amount <= 0 || milestone_titles.len() != 3 || milestone_dates.len() != 3 {
             panic_with_error!(&env, Error::InvalidAmount);
@@ -324,6 +351,24 @@ impl ScholarshipTreasury {
         if !env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(env, Error::NotInitialized);
         }
+    }
+
+    fn assert_not_paused(env: &Env) {
+        let paused: bool = env
+            .storage()
+            .instance()
+            .get(&PAUSED_KEY)
+            .unwrap_or(false);
+        if paused {
+            panic_with_error!(env, Error::ContractPaused);
+        }
+    }
+
+    fn admin(env: &Env) -> Address {
+        env.storage()
+            .instance()
+            .get(&ADMIN_KEY)
+            .unwrap_or_else(|| panic_with_error!(env, Error::NotInitialized))
     }
 }
 

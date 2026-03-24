@@ -77,6 +77,13 @@
 		"networkConnect": "Connect your wallet using this network.",
 		"networkMismatch": "Wallet is on {{wallet}}, connect to {{app}} instead."
 	},
+	"usdc": {
+		"getTestUSDC": "Get Test USDC",
+		"minting": "Minting...",
+		"mintSuccess": "Successfully minted {{amount}} USDC to {{address}}...",
+		"mintError": "Error minting USDC: {{error}}",
+		"tooltip": "Get {{amount}} test USDC tokens for testing donations and treasury operations"
+	},
 	"wallet": {
 		"loading": "Loading...",
 		"connect": "Connect Wallet",

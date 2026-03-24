@@ -2,6 +2,7 @@ import { Routes, Route, Outlet } from "react-router-dom"
 import Footer from "./components/Footer"
 import NavBar from "./components/NavBar"
 import Admin from "./pages/Admin"
+import Courses from "./pages/Courses"
 import Credential from "./pages/Credential"
 import Dao from "./pages/Dao"
 import Debug from "./pages/Debug"
@@ -11,7 +12,6 @@ import Learn from "./pages/Learn"
 import NotFound from "./pages/NotFound"
 import Profile from "./pages/Profile"
 import Treasury from "./pages/Treasury"
-import Courses from "./pages/Courses"
 
 function App() {
 	return (

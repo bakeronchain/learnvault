@@ -1,14 +1,22 @@
 extern crate std;
 
 use soroban_sdk::{
+    Address, Env, IntoVal, String, Val, Vec,
     testutils::{Address as _, MockAuth, MockAuthInvoke},
     token::{StellarAssetClient, TokenClient},
-    Address, Env, IntoVal, String, Val, Vec,
 };
 
 use crate::{Error, ScholarshipTreasury, ScholarshipTreasuryClient, token};
 
-fn setup<'a>(env: &'a Env) -> (ScholarshipTreasuryClient<'a>, Address, Address, Address, Address) {
+fn setup<'a>(
+    env: &'a Env,
+) -> (
+    ScholarshipTreasuryClient<'a>,
+    Address,
+    Address,
+    Address,
+    Address,
+) {
     let admin = Address::generate(env);
     let governance = Address::generate(env);
     let donor = Address::generate(env);
@@ -136,7 +144,10 @@ fn submitted_proposals_are_stored_per_applicant() {
         &500,
         &String::from_str(&env, "Stellar Builder Bootcamp"),
         &String::from_str(&env, "https://bootcamp.example/apply"),
-        &String::from_str(&env, "An intensive Soroban engineering scholarship request."),
+        &String::from_str(
+            &env,
+            "An intensive Soroban engineering scholarship request.",
+        ),
         &String::from_str(&env, "2026-05-15"),
         &milestone_titles,
         &milestone_dates,
@@ -144,17 +155,31 @@ fn submitted_proposals_are_stored_per_applicant() {
 
     assert_eq!(proposal_id, 1);
     assert_eq!(client.get_proposal_count(), 1);
-    assert_eq!(client.get_proposals_by_applicant(&donor), Vec::from_array(&env, [1_u32]));
+    assert_eq!(
+        client.get_proposals_by_applicant(&donor),
+        Vec::from_array(&env, [1_u32])
+    );
 
-    let proposal = client.get_proposal(&proposal_id).expect("proposal should exist");
+    let proposal = client
+        .get_proposal(&proposal_id)
+        .expect("proposal should exist");
     assert_eq!(proposal.id, 1);
     assert_eq!(proposal.applicant, donor);
     assert_eq!(proposal.amount, 500);
-    assert_eq!(proposal.program_name, String::from_str(&env, "Stellar Builder Bootcamp"));
-    assert_eq!(proposal.program_url, String::from_str(&env, "https://bootcamp.example/apply"));
+    assert_eq!(
+        proposal.program_name,
+        String::from_str(&env, "Stellar Builder Bootcamp")
+    );
+    assert_eq!(
+        proposal.program_url,
+        String::from_str(&env, "https://bootcamp.example/apply")
+    );
     assert_eq!(
         proposal.program_description,
-        String::from_str(&env, "An intensive Soroban engineering scholarship request."),
+        String::from_str(
+            &env,
+            "An intensive Soroban engineering scholarship request."
+        ),
     );
     assert_eq!(proposal.start_date, String::from_str(&env, "2026-05-15"));
     assert_eq!(proposal.milestone_titles, milestone_titles);

@@ -1,7 +1,7 @@
 export type DbClient = {
-  connected: boolean;
-};
+	connected: boolean
+}
 
 export const db: DbClient = {
-  connected: false
-};
+	connected: false,
+}

@@ -22,8 +22,8 @@
 	height: 1.2rem;
 }
 .failure {
-	color: var(--sds-clr-red-11);
+	color: var(--app-color-danger);
 }
 .success {
-	color: var(--sds-clr-green-11);
+	color: var(--app-color-success);
 }

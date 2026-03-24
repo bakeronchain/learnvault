@@ -1,0 +1,12 @@
+graph TD
+    User([User / Learner]) -->|1. Submit Coursework| WebApp[Frontend App]
+    WebApp -->|2. Request Verification| API[Backend / API API]
+    API -->|3. Validate Code/Quizzes| Oracle[Testing Oracle]
+    Oracle -->|4. Return Result| API
+    API -->|5. Invoke Contract| SC_Core[LearnVault Core Contract]
+    
+    SC_Core -->|6. Mint/Transfer Tokens| LRN_Token{LRN Token Contract}
+    SC_Core -->|7. Issue Credential| SBT_Contract{Soulbound Credential}
+    
+    Treasury[Treasury Contract] -.->|Funds| LRN_Token
+    DAO[Governance Contract] -->|Parameters| SC_Core

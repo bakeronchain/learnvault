@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <defs>
+    <linearGradient id="fg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00d2ff"/>
+      <stop offset="100%" stop-color="#00ff80"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="32" height="32" rx="6" fill="#05070a"/>
+  <!-- Shield -->
+  <path d="M16 3 L27 7 L27 17 C27 23 22 28 16 30 C10 28 5 23 5 17 L5 7 Z"
+        fill="url(#fg)" opacity="0.2" stroke="url(#fg)" stroke-width="1"/>
+  <!-- Cap -->
+  <polygon points="16,10 22,13 16,16 10,13" fill="url(#fg)"/>
+  <!-- Book/base -->
+  <rect x="12" y="16" width="8" height="5" rx="1" fill="url(#fg)" opacity="0.9"/>
+</svg>

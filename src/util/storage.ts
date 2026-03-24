@@ -1,27 +1,13 @@
-/**
- * A typed wrapper around localStorage largely borrowed from (but less capable
- * than) https://www.npmjs.com/package/typed-local-store
- *
- * Provides a fully-typed interface to localStorage, and is easy to modify for other storage strategies (i.e. sessionStorage)
- */
-
-/**
- * Valid localStorage key names mapped to an arbitrary value of the correct
- * type. Used to provide both good typing AND good type-ahead, so that you can
- * see a list of valid storage keys while using this module elsewhere.
- */
 type Schema = {
 	walletId: string
 	walletAddress: string
 	walletNetwork: string
 	networkPassphrase: string
+	"learnvault:theme": "light" | "dark"
+	"learnvault:onboarding-complete": boolean
+	"learnvault:onboarding-track": string
 }
 
-/**
- * Typed interface that follows the Web Storage API: https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API
- *
- * Implementation has been borrowed and simplified from https://www.npmjs.com/package/typed-local-store
- */
 class TypedStorage<T> {
 	private readonly storage: Storage
 
@@ -30,25 +16,39 @@ class TypedStorage<T> {
 	}
 
 	public get length(): number {
-		return this.storage?.length
+		return this.storage.length
 	}
 
-	public key<U extends keyof T>(index: number): U {
-		return this.storage?.key(index) as U
+	public key<U extends keyof T>(index: number): U | null {
+		return this.storage.key(index) as U | null
 	}
 
 	public getItem<U extends keyof T>(
 		key: U,
 		retrievalMode: "fail" | "raw" | "safe" = "fail",
 	): T[U] | null {
-		const item = this.storage?.getItem(key.toString())
+		const item = this.storage.getItem(String(key))
 
 		if (item == null) {
-			return item
+			return null
 		}
 
 		try {
-			return JSON.parse(item) as T[U]
+			const parsed = JSON.parse(item)
+
+			if (key === "learnvault:theme") {
+				if (parsed === "light" || parsed === "dark") {
+					return parsed as T[U]
+				}
+
+				if (retrievalMode === "safe") {
+					return null
+				}
+
+				throw new Error(`Invalid theme value for "${String(key)}"`)
+			}
+
+			return parsed as T[U]
 		} catch (error) {
 			switch (retrievalMode) {
 				case "safe":
@@ -56,25 +56,30 @@ class TypedStorage<T> {
 				case "raw":
 					return item as unknown as T[U]
 				default:
-					throw error
+					throw new Error(`Failed to parse localStorage key "${String(key)}"`, {
+						cause: error,
+					})
 			}
 		}
 	}
 
 	public setItem<U extends keyof T>(key: U, value: T[U]): void {
-		this.storage?.setItem(key.toString(), JSON.stringify(value))
+		try {
+			this.storage.setItem(String(key), JSON.stringify(value))
+		} catch (error) {
+			console.error(`Failed to set localStorage key "${String(key)}":`, error)
+		}
 	}
 
 	public removeItem<U extends keyof T>(key: U): void {
-		this.storage?.removeItem(key.toString())
+		this.storage.removeItem(String(key))
 	}
 
 	public clear(): void {
-		this.storage?.clear()
+		this.storage.clear()
 	}
 }
 
-/**
- * Fully-typed wrapper around localStorage
- */
-export default new TypedStorage<Schema>()
+const storage = new TypedStorage<Schema>()
+
+export default storage

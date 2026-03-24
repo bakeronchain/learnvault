@@ -11,6 +11,8 @@ default = true # Optional. Whether to use this account as the `--source` for com
 [development.contracts]
 fungible_allowlist_example = { client = true, constructor_args = "--admin me --manager me --initial_supply 1000000000000000000000000" }
 nft_enumerable_example = { client = true, constructor_args = "--owner me" }
+# USDC test token for local development - deployed as a Stellar Asset Contract
+usdc_test_token = { client = true, constructor_args = "--admin me --initial_supply 1000000000000000" }
 
 # Rather than in one list, TOML allows specifying contracts in their own "sections"
 [development.contracts.guess_the_number]
@@ -85,6 +87,12 @@ default = true
 # eurc = { id = "C789..." }
 guess_the_number = { client = true, constructor_args = "--admin me", after_deploy = "reset" }
 
+# USDC on Stellar Testnet
+# For testnet, we use a test USDC token deployed as a Stellar Asset Contract
+# Official Circle USDC mainnet: CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75
+# Testnet USDC (to be deployed): Use the fungible_allowlist contract as a test USDC token
+usdc_testnet = { client = true, constructor_args = "--admin testnet-user --manager testnet-user --initial_supply 1000000000000000" }
+
 ### Production environment configuration
 [production.network]
 rpc-url = "https://our-custom-rpc-provider.cool"
@@ -102,3 +110,7 @@ default = true
 # soroban-increment-contract = { id = "C543..." }
 # soroban-token-contract = { id = "C432..." }
 # eurc = { id = "C321..." }
+
+# Official Circle USDC on Stellar Mainnet
+# Contract ID: CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75
+usdc_mainnet = { id = "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75" }

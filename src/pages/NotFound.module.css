@@ -1,0 +1,21 @@
+.NotFound {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 1rem;
+	min-height: 60vh;
+	text-align: center;
+	max-width: 520px;
+	margin: 0 auto;
+}
+
+.NotFound h1 {
+	font-size: clamp(2.25rem, 7vw, 4rem);
+	line-height: 1;
+	margin: 0;
+}
+
+.NotFound :global(svg) {
+	color: var(--app-color-accent);
+}

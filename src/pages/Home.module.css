@@ -18,12 +18,9 @@
 	margin-bottom: 2rem;
 }
 
-:global(.sds-theme-light) .Home > div:nth-child(2) {
-	box-shadow: 2px 6px 20px -10px var(--sds-clr-gray-10);
-}
-:global(.sds-theme-dark) .Home > div:nth-child(2) {
-	background: var(--sds-clr-gray-02);
-	box-shadow: 2px 6px 20px -10px var(--sds-clr-gray-08);
+.Home > div:nth-child(2) {
+	background: var(--app-surface-highlight);
+	box-shadow: var(--app-surface-shadow);
 }
 
 .Home > div:nth-child(2) nav {
@@ -37,7 +34,7 @@ h2 {
 	align-items: center;
 }
 h2 svg {
-	color: var(--sds-clr-gray-08);
+	color: var(--app-color-muted);
 	display: inline-block;
 	width: 30px;
 	height: 30px;
@@ -55,7 +52,7 @@ section svg {
 	display: block;
 	width: 30px;
 	height: 30px;
-	background: var(--sds-clr-lilac-06);
+	background: var(--app-color-accent-soft);
 	border-radius: 50%;
 	margin: 0 auto 1rem;
 	padding: 5px;

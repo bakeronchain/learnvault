@@ -1,13 +1,13 @@
 /** GLOBAL */
 /* Typography Color */
 body {
-	color: var(--sds-clr-gray-12);
+	color: var(--app-color-foreground);
 }
 
 /* External link icons */
 a[target]::after {
 	content: " ";
-	background: var(--sds-clr-lilac-11);
+	background: var(--app-color-link-icon);
 	width: 1em;
 	height: 1em;
 	display: inline-block;
@@ -15,10 +15,10 @@ a[target]::after {
 	mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1em' height='1em' fill='none' stroke='currentColor' viewBox='0 0 24 24'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M7 17 17 7m0 0H7m10 0v10'%3E%3C/path%3E%3C/svg%3E");
 }
 a[target]:hover::after {
-	background: var(--sds-clr-lilac-12);
+	background: var(--app-color-link-icon-hover);
 }
 a[target]:disabled::after {
-	background: var(--sds-clr-lilac-08);
+	background: var(--app-color-link-icon-disabled);
 }
 
 a:has(button) {
@@ -32,7 +32,7 @@ a[target]:has(button)::after {
 
 /** HEADER */
 .AppLayout :global(.Layout__header) {
-	border-bottom: 1px solid var(--sds-clr-gray-06);
+	border-bottom: 1px solid var(--app-color-border);
 	padding: 1rem 3rem;
 }
 
@@ -45,9 +45,70 @@ a[target]:has(button)::after {
 	justify-content: start;
 }
 
-/** FOOTER */
-.AppLayout :global(.Layout__footer__content) {
-	flex-direction: row-reverse;
+/** NAV BAR */
+.NavBar {
+	border-bottom: 1px solid var(--sds-clr-gray-06);
+	padding: 1rem 3rem;
+	background: var(--sds-clr-white);
+}
+
+.NavBarContent {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	max-width: 1200px;
+	margin: 0 auto;
+}
+
+.Logo {
+	text-decoration: none;
+	color: inherit;
+}
+
+.NavLinks {
+	display: flex;
+	gap: 2rem;
+	align-items: center;
+}
+
+.NavRight {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+}
+
+.Hamburger {
+	display: none;
+}
+
+/* Mobile styles */
+@media (max-width: 768px) {
+	.NavBar {
+		padding: 1rem;
+	}
+
+	.NavLinks {
+		display: none;
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		background: var(--sds-clr-white);
+		flex-direction: column;
+		justify-content: center;
+		align-items: center;
+		gap: 2rem;
+		z-index: 1000;
+	}
+
+	.NavLinksOpen {
+		display: flex;
+	}
+
+	.Hamburger {
+		display: block;
+	}
 }
 
 /** SDS FIXES */

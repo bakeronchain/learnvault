@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#05070a"/>
+      <stop offset="100%" stop-color="#071520"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00d2ff"/>
+      <stop offset="100%" stop-color="#3a7bd5"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="70%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#00d2ff" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#00d2ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- Star field -->
+  <g fill="#00d2ff">
+    <circle cx="900" cy="80" r="2" opacity="0.6"/>
+    <circle cx="1050" cy="150" r="1.5" opacity="0.4"/>
+    <circle cx="980" cy="220" r="1" opacity="0.5"/>
+    <circle cx="1100" cy="300" r="2" opacity="0.3"/>
+    <circle cx="850" cy="350" r="1.5" opacity="0.4"/>
+    <circle cx="1150" cy="420" r="1" opacity="0.5"/>
+    <circle cx="920" cy="480" r="2" opacity="0.3"/>
+    <circle cx="1020" cy="550" r="1.5" opacity="0.4"/>
+    <circle cx="800" cy="180" r="1" opacity="0.6"/>
+    <circle cx="1080" cy="500" r="1" opacity="0.3"/>
+  </g>
+
+  <!-- Stellar network nodes (right side decoration) -->
+  <g opacity="0.12" stroke="#00d2ff" stroke-width="1" fill="none">
+    <circle cx="950" cy="315" r="120"/>
+    <circle cx="950" cy="315" r="80"/>
+    <circle cx="950" cy="315" r="40"/>
+    <line x1="950" y1="195" x2="950" y2="435"/>
+    <line x1="830" y1="315" x2="1070" y2="315"/>
+    <line x1="865" y1="230" x2="1035" y2="400"/>
+    <line x1="1035" y1="230" x2="865" y2="400"/>
+  </g>
+  <circle cx="950" cy="315" r="8" fill="#00d2ff" opacity="0.4"/>
+
+  <!-- Track badge -->
+  <rect x="60" y="60" width="200" height="36" rx="18" fill="#00d2ff" fill-opacity="0.1" stroke="#00d2ff" stroke-width="1" stroke-opacity="0.6"/>
+  <text x="160" y="83" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#00d2ff" letter-spacing="2">TRACK 01</text>
+
+  <!-- Title -->
+  <text x="60" y="200" font-family="Inter, system-ui, sans-serif" font-size="58" font-weight="800" fill="white" letter-spacing="-1">Introduction</text>
+  <text x="60" y="270" font-family="Inter, system-ui, sans-serif" font-size="58" font-weight="800" fill="url(#accent)" letter-spacing="-1">to Stellar</text>
+
+  <!-- Description -->
+  <text x="60" y="340" font-family="Inter, system-ui, sans-serif" font-size="20" font-weight="400" fill="white" opacity="0.55">Learn the fundamentals of the Stellar network,</text>
+  <text x="60" y="368" font-family="Inter, system-ui, sans-serif" font-size="20" font-weight="400" fill="white" opacity="0.55">accounts, assets, and transactions.</text>
+
+  <!-- Stats row -->
+  <g font-family="Inter, system-ui, sans-serif" font-size="14" fill="white" opacity="0.4">
+    <text x="60" y="440">8 Modules</text>
+    <text x="160" y="440">·</text>
+    <text x="175" y="440">Beginner</text>
+    <text x="265" y="440">·</text>
+    <text x="280" y="440">Earn LRN</text>
+  </g>
+
+  <!-- Bottom bar -->
+  <rect x="0" y="580" width="1200" height="50" fill="url(#accent)" opacity="0.06"/>
+  <rect x="0" y="580" width="1200" height="1" fill="url(#accent)" opacity="0.3"/>
+  <text x="60" y="612" font-family="Inter, system-ui, sans-serif" font-size="14" font-weight="700" fill="white" opacity="0.4" letter-spacing="3">LEARNVAULT</text>
+  <text x="1140" y="612" text-anchor="end" font-family="Inter, system-ui, sans-serif" font-size="13" fill="white" opacity="0.25">learnvault.xyz</text>
+</svg>

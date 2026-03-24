@@ -26,6 +26,9 @@ const pemString = z
 import { validatorRouter } from "./routes/validator.routes";
 import { commentsRouter } from "./routes/comments.routes";
 import { adminMilestonesRouter } from "./routes/admin-milestones.routes";
+import { uploadRouter } from "./routes/upload.routes";
+import { coursesRouter } from "./routes/courses.routes";
+import { eventsRouter } from "./routes/events.routes";
 import { initDb } from "./db/index";
 import { buildOpenApiSpec } from "./openapi";
 import { coursesRouter } from "./routes/courses.routes";
@@ -98,6 +101,7 @@ app.use("/api", validatorRouter);
 app.use("/api", eventsRouter);
 app.use("/api", commentsRouter);
 app.use("/api", adminMilestonesRouter);
+app.use("/api", uploadRouter);
 
 app.get("/api/docs", (_req, res) => {
 	res.type("application/yaml").send(openApiYaml)

@@ -1,6 +1,11 @@
-import type { NextFunction, Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
+import jwt from "jsonwebtoken";
 
 import type { JwtService } from "../services/jwt.service";
+
+// ---------------------------------------------------------------------------
+// Factory-based auth (used by routes that receive jwtService via DI)
+// ---------------------------------------------------------------------------
 
 export function createRequireAuth(jwtService: JwtService) {
   return function requireAuth(
@@ -29,8 +34,10 @@ export function createRequireAuth(jwtService: JwtService) {
     }
   };
 }
-import { NextFunction, Request, Response } from "express";
-import jwt from "jsonwebtoken";
+
+// ---------------------------------------------------------------------------
+// Standalone auth (used by self-contained routers, e.g. upload, comments)
+// ---------------------------------------------------------------------------
 
 const JWT_SECRET = process.env.JWT_SECRET || "learnvault-secret";
 
@@ -51,7 +58,7 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
     const decoded = jwt.verify(token, JWT_SECRET) as { address: string };
     req.user = decoded;
     next();
-  } catch (err) {
+  } catch {
     return res.status(401).json({ error: "Invalid token" });
   }
 };

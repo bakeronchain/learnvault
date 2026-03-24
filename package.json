@@ -29,6 +29,7 @@
     "@tanstack/react-query": "^5.90.17",
     "@theahaco/contract-explorer": "^1.1.0",
     "@theahaco/ts-config": "^1.2.0",
+    "bufferutil": "^4.1.0",
     "canvas-confetti": "^1.9.4",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.38.0",
@@ -42,6 +43,7 @@
     "react-router-dom": "^7.12.0",
     "recharts": "^2.15.1",
     "tailwindcss": "^4.2.2",
+    "utf-8-validate": "^5.0.10",
     "zod": "^4.3.5"
   },
   "devDependencies": {

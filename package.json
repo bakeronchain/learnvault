@@ -15,7 +15,8 @@
     "format": "prettier . --write",
     "docs:generate": "npm run docs:generate --prefix server",
     "prepare": "husky",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "test": "vitest run"
   },
   "workspaces": [
     "packages/*"
@@ -63,7 +64,8 @@
     "typescript": "~5.9.3",
     "vite": "^7.3.1",
     "vite-plugin-node-polyfills": "^0.25.0",
-    "vite-plugin-wasm": "^3.5.0"
+    "vite-plugin-wasm": "^3.5.0",
+    "vitest": "^4.1.1"
   },
   "lint-staged": {
     "**/*": [

@@ -1,16 +1,36 @@
-import cors from "cors"
-import express from "express"
-import morgan from "morgan"
-import swaggerUi from "swagger-ui-express"
-import YAML from "yaml"
-import { z } from "zod"
+import path from "node:path";
 
-import { errorHandler } from "./middleware/error.middleware"
-import { buildOpenApiSpec } from "./openapi"
-import { coursesRouter } from "./routes/courses.routes"
-import { eventsRouter } from "./routes/events.routes"
-import { healthRouter } from "./routes/health.routes"
-import { validatorRouter } from "./routes/validator.routes"
+import dotenv from "dotenv";
+import cors from "cors";
+import express from "express";
+import morgan from "morgan";
+import swaggerUi from "swagger-ui-express";
+import YAML from "yaml";
+import { z } from "zod";
+
+import { createNonceStore } from "./db/nonce-store";
+import { errorHandler } from "./middleware/error.middleware";
+import { createAuthRouter } from "./routes/auth.routes";
+import { healthRouter } from "./routes/health.routes";
+import { createMeRouter } from "./routes/me.routes";
+import { createAuthService } from "./services/auth.service";
+import { createJwtService, generateEphemeralDevJwtKeys } from "./services/jwt.service";
+
+// Load server/.env whether you run from repo root or from server/
+dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
+
+const pemString = z
+  .string()
+  .min(1)
+  .transform((s) => s.replace(/\\n/g, "\n").trim());
+import { validatorRouter } from "./routes/validator.routes";
+import { commentsRouter } from "./routes/comments.routes";
+import { adminMilestonesRouter } from "./routes/admin-milestones.routes";
+import { initDb } from "./db/index";
+import { buildOpenApiSpec } from "./openapi";
+import { coursesRouter } from "./routes/courses.routes";
+import { eventsRouter } from "./routes/events.routes";
+
 
 const envSchema = z.object({
 	PORT: z.coerce.number().int().positive().default(4000),
@@ -78,7 +98,6 @@ app.use("/api", validatorRouter);
 app.use("/api", eventsRouter);
 app.use("/api", commentsRouter);
 app.use("/api", adminMilestonesRouter);
-
 
 app.get("/api/docs", (_req, res) => {
 	res.type("application/yaml").send(openApiYaml)

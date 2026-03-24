@@ -1,12 +1,9 @@
-import { Router } from "express";
-import { authMiddleware } from "../middleware/auth.middleware";
-import { upload } from "../middleware/upload.middleware";
-import {
-  pinNftMetadata,
-  uploadFile,
-} from "../controllers/upload.controller";
+import { Router } from "express"
+import { pinNftMetadata, uploadFile } from "../controllers/upload.controller"
+import { authMiddleware } from "../middleware/auth.middleware"
+import { upload } from "../middleware/upload.middleware"
 
-export const uploadRouter = Router();
+export const uploadRouter = Router()
 
 /**
  * @openapi
@@ -51,12 +48,7 @@ export const uploadRouter = Router();
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-uploadRouter.post(
-  "/upload",
-  authMiddleware,
-  upload.single("file"),
-  uploadFile,
-);
+uploadRouter.post("/upload", authMiddleware, upload.single("file"), uploadFile)
 
 /**
  * @openapi
@@ -113,4 +105,4 @@ uploadRouter.post(
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-uploadRouter.post("/upload/nft-metadata", authMiddleware, pinNftMetadata);
+uploadRouter.post("/upload/nft-metadata", authMiddleware, pinNftMetadata)

@@ -1,10 +1,10 @@
-import { Router } from "express";
+import { Router } from "express"
 
-import { getCourseById, getCourses } from "../controllers/courses.controller";
-import { validate } from "../middleware/validation.middleware";
-import * as schemas from "../lib/zod-schemas";
+import { getCourseById, getCourses } from "../controllers/courses.controller"
+import * as schemas from "../lib/zod-schemas"
+import { validate } from "../middleware/validation.middleware"
 
-export const coursesRouter = Router();
+export const coursesRouter = Router()
 
 /**
  * @openapi
@@ -31,7 +31,7 @@ export const coursesRouter = Router();
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-coursesRouter.get("/courses", getCourses);
+coursesRouter.get("/courses", getCourses)
 
 /**
  * @openapi
@@ -66,9 +66,9 @@ coursesRouter.get("/courses", getCourses);
  *         $ref: '#/components/responses/InternalServerError'
  */
 coursesRouter.get(
-  "/courses/:courseId", 
-  validate({
-    params: schemas.courseIdParamSchema,
-  }), 
-  getCourseById
-);
+	"/courses/:courseId",
+	validate({
+		params: schemas.courseIdParamSchema,
+	}),
+	getCourseById,
+)

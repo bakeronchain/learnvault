@@ -25,6 +25,7 @@ const pemString = z
   .transform((s) => s.replace(/\\n/g, "\n").trim());
 import { validatorRouter } from "./routes/validator.routes";
 import { commentsRouter } from "./routes/comments.routes";
+import { adminMilestonesRouter } from "./routes/admin-milestones.routes";
 import { initDb } from "./db/index";
 
 
@@ -83,6 +84,7 @@ app.use("/api", coursesRouter);
 app.use("/api", validatorRouter);
 app.use("/api", eventsRouter);
 app.use("/api", commentsRouter);
+app.use("/api", adminMilestonesRouter);
 
 
 app.get("/api/docs", (_req, res) => {

@@ -16,11 +16,16 @@ export default defineConfig({
 		}),
 		wasm(),
 	],
+	optimizeDeps: {
+		esbuildOptions: {
+			loader: {
+				".js": "jsx",
+			},
+		},
+		exclude: ["@stellar/stellar-xdr-json"],
+	},
 	build: {
 		target: "esnext",
-	},
-	optimizeDeps: {
-		exclude: ["@stellar/stellar-xdr-json"],
 	},
 	define: {
 		global: "window",

@@ -8,17 +8,26 @@ LearnVault is an open-source, learn-and-earn platform built for African learners
 
 ## Table of Contents
 
-- [Prerequisites](#prerequisites)
-- [Clone and Install](#clone-and-install)
-- [Run the Frontend (No Blockchain Required)](#run-the-frontend-no-blockchain-required)
-- [Run Contract Tests](#run-contract-tests)
-- [Start Full Dev Environment (Requires Docker)](#start-full-dev-environment-requires-docker)
-- [Project Structure](#project-structure)
-- [How to Pick an Issue](#how-to-pick-an-issue)
-- [Branching and PR Workflow](#branching-and-pr-workflow)
-- [Code Style](#code-style)
-- [Commit Messages](#commit-messages)
-- [Need Help?](#need-help)
+- [Contributing to LearnVault](#contributing-to-learnvault)
+	- [Table of Contents](#table-of-contents)
+	- [Prerequisites](#prerequisites)
+	- [Clone and Install](#clone-and-install)
+	- [Run the Frontend (No Blockchain Required)](#run-the-frontend-no-blockchain-required)
+	- [Run Contract Tests](#run-contract-tests)
+	- [Start Full Dev Environment (Requires Docker)](#start-full-dev-environment-requires-docker)
+	- [Project Structure](#project-structure)
+	- [How to Pick an Issue](#how-to-pick-an-issue)
+	- [Branching and PR Workflow](#branching-and-pr-workflow)
+		- [1. Create a branch](#1-create-a-branch)
+		- [2. Make your changes](#2-make-your-changes)
+		- [3. Open a pull request](#3-open-a-pull-request)
+		- [PR Checklist](#pr-checklist)
+	- [Code Style](#code-style)
+		- [TypeScript / Frontend](#typescript--frontend)
+		- [Rust / Smart Contracts](#rust--smart-contracts)
+	- [Commit Messages](#commit-messages)
+	- [Need Help?](#need-help)
+	- [Code of Conduct](#code-of-conduct)
 
 ---
 
@@ -207,6 +216,9 @@ Before opening your PR, make sure:
 
 ### TypeScript / Frontend
 
+- **TypeScript Only** — All frontend code must be written in TypeScript. We do not accept JavaScript files in the codebase.
+- **No `any` Type** — The use of the `any` type is prohibited. Use specific types, interfaces, `unknown` with type guards, or generics instead.
+- **Use @stellar/design-system Components** — When building UI components, use components from the `@stellar/design-system` library instead of creating custom equivalents. This ensures visual consistency, accessibility compliance, and alignment with Stellar ecosystem standards.
 - **Linting** — ESLint is configured via `eslint.config.js`. Run:
   ```bash
   npm run lint
@@ -231,6 +243,8 @@ Before opening your PR, make sure:
   ```bash
   cargo clippy --workspace --all-targets
   ```
+- **Unit Tests Required** — Every pull request that touches a Soroban contract must include unit tests for the changed logic. Testing is critical for smart contracts because contract bugs can have serious consequences in a blockchain environment.
+- **Soroban Best Practices** — Follow the official [Soroban documentation](https://soroban.stellar.org/docs) best practices, including proper error handling, efficient storage patterns, and security considerations.
 
 > [!NOTE]
 > A pre-commit hook powered by [Husky](https://typicode.github.io/husky/) and [lint-staged](https://github.com/lint-staged/lint-staged) automatically runs ESLint and Prettier on staged files. If the hook blocks your commit, fix the reported issues before committing.
@@ -265,6 +279,16 @@ If you run into any issues during setup or have questions about the codebase:
 - **Tag a maintainer** on your issue or PR if you're blocked
 
 We're building LearnVault for the next generation of African builders — and that includes building a welcoming, supportive contributor community. No question is too small. We're glad you're here. 💛
+
+---
+
+## Code of Conduct
+
+LearnVault is committed to providing a welcoming, inclusive, and harassment-free experience for everyone. All contributors are expected to adhere to our Code of Conduct.
+
+Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing. By participating in this project, you agree to abide by its terms and help us maintain a positive and respectful community.
+
+If you experience or witness unacceptable behavior, please report it to the project maintainers. We take all reports seriously and will respond appropriately.
 
 ---
 

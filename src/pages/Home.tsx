@@ -1,13 +1,27 @@
 import { Button, Card, Icon } from "@stellar/design-system"
-import React from "react"
+import React, { useState, useEffect } from "react" // Added React hooks
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import { GuessTheNumber } from "../components/GuessTheNumber"
 import { MilestoneTracker } from "../components/MilestoneTracker"
+import {
+	DashboardStatsSkeleton,
+	CourseCardSkeleton,
+} from "../components/SkeletonLoader"
 import { labPrefix } from "../contracts/util"
+// Added Skeleton Imports
 
 const Home: React.FC = () => {
 	const { t } = useTranslation()
+
+	// NEW: Loading state to trigger skeletons for Issue #44
+	const [isLoading, setIsLoading] = useState(true)
+
+	useEffect(() => {
+		// Simulated delay to test the skeleton/shimmer UI
+		const timer = setTimeout(() => setIsLoading(false), 2000)
+		return () => clearTimeout(timer)
+	}, [])
 
 	const mockMilestones = [
 		{ id: 1, label: t("home.milestones.1"), lrnReward: 10 },
@@ -55,23 +69,27 @@ const Home: React.FC = () => {
 				{/* Upstream Content: Course Progress */}
 				<div className="iridescent-border p-[1px] rounded-[3.5rem] shadow-2xl">
 					<div className="glass-card p-12 rounded-[3.5rem] border border-white/5">
-						<div className="flex flex-col md:flex-row gap-12 items-start">
-							<div className="md:w-1/3">
-								<h2 className="text-3xl font-black mb-4 flex items-center gap-4">
-									<Icon.Trophy01 size="lg" className="text-brand-cyan" />
-									{t("home.courseProgress.title")}
-								</h2>
-								<p className="text-white/40 leading-relaxed">
-									{t("home.courseProgress.desc")}
-								</p>
+						{isLoading ? (
+							<DashboardStatsSkeleton />
+						) : (
+							<div className="flex flex-col md:flex-row gap-12 items-start">
+								<div className="md:w-1/3">
+									<h2 className="text-3xl font-black mb-4 flex items-center gap-4">
+										<Icon.Trophy01 size="lg" className="text-brand-cyan" />
+										{t("home.courseProgress.title")}
+									</h2>
+									<p className="text-white/40 leading-relaxed">
+										{t("home.courseProgress.desc")}
+									</p>
+								</div>
+								<div className="md:w-2/3 w-full">
+									<MilestoneTracker
+										courseId="stellar-basics"
+										milestones={mockMilestones}
+									/>
+								</div>
 							</div>
-							<div className="md:w-2/3 w-full">
-								<MilestoneTracker
-									courseId="stellar-basics"
-									milestones={mockMilestones}
-								/>
-							</div>
-						</div>
+						)}
 					</div>
 				</div>
 
@@ -131,23 +149,33 @@ const Home: React.FC = () => {
 					</div>
 				</div>
 
-				{/* Features Cards */}
+				{/* Features Cards - Applied Skeletons here too */}
 				<div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-					<FeatureCard
-						icon="🎓"
-						title="ScholarNFTs"
-						description="Your hard-earned expertise, permanently immortalized as verifiable credentials on the Stellar network."
-					/>
-					<FeatureCard
-						icon="💰"
-						title="Automated Funding"
-						description="Decentralized treasury disbursements triggered instantly upon milestone completion via Soroban contracts."
-					/>
-					<FeatureCard
-						icon="🏛"
-						title="Community DAO"
-						description="A protocol governed by the scholars who use it. Vote on curriculum, treasury, and reputation standards."
-					/>
+					{isLoading ? (
+						<>
+							<CourseCardSkeleton />
+							<CourseCardSkeleton />
+							<CourseCardSkeleton />
+						</>
+					) : (
+						<>
+							<FeatureCard
+								icon="🎓"
+								title="ScholarNFTs"
+								description="Your hard-earned expertise, permanently immortalized as verifiable credentials on the Stellar network."
+							/>
+							<FeatureCard
+								icon="💰"
+								title="Automated Funding"
+								description="Decentralized treasury disbursements triggered instantly upon milestone completion via Soroban contracts."
+							/>
+							<FeatureCard
+								icon="🏛"
+								title="Community DAO"
+								description="A protocol governed by the scholars who use it. Vote on curriculum, treasury, and reputation standards."
+							/>
+						</>
+					)}
 				</div>
 			</main>
 		</div>

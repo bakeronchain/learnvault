@@ -2,8 +2,6 @@
  * Utility functions for USDC token operations on Stellar
  */
 
-import { Contract, SorobanRpc } from "@stellar/stellar-sdk"
-
 /**
  * Get the USDC contract ID from environment variables
  * @returns The USDC contract ID
@@ -37,18 +35,9 @@ export async function mintTestUSDC(
 	try {
 		const contractId = getUSDCContractId()
 
-		// Convert amount to stroops (7 decimals for USDC)
-		const amountStroops = amount * 10000000
-
 		// Get RPC URL from environment
 		const rpcUrl =
 			import.meta.env.PUBLIC_STELLAR_RPC_URL || "http://localhost:8000/rpc"
-
-		// Create RPC server instance
-		const server = new SorobanRpc.Server(rpcUrl)
-
-		// Create contract instance
-		const contract = new Contract(contractId)
 
 		// Build the mint transaction
 		// Note: This is a simplified version. In production, you would need to:
@@ -61,7 +50,7 @@ export async function mintTestUSDC(
 		throw new Error(
 			`Please use the CLI script to mint test USDC:\n\n` +
 				`./scripts/mint-test-usdc.sh ${recipientAddress} ${amount}\n\n` +
-				`This UI button will be fully functional once contract clients are generated.`,
+				`The configured contract ${contractId} will be reachable via ${rpcUrl} once contract clients are generated.`,
 		)
 
 		// TODO: Implement full minting flow once contract clients are available
@@ -85,20 +74,19 @@ export async function mintTestUSDC(
  * @param address - The Stellar address to check
  * @returns Promise that resolves to the USDC balance
  */
-export async function getUSDCBalance(address: string): Promise<number> {
+export async function getUSDCBalance(_address: string): Promise<number> {
 	try {
-		const contractId = getUSDCContractId()
+		getUSDCContractId()
 		const rpcUrl =
 			import.meta.env.PUBLIC_STELLAR_RPC_URL || "http://localhost:8000/rpc"
-
-		const server = new SorobanRpc.Server(rpcUrl)
-		const contract = new Contract(contractId)
 
 		// TODO: Implement balance checking once contract clients are available
 		// const balance = await contract.call('balance', { id: address })
 		// return balance / 10000000 // Convert from stroops to USDC
 
-		throw new Error("Balance checking not yet implemented")
+		throw new Error(
+			`Balance checking is not yet implemented. Query the configured RPC endpoint directly: ${rpcUrl}`,
+		)
 	} catch (error) {
 		if (error instanceof Error) {
 			throw error

@@ -1,52 +1,86 @@
-import { Routes, Route, Outlet } from "react-router-dom"
-import ErrorBoundary from "./components/ErrorBoundary"
+import { lazy, Suspense, type ReactNode } from "react"
+import { Outlet, Route, Routes } from "react-router-dom"
 import ComingSoon from "./components/ComingSoon"
+import ErrorBoundary from "./components/ErrorBoundary"
 import Footer from "./components/Footer"
 import NavBar from "./components/NavBar"
-import Admin from "./pages/Admin"
-import Courses from "./pages/Courses"
-import Credential from "./pages/Credential"
-import Dao from "./pages/Dao"
-import DaoProposals from "./pages/DaoProposals"
-import Debug from "./pages/Debug"
-import Donor from "./pages/Donor"
-import Home from "./pages/Home"
-import Leaderboard from "./pages/Leaderboard"
-import Learn from "./pages/Learn"
-import NotFound from "./pages/NotFound"
-import Profile from "./pages/Profile"
-import ScholarshipApply from "./pages/ScholarshipApply"
-import Treasury from "./pages/Treasury"
+import NetworkPreconnect from "./components/NetworkPreconnect"
+
+const Admin = lazy(() => import("./pages/Admin"))
+const Courses = lazy(() => import("./pages/Courses"))
+const Credential = lazy(() => import("./pages/Credential"))
+const Dao = lazy(() => import("./pages/Dao"))
+const DaoProposals = lazy(() => import("./pages/DaoProposals"))
+const Debug = lazy(() => import("./pages/Debug"))
+const Donor = lazy(() => import("./pages/Donor"))
+const Home = lazy(() => import("./pages/Home"))
+const Leaderboard = lazy(() => import("./pages/Leaderboard"))
+const Learn = lazy(() => import("./pages/Learn"))
+const NotFound = lazy(() => import("./pages/NotFound"))
+const Profile = lazy(() => import("./pages/Profile"))
+const ScholarshipApply = lazy(() => import("./pages/ScholarshipApply"))
+const Treasury = lazy(() => import("./pages/Treasury"))
+
+const renderRoute = (element: ReactNode) => (
+	<ErrorBoundary>
+		<Suspense fallback={<RouteFallback />}>{element}</Suspense>
+	</ErrorBoundary>
+)
 
 function App() {
 	return (
 		<Routes>
 			<Route element={<AppLayout />}>
-				<Route path="/" element={<ErrorBoundary><Home /></ErrorBoundary>} />
-				<Route path="/courses" element={<ErrorBoundary><Courses /></ErrorBoundary>} />
-				<Route path="/learn" element={<ErrorBoundary><Learn /></ErrorBoundary>} />
-				<Route path="/dao" element={<ErrorBoundary><Dao /></ErrorBoundary>} />
-				<Route path="/dao/proposals" element={<ErrorBoundary><DaoProposals /></ErrorBoundary>} />
-				<Route path="/leaderboard" element={<ErrorBoundary><Leaderboard /></ErrorBoundary>} />
-				<Route path="/profile" element={<ErrorBoundary><Profile /></ErrorBoundary>} />
-				<Route path="/scholarships/apply" element={<ErrorBoundary><ScholarshipApply /></ErrorBoundary>} />
-				<Route path="/admin" element={<ErrorBoundary><Admin /></ErrorBoundary>} />
-				<Route path="/treasury" element={<ErrorBoundary><Treasury /></ErrorBoundary>} />
-				<Route path="/credentials/:nftId" element={<ErrorBoundary><Credential /></ErrorBoundary>} />
+				<Route path="/" element={renderRoute(<Home />)} />
+				<Route path="/courses" element={renderRoute(<Courses />)} />
+				<Route path="/learn" element={renderRoute(<Learn />)} />
+				<Route path="/dao" element={renderRoute(<Dao />)} />
+				<Route path="/dao/proposals" element={renderRoute(<DaoProposals />)} />
+				<Route path="/leaderboard" element={renderRoute(<Leaderboard />)} />
+				<Route path="/profile" element={renderRoute(<Profile />)} />
+				<Route
+					path="/scholarships/apply"
+					element={renderRoute(<ScholarshipApply />)}
+				/>
+				<Route path="/admin" element={renderRoute(<Admin />)} />
+				<Route path="/treasury" element={renderRoute(<Treasury />)} />
+				<Route
+					path="/credentials/:nftId"
+					element={renderRoute(<Credential />)}
+				/>
 				<Route
 					path="/dashboard"
-					element={<ErrorBoundary><ComingSoon title="My Dashboard" /></ErrorBoundary>}
+					element={renderRoute(<ComingSoon title="My Dashboard" />)}
 				/>
-				<Route path="/debug" element={<ErrorBoundary><Debug /></ErrorBoundary>} />
-				<Route path="/debug/:contractName" element={<ErrorBoundary><Debug /></ErrorBoundary>} />
-				<Route path="*" element={<ErrorBoundary><NotFound /></ErrorBoundary>} />
+				<Route path="/debug" element={renderRoute(<Debug />)} />
+				<Route path="/debug/:contractName" element={renderRoute(<Debug />)} />
+				<Route path="/donor" element={renderRoute(<Donor />)} />
+				<Route path="*" element={renderRoute(<NotFound />)} />
 			</Route>
 		</Routes>
 	)
 }
 
-const AppLayout: React.FC = () => (
+const RouteFallback = () => (
+	<div className="mx-auto w-full max-w-7xl px-6 py-16 sm:px-12">
+		<div className="glass-card animate-pulse rounded-[2.5rem] border border-white/5 p-8">
+			<div className="mb-6 h-8 w-56 rounded-full bg-white/8" />
+			<div className="h-4 w-72 rounded-full bg-white/6" />
+			<div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+				{Array.from({ length: 3 }).map((_, index) => (
+					<div
+						key={index}
+						className="h-32 rounded-[1.75rem] border border-white/5 bg-white/5"
+					/>
+				))}
+			</div>
+		</div>
+	</div>
+)
+
+const AppLayout = () => (
 	<div className="min-h-screen flex flex-col pt-24">
+		<NetworkPreconnect />
 		<NavBar />
 		<main className="flex-1 relative z-10">
 			<Outlet />

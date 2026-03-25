@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from "react"
 import { Helmet } from "react-helmet"
 import { useSearchParams } from "react-router-dom"
 import Pagination from "../components/Pagination"
-import { useToast } from "../components/Toast/ToastProvider"
 import { useGovernance, type Proposal } from "../hooks/useGovernance"
 
 type FilterType = "Active" | "Passed" | "Rejected" | "All"
@@ -45,8 +44,6 @@ const DaoProposals: React.FC = () => {
 	const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(
 		null,
 	)
-
-	const { showInfo } = useToast()
 
 	const filteredProposals = useMemo(() => {
 		if (filter === "All") return proposals
@@ -107,15 +104,17 @@ const DaoProposals: React.FC = () => {
 			: 0
 
 	const userHasVoted = selectedProposal ? hasVoted(selectedProposal.id) : false
+	const governanceTokens = votingPower
+	const isTokenHolder = governanceTokens > 0n
 	const voteDisabled =
 		!selectedProposal ||
 		userHasVoted ||
 		selectedProposal.status !== "Active" ||
-		votingPower === 0n
+		!isTokenHolder
 
 	const getVoteDisabledMessage = () => {
 		if (!selectedProposal) return ""
-		if (votingPower === 0n) return "You must hold GOV tokens to vote."
+		if (!isTokenHolder) return "You must hold GOV tokens to vote."
 		if (userHasVoted) return "You have already cast your vote."
 		if (selectedProposal.status !== "Active")
 			return "Voting is closed for this proposal."
@@ -206,7 +205,7 @@ const DaoProposals: React.FC = () => {
 									My Voting Power
 								</p>
 								<h3 className="text-2xl font-black">
-									{votingPower.toString()} GOV
+									{governanceTokens.toString()} GOV
 								</h3>
 							</div>
 						</div>

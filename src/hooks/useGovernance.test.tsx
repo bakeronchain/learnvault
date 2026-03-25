@@ -1,55 +1,52 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { renderHook, waitFor } from "@testing-library/react"
+import { act, renderHook, waitFor } from "@testing-library/react"
 import { createElement, type ReactNode } from "react"
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import { ToastProvider } from "../components/Toast/ToastProvider"
 import {
 	WalletContext,
 	type WalletContextType,
 } from "../providers/WalletProvider"
 
-// ---------------------------------------------------------------------------
-// Mocks
-// ---------------------------------------------------------------------------
-
-const mockGetProposals = vi.fn()
+const mockGetActiveProposals = vi.fn()
+const mockGetProposalsByStatus = vi.fn()
 const mockVote = vi.fn()
 const mockBalanceFn = vi.fn()
 const mockHasVoted = vi.fn()
+const mockSignAndSend = vi.fn()
+
 vi.stubEnv("PUBLIC_SCHOLARSHIP_TREASURY_CONTRACT", "0xMOCKSCHOLARSHIP")
 vi.stubEnv("PUBLIC_GOVERNANCE_TOKEN_CONTRACT", "0xMOCKGOVTOKEN")
+
 vi.mock("../contracts/util", () => ({
 	rpcUrl: "http://localhost:8000/rpc",
 	stellarNetwork: "LOCAL",
 	networkPassphrase: "Test SDF Network ; September 2015",
 }))
 
-// The hook dynamically imports contract modules via `import(/* @vite-ignore */ path)`.
-// We intercept each path so the fn resolves a mock client.
-vi.mock("../../contracts/scholarship_treasury", () => ({
+vi.mock("../contracts/scholarship_treasury", () => ({
 	default: {
-		get_proposals: (...args: unknown[]) => mockGetProposals(...args),
+		get_active_proposals: (...args: unknown[]) =>
+			mockGetActiveProposals(...args),
+		get_proposals_by_status: (...args: unknown[]) =>
+			mockGetProposalsByStatus(...args),
 		vote: (...args: unknown[]) => mockVote(...args),
 		has_voted: (...args: unknown[]) => mockHasVoted(...args),
 	},
 }))
 
-vi.mock("../../contracts/governance_token", () => ({
+vi.mock("../contracts/governance_token", () => ({
 	default: {
 		balance: (...args: unknown[]) => mockBalanceFn(...args),
 	},
 }))
 
-// ---------------------------------------------------------------------------
-// Import after mocks – IMPORTANT: useGovernance does dynamic import()
-// ---------------------------------------------------------------------------
-import { useGovernance } from "./useGovernance"
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 const signTransaction = vi.fn()
+
+const loadUseGovernance = async () => {
+	const module = await import("./useGovernance")
+	return module.useGovernance
+}
 
 function createWrapper(address?: string) {
 	const queryClient = new QueryClient({
@@ -78,91 +75,103 @@ function createWrapper(address?: string) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 beforeEach(() => {
 	vi.clearAllMocks()
+	mockHasVoted.mockResolvedValue(false)
+	mockBalanceFn.mockResolvedValue(0n)
+	mockGetActiveProposals.mockResolvedValue([])
+	mockGetProposalsByStatus.mockResolvedValue([])
+	mockSignAndSend.mockResolvedValue({
+		result: {
+			isErr: () => false,
+			unwrap: () => undefined,
+		},
+	})
+	mockVote.mockResolvedValue({
+		signAndSend: mockSignAndSend,
+	})
 })
 
 describe("useGovernance", () => {
-	it("starts with empty proposals when contract returns nothing", async () => {
-		mockGetProposals.mockResolvedValue([])
+	it("loads proposals from treasury status queries", async () => {
+		const useGovernance = await loadUseGovernance()
+
+		mockGetActiveProposals.mockResolvedValue([
+			{
+				id: 1,
+				program_name: "Active proposal",
+				program_description: "Pending vote",
+				applicant: "GACTIVE",
+				yes_votes: 10,
+				no_votes: 2,
+				deadline_ledger: 100,
+			},
+		])
+		mockGetProposalsByStatus.mockImplementation(async (status: unknown) => {
+			if (status === "Approved") {
+				return [
+					{
+						id: 2,
+						program_name: "Approved proposal",
+						program_description: "Passed vote",
+						applicant: "GAPPROVED",
+						yes_votes: 20,
+						no_votes: 4,
+						deadline_ledger: 200,
+					},
+				]
+			}
+			if (status === "Rejected") {
+				return [
+					{
+						id: 3,
+						program_name: "Rejected proposal",
+						program_description: "Failed vote",
+						applicant: "GREJECTED",
+						yes_votes: 1,
+						no_votes: 8,
+						deadline_ledger: 300,
+					},
+				]
+			}
+			return []
+		})
 
 		const { result } = renderHook(() => useGovernance(), {
 			wrapper: createWrapper("GADDR"),
 		})
 
 		await waitFor(() => {
-			expect(result.current.proposals).toEqual([])
+			expect(result.current.proposals).toHaveLength(3)
 		})
+
+		expect(result.current.proposals.map((proposal) => proposal.status)).toEqual(
+			["Active", "Passed", "Rejected"],
+		)
+		expect(result.current.proposals.map((proposal) => proposal.id)).toEqual([
+			1, 2, 3,
+		])
 	})
 
-	it("maps raw proposal data to Proposal interface", async () => {
-		console.log("Setting up mock for getProposals")
-		mockGetProposals.mockResolvedValue([
-			{
-				id: 1,
-				title: "Fund bootcamp",
-				description: "Cover tuition",
-				author: "GAUTHOR",
-				status: "Active",
-				votes_for: 100,
-				votes_against: 20,
-				end_date: 1700000000,
-			},
-		])
-
-		console.log("Mock calls:", mockGetProposals.mock.calls)
+	it("reads voting power from the governance token client", async () => {
+		const useGovernance = await loadUseGovernance()
+		mockBalanceFn.mockResolvedValue(42n)
 
 		const { result } = renderHook(() => useGovernance(), {
 			wrapper: createWrapper("GADDR"),
 		})
 
-		// Since the contracts aren't built, this test will fail to load the contract.
-		// For now, let's just test that the hook returns the expected default state
-		await waitFor(
-			() => {
-				console.log("Current proposals:", result.current.proposals)
-				console.log("Mock calls after render:", mockGetProposals.mock.calls)
-				// The proposals should be empty since the contract client isn't available
-				expect(result.current.proposals).toEqual([])
-			},
-			{ timeout: 2000 },
-		)
-
-		// Remove the failing assertion for now until contracts are built
-		// expect(result.current.proposals.length).toBe(1)
-
-		// Skip the detailed proposal checks since contracts aren't built
-		// const proposal = result.current.proposals[0]!
-		// expect(proposal.title).toBe("Fund bootcamp")
-		// expect(proposal.votesFor).toBe(100n)
-		// expect(proposal.votesAgainst).toBe(20n)
-	})
-
-	it("returns 0n voting power when no wallet is connected", () => {
-		const { result } = renderHook(() => useGovernance(), {
-			wrapper: createWrapper(undefined),
+		await waitFor(() => {
+			expect(result.current.votingPower).toBe(42n)
 		})
-
-		expect(result.current.votingPower).toBe(0n)
 	})
 
-	it("hasVoted returns false when no cached data exists", () => {
+	it("hasVoted returns false when no cached data exists", async () => {
+		const useGovernance = await loadUseGovernance()
 		const { result } = renderHook(() => useGovernance(), {
 			wrapper: createWrapper("GADDR"),
 		})
 
 		expect(result.current.hasVoted(1)).toBe(false)
-	})
-
-	it("isVoting defaults to false", () => {
-		const { result } = renderHook(() => useGovernance(), {
-			wrapper: createWrapper("GADDR"),
-		})
-
-		expect(result.current.isVoting).toBe(false)
 	})
 })

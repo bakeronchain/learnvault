@@ -8,6 +8,7 @@ import Courses from "./pages/Courses"
 import Credential from "./pages/Credential"
 import Dao from "./pages/Dao"
 import DaoProposals from "./pages/DaoProposals"
+import DaoPropose from "./pages/DaoPropose"
 import Debug from "./pages/Debug"
 import Donor from "./pages/Donor"
 import Home from "./pages/Home"
@@ -23,118 +24,12 @@ function App() {
 	return (
 		<Routes>
 			<Route element={<AppLayout />}>
-				<Route
-					path="/"
-					element={
-						<ErrorBoundary>
-							<Home />
-						</ErrorBoundary>
-					}
-				/>
-				<Route
-					path="/courses"
-					element={
-						<ErrorBoundary>
-							<Courses />
-						</ErrorBoundary>
-					}
-				/>
-				<Route
-					path="/courses/:courseId/lessons/:lessonId"
-					element={
-						<ErrorBoundary>
-							<LessonView />
-						</ErrorBoundary>
-					}
-				/>
-				<Route
-					path="/learn"
-					element={
-						<ErrorBoundary>
-							<Learn />
-						</ErrorBoundary>
-					}
-				/>
-				<Route
-					path="/dao"
-					element={
-						<ErrorBoundary>
-							<Dao />
-						</ErrorBoundary>
-					}
-				/>
-				<Route
-					path="/dao/proposals"
-					element={
-						<ErrorBoundary>
-							<DaoProposals />
-						</ErrorBoundary>
-					}
-				/>
-				<Route
-					path="/leaderboard"
-					element={
-						<ErrorBoundary>
-							<Leaderboard />
-						</ErrorBoundary>
-					}
-				/>
-				<Route
-					path="/profile"
-					element={
-						<ErrorBoundary>
-							<Profile />
-						</ErrorBoundary>
-					}
-				/>
-				<Route
-					path="/profile/:walletAddress"
-					element={
-						<ErrorBoundary>
-							<Profile />
-						</ErrorBoundary>
-					}
-				/>
-				<Route
-					path="/scholarships/apply"
-					element={
-						<ErrorBoundary>
-							<ScholarshipApply />
-						</ErrorBoundary>
-					}
-				/>
-				<Route
-					path="/admin"
-					element={
-						<ErrorBoundary>
-							<Admin />
-						</ErrorBoundary>
-					}
-				/>
-				<Route
-					path="/treasury"
-					element={
-						<ErrorBoundary>
-							<Treasury />
-						</ErrorBoundary>
-					}
-				/>
-				<Route
-					path="/donor"
-					element={
-						<ErrorBoundary>
-							<Donor />
-						</ErrorBoundary>
-					}
-				/>
-				<Route
-					path="/credentials/:nftId"
-					element={
-						<ErrorBoundary>
-							<Credential />
-						</ErrorBoundary>
-					}
-				/>
+				<Route path="/" element={<Home />} />
+				<Route path="/courses" element={<CourseCatalog />} />
+				<Route path="/profile" element={<Profile />} />
+				<Route path="/profile/:walletAddress" element={<Profile />} />
+				<Route path="/debug" element={<Debug />} />
+				<Route path="/debug/:contractName" element={<Debug />} />
 				<Route
 					path="/dashboard"
 					element={

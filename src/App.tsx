@@ -1,4 +1,7 @@
-import { Routes, Route, Outlet } from "react-router-dom"
+import { Button, Icon, Layout } from "@stellar/design-system"
+import { Routes, Route, Outlet, NavLink } from "react-router-dom"
+import styles from "./App.module.css"
+import ConnectAccount from "./components/ConnectAccount"
 import ErrorBoundary from "./components/ErrorBoundary"
 import ComingSoon from "./components/ComingSoon"
 import Footer from "./components/Footer"

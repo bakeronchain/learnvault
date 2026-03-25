@@ -6,9 +6,10 @@ import { connectWallet, disconnectWallet } from "../util/wallet"
 
 export const WalletButton = () => {
 	const [showDisconnectModal, setShowDisconnectModal] = useState(false)
-	const { address, isPending, balances } = useWallet()
+	const { address, isPending, isReconnecting, balances } = useWallet()
 	const { t } = useTranslation()
-	const buttonLabel = isPending ? t("wallet.loading") : t("wallet.connect")
+	const buttonLabel =
+		isPending || isReconnecting ? t("wallet.loading") : t("wallet.connect")
 
 	if (!address) {
 		return (
@@ -16,6 +17,7 @@ export const WalletButton = () => {
 				variant="secondary"
 				size="md"
 				onClick={() => void connectWallet()}
+				disabled={isReconnecting}
 			>
 				<Icon.Wallet02 />
 				{buttonLabel}
@@ -30,7 +32,7 @@ export const WalletButton = () => {
 				flexDirection: "row",
 				alignItems: "center",
 				gap: "5px",
-				opacity: isPending ? 0.6 : 1,
+				opacity: isPending || isReconnecting ? 0.6 : 1,
 			}}
 		>
 			<Text as="div" size="sm">

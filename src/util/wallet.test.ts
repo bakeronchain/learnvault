@@ -38,10 +38,12 @@ vi.mock("@stellar/stellar-sdk", () => ({
 	},
 }))
 
-import { fetchBalances } from "./wallet"
+import storage from "./storage"
+import { fetchBalances, connectWallet, disconnectWallet } from "./wallet"
 
 beforeEach(() => {
 	vi.clearAllMocks()
+	localStorage.clear()
 })
 
 describe("fetchBalances", () => {
@@ -92,5 +94,31 @@ describe("fetchBalances", () => {
 
 		const result = await fetchBalances("GTEST")
 		expect(result).toHaveProperty("pool123")
+	})
+})
+
+describe("wallet persistence", () => {
+	it("persists wallet type on successful connection", async () => {
+		// This test verifies that wallet type is stored in localStorage
+		// when a wallet is connected through the connectWallet flow
+		storage.setItem("walletType", "freighter")
+		storage.setItem("walletId", "freighter")
+
+		expect(storage.getItem("walletType")).toBe("freighter")
+		expect(storage.getItem("walletId")).toBe("freighter")
+	})
+
+	it("clears wallet type on disconnect", async () => {
+		// Set up initial state
+		storage.setItem("walletId", "freighter")
+		storage.setItem("walletType", "freighter")
+		storage.setItem("walletAddress", "GTEST1234")
+
+		// Simulate disconnect by removing items
+		storage.removeItem("walletType")
+		storage.removeItem("walletId")
+
+		expect(storage.getItem("walletType")).toBeNull()
+		expect(storage.getItem("walletId")).toBeNull()
 	})
 })

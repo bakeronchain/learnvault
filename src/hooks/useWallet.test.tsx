@@ -19,6 +19,7 @@ const baseCtx: WalletContextType = {
 	address: undefined,
 	balances: {},
 	isPending: false,
+	isReconnecting: false,
 	signTransaction,
 	updateBalances: vi.fn(),
 }
@@ -78,5 +79,18 @@ describe("useWallet", () => {
 		expect(result.current.networkPassphrase).toBe(
 			"Test SDF Network ; September 2015",
 		)
+	})
+
+	it("exposes isReconnecting state from context", () => {
+		const ctx: WalletContextType = {
+			...baseCtx,
+			isReconnecting: true,
+		}
+
+		const { result } = renderHook(() => useWallet(), {
+			wrapper: createWrapper(ctx),
+		})
+
+		expect(result.current.isReconnecting).toBe(true)
 	})
 })

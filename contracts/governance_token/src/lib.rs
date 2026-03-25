@@ -50,6 +50,8 @@ pub enum DataKey {
     Balance(Address),
     Allowance(Address, Address), // (owner, spender)
     TotalSupply,
+    Delegate(Address),
+    DelegatedAmount(Address),
 }
 
 // ---------------------------------------------------------------------------
@@ -98,6 +100,13 @@ impl GovernanceToken {
         let key = DataKey::Balance(to.clone());
         let bal: i128 = env.storage().persistent().get(&key).unwrap_or(0);
         env.storage().persistent().set(&key, &(bal + amount));
+
+        // Update delegated amount for 'to's delegate
+        if let Some(delegate) = Self::get_delegate(env.clone(), to.clone()) {
+            let del_key = DataKey::DelegatedAmount(delegate.clone());
+            let del_bal: i128 = env.storage().persistent().get(&del_key).unwrap_or(0);
+            env.storage().persistent().set(&del_key, &(del_bal + amount));
+        }
 
         let supply: i128 = env
             .storage()
@@ -161,8 +170,80 @@ impl GovernanceToken {
     }
 
     // -----------------------------------------------------------------------
+    // Delegation
+    // -----------------------------------------------------------------------
+
+    pub fn delegate(env: Env, delegator: Address, delegatee: Address) {
+        delegator.require_auth();
+
+        let old_delegate = Self::get_delegate(env.clone(), delegator.clone());
+        if old_delegate == Some(delegatee.clone()) {
+            return;
+        }
+
+        let bal = Self::balance(env.clone(), delegator.clone());
+
+        // Remove from old delegate
+        if let Some(old) = old_delegate {
+            let key = DataKey::DelegatedAmount(old);
+            let current: i128 = env.storage().persistent().get(&key).unwrap_or(0);
+            env.storage().persistent().set(&key, &(current - bal));
+        }
+
+        // Add to new delegate
+        if delegator != delegatee {
+            let key = DataKey::DelegatedAmount(delegatee.clone());
+            let current: i128 = env.storage().persistent().get(&key).unwrap_or(0);
+            env.storage().persistent().set(&key, &(current + bal));
+            env.storage()
+                .persistent()
+                .set(&DataKey::Delegate(delegator), &delegatee);
+        } else {
+            // Delegating to self is same as undelegating
+            env.storage()
+                .persistent()
+                .remove(&DataKey::Delegate(delegator));
+        }
+    }
+
+    pub fn undelegate(env: Env, delegator: Address) {
+        delegator.require_auth();
+
+        let old_delegate = Self::get_delegate(env.clone(), delegator.clone());
+        if let Some(old) = old_delegate {
+            let bal = Self::balance(env.clone(), delegator.clone());
+            let key = DataKey::DelegatedAmount(old);
+            let current: i128 = env.storage().persistent().get(&key).unwrap_or(0);
+            env.storage().persistent().set(&key, &(current - bal));
+
+            env.storage()
+                .persistent()
+                .remove(&DataKey::Delegate(delegator));
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Read functions
     // -----------------------------------------------------------------------
+
+    pub fn get_delegate(env: Env, delegator: Address) -> Option<Address> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Delegate(delegator))
+    }
+
+    pub fn get_voting_power(env: Env, address: Address) -> i128 {
+        if Self::get_delegate(env.clone(), address.clone()).is_some() {
+            return 0;
+        }
+        let bal = Self::balance(env.clone(), address.clone());
+        let delegated: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::DelegatedAmount(address))
+            .unwrap_or(0);
+        bal + delegated
+    }
 
     pub fn balance(env: Env, account: Address) -> i128 {
         env.storage()
@@ -214,12 +295,26 @@ impl GovernanceToken {
             panic_with_error!(env, GOVError::InsufficientFunds);
         }
         env.storage().persistent().set(&key, &(bal - amount));
+
+        // Update delegated amount for 'from's delegate
+        if let Some(delegate) = Self::get_delegate(env.clone(), from.clone()) {
+            let del_key = DataKey::DelegatedAmount(delegate.clone());
+            let del_bal: i128 = env.storage().persistent().get(&del_key).unwrap_or(0);
+            env.storage().persistent().set(&del_key, &(del_bal - amount));
+        }
     }
 
     fn _credit(env: &Env, to: &Address, amount: i128) {
         let key = DataKey::Balance(to.clone());
         let bal: i128 = env.storage().persistent().get(&key).unwrap_or(0);
         env.storage().persistent().set(&key, &(bal + amount));
+
+        // Update delegated amount for 'to's delegate
+        if let Some(delegate) = Self::get_delegate(env.clone(), to.clone()) {
+            let del_key = DataKey::DelegatedAmount(delegate.clone());
+            let del_bal: i128 = env.storage().persistent().get(&del_key).unwrap_or(0);
+            env.storage().persistent().set(&del_key, &(del_bal + amount));
+        }
     }
 }
 
@@ -406,5 +501,93 @@ mod test {
         let donor = Address::generate(&e);
         client.mint(&donor, &50);
         assert_eq!(client.balance(&donor), 50);
+    }
+
+    // --- delegation ---
+
+    #[test]
+    fn delegation_increases_voting_power() {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        let alice = Address::generate(&e);
+        let bob = Address::generate(&e);
+
+        client.mint(&alice, &100);
+        client.mint(&bob, &50);
+
+        // Before delegation
+        assert_eq!(client.get_voting_power(&alice), 100);
+        assert_eq!(client.get_voting_power(&bob), 50);
+
+        client.delegate(&alice, &bob);
+
+        // After delegation
+        assert_eq!(client.get_voting_power(&alice), 0);
+        assert_eq!(client.get_voting_power(&bob), 150);
+        assert_eq!(client.get_delegate(&alice), Some(bob.clone()));
+    }
+
+    #[test]
+    fn undelegate_restores_power() {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        let alice = Address::generate(&e);
+        let bob = Address::generate(&e);
+
+        client.mint(&alice, &100);
+        client.delegate(&alice, &bob);
+        assert_eq!(client.get_voting_power(&bob), 100);
+
+        client.undelegate(&alice);
+        assert_eq!(client.get_voting_power(&alice), 100);
+        assert_eq!(client.get_voting_power(&bob), 0);
+        assert_eq!(client.get_delegate(&alice), None);
+    }
+
+    #[test]
+    fn transfer_updates_delegated_power() {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        let alice = Address::generate(&e);
+        let bob = Address::generate(&e);
+        let carol = Address::generate(&e);
+
+        client.mint(&alice, &100);
+        client.delegate(&alice, &bob);
+        assert_eq!(client.get_voting_power(&bob), 100);
+
+        client.transfer(&alice, &carol, &40);
+        assert_eq!(client.get_voting_power(&bob), 60);
+        assert_eq!(client.balance(&carol), 40);
+        assert_eq!(client.get_voting_power(&carol), 40); // Carol has no delegate
+    }
+
+    #[test]
+    fn mint_updates_delegated_power() {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        let alice = Address::generate(&e);
+        let bob = Address::generate(&e);
+
+        client.delegate(&alice, &bob);
+        client.mint(&alice, &100);
+        assert_eq!(client.get_voting_power(&bob), 100);
+    }
+
+    #[test]
+    fn delegate_to_self_is_undelegate() {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        let alice = Address::generate(&e);
+        let bob = Address::generate(&e);
+
+        client.mint(&alice, &100);
+        client.delegate(&alice, &bob);
+        assert_eq!(client.get_delegate(&alice), Some(bob.clone()));
+
+        client.delegate(&alice, &alice);
+        assert_eq!(client.get_delegate(&alice), None);
+        assert_eq!(client.get_voting_power(&alice), 100);
+        assert_eq!(client.get_voting_power(&bob), 0);
     }
 }

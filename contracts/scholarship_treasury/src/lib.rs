@@ -394,7 +394,7 @@ impl ScholarshipTreasury {
         // 5. Get voter's GOV token balance as weight
         let gov_contract = Self::governance_contract(&env);
         let gov_client = governance::client(&env, &gov_contract);
-        let weight = gov_client.balance(&voter);
+        let weight = gov_client.get_voting_power(&voter);
         // Weight of 0 is permitted; vote is recorded but has no numerical effect on outcome
 
         // 6. Add weight to yes_votes or no_votes
@@ -462,6 +462,7 @@ mod governance {
     pub trait GovernanceTokenInterface {
         fn mint(env: Env, to: Address, amount: i128);
         fn balance(env: Env, account: Address) -> i128;
+        fn get_voting_power(env: Env, address: Address) -> i128;
     }
 }
 

@@ -23,6 +23,10 @@ impl MockGovernance {
     pub fn balance(env: Env, account: Address) -> i128 {
         env.storage().persistent().get(&account).unwrap_or(0)
     }
+    pub fn get_voting_power(env: Env, address: Address) -> i128 {
+        // For mock, just return balance. We'll manually mint to simulate delegated power in tests if needed.
+        Self::balance(env, address)
+    }
 }
 
 fn setup<'a>(
@@ -282,6 +286,34 @@ fn yes_vote_adds_weight() {
     let proposal = client.get_proposal(&proposal_id).unwrap();
     assert_eq!(proposal.yes_votes, 500);
     assert_eq!(proposal.no_votes, 0);
+}
+
+#[test]
+fn vote_uses_delegated_power() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client) = setup(&env);
+    let (milestone_titles, milestone_dates) = sample_milestones(&env);
+
+    let voter = Address::generate(&env);
+    // Simulate delegated power by minting directly to the voter in the mock
+    gov_client.mint(&voter, &1000);
+
+    env.mock_all_auths();
+    let proposal_id = client.submit_proposal(
+        &donor,
+        &500,
+        &String::from_str(&env, "Scholarship"),
+        &String::from_str(&env, "https://example.com"),
+        &String::from_str(&env, "Program description"),
+        &String::from_str(&env, "2026-05-15"),
+        &milestone_titles,
+        &milestone_dates,
+    );
+
+    client.vote(&voter, &proposal_id, &true);
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    assert_eq!(proposal.yes_votes, 1000);
 }
 
 #[test]

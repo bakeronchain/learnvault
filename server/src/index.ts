@@ -103,6 +103,13 @@ app.use("/api", commentsRouter)
 app.use("/api", adminMilestonesRouter)
 app.use("/api", uploadRouter)
 
+// Start event poller (non-prod only for now)
+if (process.env.NODE_ENV !== "production") {
+  import('./workers/event-poller.js').then(({ startEventPoller }) => {
+    startEventPoller().catch(console.error)
+  })
+}
+
 app.get("/api/docs", (_req, res) => {
 	res.type("application/yaml").send(openApiYaml)
 })
@@ -112,6 +119,12 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 app.use(errorHandler)
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  import('./workers/event-poller.js').then(({ stopEventPoller }) => stopEventPoller())
+  process.exit(0)
+})
 
 app.listen(env.PORT, () => {
 	console.log(`Server listening on port ${env.PORT}`)

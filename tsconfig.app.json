@@ -1,4 +1,4 @@
 {
 	"extends": "@theahaco/ts-config/typescript.app",
-	"include": ["src", "reset.d.ts"]
+	"include": ["src", "reset.d.ts", "vitest.config.ts"]
 }

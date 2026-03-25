@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { useState, useCallback } from "react"
 import { rpcUrl, stellarNetwork } from "../contracts/util"
 
 export type ActivityEventType =

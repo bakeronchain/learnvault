@@ -22,6 +22,7 @@ pub enum DataKey {
     Proposal(u32),
     ApplicantProposals(Address),
     Scholar(Address),
+    VoteCast(u32, Address),   // (proposal_id, voter) -> bool
 }
 
 #[derive(Clone)]
@@ -37,6 +38,9 @@ pub struct Proposal {
     pub milestone_titles: Vec<String>,
     pub milestone_dates: Vec<String>,
     pub submitted_at: u64,
+    pub yes_votes: i128,
+    pub no_votes: i128,
+    pub deadline_ledger: u32,
 }
 
 #[contracterror]
@@ -48,6 +52,9 @@ pub enum Error {
     InvalidAmount = 3,
     InsufficientFunds = 4,
     ContractPaused = 5,
+    ProposalNotFound = 6,
+    AlreadyVoted = 7,
+    VotingClosed = 8,
 }
 
 #[contract]
@@ -77,6 +84,17 @@ pub struct ProposalSubmitted {
     #[topic]
     pub proposal_id: u32,
     pub amount: i128,
+}
+
+#[contractevent(topics = ["vote"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VoteCast {
+    #[topic]
+    pub voter: Address,
+    #[topic]
+    pub proposal_id: u32,
+    pub support: bool,
+    pub weight: i128,
 }
 
 #[contractimpl]
@@ -292,6 +310,9 @@ impl ScholarshipTreasury {
             milestone_titles,
             milestone_dates,
             submitted_at: env.ledger().timestamp(),
+            yes_votes: 0,
+            no_votes: 0,
+            deadline_ledger: env.ledger().sequence() + 7 * 17_280,
         };
 
         env.storage()
@@ -343,6 +364,64 @@ impl ScholarshipTreasury {
             .saturating_sub(1)
     }
 
+    pub fn vote(env: Env, voter: Address, proposal_id: u32, support: bool) {
+        // 1. Require auth
+        voter.require_auth();
+
+        // 2. Load proposal — panic ProposalNotFound if missing
+        let mut proposal = env
+            .storage()
+            .persistent()
+            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
+
+        // 3. Panic VotingClosed if past deadline
+        if env.ledger().sequence() > proposal.deadline_ledger {
+            panic_with_error!(&env, Error::VotingClosed);
+        }
+
+        // 4. Panic AlreadyVoted if VoteCast(proposal_id, voter) exists
+        let vote_key = DataKey::VoteCast(proposal_id, voter.clone());
+        if env
+            .storage()
+            .persistent()
+            .get::<_, bool>(&vote_key)
+            .unwrap_or(false)
+        {
+            panic_with_error!(&env, Error::AlreadyVoted);
+        }
+
+        // 5. Get voter's GOV token balance as weight
+        let gov_contract = Self::governance_contract(&env);
+        let gov_client = governance::client(&env, &gov_contract);
+        let weight = gov_client.balance(&voter);
+        // Weight of 0 is permitted; vote is recorded but has no numerical effect on outcome
+
+        // 6. Add weight to yes_votes or no_votes
+        if support {
+            proposal.yes_votes += weight;
+        } else {
+            proposal.no_votes += weight;
+        }
+
+        // 7. Mark VoteCast = true
+        env.storage().persistent().set(&vote_key, &true);
+
+        // 8. Update stored proposal
+        env.storage()
+            .persistent()
+            .set(&DataKey::Proposal(proposal_id), &proposal);
+
+        // 9. Emit event
+        VoteCast {
+            voter,
+            proposal_id,
+            support,
+            weight,
+        }
+        .publish(&env);
+    }
+
     fn governance_contract(env: &Env) -> Address {
         if let Some(governance) = env.storage().instance().get::<_, Address>(&GOV_KEY) {
             governance
@@ -391,9 +470,9 @@ pub use governance::GovernanceTokenClient;
 mod token {
     #[cfg(test)]
     mod test_token {
-        use soroban_sdk::{symbol_short, Address, Env, Symbol};
+        use soroban_sdk::{Address, Env};
 
-        const USDC_KEY: Symbol = symbol_short!("USDC");
+        use super::super::USDC_KEY;
 
         pub fn contract_id(env: &Env) -> Address {
             env.storage()

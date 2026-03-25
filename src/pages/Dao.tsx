@@ -50,11 +50,11 @@ export default function Dao() {
 							Apply for scholarship
 						</Button>
 					</Link>
-					<span>
+					<p className={styles.LiveCount} aria-live="polite">
 						Showing {scopedProposals.length} proposal
 						{scopedProposals.length === 1 ? "" : "s"}
 						{address ? " for your wallet" : " across local submissions"}
-					</span>
+					</p>
 				</div>
 			</section>
 
@@ -141,12 +141,20 @@ export default function Dao() {
 									</div>
 
 									<div className={styles.ProposalFooter}>
-										<Link to={proposal.programUrl} target="_blank">
+										<a
+											href={proposal.programUrl}
+											target="_blank"
+											rel="noreferrer"
+										>
 											<Button variant="tertiary" size="md">
 												View program
 											</Button>
-										</Link>
-										{proposal.txHash && <code>{proposal.txHash}</code>}
+										</a>
+										{proposal.txHash && (
+											<code aria-label={`Transaction hash ${proposal.txHash}`}>
+												{proposal.txHash}
+											</code>
+										)}
 									</div>
 								</article>
 							</Card>

@@ -1,0 +1,34 @@
+{
+	"lessonId": "soroban-fundamentals-1",
+	"passingScore": 80,
+	"questions": [
+		{
+			"id": 1,
+			"text": "In Rust, which type best represents “this value might be missing”?",
+			"options": ["Result<T, E>", "Option<T>", "Vec<T>", "HashMap<K, V>"],
+			"correctIndex": 1
+		},
+		{
+			"id": 2,
+			"text": "Why are unbounded loops risky in smart contract code?",
+			"options": [
+				"They can exceed resource limits and fail unpredictably",
+				"They make keys easier to steal",
+				"They disable signature checks",
+				"They force the network into maintenance mode"
+			],
+			"correctIndex": 0
+		},
+		{
+			"id": 3,
+			"text": "Which statement about ownership is most accurate?",
+			"options": [
+				"A value can have unlimited owners by default",
+				"Exactly one owner controls a value at a time",
+				"Only mutable references can own values",
+				"Ownership only applies to strings"
+			],
+			"correctIndex": 1
+		}
+	]
+}

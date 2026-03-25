@@ -1,0 +1,39 @@
+{
+	"lessonId": "stellar-basics-4",
+	"passingScore": 80,
+	"questions": [
+		{
+			"id": 1,
+			"text": "Soroban contracts are compiled to which format for execution?",
+			"options": [
+				"Native x86",
+				"WebAssembly (Wasm)",
+				"JVM bytecode",
+				"Solidity source"
+			],
+			"correctIndex": 1
+		},
+		{
+			"id": 2,
+			"text": "Which statement best describes Soroban contract storage?",
+			"options": [
+				"Storage is implicit and unlimited",
+				"State is stored explicitly in the Stellar ledger when the contract writes it",
+				"State is stored in the user’s browser localStorage",
+				"State is stored on Horizon servers only"
+			],
+			"correctIndex": 1
+		},
+		{
+			"id": 3,
+			"text": "In Soroban, what is `Env` primarily used for?",
+			"options": [
+				"Mining blocks",
+				"Accessing storage, auth, and ledger context",
+				"Generating seed phrases",
+				"Replacing Stellar Core"
+			],
+			"correctIndex": 1
+		}
+	]
+}

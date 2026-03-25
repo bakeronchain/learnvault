@@ -1,13 +1,29 @@
 extern crate std;
 
 use soroban_sdk::{
-    testutils::{Address as _, MockAuth, MockAuthInvoke},
+    contract, contractimpl,
+    testutils::{Address as _, Ledger, MockAuth, MockAuthInvoke},
     token::{StellarAssetClient, TokenClient},
     Address, Env, IntoVal, String, Val, Vec,
 };
 
-use crate::{token, Error, GovernanceTokenClient, ScholarshipTreasury, ScholarshipTreasuryClient};
-use governance_token::{GovernanceToken, GovernanceTokenClient as GovTokenClient};
+use crate::{token, Error, ScholarshipTreasury, ScholarshipTreasuryClient};
+
+#[contract]
+pub struct MockGovernance;
+
+#[contractimpl]
+impl MockGovernance {
+    pub fn initialize(env: Env, treasury: Address) {}
+    pub fn mint(env: Env, to: Address, amount: i128) {
+        let key = soroban_sdk::Symbol::new(&env, "balance");
+        let balance: i128 = env.storage().persistent().get(&to).unwrap_or(0);
+        env.storage().persistent().set(&to, &(balance + amount));
+    }
+    pub fn balance(env: Env, account: Address) -> i128 {
+        env.storage().persistent().get(&account).unwrap_or(0)
+    }
+}
 
 fn setup<'a>(
     env: &'a Env,
@@ -17,7 +33,7 @@ fn setup<'a>(
     Address,
     Address,
     Address,
-    GovTokenClient<'a>,
+    MockGovernanceClient<'a>,
 ) {
     let admin = Address::generate(env);
     let donor = Address::generate(env);
@@ -26,8 +42,8 @@ fn setup<'a>(
     let contract_id = env.register(ScholarshipTreasury, ());
     let client = ScholarshipTreasuryClient::new(env, &contract_id);
 
-    let gov_contract_id = env.register(GovernanceToken, ());
-    let gov_client = GovTokenClient::new(env, &gov_contract_id);
+    let gov_contract_id = env.register(MockGovernance, ());
+    let gov_client = MockGovernanceClient::new(env, &gov_contract_id);
 
     env.mock_all_auths();
     env.as_contract(&contract_id, || token::register(env, &admin));
@@ -236,6 +252,182 @@ fn proposal_requires_three_milestones() {
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
             Error::InvalidAmount as u32
+        )))
+    );
+}
+
+#[test]
+fn yes_vote_adds_weight() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client) = setup(&env);
+    let (milestone_titles, milestone_dates) = sample_milestones(&env);
+
+    let voter = Address::generate(&env);
+    gov_client.mint(&voter, &500);
+
+    env.mock_all_auths();
+    let proposal_id = client.submit_proposal(
+        &donor,
+        &500,
+        &String::from_str(&env, "Scholarship"),
+        &String::from_str(&env, "https://example.com"),
+        &String::from_str(&env, "Program description"),
+        &String::from_str(&env, "2026-05-15"),
+        &milestone_titles,
+        &milestone_dates,
+    );
+
+    client.vote(&voter, &proposal_id, &true);
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    assert_eq!(proposal.yes_votes, 500);
+    assert_eq!(proposal.no_votes, 0);
+}
+
+#[test]
+fn no_vote_adds_weight() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client) = setup(&env);
+    let (milestone_titles, milestone_dates) = sample_milestones(&env);
+
+    let voter = Address::generate(&env);
+    gov_client.mint(&voter, &500);
+
+    env.mock_all_auths();
+    let proposal_id = client.submit_proposal(
+        &donor,
+        &500,
+        &String::from_str(&env, "Scholarship"),
+        &String::from_str(&env, "https://example.com"),
+        &String::from_str(&env, "Program description"),
+        &String::from_str(&env, "2026-05-15"),
+        &milestone_titles,
+        &milestone_dates,
+    );
+
+    client.vote(&voter, &proposal_id, &false);
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    assert_eq!(proposal.no_votes, 500);
+    assert_eq!(proposal.yes_votes, 0);
+}
+
+#[test]
+fn double_vote_panics() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client) = setup(&env);
+    let (milestone_titles, milestone_dates) = sample_milestones(&env);
+
+    let voter = Address::generate(&env);
+    gov_client.mint(&voter, &500);
+
+    env.mock_all_auths();
+    let proposal_id = client.submit_proposal(
+        &donor,
+        &500,
+        &String::from_str(&env, "Scholarship"),
+        &String::from_str(&env, "https://example.com"),
+        &String::from_str(&env, "Program description"),
+        &String::from_str(&env, "2026-05-15"),
+        &milestone_titles,
+        &milestone_dates,
+    );
+
+    client.vote(&voter, &proposal_id, &true);
+    let result = client.try_vote(&voter, &proposal_id, &true);
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::AlreadyVoted as u32
+        )))
+    );
+}
+
+#[test]
+fn vote_after_deadline_panics() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client) = setup(&env);
+    let (milestone_titles, milestone_dates) = sample_milestones(&env);
+
+    let voter = Address::generate(&env);
+    gov_client.mint(&voter, &500);
+
+    env.mock_all_auths();
+    let proposal_id = client.submit_proposal(
+        &donor,
+        &500,
+        &String::from_str(&env, "Scholarship"),
+        &String::from_str(&env, "https://example.com"),
+        &String::from_str(&env, "Program description"),
+        &String::from_str(&env, "2026-05-15"),
+        &milestone_titles,
+        &milestone_dates,
+    );
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger().set_sequence_number(proposal.deadline_ledger + 1);
+
+    let result = client.try_vote(&voter, &proposal_id, &true);
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::VotingClosed as u32
+        )))
+    );
+}
+
+#[test]
+fn zero_weight_vote_allowed() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client) = setup(&env);
+    let (milestone_titles, milestone_dates) = sample_milestones(&env);
+
+    let voter = Address::generate(&env);
+    // No minting, weight is 0
+
+    env.mock_all_auths();
+    let proposal_id = client.submit_proposal(
+        &donor,
+        &500,
+        &String::from_str(&env, "Scholarship"),
+        &String::from_str(&env, "https://example.com"),
+        &String::from_str(&env, "Program description"),
+        &String::from_str(&env, "2026-05-15"),
+        &milestone_titles,
+        &milestone_dates,
+    );
+
+    client.vote(&voter, &proposal_id, &true);
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    assert_eq!(proposal.yes_votes, 0);
+
+    // Assert VoteCast storage key is true (vote again should panic)
+    let result = client.try_vote(&voter, &proposal_id, &true);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::AlreadyVoted as u32
+        )))
+    );
+}
+
+#[test]
+fn vote_on_missing_proposal_panics() {
+    let env = Env::default();
+    let (client, _governance, _donor, _recipient, _token_id, _gov_client) = setup(&env);
+
+    let voter = Address::generate(&env);
+    env.mock_all_auths();
+
+    let result = client.try_vote(&voter, &999, &true);
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::ProposalNotFound as u32
         )))
     );
 }

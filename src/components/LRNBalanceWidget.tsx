@@ -597,8 +597,8 @@ const lgStyles = `
     background: linear-gradient(160deg, #0e0c1a 0%, #141027 50%, #1a1535 100%);
     border: 1px solid #2e2a4a;
     border-radius: 20px;
-    padding: 28px;
-    min-width: 280px;
+    padding: 24px;
+    width: 100%;
     max-width: 380px;
     position: relative;
     overflow: hidden;

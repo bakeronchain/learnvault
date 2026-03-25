@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react"
+import ReactMarkdown from "react-markdown"
 import { useNavigate } from "react-router-dom"
 import { useWallet } from "../hooks/useWallet"
 import { useScholarshipTreasury } from "../util/scholarshipTreasury"
-import ReactMarkdown from "react-markdown"
 
 type ProposalType = "scholarship" | "parameter_change" | "new_course"
 
@@ -27,7 +27,12 @@ interface FormData {
 const DaoPropose: React.FC = () => {
 	const { address } = useWallet()
 	const navigate = useNavigate()
-	const { createProposal, getGovernanceTokenBalance, getMinimumProposalTokens, isConnected } = useScholarshipTreasury()
+	const {
+		createProposal,
+		getGovernanceTokenBalance,
+		getMinimumProposalTokens,
+		isConnected,
+	} = useScholarshipTreasury()
 	const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit")
 	const [isSubmitting, setIsSubmitting] = useState(false)
 	const [governanceTokenBalance, setGovernanceTokenBalance] = useState(0)
@@ -49,9 +54,9 @@ const DaoPropose: React.FC = () => {
 			try {
 				const [balance, minimum] = await Promise.all([
 					getGovernanceTokenBalance(address),
-					getMinimumProposalTokens()
+					getMinimumProposalTokens(),
 				])
-				
+
 				setGovernanceTokenBalance(balance)
 				setMinimumTokens(minimum)
 				setHasMinimumBalance(balance >= minimum)
@@ -66,14 +71,16 @@ const DaoPropose: React.FC = () => {
 			}
 		}
 
-		checkBalance()
+		void checkBalance()
 	}, [address, isConnected, getGovernanceTokenBalance, getMinimumProposalTokens])
 
 	const handleInputChange = (
-		e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+		e: React.ChangeEvent<
+			HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+		>,
 	) => {
 		const { name, value } = e.target
-		setFormData(prev => ({
+		setFormData((prev) => ({
 			...prev,
 			[name]: value,
 		}))
@@ -93,27 +100,31 @@ const DaoPropose: React.FC = () => {
 				proposalType: formData.type,
 				typeSpecificData: {
 					applicationUrl: formData.applicationUrl,
-					fundingAmount: formData.fundingAmount ? parseFloat(formData.fundingAmount) : undefined,
+					fundingAmount: formData.fundingAmount
+						? parseFloat(formData.fundingAmount)
+						: undefined,
 					parameterName: formData.parameterName,
 					parameterValue: formData.parameterValue,
 					parameterReason: formData.parameterReason,
 					courseTitle: formData.courseTitle,
 					courseDescription: formData.courseDescription,
-					courseDuration: formData.courseDuration ? parseInt(formData.courseDuration) : undefined,
+					courseDuration: formData.courseDuration
+						? parseInt(formData.courseDuration)
+						: undefined,
 					courseDifficulty: formData.courseDifficulty,
-				}
+				},
 			}
 
 			// Submit to ScholarshipTreasury contract
 			const txHash = await createProposal(proposalData)
-			
+
 			// Extract proposal ID from transaction hash (mock implementation)
-			const proposalId = txHash.includes('PROPOSAL_') 
-				? txHash.split('_')[1] 
+			const proposalId = txHash.includes("PROPOSAL_")
+				? txHash.split("_")[1]
 				: Math.floor(Math.random() * 1000) + 1
-			
+
 			// Redirect to proposal detail page
-			navigate(`/dao/proposals#proposal-${proposalId}`)
+			void navigate(`/dao/proposals#proposal-${proposalId}`)
 		} catch (error) {
 			console.error("Failed to submit proposal:", error)
 			// In a real implementation, you would show an error message to the user
@@ -276,28 +287,31 @@ const DaoPropose: React.FC = () => {
 		return (
 			<div className="prose prose-invert max-w-none">
 				{formData.title && (
-					<h1 className="text-3xl font-bold text-white mb-4">{formData.title}</h1>
+					<h1 className="text-3xl font-bold text-white mb-4">
+						{formData.title}
+					</h1>
 				)}
-				<ReactMarkdown 
-					className="text-white/80"
-					components={{
-						h1: ({children}) => <h1 className="text-2xl font-bold text-white mb-4">{children}</h1>,
-						h2: ({children}) => <h2 className="text-xl font-bold text-white mb-3">{children}</h2>,
-						h3: ({children}) => <h3 className="text-lg font-bold text-white mb-2">{children}</h3>,
-						p: ({children}) => <p className="text-white/80 leading-relaxed mb-4">{children}</p>,
-						ul: ({children}) => <ul className="list-disc list-inside text-white/80 mb-4">{children}</ul>,
-						ol: ({children}) => <ol className="list-decimal list-inside text-white/80 mb-4">{children}</ol>,
-						li: ({children}) => <li className="text-white/80 mb-2">{children}</li>,
-						strong: ({children}) => <strong className="text-white font-bold">{children}</strong>,
-						em: ({children}) => <em className="text-white italic">{children}</em>,
-						code: ({children}) => <code className="bg-white/10 text-brand-cyan px-2 py-1 rounded text-sm">{children}</code>,
-						pre: ({children}) => <pre className="bg-white/10 text-white p-4 rounded-lg overflow-x-auto mb-4">{children}</pre>,
-						blockquote: ({children}) => <blockquote className="border-l-4 border-brand-cyan pl-4 text-white/60 italic mb-4">{children}</blockquote>,
-						a: ({children, href}) => <a href={href} className="text-brand-cyan hover:text-brand-cyan/80 underline">{children}</a>,
-					}}
-				>
-					{formData.description || "*Start typing to see a preview...*"}
-				</ReactMarkdown>
+				<div className="text-white/80">
+					<ReactMarkdown 
+						components={{
+							h1: ({children}) => <h1 className="text-2xl font-bold text-white mb-4">{children}</h1>,
+							h2: ({children}) => <h2 className="text-xl font-bold text-white mb-3">{children}</h2>,
+							h3: ({children}) => <h3 className="text-lg font-bold text-white mb-2">{children}</h3>,
+							p: ({children}) => <p className="text-white/80 leading-relaxed mb-4">{children}</p>,
+							ul: ({children}) => <ul className="list-disc list-inside text-white/80 mb-4">{children}</ul>,
+							ol: ({children}) => <ol className="list-decimal list-inside text-white/80 mb-4">{children}</ol>,
+							li: ({children}) => <li className="text-white/80 mb-2">{children}</li>,
+							strong: ({children}) => <strong className="text-white font-bold">{children}</strong>,
+							em: ({children}) => <em className="text-white italic">{children}</em>,
+							code: ({children}) => <code className="bg-white/10 text-brand-cyan px-2 py-1 rounded text-sm">{children}</code>,
+							pre: ({children}) => <pre className="bg-white/10 text-white p-4 rounded-lg overflow-x-auto mb-4">{children}</pre>,
+							blockquote: ({children}) => <blockquote className="border-l-4 border-brand-cyan pl-4 text-white/60 italic mb-4">{children}</blockquote>,
+							a: ({children, href}) => <a href={href} className="text-brand-cyan hover:text-brand-cyan/80 underline">{children}</a>,
+						}}
+					>
+						{formData.description || "*Start typing to see a preview...*"}
+					</ReactMarkdown>
+				</div>
 			</div>
 		)
 	}
@@ -318,7 +332,9 @@ const DaoPropose: React.FC = () => {
 			<div className="min-h-screen flex items-center justify-center text-white">
 				<div className="text-center">
 					<h1 className="text-4xl font-black mb-4">Connect Your Wallet</h1>
-					<p className="text-white/60 mb-8">You need to connect your wallet to create a proposal</p>
+					<p className="text-white/60 mb-8">
+						You need to connect your wallet to create a proposal
+					</p>
 				</div>
 			</div>
 		)
@@ -328,9 +344,12 @@ const DaoPropose: React.FC = () => {
 		return (
 			<div className="min-h-screen flex items-center justify-center text-white">
 				<div className="glass-card p-12 rounded-[3rem] border border-white/5 text-center max-w-md">
-					<h1 className="text-4xl font-black mb-4">Insufficient Governance Tokens</h1>
+					<h1 className="text-4xl font-black mb-4">
+						Insufficient Governance Tokens
+					</h1>
 					<p className="text-white/60 mb-6">
-						You need at least {minimumTokens} governance tokens to create a proposal.
+						You need at least {minimumTokens} governance tokens to create a
+						proposal.
 					</p>
 					<div className="text-brand-cyan text-2xl font-bold mb-8">
 						Current Balance: {governanceTokenBalance} tokens
@@ -457,7 +476,8 @@ const DaoPropose: React.FC = () => {
 					<div className="glass-card p-8 rounded-[2.5rem] border border-white/5">
 						<h2 className="text-2xl font-black mb-6 tracking-tight">
 							{formData.type === "scholarship" && "Scholarship Details"}
-							{formData.type === "parameter_change" && "Parameter Change Details"}
+							{formData.type === "parameter_change" &&
+								"Parameter Change Details"}
 							{formData.type === "new_course" && "Course Details"}
 						</h2>
 						{renderTypeSpecificFields()}
@@ -466,7 +486,10 @@ const DaoPropose: React.FC = () => {
 					{/* Submit Section */}
 					<div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
 						<div className="text-sm text-white/40">
-							Your governance token balance: <span className="text-brand-cyan font-bold">{governanceTokenBalance} tokens</span>
+							Your governance token balance:{" "}
+							<span className="text-brand-cyan font-bold">
+								{governanceTokenBalance} tokens
+							</span>
 						</div>
 						<div className="flex gap-4">
 							<button
@@ -478,7 +501,12 @@ const DaoPropose: React.FC = () => {
 							</button>
 							<button
 								type="submit"
-								disabled={isSubmitting || !formData.title || !formData.description || !hasMinimumBalance}
+								disabled={
+									isSubmitting ||
+									!formData.title ||
+									!formData.description ||
+									!hasMinimumBalance
+								}
 								className="px-8 py-3 bg-brand-cyan/10 border border-brand-cyan/30 text-brand-cyan font-black uppercase tracking-widest rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 transition-all"
 							>
 								{isSubmitting ? "Submitting..." : "Submit Proposal"}

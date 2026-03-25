@@ -1,0 +1,39 @@
+{
+	"lessonId": "defi-fundamentals-2",
+	"passingScore": 80,
+	"questions": [
+		{
+			"id": 1,
+			"text": "In an AMM, why does a large swap often experience more slippage?",
+			"options": [
+				"Because it changes the pool’s ratio more",
+				"Because wallets disable small trades",
+				"Because oracles refuse to update",
+				"Because fees are always zero"
+			],
+			"correctIndex": 0
+		},
+		{
+			"id": 2,
+			"text": "Who are liquidity providers (LPs)?",
+			"options": [
+				"Users who deposit assets into a pool to enable swaps",
+				"Validators that run Stellar Core",
+				"People who write wallet seed phrases",
+				"A type of oracle"
+			],
+			"correctIndex": 0
+		},
+		{
+			"id": 3,
+			"text": "A fungible token means…",
+			"options": [
+				"Every token is unique like an NFT",
+				"Units are interchangeable (1 unit equals another)",
+				"Tokens cannot be transferred",
+				"Tokens must be physical"
+			],
+			"correctIndex": 1
+		}
+	]
+}

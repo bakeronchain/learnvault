@@ -34,10 +34,9 @@ const Home: React.FC = () => {
 			</Helmet>
 
 			<div className="min-h-screen flex flex-col items-center py-20 px-6 relative overflow-hidden">
-				{/* Immersive Background Elements */}
 				<div className="absolute top-0 left-0 w-full h-full animate-mesh opacity-30 -z-20" />
-				<div className="absolute top-1/4 left-1/4 w-150 h-150 bg-brand-cyan/20 blur-[150px] rounded-full -z-10 animate-pulse" />
-				<div className="absolute bottom-1/4 right-1/4 w-150 h-150 bg-brand-purple/20 blur-[150px] rounded-full -z-10 animate-pulse delay-700" />
+				<div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-brand-cyan/20 blur-[150px] rounded-full -z-10 animate-pulse" />
+				<div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-brand-purple/20 blur-[150px] rounded-full -z-10 animate-pulse delay-700" />
 
 				<OnboardingWizard />
 
@@ -59,7 +58,7 @@ const Home: React.FC = () => {
 							to="/courses"
 							className="iridescent-border px-12 py-5 rounded-2xl font-black text-lg uppercase tracking-widest hover:scale-105 active:scale-95 transition-all group relative overflow-hidden shadow-2xl shadow-brand-cyan/20"
 						>
-							<span className="relative z-10">Browse Tracks</span>
+							<span className="relative z-10">{t("nav.courses")}</span>
 						</Link>
 						<Link
 							to="/learn"
@@ -69,38 +68,13 @@ const Home: React.FC = () => {
 						</Link>
 					</div>
 				</header>
-				<div className="flex justify-center mb-8">
-					<WalletAddressPill 
-						address="GABC1234567890ABCDEFGHWXYZ" 
-						showLink={true} 
-					/>
-				</div>
 
-				<h1 className="text-7xl md:text-8xl font-black mb-8 tracking-tighter text-gradient leading-[0.9] animate-in slide-in-from-bottom-12 duration-1000 delay-200">
-					{t("home.heroTitle")}
-				</h1>
-				<p className="text-xl md:text-2xl text-white/50 mb-12 max-w-2xl mx-auto font-medium leading-relaxed animate-in slide-in-from-bottom-12 duration-1000 delay-400">
-					{t("home.heroDesc")}
-				</p>
-				<div className="flex flex-wrap justify-center gap-6 animate-in slide-in-from-bottom-12 duration-1000 delay-600">
-					<Link
-						to="/courses"
-						className="iridescent-border px-12 py-5 rounded-2xl font-black text-lg uppercase tracking-widest hover:scale-105 active:scale-95 transition-all group relative overflow-hidden shadow-2xl shadow-brand-cyan/20"
-					>
-						<span className="relative z-10">Browse Tracks</span>
-					</Link>
-					<Link
-						to="/learn"
-						className="px-12 py-5 glass text-white rounded-2xl font-black text-lg uppercase tracking-widest hover:bg-white/10 hover:scale-105 active:scale-95 transition-all border border-white/10"
-					>
-						{t("nav.learn")}
-					</Link>
+				<div className="flex justify-center mb-8">
+					<WalletAddressPill address="GABC1234567890ABCDEFGHWXYZ" showLink />
 				</div>
-			</header>
 
 				<main className="w-full max-w-6xl flex flex-col gap-12 relative z-10 animate-in slide-in-from-bottom-12 duration-1000 delay-800">
-					{/* Upstream Content: Course Progress */}
-					<div className="iridescent-border p-1px rounded-[3.5rem] shadow-2xl">
+					<div className="iridescent-border p-[1px] rounded-[3.5rem] shadow-2xl">
 						<div className="glass-card p-12 rounded-[3.5rem] border border-white/5">
 							<div className="flex flex-col md:flex-row gap-12 items-start">
 								<div className="md:w-1/3">
@@ -122,7 +96,6 @@ const Home: React.FC = () => {
 						</div>
 					</div>
 
-					{/* Upstream Content: Sample Contracts */}
 					<div className="glass-card p-12 rounded-[3.5rem] border border-white/10 shadow-2xl">
 						<h2 className="text-3xl font-black mb-10 flex items-center gap-4">
 							<Icon.File06 size="lg" className="text-brand-purple" />
@@ -178,7 +151,6 @@ const Home: React.FC = () => {
 						</div>
 					</div>
 
-					{/* Features Cards */}
 					<div className="grid grid-cols-1 md:grid-cols-3 gap-8">
 						<FeatureCard
 							icon="🎓"

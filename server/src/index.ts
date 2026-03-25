@@ -11,6 +11,7 @@ import { z } from "zod"
 import { initDb } from "./db/index"
 import { createNonceStore } from "./db/nonce-store"
 import { errorHandler } from "./middleware/error.middleware"
+import { globalLimiter } from "./middleware/rate-limit.middleware"
 import { createAuthRouter } from "./routes/auth.routes"
 import { healthRouter } from "./routes/health.routes"
 import { createMeRouter } from "./routes/me.routes"
@@ -19,14 +20,6 @@ import {
 	createJwtService,
 	generateEphemeralDevJwtKeys,
 } from "./services/jwt.service"
-
-// Load server/.env whether you run from repo root or from server/
-dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
-
-const pemString = z
-	.string()
-	.min(1)
-	.transform((s) => s.replace(/\\n/g, "\n").trim())
 import { validatorRouter } from "./routes/validator.routes"
 import { commentsRouter } from "./routes/comments.routes"
 import { adminMilestonesRouter } from "./routes/admin-milestones.routes"
@@ -35,29 +28,25 @@ import { coursesRouter } from "./routes/courses.routes"
 import { eventsRouter } from "./routes/events.routes"
 import { buildOpenApiSpec } from "./openapi"
 
+// Load server/.env whether you run from repo root or from server/
+dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
+
+const pemString = z
+	.string()
+	.min(1)
+	.transform((s) => s.replace(/\\n/g, "\n").trim())
+
 const envSchema = z.object({
 	PORT: z.coerce.number().int().positive().default(4000),
 	CORS_ORIGIN: z.string().default("http://localhost:5173"),
+	NODE_ENV: z.string().default("development"),
+	JWT_PRIVATE_KEY: pemString.optional(),
+	JWT_PUBLIC_KEY: pemString.optional(),
+	REDIS_URL: z.string().optional(),
 })
 
 const env = envSchema.parse(process.env)
 
-const app = express()
-const openApiSpec = buildOpenApiSpec()
-const openApiYaml = YAML.stringify(openApiSpec)
-
-app.use(morgan("dev"))
-app.use(
-	cors({
-		origin: env.CORS_ORIGIN,
-	}),
-)
-app.use(express.json())
-
-app.use("/api", healthRouter)
-app.use("/api", coursesRouter)
-app.use("/api", validatorRouter)
-app.use("/api", eventsRouter)
 const isProduction = env.NODE_ENV === "production"
 
 let jwtPrivateKey = env.JWT_PRIVATE_KEY
@@ -103,6 +92,13 @@ app.use("/api", commentsRouter)
 app.use("/api", adminMilestonesRouter)
 app.use("/api", uploadRouter)
 
+// Start event poller (non-prod only for now)
+if (process.env.NODE_ENV !== "production") {
+  void import('./workers/event-poller.js').then(({ startEventPoller }) => {
+    void startEventPoller().catch(console.error)
+  })
+}
+
 app.get("/api/docs", (_req, res) => {
 	res.type("application/yaml").send(openApiYaml)
 })
@@ -112,6 +108,14 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 app.use(errorHandler)
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  void import('./workers/event-poller.js').then(({ stopEventPoller }) => {
+    void stopEventPoller()
+  })
+  process.exit(0)
+})
 
 app.listen(env.PORT, () => {
 	console.log(`Server listening on port ${env.PORT}`)

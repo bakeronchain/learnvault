@@ -1,0 +1,39 @@
+{
+	"lessonId": "soroban-fundamentals-2",
+	"passingScore": 80,
+	"questions": [
+		{
+			"id": 1,
+			"text": "When you build a Soroban contract, what is the primary output artifact?",
+			"options": [
+				"A PNG file",
+				"A WebAssembly (.wasm) file",
+				"A PDF",
+				"A seed phrase"
+			],
+			"correctIndex": 1
+		},
+		{
+			"id": 2,
+			"text": "What does “deploy” generally mean in the Soroban contract lifecycle?",
+			"options": [
+				"Calling a function",
+				"Uploading Wasm and creating a contract instance (contract ID)",
+				"Changing a trustline limit",
+				"Minting XLM"
+			],
+			"correctIndex": 1
+		},
+		{
+			"id": 3,
+			"text": "Which action typically requires a contract ID?",
+			"options": [
+				"Viewing an explorer",
+				"Invoking a contract entrypoint",
+				"Creating a wallet",
+				"Exporting keys"
+			],
+			"correctIndex": 1
+		}
+	]
+}

@@ -12,14 +12,19 @@ import { useWallet } from "./useWallet"
 
 type ContractRecord = Record<string, unknown>
 
+const generatedContractModules = import.meta.glob("../contracts/*.ts")
+
 /**
  * Dynamically loads the generated LearnToken contract client (or its shim).
  * Returns null if the module cannot be found at all.
  */
 const loadLearnTokenClient = async (): Promise<ContractRecord | null> => {
+	const moduleLoader = generatedContractModules["../contracts/learn_token.ts"]
+	if (!moduleLoader) return null
+
 	try {
-		const path = "../contracts/learn_token"
-		const mod = (await import(/* @vite-ignore */ path)) as ContractRecord
+		const mod = (await moduleLoader()) as ContractRecord
+
 		return (mod.default as ContractRecord) ?? mod
 	} catch {
 		return null

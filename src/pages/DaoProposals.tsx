@@ -108,6 +108,9 @@ const MOCK_PROPOSALS: Proposal[] = [
 
 const governanceTokens = 128.45
 const isTokenHolder = true
+const filterGroupLabelId = "dao-proposals-filter-label"
+const voteHelpId = "dao-proposals-vote-help"
+const voteStatusId = "dao-proposals-vote-status"
 
 const shortenAddress = (address: string) => {
 	if (address.includes("...")) return address
@@ -151,7 +154,10 @@ const DaoProposals: React.FC = () => {
 		)
 
 		if (!stillVisible) {
-			setSelectedProposal(filteredProposals[0] ?? null)
+			const firstVisible = filteredProposals[0]
+			if (firstVisible) {
+				setSelectedProposal(firstVisible)
+			}
 		}
 	}, [filteredProposals, selectedProposal])
 
@@ -205,6 +211,8 @@ const DaoProposals: React.FC = () => {
 		}
 	}
 
+	const voteDisabledMessage = getVoteDisabledMessage()
+
 	const siteUrl = "https://learnvault.app"
 	const title = selectedProposal
 		? `${selectedProposal.title} — $${selectedProposal.usdcRequested} USDC · ${selectedProposal.userVote ?? "Not Voted"} — LearnVault DAO`
@@ -228,25 +236,34 @@ const DaoProposals: React.FC = () => {
 				<h1 className="text-6xl font-black mb-4 tracking-tighter text-gradient">
 					DAO Proposals
 				</h1>
-				<p className="text-white/40 text-lg font-medium max-w-2xl mx-auto">
+				<p className="text-white/70 text-lg font-medium max-w-2xl mx-auto">
 					Governance token holders can review scholarship proposals and cast
 					votes.
 				</p>
 			</header>
 
-			<div className="flex flex-wrap gap-3 mb-8 justify-center">
+			<div
+				className="flex flex-wrap gap-3 mb-8 justify-center"
+				role="group"
+				aria-labelledby={filterGroupLabelId}
+			>
+				<p id={filterGroupLabelId} className="sr-only">
+					Filter proposals by status
+				</p>
 				{(["Active", "Passed", "Rejected", "All"] as FilterType[]).map(
 					(item) => (
 						<button
+							type="button"
 							key={item}
 							onClick={() => {
 								setFilter(item)
 								setTxMessage("")
 							}}
+							aria-pressed={filter === item}
 							className={`px-5 py-2.5 rounded-full border text-xs font-black uppercase tracking-widest transition-all ${
 								filter === item
 									? "bg-brand-cyan/10 border-brand-cyan/40 text-brand-cyan"
-									: "bg-white/5 border-white/10 text-white/60 hover:border-brand-cyan/30 hover:text-brand-cyan"
+									: "bg-white/5 border-white/10 text-white/70 hover:border-brand-cyan/30 hover:text-brand-cyan"
 							}`}
 						>
 							{item}
@@ -256,18 +273,24 @@ const DaoProposals: React.FC = () => {
 			</div>
 
 			{selectedProposal && (
-				<div className="glass-card p-10 rounded-[2.5rem] border border-white/5 mb-10">
+				<section
+					className="glass-card p-10 rounded-[2.5rem] border border-white/5 mb-10"
+					aria-labelledby="selected-proposal-title"
+				>
 					<div className="flex justify-between items-start gap-6 mb-6">
 						<div>
-							<h2 className="text-4xl font-black tracking-tight mb-3">
+							<h2
+								id="selected-proposal-title"
+								className="text-4xl font-black tracking-tight mb-3"
+							>
 								{selectedProposal.title}
 							</h2>
 							<div className="flex flex-wrap items-center gap-3 text-xs font-black uppercase tracking-widest">
 								<span className="text-brand-cyan">
 									Applicant {shortenAddress(selectedProposal.author)}
 								</span>
-								<span className="w-1.5 h-1.5 bg-white/10 rounded-full" />
-								<span className="text-white/40">
+								<span className="w-1.5 h-1.5 bg-white/20 rounded-full" />
+								<span className="text-white/70">
 									Time Remaining {getTimeRemaining(selectedProposal.endDate)}
 								</span>
 							</div>
@@ -284,7 +307,7 @@ const DaoProposals: React.FC = () => {
 						<div>
 							<div className="grid grid-cols-2 gap-4 mb-8">
 								<div className="rounded-[1.75rem] border border-white/5 bg-white/5 p-5">
-									<p className="text-[10px] text-white/30 uppercase font-black tracking-widest mb-2">
+									<p className="text-[10px] text-white/70 uppercase font-black tracking-widest mb-2">
 										USDC Requested
 									</p>
 									<h3 className="text-2xl font-black">
@@ -293,7 +316,7 @@ const DaoProposals: React.FC = () => {
 								</div>
 
 								<div className="rounded-[1.75rem] border border-white/5 bg-white/5 p-5">
-									<p className="text-[10px] text-white/30 uppercase font-black tracking-widest mb-2">
+									<p className="text-[10px] text-white/70 uppercase font-black tracking-widest mb-2">
 										LRN Score
 									</p>
 									<h3 className="text-2xl font-black">
@@ -305,7 +328,7 @@ const DaoProposals: React.FC = () => {
 							<h3 className="text-xl font-black mb-3 tracking-tight">
 								Program Description
 							</h3>
-							<p className="text-white/60 leading-relaxed mb-8">
+							<p className="text-white/70 leading-relaxed mb-8">
 								{selectedProposal.description}
 							</p>
 
@@ -319,7 +342,7 @@ const DaoProposals: React.FC = () => {
 										className="rounded-[1.5rem] border border-white/5 bg-white/5 p-5"
 									>
 										<p className="font-black mb-1">{milestone.title}</p>
-										<p className="text-sm text-white/60 leading-relaxed">
+										<p className="text-sm text-white/70 leading-relaxed">
 											{milestone.description}
 										</p>
 									</div>
@@ -333,12 +356,15 @@ const DaoProposals: React.FC = () => {
 							</h3>
 
 							<div className="mb-5">
-								<div className="flex justify-between text-xs font-black uppercase tracking-widest mb-2">
+								<div className="flex justify-between text-xs font-black uppercase tracking-widest mb-2 text-white/85">
 									<span>YES {yesPercent.toFixed(1)}%</span>
 									<span>NO {noPercent.toFixed(1)}%</span>
 								</div>
 
-								<div className="w-full h-3 rounded-full bg-white/5 overflow-hidden flex">
+								<div
+									className="w-full h-3 rounded-full bg-white/5 overflow-hidden flex"
+									aria-hidden="true"
+								>
 									<div
 										className="h-full bg-brand-cyan"
 										style={{ width: `${yesPercent}%` }}
@@ -350,7 +376,7 @@ const DaoProposals: React.FC = () => {
 								</div>
 							</div>
 
-							<div className="space-y-3 text-sm text-white/60 mb-6">
+							<div className="space-y-3 text-sm text-white/70 mb-6">
 								<p>
 									Current quorum: {totalVotes} /{" "}
 									{selectedProposal.quorumRequired}
@@ -374,16 +400,24 @@ const DaoProposals: React.FC = () => {
 
 							<div className="flex flex-wrap gap-3">
 								<button
+									type="button"
 									onClick={() => handleVote("YES")}
 									disabled={voteDisabled || isSubmittingVote}
+									aria-describedby={
+										voteDisabledMessage ? voteHelpId : undefined
+									}
 									className="px-6 py-3 bg-brand-cyan/10 border border-brand-cyan/30 text-brand-cyan font-black uppercase tracking-widest rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
 								>
 									{isSubmittingVote ? "Submitting..." : "Vote YES"}
 								</button>
 
 								<button
+									type="button"
 									onClick={() => handleVote("NO")}
 									disabled={voteDisabled || isSubmittingVote}
+									aria-describedby={
+										voteDisabledMessage ? voteHelpId : undefined
+									}
 									className="px-6 py-3 bg-brand-purple/10 border border-brand-purple/30 text-brand-purple font-black uppercase tracking-widest rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
 								>
 									{isSubmittingVote ? "Submitting..." : "Vote NO"}
@@ -391,107 +425,117 @@ const DaoProposals: React.FC = () => {
 							</div>
 
 							{txMessage && (
-								<p className="mt-4 text-sm text-white/70">{txMessage}</p>
+								<p
+									id={voteStatusId}
+									className="mt-4 text-sm text-white/85"
+									role="status"
+									aria-live="polite"
+								>
+									{txMessage}
+								</p>
 							)}
 
-							{getVoteDisabledMessage() && (
-								<p className="mt-4 text-sm text-white/50">
-									{getVoteDisabledMessage()}
+							{voteDisabledMessage && (
+								<p id={voteHelpId} className="mt-4 text-sm text-white/70">
+									{voteDisabledMessage}
 								</p>
 							)}
 						</div>
 					</div>
-				</div>
+				</section>
 			)}
 
 			{filteredProposals.length > 0 ? (
 				<div className="grid gap-6">
-					{filteredProposals.map((proposal) => (
-						<button
-							key={proposal.id}
-							onClick={() => {
-								setSelectedProposal(proposal)
-								setTxMessage("")
-							}}
-							className={`glass-card p-8 rounded-[2.5rem] border text-left transition-all duration-300 ${
-								selectedProposal?.id === proposal.id
-									? "border-brand-cyan/40"
-									: "border-white/5 hover:border-brand-cyan/30 hover:-translate-y-1"
-							}`}
-						>
-							<div className="flex justify-between items-start gap-6 mb-5">
-								<div>
-									<h2 className="text-2xl font-black tracking-tight mb-2">
-										{proposal.title}
-									</h2>
-									<p className="text-sm text-white/40">
-										Applicant: {shortenAddress(proposal.author)}
-									</p>
+					{filteredProposals.map((proposal) => {
+						const approvalPercent = Math.round(
+							(proposal.votesFor /
+								(proposal.votesFor + proposal.votesAgainst)) *
+								100,
+						)
+
+						return (
+							<button
+								type="button"
+								key={proposal.id}
+								onClick={() => {
+									setSelectedProposal(proposal)
+									setTxMessage("")
+								}}
+								aria-pressed={selectedProposal?.id === proposal.id}
+								aria-label={`Select ${proposal.title}, ${proposal.status} proposal`}
+								className={`glass-card p-8 rounded-[2.5rem] border text-left transition-all duration-300 ${
+									selectedProposal?.id === proposal.id
+										? "border-brand-cyan/40"
+										: "border-white/5 hover:border-brand-cyan/30 hover:-translate-y-1"
+								}`}
+							>
+								<div className="flex justify-between items-start gap-6 mb-5">
+									<div>
+										<h2 className="text-2xl font-black tracking-tight mb-2">
+											{proposal.title}
+										</h2>
+										<p className="text-sm text-white/70">
+											Applicant: {shortenAddress(proposal.author)}
+										</p>
+									</div>
+
+									<span className="px-4 py-1.5 bg-white/5 text-[10px] font-black uppercase tracking-widest rounded-full border border-white/10">
+										{proposal.status}
+									</span>
 								</div>
 
-								<span className="px-4 py-1.5 bg-white/5 text-[10px] font-black uppercase tracking-widest rounded-full border border-white/10">
-									{proposal.status}
-								</span>
-							</div>
+								<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+									<div>
+										<p className="text-[10px] text-white/70 uppercase font-black tracking-widest mb-1">
+											USDC Requested
+										</p>
+										<p className="font-bold">{proposal.usdcRequested}</p>
+									</div>
 
-							<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
-								<div>
-									<p className="text-[10px] text-white/30 uppercase font-black tracking-widest mb-1">
-										USDC Requested
-									</p>
-									<p className="font-bold">{proposal.usdcRequested}</p>
+									<div>
+										<p className="text-[10px] text-white/70 uppercase font-black tracking-widest mb-1">
+											LRN Score
+										</p>
+										<p className="font-bold">{proposal.lrnScore}</p>
+									</div>
+
+									<div>
+										<p className="text-[10px] text-white/70 uppercase font-black tracking-widest mb-1">
+											Time Remaining
+										</p>
+										<p className="font-bold">
+											{getTimeRemaining(proposal.endDate)}
+										</p>
+									</div>
+
+									<div>
+										<p className="text-[10px] text-white/70 uppercase font-black tracking-widest mb-1">
+											Total Votes
+										</p>
+										<p className="font-bold">
+											{proposal.votesFor + proposal.votesAgainst}
+										</p>
+									</div>
 								</div>
 
-								<div>
-									<p className="text-[10px] text-white/30 uppercase font-black tracking-widest mb-1">
-										LRN Score
-									</p>
-									<p className="font-bold">{proposal.lrnScore}</p>
-								</div>
-
-								<div>
-									<p className="text-[10px] text-white/30 uppercase font-black tracking-widest mb-1">
-										Time Remaining
-									</p>
-									<p className="font-bold">
-										{getTimeRemaining(proposal.endDate)}
-									</p>
-								</div>
-
-								<div>
-									<p className="text-[10px] text-white/30 uppercase font-black tracking-widest mb-1">
-										Total Votes
-									</p>
-									<p className="font-bold">
-										{proposal.votesFor + proposal.votesAgainst}
-									</p>
-								</div>
-							</div>
-
-							<div className="flex items-center gap-4">
-								<div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+								<div className="flex items-center gap-4">
 									<div
-										className="h-full bg-brand-cyan"
-										style={{
-											width: `${
-												(proposal.votesFor /
-													(proposal.votesFor + proposal.votesAgainst)) *
-												100
-											}%`,
-										}}
-									/>
+										className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"
+										aria-hidden="true"
+									>
+										<div
+											className="h-full bg-brand-cyan"
+											style={{ width: `${approvalPercent}%` }}
+										/>
+									</div>
+									<div className="text-[10px] font-black uppercase tracking-widest text-white/80">
+										{approvalPercent}% YES
+									</div>
 								</div>
-								<div className="text-[10px] font-black uppercase tracking-widest text-white/40">
-									{Math.round(
-										(proposal.votesFor /
-											(proposal.votesFor + proposal.votesAgainst)) *
-											100,
-									)}
-									% YES
-								</div>
-							</div>
-						</button>
-					))}
+							</button>
+						)
+					})}
 				</div>
 			) : (
 				<div className="glass-card p-12 rounded-[2.5rem] border border-white/5 text-center">
@@ -500,7 +544,7 @@ const DaoProposals: React.FC = () => {
 							? "No active proposals at the moment."
 							: "No proposals found for this filter."}
 					</h3>
-					<p className="text-white/40">
+					<p className="text-white/70">
 						Check back later for new governance proposals.
 					</p>
 				</div>

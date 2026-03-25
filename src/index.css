@@ -16,7 +16,6 @@
 	--animate-mesh: mesh 20s ease infinite;
 
 	@keyframes mesh {
-
 		0%,
 		100% {
 			background-position: 0% 50%;
@@ -42,6 +41,10 @@
 	color-scheme: dark;
 }
 
+html {
+	scroll-behavior: smooth;
+}
+
 html,
 body {
 	margin: 0;
@@ -63,6 +66,17 @@ body {
 	-webkit-font-smoothing: antialiased;
 }
 
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
+	outline: 3px solid rgba(0, 210, 255, 0.9);
+	outline-offset: 3px;
+	box-shadow: 0 0 0 6px rgba(0, 210, 255, 0.18);
+}
+
 .glass {
 	background: rgba(255, 255, 255, 0.03);
 	backdrop-filter: blur(20px);
@@ -71,9 +85,11 @@ body {
 }
 
 .glass-card {
-	background: linear-gradient(135deg,
-			rgba(255, 255, 255, 0.05) 0%,
-			rgba(255, 255, 255, 0.01) 100%);
+	background: linear-gradient(
+		135deg,
+		rgba(255, 255, 255, 0.05) 0%,
+		rgba(255, 255, 255, 0.01) 100%
+	);
 	backdrop-filter: blur(24px);
 	border: 1px solid rgba(255, 255, 255, 0.08);
 	box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
@@ -119,9 +135,31 @@ body {
 	right: 0;
 	bottom: 0;
 	left: 0;
-	background: linear-gradient(90deg,
-			transparent,
-			rgba(255, 255, 255, 0.05),
-			transparent);
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(255, 255, 255, 0.05),
+		transparent
+	);
 	animation: shimmer 2s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+
+	body {
+		animation: none;
+		background-size: auto;
+	}
 }

@@ -89,6 +89,7 @@ stablecoins — real, stable value delivered directly to their wallets.
 ---
 
 ## Platform Architecture
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │                     LEARNVAULT                       │
@@ -185,7 +186,8 @@ Shareable with employers, DAOs, and the broader ecosystem.
 ## The Earn Loop
 
 LearnVault's flywheel is designed so that effort compounds over time:
-```
+
+````
 Complete Lesson
        │
        ▼
@@ -201,21 +203,18 @@ Submit Scholarship Proposal
    ```bash
    # Fund your deployer address for testing
    stellar friendbot fund <NETWORK> <ADDRESS>
-   
+
    # Example:
    stellar friendbot fund testnet GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-   ```
+````
 
 **Deployer Address:**
+
 - For testing on Stellar Testnet, use the friendbot-funded deployer:
-  `GDU2P3YJ5K7E6ZK3Q2K7E6ZK3Q2K7E6ZK3Q2K7E6ZK3`
-       │
-       ▼
-Mint ScholarNFT Credential
-       │
-       ▼
-Higher Reputation ──▶ Larger Future Proposals ──▶ Loop Continues
-```
+  `GDU2P3YJ5K7E6ZK3Q2K7E6ZK3Q2K7E6ZK3Q2K7E6ZK3` │ ▼ Mint ScholarNFT Credential │
+  ▼ Higher Reputation ──▶ Larger Future Proposals ──▶ Loop Continues
+
+````
 
 The more you learn, the more power and opportunity you unlock. Wealth is not the
 barrier — effort is the currency.
@@ -333,13 +332,15 @@ two-step build process:
 
    ```bash
    npx @mermaid-js/mermaid-cli -i docs/architecture.mmd -o docs/architecture.png
-```
+````
 
 2. **Generate the PDF:** Once the diagrams are compiled and embedded as standard
    markdown image links, generate the final PDF using `md-to-pdf`:
    ```bash
    npx md-to-pdf docs/whitepaper.md
-```
+   ```
+
+````
 
 ---
 
@@ -351,9 +352,10 @@ two-step build process:
    ```bash
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    npm install -g @stellar/stellar-cli
-   ```
+````
 
 2. **Install Visual Studio Build Tools (Windows):**
+
    ```bash
    # Download Visual Studio Build Tools installer
    # Visit: https://visualstudio.microsoft.com/downloads/
@@ -361,15 +363,17 @@ two-step build process:
    ```
 
 3. **Configure Environment:**
+
    ```bash
    # Copy environment template
    cp .env.example .env
-   
+
    # Edit .env with your configuration
    # Set STELLAR_SCAFFOLD_ENV=testnet for testnet deployment
    ```
 
 ### Run Tests
+
 ```bash
 npm test                 # runs all Soroban contract tests
 npm run test:contracts   # alias for the above
@@ -398,7 +402,8 @@ All contributors are recognized on-chain and in our official documentation.
 
 ## Resources
 
-- [Glossary](docs/glossary.md) — Key terms, tokens, and contracts explained in plain English
+- [Glossary](docs/glossary.md) — Key terms, tokens, and contracts explained in
+  plain English
 
 ---
 

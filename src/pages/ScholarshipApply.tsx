@@ -1,5 +1,5 @@
 import { Button, Card } from "@stellar/design-system"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import { useScholarshipApplication } from "../hooks/useScholarshipApplication"
 import { useWallet } from "../hooks/useWallet"
@@ -49,6 +49,11 @@ const filterErrorsByScopes = (
 		),
 	)
 
+const joinIds = (...ids: Array<string | false | null | undefined>) => {
+	const filtered = ids.filter(Boolean)
+	return filtered.length > 0 ? filtered.join(" ") : undefined
+}
+
 export default function ScholarshipApply() {
 	const { address } = useWallet()
 	const {
@@ -70,6 +75,11 @@ export default function ScholarshipApply() {
 	const [submitError, setSubmitError] = useState<string | null>(null)
 	const [submittedProposal, setSubmittedProposal] =
 		useState<StoredScholarshipProposal | null>(null)
+	const stepHeadingRef = useRef<HTMLHeadingElement>(null)
+
+	useEffect(() => {
+		stepHeadingRef.current?.focus()
+	}, [stepIndex])
 
 	const clearErrorsForScopes = (scopes: readonly string[]) => {
 		setErrors((current) =>
@@ -242,6 +252,10 @@ export default function ScholarshipApply() {
 		? explorerTransactionUrl(confirmationProposal.txHash)
 		: undefined
 
+	const eligibilityErrorId = "scholarship-eligibility-error"
+	const eligibilityStatusId = "scholarship-eligibility-status"
+	const submitErrorId = "scholarship-submit-error"
+
 	return (
 		<div className={styles.Page}>
 			<section className={styles.Hero}>
@@ -266,7 +280,7 @@ export default function ScholarshipApply() {
 
 			<div className={styles.Layout}>
 				<Card>
-					<div className={styles.StepRail}>
+					<ol className={styles.StepRail}>
 						{steps.map((label, index) => {
 							const state =
 								index === stepIndex
@@ -275,7 +289,12 @@ export default function ScholarshipApply() {
 										? "done"
 										: "upcoming"
 							return (
-								<div key={label} className={styles.StepRow} data-state={state}>
+								<li
+									key={label}
+									className={styles.StepRow}
+									data-state={state}
+									aria-current={index === stepIndex ? "step" : undefined}
+								>
 									<div className={styles.StepIndex}>{index + 1}</div>
 									<div>
 										<p className={styles.StepLabel}>{label}</p>
@@ -291,17 +310,19 @@ export default function ScholarshipApply() {
 															: "Track hash and DAO link"}
 										</p>
 									</div>
-								</div>
+								</li>
 							)
 						})}
-					</div>
+					</ol>
 				</Card>
 
 				<div className={styles.MainColumn}>
 					<Card>
 						{stepIndex === 0 && (
 							<div className={styles.StepPanel}>
-								<h2>Eligibility check</h2>
+								<h2 ref={stepHeadingRef} tabIndex={-1}>
+									Eligibility check
+								</h2>
 								<p className={styles.StepDescription}>
 									Your LRN balance is checked as soon as a wallet is connected.
 									If a generated LearnToken client is available, the form reads
@@ -332,9 +353,11 @@ export default function ScholarshipApply() {
 									<div className={styles.StatCard}>
 										<span className={styles.StatLabel}>Eligibility status</span>
 										<strong
+											id={eligibilityStatusId}
 											className={
 												eligible ? styles.SuccessText : styles.WarningText
 											}
+											aria-live="polite"
 										>
 											{eligible
 												? "Eligible to continue"
@@ -351,76 +374,135 @@ export default function ScholarshipApply() {
 											: "no wallet connected"}
 								</p>
 								{errors.eligibility && (
-									<p className={styles.ErrorText}>{errors.eligibility}</p>
+									<p
+										id={eligibilityErrorId}
+										className={styles.ErrorText}
+										role="alert"
+									>
+										{errors.eligibility}
+									</p>
 								)}
 							</div>
 						)}
 
 						{stepIndex === 1 && (
 							<div className={styles.StepPanel}>
-								<h2>Program details</h2>
+								<h2 ref={stepHeadingRef} tabIndex={-1}>
+									Program details
+								</h2>
 								<p className={styles.StepDescription}>
 									Share where you want to study, what you plan to learn, and
 									when the program begins.
 								</p>
 								<div className={styles.FormGrid}>
-									<label className={styles.Field}>
+									<label
+										className={styles.Field}
+										htmlFor="scholarship-program-name"
+									>
 										<span>Program or bootcamp name</span>
 										<input
+											id="scholarship-program-name"
 											value={formValues.programName}
 											onChange={(event) =>
 												updateField("programName", event.target.value)
 											}
 											placeholder="Soroban builder bootcamp"
+											aria-invalid={Boolean(errors.programName)}
+											aria-describedby={joinIds(
+												errors.programName && "scholarship-program-name-error",
+											)}
 										/>
 										{errors.programName && (
-											<span className={styles.ErrorText}>
+											<span
+												id="scholarship-program-name-error"
+												className={styles.ErrorText}
+												role="alert"
+											>
 												{errors.programName}
 											</span>
 										)}
 									</label>
-									<label className={styles.Field}>
+									<label
+										className={styles.Field}
+										htmlFor="scholarship-program-url"
+									>
 										<span>Program URL</span>
 										<input
+											id="scholarship-program-url"
+											type="url"
 											value={formValues.programUrl}
 											onChange={(event) =>
 												updateField("programUrl", event.target.value)
 											}
 											placeholder="https://example.com/program"
+											autoComplete="url"
+											aria-invalid={Boolean(errors.programUrl)}
+											aria-describedby={joinIds(
+												errors.programUrl && "scholarship-program-url-error",
+											)}
 										/>
 										{errors.programUrl && (
-											<span className={styles.ErrorText}>
+											<span
+												id="scholarship-program-url-error"
+												className={styles.ErrorText}
+												role="alert"
+											>
 												{errors.programUrl}
 											</span>
 										)}
 									</label>
-									<label className={`${styles.Field} ${styles.FullWidth}`}>
+									<label
+										className={`${styles.Field} ${styles.FullWidth}`}
+										htmlFor="scholarship-program-description"
+									>
 										<span>Why this program matters</span>
 										<textarea
+											id="scholarship-program-description"
 											rows={5}
 											value={formValues.programDescription}
 											onChange={(event) =>
 												updateField("programDescription", event.target.value)
 											}
 											placeholder="Describe the skills you plan to build and how the scholarship changes your trajectory."
+											aria-invalid={Boolean(errors.programDescription)}
+											aria-describedby={joinIds(
+												errors.programDescription &&
+													"scholarship-program-description-error",
+											)}
 										/>
 										{errors.programDescription && (
-											<span className={styles.ErrorText}>
+											<span
+												id="scholarship-program-description-error"
+												className={styles.ErrorText}
+												role="alert"
+											>
 												{errors.programDescription}
 											</span>
 										)}
 									</label>
-									<label className={styles.Field}>
+									<label
+										className={styles.Field}
+										htmlFor="scholarship-start-date"
+									>
 										<span>Program start date</span>
 										<input
+											id="scholarship-start-date"
 											type="date"
 											value={formValues.startDate}
 											onChange={(event) =>
 												updateField("startDate", event.target.value)
 											}
+											aria-invalid={Boolean(errors.startDate)}
+											aria-describedby={joinIds(
+												errors.startDate && "scholarship-start-date-error",
+											)}
 										/>
 										{errors.startDate && (
-											<span className={styles.ErrorText}>
+											<span
+												id="scholarship-start-date-error"
+												className={styles.ErrorText}
+												role="alert"
+											>
 												{errors.startDate}
 											</span>
 										)}
@@ -431,14 +513,20 @@ export default function ScholarshipApply() {
 
 						{stepIndex === 2 && (
 							<div className={styles.StepPanel}>
-								<h2>Funding request</h2>
+								<h2 ref={stepHeadingRef} tabIndex={-1}>
+									Funding request
+								</h2>
 								<p className={styles.StepDescription}>
 									Break the request into three concrete milestones the DAO can
 									review and track over time.
 								</p>
-								<label className={styles.Field}>
+								<label
+									className={styles.Field}
+									htmlFor="scholarship-amount-usdc"
+								>
 									<span>Requested amount (USDC)</span>
 									<input
+										id="scholarship-amount-usdc"
 										type="number"
 										min="0"
 										step="0.0000001"
@@ -447,69 +535,110 @@ export default function ScholarshipApply() {
 											updateField("amountUsdc", event.target.value)
 										}
 										placeholder="1500"
+										aria-invalid={Boolean(errors.amountUsdc)}
+										aria-describedby={joinIds(
+											errors.amountUsdc && "scholarship-amount-usdc-error",
+										)}
 									/>
 									{errors.amountUsdc && (
-										<span className={styles.ErrorText}>
+										<span
+											id="scholarship-amount-usdc-error"
+											className={styles.ErrorText}
+											role="alert"
+										>
 											{errors.amountUsdc}
 										</span>
 									)}
 								</label>
 
 								<div className={styles.MilestoneStack}>
-									{formValues.milestones.map((milestone, index) => (
-										<div
-											key={`milestone-${index}`}
-											className={styles.MilestoneCard}
-										>
-											<h3>Milestone {index + 1}</h3>
-											<label className={styles.Field}>
-												<span>Description</span>
-												<textarea
-													rows={3}
-													value={milestone.description}
-													onChange={(event) =>
-														updateMilestone(
-															index,
-															"description",
-															event.target.value,
-														)
-													}
-													placeholder="What will be delivered at this checkpoint?"
-												/>
-												{errors[`milestones.${index}.description`] && (
-													<span className={styles.ErrorText}>
-														{errors[`milestones.${index}.description`]}
-													</span>
-												)}
-											</label>
-											<label className={styles.Field}>
-												<span>Target date</span>
-												<input
-													type="date"
-													value={milestone.dueDate}
-													onChange={(event) =>
-														updateMilestone(
-															index,
-															"dueDate",
-															event.target.value,
-														)
-													}
-												/>
-												{errors[`milestones.${index}.dueDate`] && (
-													<span className={styles.ErrorText}>
-														{errors[`milestones.${index}.dueDate`]}
-													</span>
-												)}
-											</label>
-										</div>
-									))}
+									{formValues.milestones.map((milestone, index) => {
+										const descriptionError =
+											errors[`milestones.${index}.description`]
+										const dueDateError = errors[`milestones.${index}.dueDate`]
+										return (
+											<fieldset
+												key={`milestone-${index}`}
+												className={styles.MilestoneCard}
+											>
+												<legend>Milestone {index + 1}</legend>
+												<label
+													className={styles.Field}
+													htmlFor={`milestone-${index}-description`}
+												>
+													<span>Description</span>
+													<textarea
+														id={`milestone-${index}-description`}
+														rows={3}
+														value={milestone.description}
+														onChange={(event) =>
+															updateMilestone(
+																index,
+																"description",
+																event.target.value,
+															)
+														}
+														placeholder="What will be delivered at this checkpoint?"
+														aria-invalid={Boolean(descriptionError)}
+														aria-describedby={joinIds(
+															descriptionError &&
+																`milestone-${index}-description-error`,
+														)}
+													/>
+													{descriptionError && (
+														<span
+															id={`milestone-${index}-description-error`}
+															className={styles.ErrorText}
+															role="alert"
+														>
+															{descriptionError}
+														</span>
+													)}
+												</label>
+												<label
+													className={styles.Field}
+													htmlFor={`milestone-${index}-due-date`}
+												>
+													<span>Target date</span>
+													<input
+														id={`milestone-${index}-due-date`}
+														type="date"
+														value={milestone.dueDate}
+														onChange={(event) =>
+															updateMilestone(
+																index,
+																"dueDate",
+																event.target.value,
+															)
+														}
+														aria-invalid={Boolean(dueDateError)}
+														aria-describedby={joinIds(
+															dueDateError &&
+																`milestone-${index}-due-date-error`,
+														)}
+													/>
+													{dueDateError && (
+														<span
+															id={`milestone-${index}-due-date-error`}
+															className={styles.ErrorText}
+															role="alert"
+														>
+															{dueDateError}
+														</span>
+													)}
+												</label>
+											</fieldset>
+										)
+									})}
 								</div>
 							</div>
 						)}
 
 						{stepIndex === 3 && (
 							<div className={styles.StepPanel}>
-								<h2>Review & submit</h2>
+								<h2 ref={stepHeadingRef} tabIndex={-1}>
+									Review & submit
+								</h2>
 								<p className={styles.StepDescription}>
 									Review the proposal summary, confirm the connected wallet, and
 									sign the transaction when prompted.
@@ -560,32 +689,55 @@ export default function ScholarshipApply() {
 									</div>
 								</div>
 
-								<label className={styles.CheckboxRow}>
+								<label
+									className={styles.CheckboxRow}
+									htmlFor="wallet-confirmed"
+								>
 									<input
+										id="wallet-confirmed"
 										type="checkbox"
 										checked={formValues.walletConfirmed}
 										onChange={(event) =>
 											updateField("walletConfirmed", event.target.checked)
 										}
+										aria-invalid={Boolean(errors.walletConfirmed)}
+										aria-describedby={joinIds(
+											errors.walletConfirmed && "wallet-confirmed-error",
+											submitError && submitErrorId,
+										)}
 									/>
-									<span>
+									<span className={styles.CheckboxText}>
 										I confirm that{" "}
 										{address ? shortenAddress(address) : "the connected wallet"}
 										should receive scholarship disbursements.
 									</span>
 								</label>
 								{errors.walletConfirmed && (
-									<p className={styles.ErrorText}>{errors.walletConfirmed}</p>
+									<p
+										id="wallet-confirmed-error"
+										className={styles.ErrorText}
+										role="alert"
+									>
+										{errors.walletConfirmed}
+									</p>
 								)}
 								{submitError && (
-									<p className={styles.ErrorText}>{submitError}</p>
+									<p
+										id={submitErrorId}
+										className={styles.ErrorText}
+										role="alert"
+									>
+										{submitError}
+									</p>
 								)}
 							</div>
 						)}
 
 						{stepIndex === 4 && confirmationProposal && (
 							<div className={styles.StepPanel}>
-								<h2>Confirmation</h2>
+								<h2 ref={stepHeadingRef} tabIndex={-1}>
+									Confirmation
+								</h2>
 								<p className={styles.StepDescription}>
 									Your proposal has been recorded and linked back into the DAO
 									view.
@@ -614,11 +766,11 @@ export default function ScholarshipApply() {
 										</Button>
 									</Link>
 									{transactionUrl && (
-										<Link to={transactionUrl} target="_blank">
+										<a href={transactionUrl} target="_blank" rel="noreferrer">
 											<Button variant="tertiary" size="md">
 												Open transaction
 											</Button>
-										</Link>
+										</a>
 									)}
 									<Button
 										variant="secondary"

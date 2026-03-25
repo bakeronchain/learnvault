@@ -22,19 +22,19 @@ import React, { useEffect, useRef, useState, useCallback } from "react"
 export type WidgetSize = "sm" | "md" | "lg"
 
 export interface LRNBalanceWidgetProps {
-  /** Wallet address to look up */
-  address: string
-  /** Visual size variant */
-  size?: WidgetSize
-  /** Optional extra className on the root element */
-  className?: string
+	/** Wallet address to look up */
+	address: string
+	/** Visual size variant */
+	size?: WidgetSize
+	/** Optional extra className on the root element */
+	className?: string
 }
 
 interface LearnTokenData {
-  balance: number
-  previousBalance: number
-  percentile: number // 0–100; lower = higher rank (top X%)
-  rankLabel: string
+	balance: number
+	previousBalance: number
+	percentile: number // 0–100; lower = higher rank (top X%)
+	rankLabel: string
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -53,59 +53,59 @@ interface LearnTokenData {
  *   error    — any fetch error
  */
 function useLearnToken(address: string): {
-  data: LearnTokenData | null
-  isLoading: boolean
-  error: string | null
+	data: LearnTokenData | null
+	isLoading: boolean
+	error: string | null
 } {
-  const [data, setData] = useState<LearnTokenData | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+	const [data, setData] = useState<LearnTokenData | null>(null)
+	const [isLoading, setIsLoading] = useState(true)
+	const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!address) {
-      setError("No wallet address provided.")
-      setIsLoading(false)
-      return
-    }
+	useEffect(() => {
+		if (!address) {
+			setError("No wallet address provided.")
+			setIsLoading(false)
+			return
+		}
 
-    setIsLoading(true)
-    setError(null)
+		setIsLoading(true)
+		setError(null)
 
-    // ── Simulate async contract call ──────────────────────────────────────
-    const timer = setTimeout(() => {
-      try {
-        // In production, replace with:
-        //   const balance = await learnTokenContract.balanceOf(address);
-        const mockBalance = 142
-        const mockPrev = 122
-        const mockPercentile = 8 // top 8%
+		// ── Simulate async contract call ──────────────────────────────────────
+		const timer = setTimeout(() => {
+			try {
+				// In production, replace with:
+				//   const balance = await learnTokenContract.balanceOf(address);
+				const mockBalance = 142
+				const mockPrev = 122
+				const mockPercentile = 8 // top 8%
 
-        setData({
-          balance: mockBalance,
-          previousBalance: mockPrev,
-          percentile: mockPercentile,
-          rankLabel: getRankLabel(mockPercentile),
-        })
-      } catch (e) {
-        setError("Failed to fetch LRN balance.")
-      } finally {
-        setIsLoading(false)
-      }
-    }, 1200)
+				setData({
+					balance: mockBalance,
+					previousBalance: mockPrev,
+					percentile: mockPercentile,
+					rankLabel: getRankLabel(mockPercentile),
+				})
+			} catch (e) {
+				setError("Failed to fetch LRN balance.")
+			} finally {
+				setIsLoading(false)
+			}
+		}, 1200)
 
-    return () => clearTimeout(timer)
-  }, [address])
+		return () => clearTimeout(timer)
+	}, [address])
 
-  return { data, isLoading, error }
+	return { data, isLoading, error }
 }
 
 function getRankLabel(percentile: number): string {
-  if (percentile <= 1) return " Legend"
-  if (percentile <= 5) return "⚡ Elite"
-  if (percentile <= 10) return " Top Scholar"
-  if (percentile <= 25) return " Rising Star"
-  if (percentile <= 50) return " Committed"
-  return " Getting Started"
+	if (percentile <= 1) return " Legend"
+	if (percentile <= 5) return "⚡ Elite"
+	if (percentile <= 10) return " Top Scholar"
+	if (percentile <= 25) return " Rising Star"
+	if (percentile <= 50) return " Committed"
+	return " Getting Started"
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -113,38 +113,38 @@ function getRankLabel(percentile: number): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function useCountUp(target: number, duration = 900): number {
-  const [current, setCurrent] = useState(0)
-  const rafRef = useRef<number | null>(null)
-  const startRef = useRef<number | null>(null)
-  const fromRef = useRef(0)
+	const [current, setCurrent] = useState(0)
+	const rafRef = useRef<number | null>(null)
+	const startRef = useRef<number | null>(null)
+	const fromRef = useRef(0)
 
-  useEffect(() => {
-    if (target === 0) return
-    fromRef.current = current
-    startRef.current = null
+	useEffect(() => {
+		if (target === 0) return
+		fromRef.current = current
+		startRef.current = null
 
-    const step = (timestamp: number) => {
-      if (!startRef.current) startRef.current = timestamp
-      const elapsed = timestamp - startRef.current
-      const progress = Math.min(elapsed / duration, 1)
-      // Ease-out cubic
-      const eased = 1 - Math.pow(1 - progress, 3)
-      setCurrent(
-        Math.round(fromRef.current + (target - fromRef.current) * eased),
-      )
-      if (progress < 1) {
-        rafRef.current = requestAnimationFrame(step)
-      }
-    }
+		const step = (timestamp: number) => {
+			if (!startRef.current) startRef.current = timestamp
+			const elapsed = timestamp - startRef.current
+			const progress = Math.min(elapsed / duration, 1)
+			// Ease-out cubic
+			const eased = 1 - Math.pow(1 - progress, 3)
+			setCurrent(
+				Math.round(fromRef.current + (target - fromRef.current) * eased),
+			)
+			if (progress < 1) {
+				rafRef.current = requestAnimationFrame(step)
+			}
+		}
 
-    rafRef.current = requestAnimationFrame(step)
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target])
+		rafRef.current = requestAnimationFrame(step)
+		return () => {
+			if (rafRef.current) cancelAnimationFrame(rafRef.current)
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [target])
 
-  return current
+	return current
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -152,12 +152,12 @@ function useCountUp(target: number, duration = 900): number {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function Tooltip({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="lrn-tooltip-wrap">
-      {children}
-      <style>{tooltipStyles}</style>
-    </span>
-  )
+	return (
+		<span className="lrn-tooltip-wrap">
+			{children}
+			<style>{tooltipStyles}</style>
+		</span>
+	)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -165,33 +165,33 @@ function Tooltip({ children }: { children: React.ReactNode }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function Skeleton({ size }: { size: WidgetSize }) {
-  return (
-    <>
-      <style>{skeletonStyles}</style>
-      {size === "sm" && (
-        <span
-          className="lrn-skeleton lrn-skeleton-sm"
-          aria-label="Loading LRN balance"
-        />
-      )}
-      {size === "md" && (
-        <div className="lrn-skeleton-card" aria-label="Loading LRN balance">
-          <span className="lrn-skeleton lrn-skeleton-title" />
-          <span className="lrn-skeleton lrn-skeleton-sub" />
-        </div>
-      )}
-      {size === "lg" && (
-        <div
-          className="lrn-skeleton-card lrn-skeleton-card-lg"
-          aria-label="Loading LRN balance"
-        >
-          <span className="lrn-skeleton lrn-skeleton-title lrn-skeleton-lg-title" />
-          <span className="lrn-skeleton lrn-skeleton-sub" />
-          <span className="lrn-skeleton lrn-skeleton-bar" />
-        </div>
-      )}
-    </>
-  )
+	return (
+		<>
+			<style>{skeletonStyles}</style>
+			{size === "sm" && (
+				<span
+					className="lrn-skeleton lrn-skeleton-sm"
+					aria-label="Loading LRN balance"
+				/>
+			)}
+			{size === "md" && (
+				<div className="lrn-skeleton-card" aria-label="Loading LRN balance">
+					<span className="lrn-skeleton lrn-skeleton-title" />
+					<span className="lrn-skeleton lrn-skeleton-sub" />
+				</div>
+			)}
+			{size === "lg" && (
+				<div
+					className="lrn-skeleton-card lrn-skeleton-card-lg"
+					aria-label="Loading LRN balance"
+				>
+					<span className="lrn-skeleton lrn-skeleton-title lrn-skeleton-lg-title" />
+					<span className="lrn-skeleton lrn-skeleton-sub" />
+					<span className="lrn-skeleton lrn-skeleton-bar" />
+				</div>
+			)}
+		</>
+	)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -200,165 +200,165 @@ function Skeleton({ size }: { size: WidgetSize }) {
 
 /** sm — inline nav pill */
 function SmWidget({
-  data,
-  animatedBalance,
+	data,
+	animatedBalance,
 }: {
-  data: LearnTokenData
-  animatedBalance: number
+	data: LearnTokenData
+	animatedBalance: number
 }) {
-  return (
-    <Tooltip>
-      <span
-        className="lrn-sm-pill"
-        role="status"
-        aria-label={`${animatedBalance} LRN tokens`}
-      >
-        <span className="lrn-trophy" aria-hidden="true">
-          🏆
-        </span>
-        <span className="lrn-sm-balance">
-          {animatedBalance.toLocaleString()}
-        </span>
-        <span className="lrn-sm-label">LRN</span>
-        <span className="lrn-tooltip">
-          LearnTokens (LRN) are your on-chain proof of learning. Earn them by
-          completing course milestones. They unlock scholarships, governance
-          rights, and your reputation score.
-        </span>
-      </span>
-      <style>{smStyles}</style>
-    </Tooltip>
-  )
+	return (
+		<Tooltip>
+			<span
+				className="lrn-sm-pill"
+				role="status"
+				aria-label={`${animatedBalance} LRN tokens`}
+			>
+				<span className="lrn-trophy" aria-hidden="true">
+					🏆
+				</span>
+				<span className="lrn-sm-balance">
+					{animatedBalance.toLocaleString()}
+				</span>
+				<span className="lrn-sm-label">LRN</span>
+				<span className="lrn-tooltip">
+					LearnTokens (LRN) are your on-chain proof of learning. Earn them by
+					completing course milestones. They unlock scholarships, governance
+					rights, and your reputation score.
+				</span>
+			</span>
+			<style>{smStyles}</style>
+		</Tooltip>
+	)
 }
 
 /** md — dashboard card */
 function MdWidget({
-  data,
-  animatedBalance,
+	data,
+	animatedBalance,
 }: {
-  data: LearnTokenData
-  animatedBalance: number
+	data: LearnTokenData
+	animatedBalance: number
 }) {
-  const delta = data.balance - data.previousBalance
-  const gained = delta > 0
+	const delta = data.balance - data.previousBalance
+	const gained = delta > 0
 
-  return (
-    <div className="lrn-md-card" role="region" aria-label="LRN Token Balance">
-      <div className="lrn-md-header">
-        <span className="lrn-md-icon" aria-hidden="true">
-          🏆
-        </span>
-        <span className="lrn-md-title">LearnTokens</span>
-        <Tooltip>
-          <span
-            className="lrn-info-btn"
-            tabIndex={0}
-            aria-label="What are LearnTokens?"
-          >
-            ?
-            <span className="lrn-tooltip lrn-tooltip-left">
-              LearnTokens (LRN) are soulbound reputation tokens earned by
-              completing course milestones. They unlock scholarships, governance
-              voting, and your on-chain profile rank.
-            </span>
-          </span>
-        </Tooltip>
-      </div>
-      <div className="lrn-md-balance" aria-live="polite">
-        {animatedBalance.toLocaleString()}
-        <span className="lrn-md-unit">LRN</span>
-      </div>
-      {gained && (
-        <div className="lrn-md-change" aria-label={`Gained ${delta} LRN`}>
-          <span className="lrn-change-arrow">↑</span>+{delta} LRN
-        </div>
-      )}
-      <style>{mdStyles}</style>
-    </div>
-  )
+	return (
+		<div className="lrn-md-card" role="region" aria-label="LRN Token Balance">
+			<div className="lrn-md-header">
+				<span className="lrn-md-icon" aria-hidden="true">
+					🏆
+				</span>
+				<span className="lrn-md-title">LearnTokens</span>
+				<Tooltip>
+					<span
+						className="lrn-info-btn"
+						tabIndex={0}
+						aria-label="What are LearnTokens?"
+					>
+						?
+						<span className="lrn-tooltip lrn-tooltip-left">
+							LearnTokens (LRN) are soulbound reputation tokens earned by
+							completing course milestones. They unlock scholarships, governance
+							voting, and your on-chain profile rank.
+						</span>
+					</span>
+				</Tooltip>
+			</div>
+			<div className="lrn-md-balance" aria-live="polite">
+				{animatedBalance.toLocaleString()}
+				<span className="lrn-md-unit">LRN</span>
+			</div>
+			{gained && (
+				<div className="lrn-md-change" aria-label={`Gained ${delta} LRN`}>
+					<span className="lrn-change-arrow">↑</span>+{delta} LRN
+				</div>
+			)}
+			<style>{mdStyles}</style>
+		</div>
+	)
 }
 
 /** lg — profile card */
 function LgWidget({
-  data,
-  animatedBalance,
+	data,
+	animatedBalance,
 }: {
-  data: LearnTokenData
-  animatedBalance: number
+	data: LearnTokenData
+	animatedBalance: number
 }) {
-  const delta = data.balance - data.previousBalance
-  const gained = delta > 0
-  // Arc bar fill: percentile is "top X%" so lower = better.
-  // Show progress as (100 - percentile) / 100
-  const fillPct = Math.max(0, Math.min(100, 100 - data.percentile))
+	const delta = data.balance - data.previousBalance
+	const gained = delta > 0
+	// Arc bar fill: percentile is "top X%" so lower = better.
+	// Show progress as (100 - percentile) / 100
+	const fillPct = Math.max(0, Math.min(100, 100 - data.percentile))
 
-  return (
-    <div className="lrn-lg-card" role="region" aria-label="LRN Token Profile">
-      {/* Header */}
-      <div className="lrn-lg-header">
-        <span className="lrn-lg-icon" aria-hidden="true">
-          🏆
-        </span>
-        <div>
-          <p className="lrn-lg-title">LearnToken Balance</p>
-          <p className="lrn-lg-sub">Soulbound Reputation Score</p>
-        </div>
-        <Tooltip>
-          <span
-            className="lrn-info-btn lrn-info-btn-sm"
-            tabIndex={0}
-            aria-label="What are LearnTokens?"
-          >
-            ?
-            <span className="lrn-tooltip lrn-tooltip-left">
-              LearnTokens (LRN) are non-transferable proof of learning, minted
-              on-chain when you complete verified course milestones. Your
-              balance determines scholarship eligibility and governance power
-              within the LearnVault DAO.
-            </span>
-          </span>
-        </Tooltip>
-      </div>
+	return (
+		<div className="lrn-lg-card" role="region" aria-label="LRN Token Profile">
+			{/* Header */}
+			<div className="lrn-lg-header">
+				<span className="lrn-lg-icon" aria-hidden="true">
+					🏆
+				</span>
+				<div>
+					<p className="lrn-lg-title">LearnToken Balance</p>
+					<p className="lrn-lg-sub">Soulbound Reputation Score</p>
+				</div>
+				<Tooltip>
+					<span
+						className="lrn-info-btn lrn-info-btn-sm"
+						tabIndex={0}
+						aria-label="What are LearnTokens?"
+					>
+						?
+						<span className="lrn-tooltip lrn-tooltip-left">
+							LearnTokens (LRN) are non-transferable proof of learning, minted
+							on-chain when you complete verified course milestones. Your
+							balance determines scholarship eligibility and governance power
+							within the LearnVault DAO.
+						</span>
+					</span>
+				</Tooltip>
+			</div>
 
-      {/* Big balance */}
-      <div className="lrn-lg-balance" aria-live="polite">
-        <span className="lrn-lg-number">
-          {animatedBalance.toLocaleString()}
-        </span>
-        <span className="lrn-lg-unit">LRN</span>
-      </div>
+			{/* Big balance */}
+			<div className="lrn-lg-balance" aria-live="polite">
+				<span className="lrn-lg-number">
+					{animatedBalance.toLocaleString()}
+				</span>
+				<span className="lrn-lg-unit">LRN</span>
+			</div>
 
-      {gained && (
-        <div className="lrn-lg-change" aria-label={`Gained ${delta} LRN`}>
-          <span className="lrn-change-arrow">↑</span>+{delta} LRN this session
-        </div>
-      )}
+			{gained && (
+				<div className="lrn-lg-change" aria-label={`Gained ${delta} LRN`}>
+					<span className="lrn-change-arrow">↑</span>+{delta} LRN this session
+				</div>
+			)}
 
-      {/* Percentile bar */}
-      <div className="lrn-lg-rank-wrap">
-        <div className="lrn-lg-rank-label-row">
-          <span className="lrn-lg-rank-badge">{data.rankLabel}</span>
-          <span className="lrn-lg-percentile">Top {data.percentile}%</span>
-        </div>
-        <div
-          className="lrn-lg-bar-track"
-          role="progressbar"
-          aria-valuenow={fillPct}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label={`Rank percentile: top ${data.percentile}%`}
-        >
-          <div className="lrn-lg-bar-fill" style={{ width: `${fillPct}%` }} />
-        </div>
-        <div className="lrn-lg-bar-hints">
-          <span>All Learners</span>
-          <span>Top 1%</span>
-        </div>
-      </div>
+			{/* Percentile bar */}
+			<div className="lrn-lg-rank-wrap">
+				<div className="lrn-lg-rank-label-row">
+					<span className="lrn-lg-rank-badge">{data.rankLabel}</span>
+					<span className="lrn-lg-percentile">Top {data.percentile}%</span>
+				</div>
+				<div
+					className="lrn-lg-bar-track"
+					role="progressbar"
+					aria-valuenow={fillPct}
+					aria-valuemin={0}
+					aria-valuemax={100}
+					aria-label={`Rank percentile: top ${data.percentile}%`}
+				>
+					<div className="lrn-lg-bar-fill" style={{ width: `${fillPct}%` }} />
+				</div>
+				<div className="lrn-lg-bar-hints">
+					<span>All Learners</span>
+					<span>Top 1%</span>
+				</div>
+			</div>
 
-      <style>{lgStyles}</style>
-    </div>
-  )
+			<style>{lgStyles}</style>
+		</div>
+	)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -366,38 +366,38 @@ function LgWidget({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function LRNBalanceWidget({
-  address,
-  size = "md",
-  className = "",
+	address,
+	size = "md",
+	className = "",
 }: LRNBalanceWidgetProps) {
-  const { data, isLoading, error } = useLearnToken(address)
-  const animatedBalance = useCountUp(data?.balance ?? 0)
+	const { data, isLoading, error } = useLearnToken(address)
+	const animatedBalance = useCountUp(data?.balance ?? 0)
 
-  if (isLoading) return <Skeleton size={size} />
+	if (isLoading) return <Skeleton size={size} />
 
-  if (error || !data) {
-    return (
-      <span className="lrn-error" role="alert">
-        ⚠ {error ?? "Unable to load balance."}
-        <style>{errorStyles}</style>
-      </span>
-    )
-  }
+	if (error || !data) {
+		return (
+			<span className="lrn-error" role="alert">
+				⚠ {error ?? "Unable to load balance."}
+				<style>{errorStyles}</style>
+			</span>
+		)
+	}
 
-  return (
-    <div className={`lrn-widget lrn-widget--${size} ${className}`.trim()}>
-      {size === "sm" && (
-        <SmWidget data={data} animatedBalance={animatedBalance} />
-      )}
-      {size === "md" && (
-        <MdWidget data={data} animatedBalance={animatedBalance} />
-      )}
-      {size === "lg" && (
-        <LgWidget data={data} animatedBalance={animatedBalance} />
-      )}
-      <style>{baseStyles}</style>
-    </div>
-  )
+	return (
+		<div className={`lrn-widget lrn-widget--${size} ${className}`.trim()}>
+			{size === "sm" && (
+				<SmWidget data={data} animatedBalance={animatedBalance} />
+			)}
+			{size === "md" && (
+				<MdWidget data={data} animatedBalance={animatedBalance} />
+			)}
+			{size === "lg" && (
+				<LgWidget data={data} animatedBalance={animatedBalance} />
+			)}
+			<style>{baseStyles}</style>
+		</div>
+	)
 }
 
 export default LRNBalanceWidget

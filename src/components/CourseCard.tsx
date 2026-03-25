@@ -54,7 +54,11 @@ const CourseCard: React.FC<CourseCardProps> = ({
 			{/* Cover Image Placeholder */}
 			<div className="relative h-48 w-full overflow-hidden bg-linear-to-br from-[#12101e] to-[#1e1840] border-b border-white/5">
 				{coverImage ? (
-					<img src={coverImage} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+					<img
+						src={coverImage}
+						alt={title}
+						className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+					/>
 				) : (
 					<div className="w-full h-full flex items-center justify-center font-black text-6xl text-white/5 group-hover:scale-110 transition-transform duration-700">
 						{title.charAt(0).toUpperCase()}
@@ -62,7 +66,9 @@ const CourseCard: React.FC<CourseCardProps> = ({
 				)}
 				{/* Difficulty Badge overlaying image */}
 				<div className="absolute top-5 left-5">
-					<span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border backdrop-blur-md ${difficultyData.className}`}>
+					<span
+						className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border backdrop-blur-md ${difficultyData.className}`}
+					>
 						{difficultyData.label}
 					</span>
 				</div>
@@ -70,7 +76,9 @@ const CourseCard: React.FC<CourseCardProps> = ({
 
 			{/* Card Content */}
 			<div className="p-8 flex flex-col flex-1 relative z-10">
-				<h3 className="text-2xl font-black mb-3 text-white leading-tight tracking-tight">{title}</h3>
+				<h3 className="text-2xl font-black mb-3 text-white leading-tight tracking-tight">
+					{title}
+				</h3>
 				<p className="text-white/40 text-sm leading-relaxed mb-6 flex-1 line-clamp-3">
 					{description}
 				</p>
@@ -78,10 +86,12 @@ const CourseCard: React.FC<CourseCardProps> = ({
 				{/* Metrics Row */}
 				<div className="flex flex-wrap items-center justify-between py-4 border-t border-white/5 gap-4">
 					<div className="text-xs font-bold text-white/40 uppercase tracking-widest flex items-center gap-2">
-						<span className="text-lg opacity-80 leading-none">📖</span> {lessonCount} Lessons
+						<span className="text-lg opacity-80 leading-none">📖</span>{" "}
+						{lessonCount} Lessons
 					</div>
 					<div className="text-xs font-bold text-brand-cyan uppercase tracking-widest bg-brand-cyan/10 px-3 py-1.5 rounded-xl border border-brand-cyan/20 flex items-center gap-1.5 shadow-inner shadow-brand-cyan/10">
-						<span className="text-[14px] leading-none">🏆</span> +{lrnReward} LRN
+						<span className="text-[14px] leading-none">🏆</span> +{lrnReward}{" "}
+						LRN
 					</div>
 				</div>
 

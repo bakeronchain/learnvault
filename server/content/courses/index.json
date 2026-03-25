@@ -1,38 +1,38 @@
 [
-  {
-    "id": "stellar-basics",
-    "title": "Introduction to Stellar & Soroban",
-    "description": "Learn the fundamentals of the Stellar blockchain, accounts, transactions, and your first Soroban smart contract.",
-    "difficulty": "beginner",
-    "estimated_hours": 4,
-    "lesson_count": 4,
-    "lrn_reward": 100,
-    "cover_image": "/assets/courses/stellar-basics.png",
-    "tags": ["stellar", "soroban", "beginner"],
-    "on_chain_course_id": 1
-  },
-  {
-    "id": "soroban-contracts",
-    "title": "Soroban Smart Contract Development",
-    "description": "Master Soroban smart contract development with advanced patterns, testing strategies, and deployment best practices.",
-    "difficulty": "intermediate",
-    "estimated_hours": 4,
-    "lesson_count": 4,
-    "lrn_reward": 200,
-    "cover_image": "/assets/courses/soroban-contracts.png",
-    "tags": ["soroban", "smart-contracts", "intermediate", "rust"],
-    "on_chain_course_id": 2
-  },
-  {
-    "id": "defi-fundamentals",
-    "title": "DeFi Fundamentals on Stellar",
-    "description": "Explore decentralized finance on Stellar including token swaps, liquidity pools, and yield strategies.",
-    "difficulty": "intermediate",
-    "estimated_hours": 4,
-    "lesson_count": 4,
-    "lrn_reward": 150,
-    "cover_image": "/assets/courses/defi-fundamentals.png",
-    "tags": ["defi", "stellar", "intermediate", "liquidity", "tokens"],
-    "on_chain_course_id": 3
-  }
+	{
+		"id": "stellar-basics",
+		"title": "Introduction to Stellar & Soroban",
+		"description": "Learn the fundamentals of the Stellar blockchain, accounts, transactions, and your first Soroban smart contract.",
+		"difficulty": "beginner",
+		"estimated_hours": 4,
+		"lesson_count": 4,
+		"lrn_reward": 100,
+		"cover_image": "/assets/courses/stellar-basics.png",
+		"tags": ["stellar", "soroban", "beginner"],
+		"on_chain_course_id": 1
+	},
+	{
+		"id": "soroban-contracts",
+		"title": "Soroban Smart Contract Development",
+		"description": "Master Soroban smart contract development with advanced patterns, testing strategies, and deployment best practices.",
+		"difficulty": "intermediate",
+		"estimated_hours": 4,
+		"lesson_count": 4,
+		"lrn_reward": 200,
+		"cover_image": "/assets/courses/soroban-contracts.png",
+		"tags": ["soroban", "smart-contracts", "intermediate", "rust"],
+		"on_chain_course_id": 2
+	},
+	{
+		"id": "defi-fundamentals",
+		"title": "DeFi Fundamentals on Stellar",
+		"description": "Explore decentralized finance on Stellar including token swaps, liquidity pools, and yield strategies.",
+		"difficulty": "intermediate",
+		"estimated_hours": 4,
+		"lesson_count": 4,
+		"lrn_reward": 150,
+		"cover_image": "/assets/courses/defi-fundamentals.png",
+		"tags": ["defi", "stellar", "intermediate", "liquidity", "tokens"],
+		"on_chain_course_id": 3
+	}
 ]

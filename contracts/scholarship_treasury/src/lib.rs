@@ -1,8 +1,8 @@
 #![no_std]
 
 use soroban_sdk::{
-    Address, Env, String, Symbol, Vec, contract, contracterror, contractevent, contractimpl,
-    contracttype, panic_with_error, symbol_short,
+    contract, contracterror, contractevent, contractimpl, contracttype, panic_with_error,
+    symbol_short, Address, Env, String, Symbol, Vec,
 };
 
 const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
@@ -119,7 +119,7 @@ impl ScholarshipTreasury {
 
     pub fn deposit(env: Env, donor: Address, amount: i128) {
         Self::assert_not_paused(&env);
-        
+
         if amount <= 0 {
             panic_with_error!(&env, Error::InvalidAmount);
         }
@@ -127,6 +127,10 @@ impl ScholarshipTreasury {
 
         let usdc = token::client(&env);
         usdc.transfer(&donor, &env.current_contract_address(), &amount);
+
+        let gov_contract = Self::governance_contract(&env);
+        let gov_client = governance::client(&env, &gov_contract);
+        gov_client.mint(&donor, &amount);
 
         let donor_key = DataKey::Donor(donor.clone());
         let current = env
@@ -162,7 +166,7 @@ impl ScholarshipTreasury {
 
     pub fn disburse(env: Env, recipient: Address, amount: i128) {
         Self::assert_not_paused(&env);
-        
+
         if amount <= 0 {
             panic_with_error!(&env, Error::InvalidAmount);
         }
@@ -240,6 +244,14 @@ impl ScholarshipTreasury {
             .persistent()
             .get::<_, i128>(&DataKey::Donor(donor))
             .unwrap_or(0)
+    }
+
+    pub fn donor_contribution(env: Env, donor: Address) -> i128 {
+        Self::get_donor_total(env, donor)
+    }
+
+    pub fn treasury_balance(env: Env) -> i128 {
+        Self::get_balance(env)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -339,7 +351,6 @@ impl ScholarshipTreasury {
         }
     }
 
-    
     fn assert_initialized(env: &Env) {
         if !env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(env, Error::NotInitialized);
@@ -347,11 +358,7 @@ impl ScholarshipTreasury {
     }
 
     fn assert_not_paused(env: &Env) {
-        let paused: bool = env
-            .storage()
-            .instance()
-            .get(&PAUSED_KEY)
-            .unwrap_or(false);
+        let paused: bool = env.storage().instance().get(&PAUSED_KEY).unwrap_or(false);
         if paused {
             panic_with_error!(env, Error::ContractPaused);
         }
@@ -365,10 +372,26 @@ impl ScholarshipTreasury {
     }
 }
 
+mod governance {
+    use soroban_sdk::{Address, Env};
+
+    pub fn client<'a>(env: &Env, contract_id: &Address) -> GovernanceTokenClient<'a> {
+        GovernanceTokenClient::new(env, contract_id)
+    }
+
+    #[soroban_sdk::contractclient(name = "GovernanceTokenClient")]
+    pub trait GovernanceTokenInterface {
+        fn mint(env: Env, to: Address, amount: i128);
+        fn balance(env: Env, account: Address) -> i128;
+    }
+}
+
+pub use governance::GovernanceTokenClient;
+
 mod token {
     #[cfg(test)]
     mod test_token {
-        use soroban_sdk::{Address, Env, Symbol, symbol_short};
+        use soroban_sdk::{symbol_short, Address, Env, Symbol};
 
         const USDC_KEY: Symbol = symbol_short!("USDC");
 
@@ -391,8 +414,11 @@ mod token {
 
     #[cfg(not(test))]
     pub fn client<'a>(env: &soroban_sdk::Env) -> soroban_sdk::token::TokenClient<'a> {
-        let token_address = env.storage().instance().get::<_, soroban_sdk::Address>(&USDC_KEY)
-            .unwrap_or_else(|| panic_with_error!(env, Error::NotInitialized));
+        let token_address = env
+            .storage()
+            .instance()
+            .get::<_, soroban_sdk::Address>(&crate::USDC_KEY)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(env, crate::Error::NotInitialized));
         soroban_sdk::token::TokenClient::new(env, &token_address)
     }
 

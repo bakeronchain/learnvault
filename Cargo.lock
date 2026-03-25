@@ -1121,6 +1121,7 @@ dependencies = [
 name = "scholarship-treasury"
 version = "0.0.1"
 dependencies = [
+ "governance-token",
  "soroban-sdk",
  "stellar-registry",
 ]

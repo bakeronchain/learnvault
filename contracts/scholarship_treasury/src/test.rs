@@ -1,12 +1,13 @@
 extern crate std;
 
 use soroban_sdk::{
-    Address, Env, IntoVal, String, Val, Vec,
     testutils::{Address as _, MockAuth, MockAuthInvoke},
     token::{StellarAssetClient, TokenClient},
+    Address, Env, IntoVal, String, Val, Vec,
 };
 
-use crate::{Error, ScholarshipTreasury, ScholarshipTreasuryClient, token};
+use crate::{token, Error, GovernanceTokenClient, ScholarshipTreasury, ScholarshipTreasuryClient};
+use governance_token::{GovernanceToken, GovernanceTokenClient as GovTokenClient};
 
 fn setup<'a>(
     env: &'a Env,
@@ -16,24 +17,36 @@ fn setup<'a>(
     Address,
     Address,
     Address,
+    GovTokenClient<'a>,
 ) {
     let admin = Address::generate(env);
-    let governance = Address::generate(env);
     let donor = Address::generate(env);
     let recipient = Address::generate(env);
 
     let contract_id = env.register(ScholarshipTreasury, ());
     let client = ScholarshipTreasuryClient::new(env, &contract_id);
 
+    let gov_contract_id = env.register(GovernanceToken, ());
+    let gov_client = GovTokenClient::new(env, &gov_contract_id);
+
     env.mock_all_auths();
     env.as_contract(&contract_id, || token::register(env, &admin));
     let token_id = env.as_contract(&contract_id, || token::contract_id(env));
     let sac = StellarAssetClient::new(env, &token_id);
     sac.mint(&donor, &1_000);
-    client.initialize(&admin, &token_id, &governance);
+
+    gov_client.initialize(&contract_id);
+    client.initialize(&admin, &token_id, &gov_contract_id);
     env.set_auths(&[]);
 
-    (client, governance, donor, recipient, token_id)
+    (
+        client,
+        gov_contract_id,
+        donor,
+        recipient,
+        token_id,
+        gov_client,
+    )
 }
 
 fn token_client<'a>(env: &Env, token_id: &Address) -> TokenClient<'a> {
@@ -81,7 +94,7 @@ fn sample_milestones(env: &Env) -> (Vec<String>, Vec<String>) {
 #[test]
 fn deposits_are_tracked_per_donor() {
     let env = Env::default();
-    let (client, _governance, donor, _recipient, token_id) = setup(&env);
+    let (client, _governance, donor, _recipient, token_id, gov_client) = setup(&env);
 
     env.mock_all_auths();
     client.deposit(&donor, &150);
@@ -91,12 +104,13 @@ fn deposits_are_tracked_per_donor() {
     assert_eq!(client.get_balance(), 200);
     assert_eq!(token_client(&env, &token_id).balance(&client.address), 200);
     assert_eq!(token_client(&env, &token_id).balance(&donor), 800);
+    assert_eq!(gov_client.balance(&donor), 200);
 }
 
 #[test]
 fn unauthorized_disburse_is_rejected() {
     let env = Env::default();
-    let (client, governance, donor, recipient, token_id) = setup(&env);
+    let (client, governance, donor, recipient, token_id, _gov_client) = setup(&env);
     env.mock_all_auths();
     client.deposit(&donor, &250);
     env.set_auths(&[]);
@@ -117,7 +131,7 @@ fn unauthorized_disburse_is_rejected() {
 #[test]
 fn disburse_more_than_balance_fails() {
     let env = Env::default();
-    let (client, governance, donor, recipient, _token_id) = setup(&env);
+    let (client, governance, donor, recipient, _token_id, _gov_client) = setup(&env);
     env.mock_all_auths();
     client.deposit(&donor, &10);
     env.set_auths(&[]);
@@ -135,7 +149,7 @@ fn disburse_more_than_balance_fails() {
 #[test]
 fn submitted_proposals_are_stored_per_applicant() {
     let env = Env::default();
-    let (client, _governance, donor, _recipient, _token_id) = setup(&env);
+    let (client, _governance, donor, _recipient, _token_id, _gov_client) = setup(&env);
     let (milestone_titles, milestone_dates) = sample_milestones(&env);
 
     env.mock_all_auths();
@@ -189,7 +203,7 @@ fn submitted_proposals_are_stored_per_applicant() {
 #[test]
 fn proposal_requires_three_milestones() {
     let env = Env::default();
-    let (client, _governance, donor, _recipient, _token_id) = setup(&env);
+    let (client, _governance, donor, _recipient, _token_id, _gov_client) = setup(&env);
 
     env.mock_all_auths();
     let titles = Vec::from_array(

@@ -9,11 +9,13 @@ import { useWallet } from "./useWallet"
 export interface Course {
 	id: string
 	title?: string
+	totalMilestones?: number
 }
 
 export interface MilestoneProgress {
 	courseId: string
 	completedMilestoneIds: number[]
+	totalMilestones?: number
 }
 
 type AnyRecord = Record<string, unknown>
@@ -113,6 +115,36 @@ const callFirst = async (
 		"No compatible method found",
 		{ methodName: methodNames.join(", ") },
 	)
+}
+
+/**
+ * Fetch the total milestone count for a course from the contract.
+ * Falls back to undefined if the contract / method is unavailable.
+ */
+const fetchTotalMilestones = async (
+	client: AnyRecord,
+	courseId: string,
+	address: string,
+): Promise<number | undefined> => {
+	try {
+		const raw = await callFirst(
+			client,
+			[
+				"get_course_milestone_count",
+				"getCourseMilestoneCount",
+				"milestone_count",
+				"milestoneCount",
+				"total_milestones",
+				"totalMilestones",
+			],
+			[{ course_id: courseId, courseId, learner: address }],
+		)
+		const value = resolveResultValue(raw)
+		const num = Number(value)
+		return Number.isFinite(num) && num > 0 ? num : undefined
+	} catch {
+		return undefined
+	}
 }
 
 const waitForMintEvent = async (
@@ -217,36 +249,46 @@ export function useCourse() {
 			)
 			const value = resolveResultValue(raw)
 			const ids = toArray(value).map((v) => String(v))
-			const courses = ids.map((id) => ({ id }))
+
+			// Fetch progress + total milestone count for each course in parallel
+			const entries = await Promise.all(
+				ids.map(async (id) => {
+					const [completedMilestoneIds, totalMilestones] = await Promise.all([
+						(async (): Promise<number[]> => {
+							try {
+								const rawProgress = await callFirst(
+									client,
+									[
+										"get_course_progress",
+										"getCourseProgress",
+										"course_progress_for",
+										"courseProgressFor",
+									],
+									[{ learner: address, course_id: id, courseId: id }],
+								)
+								return toNumberArray(resolveResultValue(rawProgress))
+							} catch {
+								return []
+							}
+						})(),
+						fetchTotalMilestones(client, id, address),
+					])
+
+					return { id, completedMilestoneIds, totalMilestones }
+				}),
+			)
+
+			const courses: Course[] = entries.map(({ id, totalMilestones }) => ({
+				id,
+				totalMilestones,
+			}))
 			setEnrolledCourses(courses)
 
-			const entries = await Promise.all(
-				ids.map(async (id) => ({
-					id,
-					progress: await (async () => {
-						try {
-							const rawProgress = await callFirst(
-								client,
-								[
-									"get_course_progress",
-									"getCourseProgress",
-									"course_progress_for",
-									"courseProgressFor",
-								],
-								[{ learner: address, course_id: id, courseId: id }],
-							)
-							return toNumberArray(resolveResultValue(rawProgress))
-						} catch {
-							return []
-						}
-					})(),
-				})),
-			)
 			setProgressMap(
 				Object.fromEntries(
-					entries.map(({ id, progress }) => [
+					entries.map(({ id, completedMilestoneIds, totalMilestones }) => [
 						id,
-						{ courseId: id, completedMilestoneIds: progress },
+						{ courseId: id, completedMilestoneIds, totalMilestones },
 					]),
 				),
 			)
@@ -258,7 +300,7 @@ export function useCourse() {
 				showError("Unable to load enrolled courses. Please try again.")
 			}
 		}
-	}, [address, addNotification, showWarning, showError])
+	}, [address, showWarning, showError])
 
 	useEffect(() => {
 		void refreshCourses()
@@ -353,6 +395,7 @@ export function useCourse() {
 					setProgressMap((prev) => ({
 						...prev,
 						[courseId]: {
+							...prev[courseId],
 							courseId,
 							completedMilestoneIds: updatedProgress,
 						},
@@ -388,6 +431,26 @@ export function useCourse() {
 					rawTx,
 					signTransaction as (...args: unknown[]) => unknown,
 				)
+
+				setProgressMap((prev) => {
+					const existing = prev[courseId] ?? {
+						courseId,
+						completedMilestoneIds: [],
+					}
+					if (existing.completedMilestoneIds.includes(milestoneId)) {
+						return prev
+					}
+					return {
+						...prev,
+						[courseId]: {
+							...existing,
+							completedMilestoneIds: [
+								...existing.completedMilestoneIds,
+								milestoneId,
+							],
+						},
+					}
+				})
 
 				const earned = await waitForMintEvent(address)
 				addNotification(

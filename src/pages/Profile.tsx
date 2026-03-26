@@ -3,11 +3,13 @@ import { Helmet } from "react-helmet"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import { ActivityFeed } from "../components/ActivityFeed"
+import { CourseProgressBar } from "../components/CourseProgressBar"
 import { ReputationBadge } from "../components/ReputationBadge"
 import {
 	NoCredentialsEmptyState,
 	ProfileSkeleton,
 } from "../components/SkeletonLoader"
+import { useCourse } from "../hooks/useCourse"
 import { WalletContext } from "../providers/WalletProvider"
 import { shortenAddress } from "../util/scholarshipApplications"
 
@@ -15,6 +17,7 @@ const Profile: React.FC = () => {
 	const { t } = useTranslation()
 	const { address: walletAddress } = useContext(WalletContext)
 	const [isLoading, setIsLoading] = useState(true)
+	const { getCourseProgress } = useCourse()
 
 	useEffect(() => {
 		const timer = setTimeout(() => setIsLoading(false), 2000)
@@ -27,15 +30,18 @@ const Profile: React.FC = () => {
 		address: walletAddress ?? "",
 		nfts: [
 			{
+				id: "soroban-101",
 				program: "Soroban 101",
 				date: "2024-02-15",
 				artwork: "https://api.placeholder.com/150/150?text=S101",
+				totalMilestones: 8,
 			},
 			{
-				id: "2",
+				id: "smart-contract-masterclass",
 				program: "Smart Contract Masterclass",
 				date: "2024-03-20",
 				artwork: "https://api.placeholder.com/150/150?text=SCM",
+				totalMilestones: 12,
 			},
 		],
 	}
@@ -107,46 +113,59 @@ const Profile: React.FC = () => {
 					<NoCredentialsEmptyState />
 				) : (
 					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-						{user.nfts.map((nft, index) => (
-							<Link
-								to={`/credentials/${nft.id}`}
-								key={nft.id}
-								aria-label={`Open ${nft.program} credential awarded on ${nft.date}`}
-								className="glass-card rounded-[2.5rem] overflow-hidden hover:border-brand-cyan/40 hover:-translate-y-3 transition-all duration-700 group animate-in fade-in zoom-in"
-								style={{ animationDelay: `${index * 150}ms` }}
-							>
-								<div className="relative aspect-square overflow-hidden mb-2">
-									<img
-										src={nft.artwork}
-										alt={`Credential artwork for ${nft.program}`}
-										className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 opacity-80 group-hover:opacity-100"
-										loading="lazy"
-									/>
-									<div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-									<div className="absolute bottom-4 left-4 right-4 translate-y-4 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-500">
-										<span
-											className="block w-full py-2 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-xl shadow-xl text-center"
-											aria-hidden="true"
-										>
-											View Certificate
-										</span>
+						{user.nfts.map((nft, index) => {
+							const progress = getCourseProgress(nft.id)
+							const completedCount = progress.completedMilestoneIds.length
+
+							return (
+								<Link
+									to={`/credentials/${nft.id}`}
+									key={nft.id}
+									aria-label={`Open ${nft.program} credential awarded on ${nft.date}`}
+									className="glass-card rounded-[2.5rem] overflow-hidden hover:border-brand-cyan/40 hover:-translate-y-3 transition-all duration-700 group animate-in fade-in zoom-in"
+									style={{ animationDelay: `${index * 150}ms` }}
+								>
+									<div className="relative aspect-square overflow-hidden mb-2">
+										<img
+											src={nft.artwork}
+											alt={`Credential artwork for ${nft.program}`}
+											className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 opacity-80 group-hover:opacity-100"
+											loading="lazy"
+										/>
+										<div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+										<div className="absolute bottom-4 left-4 right-4 translate-y-4 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-500">
+											<span
+												className="block w-full py-2 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-xl shadow-xl text-center"
+												aria-hidden="true"
+											>
+												View Certificate
+											</span>
+										</div>
 									</div>
-								</div>
-								<div className="p-8">
-									<h3 className="text-lg font-black mb-2 leading-tight group-hover:text-brand-cyan transition-colors">
-										{nft.program}
-									</h3>
-									<div className="flex justify-between items-center gap-4">
-										<p className="text-[10px] text-white/70 uppercase font-black tracking-widest">
-											{nft.date}
-										</p>
-										<span className="text-[10px] text-brand-emerald font-black uppercase tracking-widest">
-											Verified ✓
-										</span>
+									<div className="p-8">
+										<h3 className="text-lg font-black mb-2 leading-tight group-hover:text-brand-cyan transition-colors">
+											{nft.program}
+										</h3>
+										<div className="flex justify-between items-center gap-4 mb-4">
+											<p className="text-[10px] text-white/70 uppercase font-black tracking-widest">
+												{nft.date}
+											</p>
+											<span className="text-[10px] text-brand-emerald font-black uppercase tracking-widest">
+												Verified ✓
+											</span>
+										</div>
+
+										{/* ── Progress bar ── */}
+										<CourseProgressBar
+											completed={completedCount}
+											total={nft.totalMilestones}
+											size="sm"
+											animate
+										/>
 									</div>
-								</div>
-							</Link>
-						))}
+								</Link>
+							)
+						})}
 					</div>
 				)}
 			</section>

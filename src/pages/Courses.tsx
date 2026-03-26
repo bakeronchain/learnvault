@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import { CourseFilter } from "../components/CourseFilter"
 import Pagination from "../components/Pagination"
-import { courses } from "../data/courses"
 import { CourseCardSkeleton } from "../components/skeletons/CourseCardSkeleton"
+import { courses } from "../data/courses"
 
 const levelStyles: Record<(typeof courses)[number]["level"], string> = {
 	Beginner: "bg-brand-emerald/20 text-brand-emerald border-brand-emerald/20",
@@ -30,8 +30,7 @@ const Courses: React.FC = () => {
 	const difficulty = searchParams.get("difficulty") ?? ""
 	const track = searchParams.get("track") ?? ""
 	const parsedPage = parseInt(searchParams.get("page") || "1", 10)
-	const currentPage =
-		isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
+	const currentPage = isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
 
 	// Simulate loading state
 	useEffect(() => {
@@ -124,18 +123,21 @@ const Courses: React.FC = () => {
 	const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE))
 	const safePage = Math.min(currentPage, totalPages)
 	const startIndex = (safePage - 1) * ITEMS_PER_PAGE
-	const paginatedCourses = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+	const paginatedCourses = filtered.slice(
+		startIndex,
+		startIndex + ITEMS_PER_PAGE,
+	)
 
 	return (
-		<div className="container mx-auto px-4 py-12">
+		<div className="container mx-auto px-4 py-8 sm:py-12">
 			<header className="mb-12 text-center">
 				<p className="text-sm uppercase tracking-[0.35em] text-brand-cyan/80 mb-4">
 					Learning Tracks
 				</p>
-				<h1 className="text-4xl md:text-5xl font-bold mb-4 text-gradient">
+				<h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-gradient">
 					Choose a path and start with a focused first lesson.
 				</h1>
-				<p className="text-gray-400 text-lg max-w-3xl mx-auto leading-relaxed">
+				<p className="text-gray-400 text-base sm:text-lg max-w-3xl mx-auto leading-relaxed">
 					Every LearnVault track is designed to move new learners from setup to
 					hands-on progress with a clear first milestone.
 				</p>
@@ -159,7 +161,7 @@ const Courses: React.FC = () => {
 					))}
 				</div>
 			) : filtered.length === 0 ? (
-				<div className="glass-card rounded-[2.5rem] border border-white/5 p-16 text-center">
+				<div className="glass-card rounded-[2.5rem] border border-white/5 p-8 sm:p-16 text-center">
 					<p className="text-5xl mb-6">🔍</p>
 					<h2 className="text-2xl font-black tracking-tight mb-3">
 						No courses match your filters
@@ -171,7 +173,7 @@ const Courses: React.FC = () => {
 					<button
 						type="button"
 						onClick={handleClear}
-						className="px-6 py-2.5 rounded-full text-sm font-bold uppercase tracking-widest border border-brand-cyan/30 text-brand-cyan hover:bg-brand-cyan/10 transition-all"
+						className="px-6 py-3 min-h-11 rounded-full text-sm font-bold uppercase tracking-widest border border-brand-cyan/30 text-brand-cyan hover:bg-brand-cyan/10 transition-all"
 					>
 						Clear all filters
 					</button>
@@ -230,7 +232,7 @@ const Courses: React.FC = () => {
 										<span>{course.duration}</span>
 										<Link
 											to={`/learn?course=${course.id}`}
-											className="iridescent-border px-4 py-2 rounded-xl font-semibold text-white hover:scale-105 transition-transform"
+											className="iridescent-border px-4 py-3 min-h-11 rounded-xl font-semibold text-white hover:scale-105 transition-transform"
 										>
 											Preview track
 										</Link>

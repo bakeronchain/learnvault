@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
-import { ActivityFeed } from "../components/ActivityFeed"
 import { CourseProgressBar } from "../components/CourseProgressBar"
 import { ReputationBadge } from "../components/ReputationBadge"
 import {
@@ -73,14 +72,14 @@ const Profile: React.FC = () => {
 
 	if (isLoading) {
 		return (
-			<div className="p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
+			<div className="p-4 sm:p-8 md:p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
 				<ProfileSkeleton />
 			</div>
 		)
 	}
 
 	return (
-		<div className="p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
+		<div className="p-4 sm:p-8 md:p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
 			<Helmet>
 				<title>{title}</title>
 				<meta property="og:title" content={title} />
@@ -93,7 +92,7 @@ const Profile: React.FC = () => {
 				<meta name="twitter:card" content="summary_large_image" />
 			</Helmet>
 
-			<header className="glass-card mb-20 p-12 rounded-[3.5rem] flex flex-col md:flex-row items-center gap-12 relative overflow-hidden group">
+			<header className="glass-card mb-12 sm:mb-20 p-6 sm:p-12 rounded-[2rem] sm:rounded-[3.5rem] flex flex-col md:flex-row items-center gap-8 sm:gap-12 relative overflow-hidden group">
 				<div className="absolute top-0 right-0 w-64 h-64 bg-brand-cyan/10 blur-[100px] rounded-full -z-10 group-hover:bg-brand-purple/10 transition-colors duration-1000"></div>
 				<div className="iridescent-border p-1 rounded-full shadow-2xl shadow-brand-cyan/20">
 					<div className="w-32 h-32 bg-[#05070a] rounded-full flex items-center justify-center text-4xl font-black text-gradient">
@@ -101,7 +100,7 @@ const Profile: React.FC = () => {
 					</div>
 				</div>
 				<div className="flex-1 text-center md:text-left">
-					<h1 className="text-4xl font-black mb-3 tracking-tighter">
+					<h1 className="text-3xl sm:text-4xl font-black mb-3 tracking-tighter">
 						{t("pages.profile.title")}
 					</h1>
 					<code className="text-white/30 text-sm block mb-6 font-mono tracking-widest">
@@ -142,7 +141,7 @@ const Profile: React.FC = () => {
 									to={`/credentials/${nft.id}`}
 									key={nft.id}
 									aria-label={`Open ${nft.program} credential awarded on ${nft.date}`}
-									className="glass-card rounded-[2.5rem] overflow-hidden hover:border-brand-cyan/40 hover:-translate-y-3 transition-all duration-700 group animate-in fade-in zoom-in"
+									className="glass-card rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden hover:border-brand-cyan/40 hover:-translate-y-3 transition-all duration-700 group animate-in fade-in zoom-in"
 									style={{ animationDelay: `${index * 150}ms` }}
 								>
 									<div className="relative aspect-square overflow-hidden mb-2">
@@ -162,7 +161,7 @@ const Profile: React.FC = () => {
 											</span>
 										</div>
 									</div>
-									<div className="p-8">
+									<div className="p-5 sm:p-8">
 										<h3 className="text-lg font-black mb-2 leading-tight group-hover:text-brand-cyan transition-colors">
 											{nft.program}
 										</h3>

@@ -1,6 +1,5 @@
-﻿import { Button, Icon } from "@stellar/design-system"
+import { Button, Icon } from "@stellar/design-system"
 import React, { lazy, Suspense, useState } from "react"
-import { Helmet } from "react-helmet"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import DeferredSection from "../components/DeferredSection"
@@ -28,45 +27,32 @@ const Home: React.FC = () => {
 		{ id: 3, label: t("home.milestones.3"), lrnReward: 50 },
 	]
 
-	const siteUrl = "https://learnvault.app"
-	const title = "LearnVault - Learn Stellar & Soroban Development"
-	const description =
-		"Master Stellar blockchain and Soroban smart contract development. Earn ScholarNFTs, unlock LRN rewards, and join a community-governed learning DAO."
-
 	return (
 		<>
-			<Helmet>
-				<title>{title}</title>
-				<meta property="og:title" content={title} />
-				<meta property="og:description" content={description} />
-				<meta property="og:image" content={`${siteUrl}/og-image.png`} />
-				<meta property="og:url" content={siteUrl} />
-				<meta name="twitter:card" content="summary_large_image" />
-			</Helmet>
-
-			<div className="min-h-screen flex flex-col items-center py-20 px-6 relative overflow-hidden">
-				<div className="absolute top-0 left-0 w-full h-full animate-mesh opacity-30 -z-20" />
-				<div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-brand-cyan/20 blur-[150px] rounded-full -z-10 animate-pulse" />
-				<div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-brand-purple/20 blur-[150px] rounded-full -z-10 animate-pulse delay-700" />
+			<div className="min-h-screen flex flex-col items-center py-14 sm:py-20 px-4 sm:px-6 relative overflow-hidden">
+				<div className="absolute top-0 left-0 w-full h-full hidden sm:block animate-mesh opacity-30 -z-20" />
+				<div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-brand-cyan/20 blur-[150px] rounded-full -z-10 animate-pulse hidden md:block" />
+				<div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-brand-purple/20 blur-[150px] rounded-full -z-10 animate-pulse delay-700 hidden md:block" />
 
 				{showOnboarding ? (
 					<Suspense fallback={<SectionSkeleton className="mb-20 min-h-64" />}>
 						<OnboardingWizard />
 					</Suspense>
 				) : (
-					<section className="mb-16 w-full max-w-6xl rounded-[2rem] border border-white/10 bg-black/20 px-6 py-8 shadow-2xl backdrop-blur-xl md:px-8">
+					<section className="mb-12 sm:mb-16 w-full max-w-6xl rounded-[2rem] border border-white/10 bg-black/20 px-4 sm:px-6 py-6 sm:py-8 shadow-2xl backdrop-blur-xl md:px-8">
 						<div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
 							<div className="max-w-3xl">
 								<p className="text-xs uppercase tracking-[0.35em] text-brand-cyan/80">
 									New Learner Flow
 								</p>
 								<h2 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">
-									Launch the guided wallet-and-enrollment setup only when you need it.
+									Launch the guided wallet-and-enrollment setup only when you
+									need it.
 								</h2>
 								<p className="mt-3 text-base leading-relaxed text-white/60">
-									The onboarding assistant is still available, but it now loads on
-									demand so the dashboard shell reaches first paint faster on mobile
-									data.
+									The onboarding assistant is still available, but it now loads
+									on demand so the dashboard shell reaches first paint faster on
+									mobile data.
 								</p>
 							</div>
 							<Button
@@ -87,22 +73,22 @@ const Home: React.FC = () => {
 						</div>
 					</div>
 
-					<h1 className="text-7xl md:text-8xl font-black mb-8 tracking-tighter text-gradient leading-[0.9] animate-in slide-in-from-bottom-12 duration-1000 delay-200">
+					<h1 className="text-5xl sm:text-6xl md:text-8xl font-black mb-6 sm:mb-8 tracking-tighter text-gradient leading-[0.95] animate-in slide-in-from-bottom-12 duration-1000 delay-200">
 						{t("home.heroTitle")}
 					</h1>
-					<p className="text-xl md:text-2xl text-white/50 mb-12 max-w-2xl mx-auto font-medium leading-relaxed animate-in slide-in-from-bottom-12 duration-1000 delay-400">
+					<p className="text-base sm:text-xl md:text-2xl text-white/50 mb-10 sm:mb-12 max-w-2xl mx-auto font-medium leading-relaxed animate-in slide-in-from-bottom-12 duration-1000 delay-400">
 						{t("home.heroDesc")}
 					</p>
 					<div className="flex flex-wrap justify-center gap-6 animate-in slide-in-from-bottom-12 duration-1000 delay-600">
 						<Link
 							to="/courses"
-							className="iridescent-border px-12 py-5 rounded-2xl font-black text-lg uppercase tracking-widest hover:scale-105 active:scale-95 transition-all group relative overflow-hidden shadow-2xl shadow-brand-cyan/20"
+							className="iridescent-border px-8 sm:px-12 py-3.5 sm:py-5 min-h-11 rounded-2xl font-black text-sm sm:text-lg uppercase tracking-widest hover:scale-105 active:scale-95 transition-all group relative overflow-hidden shadow-2xl shadow-brand-cyan/20"
 						>
 							<span className="relative z-10">{t("nav.courses")}</span>
 						</Link>
 						<Link
 							to="/learn"
-							className="px-12 py-5 glass text-white rounded-2xl font-black text-lg uppercase tracking-widest hover:bg-white/10 hover:scale-105 active:scale-95 transition-all border border-white/10"
+							className="px-8 sm:px-12 py-3.5 sm:py-5 min-h-11 glass text-white rounded-2xl font-black text-sm sm:text-lg uppercase tracking-widest hover:bg-white/10 hover:scale-105 active:scale-95 transition-all border border-white/10"
 						>
 							{t("nav.learn")}
 						</Link>
@@ -115,7 +101,7 @@ const Home: React.FC = () => {
 
 				<main className="w-full max-w-6xl flex flex-col gap-12 relative z-10 animate-in slide-in-from-bottom-12 duration-1000 delay-800">
 					<div className="iridescent-border p-[1px] rounded-[3.5rem] shadow-2xl">
-						<div className="glass-card p-12 rounded-[3.5rem] border border-white/5">
+						<div className="glass-card p-6 sm:p-12 rounded-[2rem] sm:rounded-[3.5rem] border border-white/5">
 							<div className="flex flex-col md:flex-row gap-12 items-start">
 								<div className="md:w-1/3">
 									<h2 className="text-3xl font-black mb-4 flex items-center gap-4">
@@ -127,8 +113,12 @@ const Home: React.FC = () => {
 									</p>
 								</div>
 								<div className="md:w-2/3 w-full">
-									<DeferredSection fallback={<SectionSkeleton className="min-h-40" />}>
-										<Suspense fallback={<SectionSkeleton className="min-h-40" />}>
+									<DeferredSection
+										fallback={<SectionSkeleton className="min-h-40" />}
+									>
+										<Suspense
+											fallback={<SectionSkeleton className="min-h-40" />}
+										>
 											<MilestoneTracker
 												courseId="stellar-basics"
 												milestones={mockMilestones}
@@ -140,13 +130,13 @@ const Home: React.FC = () => {
 						</div>
 					</div>
 
-					<div className="glass-card p-12 rounded-[3.5rem] border border-white/10 shadow-2xl">
+					<div className="glass-card p-6 sm:p-12 rounded-[2rem] sm:rounded-[3.5rem] border border-white/10 shadow-2xl">
 						<h2 className="text-3xl font-black mb-10 flex items-center gap-4">
 							<Icon.File06 size="lg" className="text-brand-purple" />
 							{t("home.sampleContracts.title")}
 						</h2>
 
-						<div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
+						<div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-16">
 							<div className="space-y-8">
 								<p className="text-lg">
 									<strong className="text-brand-cyan">
@@ -164,14 +154,16 @@ const Home: React.FC = () => {
 									</Link>{" "}
 									{t("home.sampleContracts.guessDesc2")}
 								</p>
-								<DeferredSection fallback={<SectionSkeleton className="min-h-40" />}>
+								<DeferredSection
+									fallback={<SectionSkeleton className="min-h-40" />}
+								>
 									<Suspense fallback={<SectionSkeleton className="min-h-40" />}>
 										<GuessTheNumber />
 									</Suspense>
 								</DeferredSection>
 							</div>
 
-							<div className="space-y-10 flex flex-col justify-center border-l border-white/10 pl-12">
+							<div className="space-y-8 sm:space-y-10 flex flex-col justify-center lg:border-l border-white/10 lg:pl-12">
 								<p className="text-white/40 leading-relaxed italic">
 									{t("home.sampleContracts.other")}
 								</p>

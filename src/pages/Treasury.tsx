@@ -10,8 +10,14 @@ import {
 	YAxis,
 } from "recharts"
 import TxHashLink from "../components/TxHashLink"
+import { useContractIds } from "../hooks/useContractIds"
+import { useUSDC } from "../hooks/useUSDC"
 
 const Treasury: React.FC = () => {
+	const { scholarshipTreasury } = useContractIds()
+	const { balance: treasuryUSDC, isLoading: treasuryLoading } =
+		useUSDC(scholarshipTreasury)
+
 	const data = [
 		{ name: "Mon", inflows: 4000, outflows: 2400 },
 		{ name: "Tue", inflows: 3000, outflows: 1398 },
@@ -23,7 +29,11 @@ const Treasury: React.FC = () => {
 	]
 
 	const stats = {
-		totalTreasury: "125,400 USDC",
+		totalTreasury: treasuryLoading
+			? "Loading…"
+			: treasuryUSDC !== undefined
+				? `${treasuryUSDC.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC`
+				: "125,400 USDC",
 		totalDisbursed: "45,200 USDC",
 		scholarsFunded: "128",
 		donorsCount: "842",

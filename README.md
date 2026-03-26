@@ -401,6 +401,8 @@ To contribute:
 
 All contributors are recognized on-chain and in our official documentation.
 
+Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing. We expect all participants to uphold these standards.
+
 ---
 
 ## Resources

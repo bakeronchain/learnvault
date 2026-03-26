@@ -134,6 +134,9 @@ impl MilestoneEscrow {
     }
 
     pub fn reclaim_inactive(env: Env, proposal_id: u32) {
+        let admin = Self::admin(&env);
+        admin.require_auth();
+
         let key = DataKey::Escrow(proposal_id);
         let mut record = Self::get_or_panic(&env, &key);
 

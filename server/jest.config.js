@@ -1,7 +1,10 @@
 /** @type {import('jest').Config} */
 module.exports = {
 	testEnvironment: "node",
-	testMatch: ["**/tests/**/*.test.ts"],
+	testMatch: [
+		"**/tests/**/*.test.ts",
+		"**/controllers/**/*.test.ts",
+	],
 	moduleFileExtensions: ["ts", "js", "json"],
 	transform: {
 		"^.+\\.ts$": [

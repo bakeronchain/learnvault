@@ -12,6 +12,13 @@ test_snapshots
 dist
 dist-ssr
 
+# Playwright E2E output
+test-results/
+playwright-report/
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
 # dependencies
 node_modules/
 
@@ -43,3 +50,6 @@ packages/*
 # generated contract client imports
 src/contracts/*
 !src/contracts/util.ts
+
+# test coverage
+coverage/

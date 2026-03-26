@@ -84,6 +84,20 @@ class InMemoryMilestoneStore {
 	async getAuditForReport(reportId: number): Promise<MilestoneAuditEntry[]> {
 		return this.auditLog.filter((e) => e.report_id === reportId)
 	}
+
+	async getMilestoneProgress(
+		scholarAddress: string,
+		courseId: string,
+	): Promise<{ totalMilestones: number; approvedCount: number }> {
+		const allForCourse = this.reports.filter(
+			(r) => r.scholar_address === scholarAddress && r.course_id === courseId,
+		)
+		const approvedCount = allForCourse.filter(
+			(r) => r.status === "approved",
+		).length
+		const totalMilestones = allForCourse.length
+		return { totalMilestones, approvedCount }
+	}
 }
 
 export const inMemoryMilestoneStore = new InMemoryMilestoneStore()
@@ -168,6 +182,30 @@ export const milestoneStore = {
 			],
 		)
 		return result.rows[0]
+	},
+
+	async getMilestoneProgress(
+		scholarAddress: string,
+		courseId: string,
+	): Promise<{ totalMilestones: number; approvedCount: number }> {
+		if (!isRealPool()) {
+			return inMemoryMilestoneStore.getMilestoneProgress(
+				scholarAddress,
+				courseId,
+			)
+		}
+		const totalResult = await pool.query(
+			`SELECT COUNT(*) AS total FROM milestones WHERE course_id = (SELECT id FROM courses WHERE slug = $1)`,
+			[courseId],
+		)
+		const approvedResult = await pool.query(
+			`SELECT COUNT(*) AS approved FROM milestone_reports WHERE scholar_address = $1 AND course_id = $2 AND status = 'approved'`,
+			[scholarAddress, courseId],
+		)
+		return {
+			totalMilestones: Number(totalResult.rows[0]?.total ?? 0),
+			approvedCount: Number(approvedResult.rows[0]?.approved ?? 0),
+		}
 	},
 
 	async getAuditForReport(reportId: number): Promise<MilestoneAuditEntry[]> {

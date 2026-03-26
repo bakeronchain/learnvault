@@ -1,0 +1,39 @@
+{
+	"lessonId": "defi-fundamentals-3",
+	"passingScore": 80,
+	"questions": [
+		{
+			"id": 1,
+			"text": "Which is a common source of yield in DeFi?",
+			"options": [
+				"AMM trading fees",
+				"Airplane tickets",
+				"Browser cache",
+				"Sequence numbers"
+			],
+			"correctIndex": 0
+		},
+		{
+			"id": 2,
+			"text": "APR vs APY: APY typically includes…",
+			"options": [
+				"Compounding",
+				"Seed phrases",
+				"Ledger pruning",
+				"Network upgrades"
+			],
+			"correctIndex": 0
+		},
+		{
+			"id": 3,
+			"text": "Which is an example of operational risk?",
+			"options": [
+				"Phishing links",
+				"Perfect audits",
+				"Unlimited liquidity",
+				"Guaranteed slippage"
+			],
+			"correctIndex": 0
+		}
+	]
+}

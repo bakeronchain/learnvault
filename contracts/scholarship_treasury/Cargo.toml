@@ -17,3 +17,5 @@ stellar-registry = "0.0.4"
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+governance-token = { path = "../governance_token" }
+proptest = { workspace = true }

@@ -3,10 +3,18 @@
  * Uses the in-memory store so no database is required.
  */
 
+jest.mock("../db/index", () => ({
+	pool: {
+		query: jest.fn(),
+		connect: jest.fn(),
+	},
+}))
+
 import express from "express"
 import jwt from "jsonwebtoken"
 import request from "supertest"
 import { inMemoryMilestoneStore } from "../db/milestone-store"
+import { errorHandler } from "../middleware/error.middleware"
 import { adminMilestonesRouter } from "../routes/admin-milestones.routes"
 
 const JWT_SECRET = "learnvault-secret"
@@ -19,6 +27,7 @@ function buildApp() {
 	const app = express()
 	app.use(express.json())
 	app.use("/api", adminMilestonesRouter)
+	app.use(errorHandler)
 	return app
 }
 
@@ -32,6 +41,16 @@ beforeEach(() => {
 	inMemoryMilestoneStore["reportSeq"] = 1
 	// @ts-ignore
 	inMemoryMilestoneStore["auditSeq"] = 1
+
+	// Provide fake Stellar credentials so the approve/reject credential guard
+	// passes — the pool mock ensures no real SDK call is made.
+	process.env.STELLAR_SECRET_KEY = "FAKE_TEST_KEY"
+	process.env.COURSE_MILESTONE_CONTRACT_ID = "FAKE_TEST_CONTRACT"
+})
+
+afterEach(() => {
+	delete process.env.STELLAR_SECRET_KEY
+	delete process.env.COURSE_MILESTONE_CONTRACT_ID
 })
 
 describe("POST /api/milestones/submit", () => {
@@ -73,6 +92,45 @@ describe("POST /api/milestones/submit", () => {
 		const res = await request(app).post("/api/milestones/submit").send(payload)
 
 		expect(res.status).toBe(409)
+	})
+
+	it("returns field-level validation errors for invalid payloads", async () => {
+		const app = buildApp()
+		const res = await request(app).post("/api/milestones/submit").send({
+			scholarAddress: "",
+			courseId: "stellar-basics",
+			milestoneId: 1,
+		})
+
+		expect(res.status).toBe(400)
+		expect(res.body.error).toBe("Validation failed")
+		expect(res.body.details).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					field: "scholarAddress",
+					message: "scholarAddress is required",
+				}),
+				expect.objectContaining({
+					field: "evidenceGithub",
+				}),
+			]),
+		)
+	})
+})
+
+describe("POST /api/milestones", () => {
+	it("creates a report with the issue payload shape", async () => {
+		const app = buildApp()
+		const res = await request(app).post("/api/milestones").send({
+			learner_address: "GSCHOLAR2",
+			course_id: "stellar-basics",
+			milestone_id: 2,
+			evidence_url: "https://example.com/evidence",
+		})
+
+		expect(res.status).toBe(201)
+		expect(res.body.data.scholar_address).toBe("GSCHOLAR2")
+		expect(res.body.data.evidence_github).toBe("https://example.com/evidence")
 	})
 })
 
@@ -176,6 +234,31 @@ describe("POST /api/admin/milestones/:id/approve", () => {
 
 		expect(res.status).toBe(409)
 	})
+
+	it("returns field-level validation errors when note is invalid", async () => {
+		const report = await inMemoryMilestoneStore["createReport"]({
+			scholar_address: "GSCHOLAR1",
+			course_id: "stellar-basics",
+			milestone_id: 1,
+			evidence_description: "Done",
+			evidence_github: null,
+			evidence_ipfs_cid: null,
+		})
+
+		const app = buildApp()
+		const res = await request(app)
+			.post(`/api/admin/milestones/${report.id}/approve`)
+			.set("Authorization", `Bearer ${makeAdminToken()}`)
+			.send({ note: 123 })
+
+		expect(res.status).toBe(400)
+		expect(res.body.details).toEqual([
+			{
+				field: "note",
+				message: "note must be a string",
+			},
+		])
+	})
 })
 
 describe("POST /api/admin/milestones/:id/reject", () => {
@@ -220,5 +303,11 @@ describe("POST /api/admin/milestones/:id/reject", () => {
 			.send({})
 
 		expect(res.status).toBe(400)
+		expect(res.body.details).toEqual([
+			{
+				field: "reason",
+				message: "reason is required",
+			},
+		])
 	})
 })

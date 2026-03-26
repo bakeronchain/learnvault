@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: LearnVault Discord
-    url: https://discord.gg/learnvault
-    about: Ask questions and discuss implementation details with the community.
+  - name: Ask a Question
+    url: https://github.com/bakeronchain/learnvault/discussions
+    about: Please ask and answer questions here
+  - name: Security Vulnerability
+    url: https://github.com/bakeronchain/learnvault/security/advisories
+    about: Please report security vulnerabilities privately

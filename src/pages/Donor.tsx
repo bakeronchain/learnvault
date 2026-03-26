@@ -10,8 +10,14 @@ import { useWallet } from "../hooks/useWallet"
 
 const Donor: React.FC = () => {
 	const { address } = useWallet()
-	const { stats, contributions, votes, scholars, isLoading, error } = useDonor()
+	const { stats, contributions, votes, scholars, isLoading, error, isEmpty } = useDonor()
 	const [showDepositForm, setShowDepositForm] = useState(false)
+	const hasActivity =
+		stats.totalContributed > 0 ||
+		stats.governanceBalance > 0 ||
+		contributions.length > 0 ||
+		votes.length > 0 ||
+		scholars.length > 0
 
 	// Guard: Not connected
 	if (!address) {
@@ -64,7 +70,7 @@ const Donor: React.FC = () => {
 	}
 
 	// Empty state: No contributions yet
-	if (stats.totalContributed === 0 && !showDepositForm) {
+	if (!hasActivity && !showDepositForm) {
 		return <EmptyState onBecomeDonor={() => setShowDepositForm(true)} />
 	}
 
@@ -98,14 +104,14 @@ const Donor: React.FC = () => {
 						color="text-brand-purple"
 					/>
 					<StatCard
-						label="Active Votes"
-						value={stats.activeVotes.toString()}
+						label="Proposals Voted"
+						value={stats.proposalsVoted.toString()}
 						icon="✓"
 						color="text-brand-emerald"
 					/>
 					<StatCard
-						label="Scholars Enabled"
-						value={stats.scholarsEnabled.toString()}
+						label="Scholars Funded"
+						value={stats.scholarsFunded.toString()}
 						icon="🎓"
 						color="text-brand-blue"
 					/>

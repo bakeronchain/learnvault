@@ -1,33 +1,35 @@
-import { Button, Icon, Layout } from "@stellar/design-system"
-import { Routes, Route, Outlet, NavLink } from "react-router-dom"
-import styles from "./App.module.css"
-import { ComingSoon } from "./components/ComingSoon"
-import ConnectAccount from "./components/ConnectAccount"
-import CourseCard from "./components/CourseCard"
+﻿import { lazy, Suspense, type ReactNode } from "react"
+import { Outlet, Route, Routes } from "react-router-dom"
 import ErrorBoundary from "./components/ErrorBoundary"
 import Footer from "./components/Footer"
 import NavBar from "./components/NavBar"
+import NetworkPreconnect from "./components/NetworkPreconnect"
 import { ToastProvider } from "./components/Toast/ToastProvider"
 import { WalletToastWatcher } from "./components/WalletToastWatcher"
-import { labPrefix } from "./contracts/util"
-import Admin from "./pages/Admin"
-import Courses from "./pages/Courses"
-import Credential from "./pages/Credential"
-import Dao from "./pages/Dao"
-import DaoProposals from "./pages/DaoProposals"
-import DaoPropose from "./pages/DaoPropose"
-import Dashboard from "./pages/Dashboard"
-import Debug from "./pages/Debug"
-import Donor from "./pages/Donor"
-import Home from "./pages/Home"
-import Leaderboard from "./pages/Leaderboard"
-import Learn from "./pages/Learn"
-import LessonView from "./pages/LessonView"
-import NotFound from "./pages/NotFound"
-import Profile from "./pages/Profile"
-import ScholarMilestones from "./pages/ScholarMilestones"
-import ScholarshipApply from "./pages/ScholarshipApply"
-import Treasury from "./pages/Treasury"
+
+const Admin = lazy(() => import("./pages/Admin"))
+const Courses = lazy(() => import("./pages/Courses"))
+const Credential = lazy(() => import("./pages/Credential"))
+const Dao = lazy(() => import("./pages/Dao"))
+const DaoProposals = lazy(() => import("./pages/DaoProposals"))
+const DaoPropose = lazy(() => import("./pages/DaoPropose"))
+const Dashboard = lazy(() => import("./pages/Dashboard"))
+const Debug = lazy(() => import("./pages/Debug"))
+const Donor = lazy(() => import("./pages/Donor"))
+const Home = lazy(() => import("./pages/Home"))
+const Leaderboard = lazy(() => import("./pages/Leaderboard"))
+const Learn = lazy(() => import("./pages/Learn"))
+const LessonView = lazy(() => import("./pages/LessonView"))
+const NotFound = lazy(() => import("./pages/NotFound"))
+const Profile = lazy(() => import("./pages/Profile"))
+const ScholarshipApply = lazy(() => import("./pages/ScholarshipApply"))
+const Treasury = lazy(() => import("./pages/Treasury"))
+
+const renderRoute = (element: ReactNode) => (
+	<ErrorBoundary>
+		<Suspense fallback={<RouteFallback />}>{element}</Suspense>
+	</ErrorBoundary>
+)
 
 function App() {
 	return (
@@ -35,37 +37,69 @@ function App() {
 			<WalletToastWatcher />
 			<Routes>
 				<Route element={<AppLayout />}>
-					<Route path="/" element={<Home />} />
-					<Route path="/courses" element={<Courses />} />
+					<Route path="/" element={renderRoute(<Home />)} />
+					<Route path="/courses" element={renderRoute(<Courses />)} />
 					<Route
 						path="/courses/:courseId/lessons/:lessonId"
-						element={<LessonView />}
+						element={renderRoute(<LessonView />)}
 					/>
-					<Route path="/learn" element={<Learn />} />
-					<Route path="/dao" element={<Dao />} />
-					<Route path="/dao/proposals" element={<DaoProposals />} />
-					<Route path="/dao/propose" element={<DaoPropose />} />
-					<Route path="/leaderboard" element={<Leaderboard />} />
-					<Route path="/profile" element={<Profile />} />
-					<Route path="/profile/:walletAddress" element={<Profile />} />
-					<Route path="/scholar/milestones" element={<ScholarMilestones />} />
-					<Route path="/scholarships/apply" element={<ScholarshipApply />} />
-					<Route path="/admin" element={<Admin />} />
-					<Route path="/treasury" element={<Treasury />} />
-					<Route path="/donor" element={<Donor />} />
-					<Route path="/credentials/:nftId" element={<Credential />} />
-					<Route path="/dashboard" element={<Dashboard />} />
-					<Route path="/debug" element={<Debug />} />
-					<Route path="/debug/:contractName" element={<Debug />} />
-					<Route path="*" element={<NotFound />} />
+					<Route path="/learn" element={renderRoute(<Learn />)} />
+					<Route path="/dao" element={renderRoute(<Dao />)} />
+					<Route
+						path="/dao/proposals"
+						element={renderRoute(<DaoProposals />)}
+					/>
+					<Route path="/dao/propose" element={renderRoute(<DaoPropose />)} />
+					<Route path="/leaderboard" element={renderRoute(<Leaderboard />)} />
+					<Route path="/profile" element={renderRoute(<Profile />)} />
+					<Route
+						path="/profile/:walletAddress"
+						element={renderRoute(<Profile />)}
+					/>
+					<Route
+						path="/scholarships/apply"
+						element={renderRoute(<ScholarshipApply />)}
+					/>
+					<Route path="/admin" element={renderRoute(<Admin />)} />
+					<Route path="/treasury" element={renderRoute(<Treasury />)} />
+					<Route path="/donor" element={renderRoute(<Donor />)} />
+					<Route
+						path="/credentials/:nftId"
+						element={renderRoute(<Credential />)}
+					/>
+					<Route path="/dashboard" element={renderRoute(<Dashboard />)} />
+					<Route path="/debug" element={renderRoute(<Debug />)} />
+					<Route
+						path="/debug/:contractName"
+						element={renderRoute(<Debug />)}
+					/>
+					<Route path="*" element={renderRoute(<NotFound />)} />
 				</Route>
 			</Routes>
 		</ToastProvider>
 	)
 }
 
-const AppLayout: React.FC = () => (
+const RouteFallback = () => (
+	<div className="mx-auto w-full max-w-7xl px-6 py-16 sm:px-12">
+		<div className="glass-card animate-pulse rounded-[2.5rem] border border-white/5 p-8">
+			<div className="mb-6 h-8 w-56 rounded-full bg-white/8" />
+			<div className="h-4 w-72 rounded-full bg-white/6" />
+			<div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+				{Array.from({ length: 3 }).map((_, index) => (
+					<div
+						key={index}
+						className="h-32 rounded-[1.75rem] border border-white/5 bg-white/5"
+					/>
+				))}
+			</div>
+		</div>
+	</div>
+)
+
+const AppLayout = () => (
 	<div className="min-h-screen flex flex-col pt-24 overflow-x-hidden w-full max-w-full">
+		<NetworkPreconnect />
 		<NavBar />
 		<main className="flex-1 relative z-10">
 			<Outlet />

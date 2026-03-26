@@ -9,7 +9,6 @@ import { useNotification } from "../hooks/useNotification"
 import { useWallet } from "../hooks/useWallet"
 import { getFriendbotUrl } from "../util/friendbot"
 import storage from "../util/storage"
-import { connectWallet } from "../util/wallet"
 
 const ONBOARDING_COMPLETE_KEY = "learnvault:onboarding-complete"
 const ONBOARDING_TRACK_KEY = "learnvault:onboarding-track"
@@ -214,6 +213,11 @@ export default function OnboardingWizard({
 		if (!address) return
 		setFundingAttempted(false)
 		await updateBalances()
+	}
+
+	const handleConnectWallet = async () => {
+		const { connectWallet } = await import("../util/wallet")
+		await connectWallet()
 	}
 
 	const handleEnroll = async () => {
@@ -473,7 +477,7 @@ export default function OnboardingWizard({
 											<Button
 												size="lg"
 												variant="primary"
-												onClick={() => void connectWallet()}
+												onClick={() => void handleConnectWallet()}
 												disabled={Boolean(address) || isPending}
 											>
 												{address ? "Wallet connected" : "Connect wallet"}

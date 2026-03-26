@@ -1,8 +1,8 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, panic_with_error,
-    symbol_short, Address, Env, String, Symbol,
+    Address, Env, String, Symbol, Vec, contract, contracterror, contractevent, contractimpl,
+    contracttype, panic_with_error, symbol_short,
 };
 
 // ---------------------------------------------------------------------------
@@ -25,14 +25,24 @@ pub enum MilestoneStatus {
 }
 
 #[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScholarStats {
+    pub enrolled_courses: u32,
+    pub completed_milestones: u32,
+    pub pending_milestones: u32,
+    pub rejected_milestones: u32,
+}
+
+#[contracttype]
 pub enum DataKey {
     Admin,
     LearnTokenContract,
     Courses(u32),
     Progress(Address, u32),
     Enrolled(Address, u32),
-    MilestoneState(Address, u32, u32),   // (learner, course_id, milestone_id)
-    RejectionReason(Address, u32, u32),  // (learner, course_id, milestone_id)
+    LearnerCourses(Address),
+    MilestoneState(Address, u32, u32), // (learner, course_id, milestone_id)
+    RejectionReason(Address, u32, u32), // (learner, course_id, milestone_id)
 }
 
 // ---------------------------------------------------------------------------
@@ -174,11 +184,22 @@ impl CourseMilestone {
             panic_with_error!(&env, Error::CourseNotFound);
         }
 
-        let key = DataKey::Enrolled(learner, course_id);
+        let key = DataKey::Enrolled(learner.clone(), course_id);
         if env.storage().persistent().has(&key) {
             panic_with_error!(&env, Error::AlreadyEnrolled);
         }
         env.storage().persistent().set(&key, &true);
+
+        let learner_courses_key = DataKey::LearnerCourses(learner);
+        let mut learner_courses = env
+            .storage()
+            .persistent()
+            .get::<_, Vec<u32>>(&learner_courses_key)
+            .unwrap_or(Vec::new(&env));
+        learner_courses.push_back(course_id);
+        env.storage()
+            .persistent()
+            .set(&learner_courses_key, &learner_courses);
     }
 
     /// Check whether a learner is enrolled in a course.
@@ -218,7 +239,11 @@ impl CourseMilestone {
 
         // Must not already be verified
         let state_key = DataKey::MilestoneState(learner.clone(), course_id, milestone_id);
-        if let Some(status) = env.storage().persistent().get::<_, MilestoneStatus>(&state_key) {
+        if let Some(status) = env
+            .storage()
+            .persistent()
+            .get::<_, MilestoneStatus>(&state_key)
+        {
             if status == MilestoneStatus::Verified {
                 panic_with_error!(&env, Error::MilestoneAlreadyVerified);
             }
@@ -256,7 +281,11 @@ impl CourseMilestone {
 
         // Milestone must not already be verified
         let state_key = DataKey::MilestoneState(learner.clone(), course_id, milestone_id);
-        if let Some(status) = env.storage().persistent().get::<_, MilestoneStatus>(&state_key) {
+        if let Some(status) = env
+            .storage()
+            .persistent()
+            .get::<_, MilestoneStatus>(&state_key)
+        {
             if status == MilestoneStatus::Verified {
                 panic_with_error!(&env, Error::MilestoneAlreadyVerified);
             }
@@ -435,6 +464,62 @@ impl CourseMilestone {
         env.storage().instance().get(&course_key)
     }
 
+    pub fn get_scholar_stats(env: Env, learner: Address) -> ScholarStats {
+        let learner_courses_key = DataKey::LearnerCourses(learner.clone());
+        let learner_courses = env
+            .storage()
+            .persistent()
+            .get::<_, Vec<u32>>(&learner_courses_key)
+            .unwrap_or(Vec::new(&env));
+
+        if learner_courses.is_empty() {
+            return ScholarStats {
+                enrolled_courses: 0,
+                completed_milestones: 0,
+                pending_milestones: 0,
+                rejected_milestones: 0,
+            };
+        }
+
+        let mut stats = ScholarStats {
+            enrolled_courses: learner_courses.len(),
+            completed_milestones: 0,
+            pending_milestones: 0,
+            rejected_milestones: 0,
+        };
+
+        let mut course_index = 0_u32;
+        while course_index < learner_courses.len() {
+            let course_id = learner_courses.get(course_index).unwrap();
+            if let Some(course) = env
+                .storage()
+                .instance()
+                .get::<_, CourseConfig>(&DataKey::Courses(course_id))
+            {
+                let mut milestone_id = 1_u32;
+                while milestone_id <= course.total_milestones {
+                    let state_key =
+                        DataKey::MilestoneState(learner.clone(), course_id, milestone_id);
+                    if let Some(status) = env
+                        .storage()
+                        .persistent()
+                        .get::<_, MilestoneStatus>(&state_key)
+                    {
+                        match status {
+                            MilestoneStatus::Pending => stats.pending_milestones += 1,
+                            MilestoneStatus::Verified => stats.completed_milestones += 1,
+                            MilestoneStatus::Rejected => stats.rejected_milestones += 1,
+                        }
+                    }
+                    milestone_id += 1;
+                }
+            }
+            course_index += 1;
+        }
+
+        stats
+    }
+
     // -----------------------------------------------------------------------
     // Internal helpers
     // -----------------------------------------------------------------------
@@ -459,7 +544,7 @@ impl CourseMilestone {
 }
 
 mod learn_token_client {
-    use soroban_sdk::{contractclient, Address, Env};
+    use soroban_sdk::{Address, Env, contractclient};
 
     #[contractclient(name = "LearnTokenClient")]
     pub trait LearnTokenInterface {

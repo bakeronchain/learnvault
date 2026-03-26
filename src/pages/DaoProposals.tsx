@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { Helmet } from "react-helmet"
 import { useSearchParams } from "react-router-dom"
-import { useToast } from "../components/Toast/ToastProvider"
 import Pagination from "../components/Pagination"
 import { useGovernance, type Proposal } from "../hooks/useGovernance"
 
@@ -18,7 +17,7 @@ const shortenAddress = (address: string) => {
 }
 
 const getTimeRemaining = (endDate: number) => {
-	// If endDate is a ledger sequence, this is simplified. 
+	// If endDate is a ledger sequence, this is simplified.
 	// In a real app we'd multiply by average block time or fetch current ledger.
 	// For now, let's treat it as a placeholder.
 	if (!endDate) return "Unknown"
@@ -29,26 +28,39 @@ const ITEMS_PER_PAGE = 5
 
 const DaoProposals: React.FC = () => {
 	const [searchParams, setSearchParams] = useSearchParams()
-	const { proposals, votingPower, castVote, isVoting, hasVoted, isLoadingProposals } = useGovernance()
-	
+	const {
+		proposals,
+		votingPower,
+		castVote,
+		isVoting,
+		hasVoted,
+		isLoadingProposals,
+	} = useGovernance()
+
 	const parsedPage = parseInt(searchParams.get("page") || "1", 10)
 	const currentPage = isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
-	
+
 	const [filter, setFilter] = useState<FilterType>("Active")
-	const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null)
-	
-	const { showInfo } = useToast()
+	const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(
+		null,
+	)
 
 	const filteredProposals = useMemo(() => {
 		if (filter === "All") return proposals
 		return proposals.filter((p) => p.status === filter)
 	}, [filter, proposals])
 
-	const totalPages = Math.max(1, Math.ceil(filteredProposals.length / ITEMS_PER_PAGE))
+	const totalPages = Math.max(
+		1,
+		Math.ceil(filteredProposals.length / ITEMS_PER_PAGE),
+	)
 	const safePage = Math.min(currentPage, totalPages)
 
 	const startIndex = (safePage - 1) * ITEMS_PER_PAGE
-	const currentProposals = filteredProposals.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+	const currentProposals = filteredProposals.slice(
+		startIndex,
+		startIndex + ITEMS_PER_PAGE,
+	)
 
 	useEffect(() => {
 		if (currentPage !== safePage) {
@@ -58,8 +70,12 @@ const DaoProposals: React.FC = () => {
 
 	// Auto-select first proposal if none selected or if filter changes
 	useEffect(() => {
-		if (filteredProposals.length > 0 && (!selectedProposal || !filteredProposals.find(p => p.id === selectedProposal.id))) {
-			setSelectedProposal(filteredProposals[0])
+		if (
+			filteredProposals.length > 0 &&
+			(!selectedProposal ||
+				!filteredProposals.find((p) => p.id === selectedProposal.id))
+		) {
+			setSelectedProposal(filteredProposals[0] ?? null)
 		} else if (filteredProposals.length === 0) {
 			setSelectedProposal(null)
 		}
@@ -75,29 +91,48 @@ const DaoProposals: React.FC = () => {
 		window.scrollTo({ top: 0, behavior: "smooth" })
 	}
 
-	const totalVotes = selectedProposal ? (selectedProposal.votesFor + selectedProposal.votesAgainst) : 0n
-	const yesPercent = totalVotes > 0n ? Number((selectedProposal!.votesFor * 100n) / totalVotes) : 0
-	const noPercent = totalVotes > 0n ? Number((selectedProposal!.votesAgainst * 100n) / totalVotes) : 0
+	const totalVotes = selectedProposal
+		? selectedProposal.votesFor + selectedProposal.votesAgainst
+		: 0n
+	const yesPercent =
+		totalVotes > 0n
+			? Number((selectedProposal!.votesFor * 100n) / totalVotes)
+			: 0
+	const noPercent =
+		totalVotes > 0n
+			? Number((selectedProposal!.votesAgainst * 100n) / totalVotes)
+			: 0
 
 	const userHasVoted = selectedProposal ? hasVoted(selectedProposal.id) : false
-	const voteDisabled = !selectedProposal || userHasVoted || selectedProposal.status !== "Active" || votingPower === 0n
+	const governanceTokens = votingPower
+	const isTokenHolder = governanceTokens > 0n
+	const voteDisabled =
+		!selectedProposal ||
+		userHasVoted ||
+		selectedProposal.status !== "Active" ||
+		!isTokenHolder
 
 	const getVoteDisabledMessage = () => {
 		if (!selectedProposal) return ""
-		if (votingPower === 0n) return "You must hold GOV tokens to vote."
+		if (!isTokenHolder) return "You must hold GOV tokens to vote."
 		if (userHasVoted) return "You have already cast your vote."
-		if (selectedProposal.status !== "Active") return "Voting is closed for this proposal."
+		if (selectedProposal.status !== "Active")
+			return "Voting is closed for this proposal."
 		return ""
 	}
 
 	const siteUrl = "https://learnvault.app"
-	const title = selectedProposal ? `${selectedProposal.title} — LearnVault DAO` : "DAO Proposals — LearnVault"
+	const title = selectedProposal
+		? `${selectedProposal.title} — LearnVault DAO`
+		: "DAO Proposals — LearnVault"
 
 	if (isLoadingProposals) {
 		return (
 			<div className="p-12 max-w-5xl mx-auto text-center h-[60vh] flex flex-col items-center justify-center">
 				<div className="w-12 h-12 border-4 border-brand-cyan/20 border-t-brand-cyan rounded-full animate-spin mb-4" />
-				<p className="text-white/60 font-medium">Loading Governance Proposals...</p>
+				<p className="text-white/60 font-medium">
+					Loading Governance Proposals...
+				</p>
 			</div>
 		)
 	}
@@ -118,22 +153,24 @@ const DaoProposals: React.FC = () => {
 			</header>
 
 			<div className="flex flex-wrap gap-3 mb-8 justify-center">
-				{(["Active", "Passed", "Rejected", "All"] as FilterType[]).map((item) => (
-					<button
-						key={item}
-						onClick={() => {
-							setFilter(item)
-							setSearchParams({ page: "1" })
-						}}
-						className={`px-5 py-2.5 rounded-full border text-xs font-black uppercase tracking-widest transition-all ${
-							filter === item
-								? "bg-brand-cyan/10 border-brand-cyan/40 text-brand-cyan"
-								: "bg-white/5 border-white/10 text-white/70 hover:border-brand-cyan/30"
-						}`}
-					>
-						{item}
-					</button>
-				))}
+				{(["Active", "Passed", "Rejected", "All"] as FilterType[]).map(
+					(item) => (
+						<button
+							key={item}
+							onClick={() => {
+								setFilter(item)
+								setSearchParams({ page: "1" })
+							}}
+							className={`px-5 py-2.5 rounded-full border text-xs font-black uppercase tracking-widest transition-all ${
+								filter === item
+									? "bg-brand-cyan/10 border-brand-cyan/40 text-brand-cyan"
+									: "bg-white/5 border-white/10 text-white/70 hover:border-brand-cyan/30"
+							}`}
+						>
+							{item}
+						</button>
+					),
+				)}
 			</div>
 
 			{selectedProposal && (
@@ -144,7 +181,9 @@ const DaoProposals: React.FC = () => {
 								{selectedProposal.title}
 							</h2>
 							<div className="flex items-center gap-3 text-xs font-black uppercase tracking-widest">
-								<span className="text-brand-cyan">Applicant {shortenAddress(selectedProposal.author)}</span>
+								<span className="text-brand-cyan">
+									Applicant {shortenAddress(selectedProposal.author)}
+								</span>
 								<span className="w-1.5 h-1.5 bg-white/20 rounded-full" />
 								<span className="text-white/70">ID #{selectedProposal.id}</span>
 							</div>
@@ -160,10 +199,14 @@ const DaoProposals: React.FC = () => {
 							<p className="text-white/70 leading-relaxed mb-8">
 								{selectedProposal.description}
 							</p>
-							
+
 							<div className="rounded-[1.75rem] border border-white/5 bg-white/5 p-6">
-								<p className="text-[10px] text-white/70 uppercase font-black tracking-widest mb-2">My Voting Power</p>
-								<h3 className="text-2xl font-black">{votingPower.toString()} GOV</h3>
+								<p className="text-[10px] text-white/70 uppercase font-black tracking-widest mb-2">
+									My Voting Power
+								</p>
+								<h3 className="text-2xl font-black">
+									{governanceTokens.toString()} GOV
+								</h3>
 							</div>
 						</div>
 
@@ -175,8 +218,14 @@ const DaoProposals: React.FC = () => {
 									<span>NO {noPercent}%</span>
 								</div>
 								<div className="w-full h-3 rounded-full bg-white/5 overflow-hidden flex">
-									<div className="h-full bg-brand-cyan" style={{ width: `${yesPercent}%` }} />
-									<div className="h-full bg-brand-purple" style={{ width: `${noPercent}%` }} />
+									<div
+										className="h-full bg-brand-cyan"
+										style={{ width: `${yesPercent}%` }}
+									/>
+									<div
+										className="h-full bg-brand-purple"
+										style={{ width: `${noPercent}%` }}
+									/>
 								</div>
 							</div>
 
@@ -203,7 +252,9 @@ const DaoProposals: React.FC = () => {
 								</button>
 							</div>
 							{getVoteDisabledMessage() && (
-								<p className="mt-4 text-xs text-white/40 font-medium italic">{getVoteDisabledMessage()}</p>
+								<p className="mt-4 text-xs text-white/40 font-medium italic">
+									{getVoteDisabledMessage()}
+								</p>
 							)}
 						</div>
 					</div>
@@ -216,7 +267,9 @@ const DaoProposals: React.FC = () => {
 						key={proposal.id}
 						onClick={() => setSelectedProposal(proposal)}
 						className={`glass-card p-8 rounded-[2.5rem] border text-left transition-all ${
-							selectedProposal?.id === proposal.id ? "border-brand-cyan/40" : "border-white/5 hover:border-brand-cyan/20"
+							selectedProposal?.id === proposal.id
+								? "border-brand-cyan/40"
+								: "border-white/5 hover:border-brand-cyan/20"
 						}`}
 					>
 						<div className="flex justify-between items-start mb-4">
@@ -225,7 +278,9 @@ const DaoProposals: React.FC = () => {
 								{proposal.status}
 							</span>
 						</div>
-						<p className="text-sm text-white/60 mb-5 line-clamp-2">{proposal.description}</p>
+						<p className="text-sm text-white/60 mb-5 line-clamp-2">
+							{proposal.description}
+						</p>
 						<div className="flex items-center gap-6 text-[10px] font-black uppercase tracking-widest text-white/40">
 							<span>For: {proposal.votesFor.toString()}</span>
 							<span>Against: {proposal.votesAgainst.toString()}</span>

@@ -50,7 +50,7 @@ export function generateLeaderboard(
 ): LeaderboardEntry[] {
 	const entries: LeaderboardEntry[] = SEED_ADDRESSES.map((addr, idx) => {
 		const seed = hashCode(addr)
-		const lrnBalance = deterministicRandom(seed, 1000, 99000)
+		const lrnBalance = deterministicRandom(seed, 1000, 99000) * 10000000
 		const coursesCompleted = deterministicRandom(seed + 1, 1, 20)
 		const daysAgo = deterministicRandom(seed + 2, 30, 730)
 		const joinedDate = new Date(NOW - daysAgo * ONE_DAY)
@@ -72,7 +72,7 @@ export function generateLeaderboard(
 		const fakeSuffix = String(i).padStart(8, "0")
 		const addr = `G${fakeSuffix}LEARNVAULTMOCK${String(i).padStart(12, "0")}`
 		const seed = i * 7919
-		const lrnBalance = deterministicRandom(seed, 100, 50000)
+		const lrnBalance = deterministicRandom(seed, 100, 50000) * 10000000
 		const coursesCompleted = deterministicRandom(seed + 1, 0, 15)
 		const daysAgo = deterministicRandom(seed + 2, 30, 730)
 		const joinedDate = new Date(NOW - daysAgo * ONE_DAY)
@@ -96,7 +96,7 @@ export function generateLeaderboard(
 			entries.push({
 				id: "connected-user",
 				address: connectedAddress,
-				lrnBalance: deterministicRandom(seed, 200, 30000),
+				lrnBalance: deterministicRandom(seed, 200, 30000) * 10000000,
 				coursesCompleted: deterministicRandom(seed + 1, 1, 10),
 				joinedDate: new Date(NOW - 90 * ONE_DAY),
 				lastActive: new Date(NOW),

@@ -1,13 +1,12 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl,
+    Address, Env, IntoVal, String, Val, Vec, contract, contractimpl,
     testutils::{Address as _, Ledger, MockAuth, MockAuthInvoke},
     token::{StellarAssetClient, TokenClient},
-    Address, Env, IntoVal, String, Val, Vec,
 };
 
-use crate::{token, Error, ScholarshipTreasury, ScholarshipTreasuryClient};
+use crate::{Error, ProposalStatus, ScholarshipTreasury, ScholarshipTreasuryClient, token};
 
 #[contract]
 pub struct MockGovernance;
@@ -109,6 +108,25 @@ fn sample_milestones(env: &Env) -> (Vec<String>, Vec<String>) {
     );
 
     (titles, dates)
+}
+
+fn submit_sample_proposal(
+    env: &Env,
+    client: &ScholarshipTreasuryClient<'_>,
+    applicant: &Address,
+    amount: i128,
+) -> u32 {
+    let (milestone_titles, milestone_dates) = sample_milestones(env);
+    client.submit_proposal(
+        applicant,
+        &amount,
+        &String::from_str(env, "Scholarship"),
+        &String::from_str(env, "https://example.com"),
+        &String::from_str(env, "Program description"),
+        &String::from_str(env, "2026-05-15"),
+        &milestone_titles,
+        &milestone_dates,
+    )
 }
 
 #[test]
@@ -218,6 +236,90 @@ fn submitted_proposals_are_stored_per_applicant() {
     assert_eq!(proposal.start_date, String::from_str(&env, "2026-05-15"));
     assert_eq!(proposal.milestone_titles, milestone_titles);
     assert_eq!(proposal.milestone_dates, milestone_dates);
+}
+
+#[test]
+fn get_proposals_by_status_returns_pending_proposals() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, _gov_client) = setup(&env);
+
+    env.mock_all_auths();
+    let proposal_id = submit_sample_proposal(&env, &client, &donor, 500);
+
+    let pending = client.get_proposals_by_status(&ProposalStatus::Pending);
+    let active = client.get_active_proposals();
+    let approved = client.get_proposals_by_status(&ProposalStatus::Approved);
+    let rejected = client.get_proposals_by_status(&ProposalStatus::Rejected);
+
+    assert_eq!(pending.len(), 1);
+    assert_eq!(active.len(), 1);
+    assert_eq!(pending.get(0).unwrap().id, proposal_id);
+    assert_eq!(active.get(0).unwrap().id, proposal_id);
+    assert_eq!(approved.len(), 0);
+    assert_eq!(rejected.len(), 0);
+}
+
+#[test]
+fn get_proposals_by_status_returns_approved_proposals_after_deadline() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client) = setup(&env);
+    let voter = Address::generate(&env);
+
+    gov_client.mint(&voter, &300);
+    env.mock_all_auths();
+    let proposal_id = submit_sample_proposal(&env, &client, &donor, 500);
+    client.vote(&voter, &proposal_id, &true);
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1);
+
+    let approved = client.get_proposals_by_status(&ProposalStatus::Approved);
+    let rejected = client.get_proposals_by_status(&ProposalStatus::Rejected);
+    let pending = client.get_proposals_by_status(&ProposalStatus::Pending);
+
+    assert_eq!(approved.len(), 1);
+    assert_eq!(approved.get(0).unwrap().id, proposal_id);
+    assert_eq!(rejected.len(), 0);
+    assert_eq!(pending.len(), 0);
+}
+
+#[test]
+fn get_proposals_by_status_returns_rejected_proposals_after_deadline() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client) = setup(&env);
+    let voter = Address::generate(&env);
+
+    gov_client.mint(&voter, &200);
+    env.mock_all_auths();
+    let proposal_id = submit_sample_proposal(&env, &client, &donor, 500);
+    client.vote(&voter, &proposal_id, &false);
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1);
+
+    let rejected = client.get_proposals_by_status(&ProposalStatus::Rejected);
+    let approved = client.get_proposals_by_status(&ProposalStatus::Approved);
+
+    assert_eq!(rejected.len(), 1);
+    assert_eq!(rejected.get(0).unwrap().id, proposal_id);
+    assert_eq!(approved.len(), 0);
+}
+
+#[test]
+fn get_proposals_by_status_returns_empty_vec_when_no_match() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, _gov_client) = setup(&env);
+
+    env.mock_all_auths();
+    let _proposal_id = submit_sample_proposal(&env, &client, &donor, 500);
+
+    let approved = client.get_proposals_by_status(&ProposalStatus::Approved);
+    let rejected = client.get_proposals_by_status(&ProposalStatus::Rejected);
+
+    assert_eq!(approved.len(), 0);
+    assert_eq!(rejected.len(), 0);
 }
 
 #[test]
@@ -398,7 +500,8 @@ fn vote_after_deadline_panics() {
     );
 
     let proposal = client.get_proposal(&proposal_id).unwrap();
-    env.ledger().set_sequence_number(proposal.deadline_ledger + 1);
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1);
 
     let result = client.try_vote(&voter, &proposal_id, &true);
 
@@ -829,10 +932,7 @@ fn submit_proposal_wrong_milestone_count_fails() {
     env.mock_all_auths();
     let titles = Vec::from_array(
         &env,
-        [
-            String::from_str(&env, "M1"),
-            String::from_str(&env, "M2"),
-        ],
+        [String::from_str(&env, "M1"), String::from_str(&env, "M2")],
     );
     let dates = Vec::from_array(
         &env,

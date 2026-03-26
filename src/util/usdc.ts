@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Utility functions for USDC token operations on Stellar
  */
 
@@ -49,6 +49,14 @@ export async function mintTestUSDC(
 		const contractId = getUSDCContractId()
 		const amountStroops = BigInt(Math.floor(amount * 10000000))
 
+		const rpcUrl =
+			import.meta.env.PUBLIC_STELLAR_RPC_URL || "http://localhost:8000/rpc"
+
+		throw new Error(
+			`Please use the CLI script to mint test USDC:\n\n` +
+				`./scripts/mint-test-usdc.sh ${recipientAddress} ${amount}\n\n` +
+				`The configured contract ${contractId} will be reachable via ${rpcUrl} once contract clients are generated.`,
+		)
 		const server = new StellarRpc.Server(rpcUrl)
 
 		// 1. Fetch account sequence
@@ -126,20 +134,15 @@ export async function mintTestUSDC(
  * @param address - The Stellar address to check
  * @returns Promise that resolves to the USDC balance
  */
-export async function getUSDCBalance(address: string): Promise<number> {
+export async function getUSDCBalance(_address: string): Promise<number> {
 	try {
-		const contractId = getUSDCContractId()
+		getUSDCContractId()
 		const rpcUrl =
 			import.meta.env.PUBLIC_STELLAR_RPC_URL || "http://localhost:8000/rpc"
 
-		const server = new StellarRpc.Server(rpcUrl)
-		const contract = new Contract(contractId)
-
-		// TODO: Implement balance checking once contract clients are available
-		// const balance = await contract.call('balance', { id: address })
-		// return balance / 10000000 // Convert from stroops to USDC
-
-		throw new Error("Balance checking not yet implemented")
+		throw new Error(
+			`Balance checking is not yet implemented. Query the configured RPC endpoint directly: ${rpcUrl}`,
+		)
 	} catch (error) {
 		if (error instanceof Error) {
 			throw error

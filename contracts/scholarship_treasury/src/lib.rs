@@ -1,8 +1,8 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, panic_with_error,
-    symbol_short, Address, Env, String, Symbol, Vec,
+    Address, Env, String, Symbol, Vec, contract, contracterror, contractevent, contractimpl,
+    contracttype, panic_with_error, symbol_short,
 };
 
 const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
@@ -22,7 +22,7 @@ pub enum DataKey {
     Proposal(u32),
     ApplicantProposals(Address),
     Scholar(Address),
-    VoteCast(u32, Address),   // (proposal_id, voter) -> bool
+    VoteCast(u32, Address), // (proposal_id, voter) -> bool
 }
 
 #[derive(Clone)]
@@ -41,6 +41,14 @@ pub struct Proposal {
     pub yes_votes: i128,
     pub no_votes: i128,
     pub deadline_ledger: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+pub enum ProposalStatus {
+    Pending,
+    Approved,
+    Rejected,
 }
 
 #[contracterror]
@@ -356,6 +364,31 @@ impl ScholarshipTreasury {
             .unwrap_or(Vec::new(&env))
     }
 
+    pub fn get_proposals_by_status(env: Env, status: ProposalStatus) -> Vec<Proposal> {
+        let proposal_count = Self::get_proposal_count(env.clone());
+        let mut proposal_id = 1_u32;
+        let mut proposals = Vec::new(&env);
+
+        while proposal_id <= proposal_count {
+            if let Some(proposal) = env
+                .storage()
+                .persistent()
+                .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+            {
+                if Self::proposal_status(&env, &proposal) == status {
+                    proposals.push_back(proposal);
+                }
+            }
+            proposal_id += 1;
+        }
+
+        proposals
+    }
+
+    pub fn get_active_proposals(env: Env) -> Vec<Proposal> {
+        Self::get_proposals_by_status(env, ProposalStatus::Pending)
+    }
+
     pub fn get_proposal_count(env: Env) -> u32 {
         env.storage()
             .instance()
@@ -440,6 +473,16 @@ impl ScholarshipTreasury {
         let paused: bool = env.storage().instance().get(&PAUSED_KEY).unwrap_or(false);
         if paused {
             panic_with_error!(env, Error::ContractPaused);
+        }
+    }
+
+    fn proposal_status(env: &Env, proposal: &Proposal) -> ProposalStatus {
+        if env.ledger().sequence() <= proposal.deadline_ledger {
+            ProposalStatus::Pending
+        } else if proposal.yes_votes > proposal.no_votes {
+            ProposalStatus::Approved
+        } else {
+            ProposalStatus::Rejected
         }
     }
 

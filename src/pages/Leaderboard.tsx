@@ -1,24 +1,5 @@
-/**
- * pages/Leaderboard.tsx
- *
- * Issue #31 — Build Community Leaderboard page
- * bakeronchain/learnvault
- *
- * Features:
- *   - Paginated table: Rank | Avatar | Address | LRN Balance | Courses | Joined
- *   - Top 3 gold/silver/bronze medal highlights
- *   - "My Rank" sticky row (requires wallet connection)
- *   - Time filter: All Time / This Month / This Week
- *   - Search by wallet address (debounced)
- *   - Row click → /profile/:address
- *   - Horizontally scrollable on mobile
- */
-
-import React, { useState, useEffect, useMemo, useRef } from "react"
+import React, { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { useNavigate, useSearchParams } from "react-router-dom"
-import Pagination from "../components/Pagination"
-import { LeaderboardRowSkeleton } from "../components/SkeletonLoader"
 import { useWallet } from "../hooks/useWallet"
 import {
 	generateLeaderboard,
@@ -26,6 +7,7 @@ import {
 	shortenAddr,
 	type LeaderboardEntry,
 } from "../util/mockLeaderboardData"
+import { formatLRN } from "../util/tokenFormat"
 
 const PAGE_SIZE = 25
 
@@ -113,7 +95,7 @@ const LeaderboardRow: React.FC<RowProps> = ({
 				<span
 					className={`font-black text-sm ${medal ? medal.color : "text-white/80"}`}
 				>
-					{new Intl.NumberFormat().format(entry.lrnBalance)} LRN
+					{formatLRN(BigInt(entry.lrnBalance))} LRN
 				</span>
 			</td>
 
@@ -134,84 +116,32 @@ const LeaderboardRow: React.FC<RowProps> = ({
 
 const Leaderboard: React.FC = () => {
 	const { t } = useTranslation()
-	const navigate = useNavigate()
-	const { address: connectedAddress } = useWallet()
-	const [searchParams, setSearchParams] = useSearchParams()
-	const parsedPage = Number.parseInt(searchParams.get("page") || "1", 10)
-	const currentPage =
-		Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
+	const { address: currentUserAddress } = useWallet()
+	const [leaders, setLeaders] = useState<LeaderboardEntry[]>([])
 	const [isLoading, setIsLoading] = useState(true)
-	const [timeFilter, setTimeFilter] = useState<TimeFilter>("all")
-	const [searchQuery, setSearchQuery] = useState("")
-	const [debouncedSearch, setDebouncedSearch] = useState("")
-	const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+	const [error, setError] = useState<string | null>(null)
 
-	// Issue #44 — Simulate async data fetch for skeleton demo
 	useEffect(() => {
-		const timer = setTimeout(() => setIsLoading(false), 1500)
-		return () => clearTimeout(timer)
+		const fetchLeaderboard = async () => {
+			try {
+				// In production, this URL should come from an environment variable
+				const response = await fetch("http://localhost:4000/api/leaderboard?limit=25")
+				if (!response.ok) throw new Error("Failed to fetch leaderboard")
+				const result = await response.json()
+				setLeaders(result.data)
+			} catch (err) {
+				console.error(err)
+				setError("Unable to load rankings. Please try again later.")
+			} finally {
+				setIsLoading(false)
+			}
+		}
+
+		fetchLeaderboard()
 	}, [])
 
-	// Debounce search input
-	useEffect(() => {
-		if (debounceRef.current) clearTimeout(debounceRef.current)
-		debounceRef.current = setTimeout(() => {
-			setDebouncedSearch(searchQuery)
-			setSearchParams({ page: "1" })
-		}, 300)
-		return () => {
-			if (debounceRef.current) clearTimeout(debounceRef.current)
-		}
-	}, [searchQuery, setSearchParams])
-
-	// Reset page when filter changes
-	useEffect(() => {
-		setSearchParams({ page: "1" })
-	}, [timeFilter, setSearchParams])
-
-	const allEntries = useMemo(
-		() => generateLeaderboard(connectedAddress ?? undefined),
-		[connectedAddress],
-	)
-
-	const filtered = useMemo(() => {
-		let result = filterByTime(allEntries, timeFilter)
-		if (debouncedSearch) {
-			result = result.filter((e) =>
-				e.address.toLowerCase().includes(debouncedSearch.toLowerCase()),
-			)
-		}
-		return result
-	}, [allEntries, timeFilter, debouncedSearch])
-
-	const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-	const safePage = Math.min(currentPage, totalPages)
-	const pageEntries = filtered.slice(
-		(safePage - 1) * PAGE_SIZE,
-		safePage * PAGE_SIZE,
-	)
-
-	useEffect(() => {
-		if (currentPage !== safePage) {
-			setSearchParams({ page: safePage.toString() })
-		}
-	}, [currentPage, safePage, setSearchParams])
-
-	const myEntry = connectedAddress
-		? (allEntries.find((e) => e.address === connectedAddress) as
-				| (LeaderboardEntry & { rank: number })
-				| undefined)
-		: undefined
-
-	const filterButtons: { key: TimeFilter; label: string }[] = [
-		{ key: "all", label: t("pages.leaderboard.filterAll") },
-		{ key: "month", label: t("pages.leaderboard.filterMonth") },
-		{ key: "week", label: t("pages.leaderboard.filterWeek") },
-	]
-
-	const handlePageChange = (newPage: number) => {
-		setSearchParams({ page: newPage.toString() })
-		window.scrollTo({ top: 0, behavior: "smooth" })
+	const isCurrentUser = (fullAddress: string) => {
+		return currentUserAddress?.toLowerCase() === fullAddress.toLowerCase()
 	}
 
 	return (
@@ -226,134 +156,112 @@ const Leaderboard: React.FC = () => {
 				</p>
 			</header>
 
-			{/* Controls */}
-			<div className="flex flex-col sm:flex-row gap-4 mb-8">
-				{/* Time Filter */}
-				<div className="flex gap-2 p-1 glass rounded-xl border border-white/10 flex-shrink-0">
-					{filterButtons.map(({ key, label }) => (
-						<button
-							key={key}
-							onClick={() => setTimeFilter(key)}
-							className={`
-								px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all
-								${
-									timeFilter === key
-										? "bg-brand-cyan text-black shadow-lg shadow-brand-cyan/30"
-										: "text-white/40 hover:text-white"
-								}
-							`}
-						>
-							{label}
-						</button>
-					))}
-				</div>
-
-				{/* Search */}
-				<div className="flex-1 relative">
-					<span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 text-sm">
-						🔍
-					</span>
-					<input
-						type="text"
-						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
-						placeholder={t("pages.leaderboard.searchPlaceholder")}
-						className="
-							w-full pl-10 pr-4 py-3 glass rounded-xl border border-white/10
-							text-sm text-white placeholder:text-white/25 font-mono
-							focus:outline-none focus:border-brand-cyan/40 transition-all
-							bg-transparent
-						"
-					/>
-				</div>
-			</div>
-
-			{/* Table */}
 			{isLoading ? (
-				<LeaderboardRowSkeleton />
-			) : (
-				<div className="glass-card rounded-[2rem] border border-white/5 overflow-hidden shadow-2xl relative">
-					{/* Horizontally scrollable on mobile */}
-					<div className="overflow-x-auto">
-						<table className="w-full min-w-[640px]">
-							<thead>
-								<tr className="border-b border-white/10 text-[10px] uppercase tracking-[2px] text-white/30 font-black">
-									<th className="px-4 py-4 text-left">
-										{t("pages.leaderboard.rank")}
-									</th>
-									<th className="px-4 py-4 text-left">
-										{t("pages.leaderboard.learner")}
-									</th>
-									<th className="px-4 py-4 text-right">
-										{t("pages.leaderboard.lrnBalance")}
-									</th>
-									<th className="px-4 py-4 text-center">
-										{t("pages.leaderboard.courses")}
-									</th>
-									<th className="px-4 py-4 text-right">
-										{t("pages.leaderboard.joined")}
-									</th>
-								</tr>
-							</thead>
-							<tbody>
-								{pageEntries.length === 0 ? (
-									<tr>
-										<td
-											colSpan={5}
-											className="px-4 py-16 text-center text-white/30 text-sm font-medium"
-										>
-											{t("pages.leaderboard.noResults")}
-										</td>
-									</tr>
-								) : (
-									pageEntries.map((entry) => (
-										<LeaderboardRow
-											key={entry.id}
-											entry={entry as LeaderboardEntry & { rank: number }}
-											isMine={
-												connectedAddress !== undefined &&
-												entry.address === connectedAddress
-											}
-											onClick={() => navigate(`/profile/${entry.address}`)}
-										/>
-									))
-								)}
-
-								{/* Sticky "My Rank" row for connected wallet */}
-								{myEntry &&
-									!pageEntries.find((e) => e.address === connectedAddress) && (
-										<>
-											<tr>
-												<td colSpan={5} className="h-px bg-brand-cyan/20" />
-											</tr>
-											<LeaderboardRow
-												entry={myEntry}
-												isMine={true}
-												onClick={() => navigate(`/profile/${myEntry.address}`)}
-												isMyRankBanner={true}
-											/>
-										</>
-									)}
-							</tbody>
-						</table>
+				<div className="glass-card p-20 rounded-[4rem] text-center border border-white/5">
+					<div className="text-6xl mb-8 animate-bounce">🏆</div>
+					<h2 className="text-3xl font-black mb-4">Synchronizing Data</h2>
+					<p className="text-white/40 max-w-md mx-auto mb-10 leading-relaxed font-medium">
+						Retrieving real-time scholar rankings from the Stellar network...
+					</p>
+					<div className="flex justify-center gap-3">
+						<div className="w-3 h-3 bg-brand-cyan rounded-full animate-pulse" />
+						<div className="w-3 h-3 bg-brand-blue rounded-full animate-pulse delay-75" />
+						<div className="w-3 h-3 bg-brand-purple rounded-full animate-pulse delay-150" />
 					</div>
 				</div>
-			)}
-
-			{/* My Rank Connect Prompt */}
-			{!connectedAddress && !isLoading && (
-				<div className="mt-4 py-3 px-5 glass rounded-xl border border-white/10 text-center text-xs text-white/30 font-medium">
-					{t("pages.leaderboard.connectPrompt")}
+			) : error ? (
+				<div className="glass-card p-20 rounded-[4rem] text-center border border-red-500/20 bg-red-500/5">
+					<div className="text-6xl mb-8">⚠️</div>
+					<h2 className="text-3xl font-black mb-4 text-red-400">Connection Error</h2>
+					<p className="text-white/60 max-w-md mx-auto mb-6 font-medium">
+						{error}
+					</p>
+					<button 
+						onClick={() => window.location.reload()}
+						className="px-8 py-3 bg-white/10 hover:bg-white/20 rounded-full font-bold transition-all"
+					>
+						Try Again
+					</button>
 				</div>
-			)}
-
-			{/* Pagination */}
-			{!isLoading && filtered.length > 0 && (
-				<Pagination
-					page={safePage}
-					totalPages={totalPages}
-					onPageChange={handlePageChange}
-				/>
+			) : leaders.length === 0 ? (
+				<div className="glass-card p-20 rounded-[4rem] text-center border border-white/5">
+					<div className="text-6xl mb-8">🌑</div>
+					<h2 className="text-3xl font-black mb-4">Empty Leaderboard</h2>
+					<p className="text-white/40 max-w-md mx-auto font-medium">
+						No scholars have earned LRN tokens yet. Be the first to complete a course!
+					</p>
+				</div>
+			) : (
+				<div className="glass-card overflow-hidden rounded-[2.5rem] border border-white/5 shadow-2xl">
+					<table className="w-full text-left border-collapse">
+						<thead>
+							<tr className="bg-white/5 border-b border-white/5">
+								<th className="py-6 px-8 text-sm font-bold uppercase tracking-widest text-white/40">Rank</th>
+								<th className="py-6 px-8 text-sm font-bold uppercase tracking-widest text-white/40">Scholar</th>
+								<th className="py-6 px-8 text-sm font-bold uppercase tracking-widest text-white/40 text-right">LRN Balance</th>
+								<th className="py-6 px-8 text-sm font-bold uppercase tracking-widest text-white/40 text-right">Milestones</th>
+							</tr>
+						</thead>
+						<tbody className="divide-y divide-white/5">
+							{leaders.map((leader) => (
+								<tr 
+									key={leader.fullAddress}
+									className={`group hover:bg-white/[0.02] transition-colors ${
+										isCurrentUser(leader.fullAddress) ? "bg-brand-cyan/10" : ""
+									}`}
+								>
+									<td className="py-6 px-8">
+										<div className={`
+											w-10 h-10 rounded-full flex items-center justify-center font-black text-lg
+											${leader.rank === 1 ? "bg-yellow-500 text-black shadow-[0_0_20px_rgba(234,179,8,0.3)]" : 
+											  leader.rank === 2 ? "bg-slate-300 text-black" : 
+											  leader.rank === 3 ? "bg-amber-600 text-black" : 
+											  "bg-white/10 text-white/60"}
+										`}>
+											{leader.rank}
+										</div>
+									</td>
+									<td className="py-6 px-8 overflow-hidden">
+										<div className="flex items-center gap-4">
+											<div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-cyan to-brand-purple flex-shrink-0 opacity-80" />
+											<div>
+												<div className="font-bold text-white group-hover:text-brand-cyan transition-colors">
+													{leader.address}
+												</div>
+												{isCurrentUser(leader.fullAddress) && (
+													<span className="text-[10px] uppercase font-black tracking-tighter text-brand-cyan bg-brand-cyan/10 px-2 py-0.5 rounded">
+														You
+													</span>
+												)}
+											</div>
+										</div>
+									</td>
+									<td className="py-6 px-8 text-right">
+										<div className="text-2xl font-black text-brand-cyan">
+											{leader.balance}
+											<span className="text-xs ml-1 text-white/20 uppercase">LRN</span>
+										</div>
+									</td>
+									<td className="py-6 px-8 text-right">
+										<div className="inline-flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/5">
+											<span className="text-white/60 font-medium">{leader.completedCourses}</span>
+											<span className="w-2 h-2 bg-brand-purple rounded-full" />
+										</div>
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+					
+					<div className="p-8 bg-white/5 border-t border-white/5 flex justify-between items-center">
+						<div className="text-sm font-medium text-white/40">
+							Showing {leaders.length} top learners
+						</div>
+						<div className="text-[10px] uppercase tracking-widest font-black text-white/20">
+							Updated every block
+						</div>
+					</div>
+				</div>
 			)}
 		</div>
 	)

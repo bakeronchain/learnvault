@@ -14,8 +14,8 @@
 //! Implements: https://github.com/bakeronchain/learnvault/issues/11
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, Address,
-    Env, String, Symbol,
+    Address, Env, String, Symbol, contract, contracterror, contractimpl, contracttype,
+    panic_with_error, symbol_short,
 };
 
 // ---------------------------------------------------------------------------
@@ -105,7 +105,9 @@ impl GovernanceToken {
         if let Some(delegate) = Self::get_delegate(env.clone(), to.clone()) {
             let del_key = DataKey::DelegatedAmount(delegate.clone());
             let del_bal: i128 = env.storage().persistent().get(&del_key).unwrap_or(0);
-            env.storage().persistent().set(&del_key, &(del_bal + amount));
+            env.storage()
+                .persistent()
+                .set(&del_key, &(del_bal + amount));
         }
 
         let supply: i128 = env
@@ -300,7 +302,9 @@ impl GovernanceToken {
         if let Some(delegate) = Self::get_delegate(env.clone(), from.clone()) {
             let del_key = DataKey::DelegatedAmount(delegate.clone());
             let del_bal: i128 = env.storage().persistent().get(&del_key).unwrap_or(0);
-            env.storage().persistent().set(&del_key, &(del_bal - amount));
+            env.storage()
+                .persistent()
+                .set(&del_key, &(del_bal - amount));
         }
     }
 
@@ -313,7 +317,9 @@ impl GovernanceToken {
         if let Some(delegate) = Self::get_delegate(env.clone(), to.clone()) {
             let del_key = DataKey::DelegatedAmount(delegate.clone());
             let del_bal: i128 = env.storage().persistent().get(&del_key).unwrap_or(0);
-            env.storage().persistent().set(&del_key, &(del_bal + amount));
+            env.storage()
+                .persistent()
+                .set(&del_key, &(del_bal + amount));
         }
     }
 }
@@ -326,7 +332,7 @@ impl GovernanceToken {
 mod test {
     extern crate std;
 
-    use soroban_sdk::{testutils::Address as _, Address, Env, IntoVal, String};
+    use soroban_sdk::{Address, Env, IntoVal, String, testutils::Address as _};
 
     use crate::{GOVError, GovernanceToken, GovernanceTokenClient};
 
@@ -589,5 +595,161 @@ mod test {
         assert_eq!(client.get_delegate(&alice), None);
         assert_eq!(client.get_voting_power(&alice), 100);
         assert_eq!(client.get_voting_power(&bob), 0);
+    }
+
+    // --- additional edge cases ---
+
+    #[test]
+    fn transfer_zero_amount_reverts() {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        let alice = Address::generate(&e);
+        let bob = Address::generate(&e);
+        client.mint(&alice, &100);
+        let result = client.try_transfer(&alice, &bob, &0);
+        assert_eq!(
+            result.err(),
+            Some(Ok(soroban_sdk::Error::from_contract_error(
+                GOVError::ZeroAmount as u32
+            )))
+        );
+    }
+
+    #[test]
+    fn transfer_from_zero_amount_reverts() {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        let alice = Address::generate(&e);
+        let bob = Address::generate(&e);
+        let carol = Address::generate(&e);
+        client.mint(&alice, &100);
+        client.approve(&alice, &bob, &50);
+        let result = client.try_transfer_from(&bob, &alice, &carol, &0);
+        assert_eq!(
+            result.err(),
+            Some(Ok(soroban_sdk::Error::from_contract_error(
+                GOVError::ZeroAmount as u32
+            )))
+        );
+    }
+
+    #[test]
+    fn balance_of_nonexistent_account_is_zero() {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        let nobody = Address::generate(&e);
+        assert_eq!(client.balance(&nobody), 0);
+    }
+
+    #[test]
+    fn allowance_of_nonexistent_pair_is_zero() {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        let alice = Address::generate(&e);
+        let bob = Address::generate(&e);
+        assert_eq!(client.allowance(&alice, &bob), 0);
+    }
+
+    #[test]
+    fn approve_zero_allowance_works() {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        let alice = Address::generate(&e);
+        let bob = Address::generate(&e);
+        client.mint(&alice, &100);
+        client.approve(&alice, &bob, &50);
+        assert_eq!(client.allowance(&alice, &bob), 50);
+        // Reset to zero
+        client.approve(&alice, &bob, &0);
+        assert_eq!(client.allowance(&alice, &bob), 0);
+    }
+
+    #[test]
+    fn transfer_from_with_insufficient_balance_reverts() {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        let alice = Address::generate(&e);
+        let bob = Address::generate(&e);
+        let carol = Address::generate(&e);
+        client.mint(&alice, &10);
+        client.approve(&alice, &bob, &100); // High allowance
+        let result = client.try_transfer_from(&bob, &alice, &carol, &50);
+        assert_eq!(
+            result.err(),
+            Some(Ok(soroban_sdk::Error::from_contract_error(
+                GOVError::InsufficientFunds as u32
+            )))
+        );
+    }
+
+    #[test]
+    fn total_supply_starts_at_zero() {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        assert_eq!(client.total_supply(), 0);
+    }
+
+    #[test]
+    fn multiple_mints_to_different_accounts() {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        let alice = Address::generate(&e);
+        let bob = Address::generate(&e);
+        let carol = Address::generate(&e);
+
+        client.mint(&alice, &100);
+        client.mint(&bob, &200);
+        client.mint(&carol, &300);
+
+        assert_eq!(client.balance(&alice), 100);
+        assert_eq!(client.balance(&bob), 200);
+        assert_eq!(client.balance(&carol), 300);
+        assert_eq!(client.total_supply(), 600);
+    }
+
+    #[test]
+    fn approve_updates_allowance() {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        let alice = Address::generate(&e);
+        let bob = Address::generate(&e);
+
+        client.approve(&alice, &bob, &100);
+        assert_eq!(client.allowance(&alice, &bob), 100);
+
+        // Update allowance
+        client.approve(&alice, &bob, &200);
+        assert_eq!(client.allowance(&alice, &bob), 200);
+    }
+
+    #[test]
+    fn transfer_entire_balance_works() {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        let alice = Address::generate(&e);
+        let bob = Address::generate(&e);
+
+        client.mint(&alice, &100);
+        client.transfer(&alice, &bob, &100);
+
+        assert_eq!(client.balance(&alice), 0);
+        assert_eq!(client.balance(&bob), 100);
+    }
+
+    #[test]
+    fn transfer_from_entire_allowance_works() {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        let alice = Address::generate(&e);
+        let bob = Address::generate(&e);
+        let carol = Address::generate(&e);
+
+        client.mint(&alice, &100);
+        client.approve(&alice, &bob, &100);
+        client.transfer_from(&bob, &alice, &carol, &100);
+
+        assert_eq!(client.balance(&alice), 0);
+        assert_eq!(client.balance(&carol), 100);
+        assert_eq!(client.allowance(&alice, &bob), 0);
     }
 }

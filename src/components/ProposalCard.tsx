@@ -1,6 +1,7 @@
-import { Card, Badge, Button, Icon } from "@stellar/design-system"
+import { Card, Badge, Button } from "@stellar/design-system"
 import React from "react"
 import { shortenAddress } from "../util/contract"
+import ProposalCountdown from "./ProposalCountdown"
 
 export interface ProposalCardProps {
 	id: number
@@ -38,15 +39,7 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({
 	const yesPercentage = totalVotes > 0 ? (yesVotes / totalVotes) * 100 : 0
 	const noPercentage = totalVotes > 0 ? (noVotes / totalVotes) * 100 : 0
 
-	// Calculate time remaining in days: (ledgers * 6 seconds) / 86400
-	const ledgersLeft = Math.max(0, deadlineLedger - currentLedger)
-	const daysLeft = (ledgersLeft * 6) / 86400
-	const timeLabel =
-		daysLeft > 1
-			? `${daysLeft.toFixed(1)} days remaining`
-			: daysLeft > 0
-				? `${(daysLeft * 24).toFixed(0)} hours remaining`
-				: "Closed"
+	const isClosed = status !== "active" || deadlineLedger <= currentLedger
 
 	const getStatusColor = () => {
 		switch (status) {
@@ -62,8 +55,6 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({
 				return "secondary"
 		}
 	}
-
-	const isClosed = status !== "active" || ledgersLeft === 0
 
 	return (
 		<div className="flex flex-col h-full bg-white/5 border border-white/10 rounded-3xl hover:border-brand-cyan/30 transition-all duration-300 overflow-hidden">
@@ -87,10 +78,10 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({
 						<Badge variant={getStatusColor() as any} size="sm">
 							{status.toUpperCase()}
 						</Badge>
-						<span className="text-xs text-white/40 flex items-center gap-1">
-							<Icon.Clock size="12" />
-							{timeLabel}
-						</span>
+						<ProposalCountdown
+							deadlineLedger={deadlineLedger}
+							currentLedger={currentLedger}
+						/>
 					</div>
 
 					{/* Progress Bar */}

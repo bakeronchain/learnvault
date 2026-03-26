@@ -1,3 +1,4 @@
+import { type KitActions } from "@creit.tech/stellar-wallets-kit"
 import {
 	createContext,
 	useCallback,
@@ -8,9 +9,16 @@ import {
 	useTransition,
 } from "react"
 import storage from "../util/storage"
-import { wallet, fetchBalances, type MappedBalances } from "../util/wallet"
+import { type MappedBalances } from "../util/wallet"
 
-const signTransaction = wallet.signTransaction.bind(wallet)
+type WalletSignTransaction = KitActions["signTransaction"]
+
+const loadWalletModule = () => import("../util/wallet")
+
+const signTransaction: WalletSignTransaction = async (xdr, opts) => {
+	const { wallet } = await loadWalletModule()
+	return wallet.signTransaction(xdr, opts)
+}
 
 /**
  * A good-enough implementation of deepEqual.
@@ -41,7 +49,7 @@ export interface WalletContextType {
 	isReconnecting: boolean
 	network?: string
 	networkPassphrase?: string
-	signTransaction: typeof wallet.signTransaction
+	signTransaction: WalletSignTransaction
 	updateBalances: () => Promise<void>
 }
 
@@ -82,6 +90,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 			return
 		}
 
+		const { fetchBalances } = await loadWalletModule()
 		const newBalances = await fetchBalances(address)
 		setBalances((prev) => {
 			if (deepEqual(newBalances, prev)) return prev
@@ -121,6 +130,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 			// network from their wallet. Note: `getAddress` MAY open their wallet
 			// extension, depending on which wallet they select!
 			try {
+				const { wallet } = await loadWalletModule()
 				popupLock.current = true
 				wallet.setWallet(walletId)
 				if (walletId !== "freighter" && walletAddr !== null) return

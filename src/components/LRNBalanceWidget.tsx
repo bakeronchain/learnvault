@@ -14,6 +14,7 @@
 "use client"
 
 import React, { useEffect, useRef, useState, useCallback } from "react"
+import { formatLRN } from "../util/tokenFormat"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -76,8 +77,8 @@ function useLearnToken(address: string): {
 			try {
 				// In production, replace with:
 				//   const balance = await learnTokenContract.balanceOf(address);
-				const mockBalance = 142
-				const mockPrev = 122
+				const mockBalance = 1420000000
+				const mockPrev = 1220000000
 				const mockPercentile = 8 // top 8%
 
 				setData({
@@ -211,13 +212,13 @@ function SmWidget({
 			<span
 				className="lrn-sm-pill"
 				role="status"
-				aria-label={`${animatedBalance} LRN tokens`}
+				aria-label={`${formatLRN(BigInt(animatedBalance))} LRN tokens`}
 			>
 				<span className="lrn-trophy" aria-hidden="true">
 					🏆
 				</span>
 				<span className="lrn-sm-balance">
-					{animatedBalance.toLocaleString()}
+					{formatLRN(BigInt(animatedBalance))}
 				</span>
 				<span className="lrn-sm-label">LRN</span>
 				<span className="lrn-tooltip">
@@ -265,12 +266,16 @@ function MdWidget({
 				</Tooltip>
 			</div>
 			<div className="lrn-md-balance" aria-live="polite">
-				{animatedBalance.toLocaleString()}
+				{formatLRN(BigInt(animatedBalance))}
 				<span className="lrn-md-unit">LRN</span>
 			</div>
 			{gained && (
-				<div className="lrn-md-change" aria-label={`Gained ${delta} LRN`}>
-					<span className="lrn-change-arrow">↑</span>+{delta} LRN
+				<div
+					className="lrn-md-change"
+					aria-label={`Gained ${formatLRN(BigInt(delta))} LRN`}
+				>
+					<span className="lrn-change-arrow">↑</span>+{formatLRN(BigInt(delta))}{" "}
+					LRN
 				</div>
 			)}
 			<style>{mdStyles}</style>
@@ -323,14 +328,18 @@ function LgWidget({
 			{/* Big balance */}
 			<div className="lrn-lg-balance" aria-live="polite">
 				<span className="lrn-lg-number">
-					{animatedBalance.toLocaleString()}
+					{formatLRN(BigInt(animatedBalance))}
 				</span>
 				<span className="lrn-lg-unit">LRN</span>
 			</div>
 
 			{gained && (
-				<div className="lrn-lg-change" aria-label={`Gained ${delta} LRN`}>
-					<span className="lrn-change-arrow">↑</span>+{delta} LRN this session
+				<div
+					className="lrn-lg-change"
+					aria-label={`Gained ${formatLRN(BigInt(delta))} LRN`}
+				>
+					<span className="lrn-change-arrow">↑</span>+{formatLRN(BigInt(delta))}{" "}
+					LRN this session
 				</div>
 			)}
 

@@ -336,7 +336,9 @@ export const useScholarshipApplication = () => {
 
 				if (!response.ok) {
 					const errorData = await response.json().catch(() => ({}))
-					throw new Error(errorData.error || "Failed to submit application to backend")
+					throw new Error(
+						errorData.error || "Failed to submit application to backend",
+					)
 				}
 
 				const result = await response.json()

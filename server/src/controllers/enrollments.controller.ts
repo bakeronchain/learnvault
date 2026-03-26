@@ -2,7 +2,8 @@ import { type Request, type Response } from "express"
 import { pool } from "../db/index"
 import { stellarContractService } from "../services/stellar-contract.service"
 
-const COURSE_MILESTONE_CONTRACT_ID = process.env.COURSE_MILESTONE_CONTRACT_ID ?? ""
+const COURSE_MILESTONE_CONTRACT_ID =
+	process.env.COURSE_MILESTONE_CONTRACT_ID ?? ""
 
 /**
  * Create a new enrollment for a learner in a course.

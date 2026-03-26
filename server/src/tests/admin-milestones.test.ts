@@ -12,9 +12,15 @@ jest.mock("../db/index", () => ({
 
 jest.mock("../services/stellar-contract.service", () => ({
 	stellarContractService: {
-		callVerifyMilestone: jest.fn().mockResolvedValue({ txHash: "test_tx_hash", simulated: false }),
-		emitRejectionEvent: jest.fn().mockResolvedValue({ txHash: "test_tx_hash", simulated: false }),
-		callMintScholarNFT: jest.fn().mockResolvedValue({ txHash: "test_tx_hash", simulated: false }),
+		callVerifyMilestone: jest
+			.fn()
+			.mockResolvedValue({ txHash: "test_tx_hash", simulated: false }),
+		emitRejectionEvent: jest
+			.fn()
+			.mockResolvedValue({ txHash: "test_tx_hash", simulated: false }),
+		callMintScholarNFT: jest
+			.fn()
+			.mockResolvedValue({ txHash: "test_tx_hash", simulated: false }),
 	},
 }))
 
@@ -333,8 +339,13 @@ describe("error handling", () => {
 		})
 
 		// Mock the service to throw the 'not configured' error
-		const mockedService = stellarContractService.callVerifyMilestone as jest.Mock
-		mockedService.mockRejectedValueOnce(new Error("STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction"))
+		const mockedService =
+			stellarContractService.callVerifyMilestone as jest.Mock
+		mockedService.mockRejectedValueOnce(
+			new Error(
+				"STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction",
+			),
+		)
 
 		const app = buildApp()
 		const res = await request(app)

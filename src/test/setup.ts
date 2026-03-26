@@ -5,8 +5,8 @@ import { createElement, type ReactElement, type ReactNode } from "react"
 import { vi } from "vitest"
 
 // Import our custom mocks
-import { mockStellarWalletsKit, mockWalletUtils } from "./mocks/wallet"
 import { mockContractImports } from "./mocks/contracts"
+import { mockStellarWalletsKit, mockWalletUtils } from "./mocks/wallet"
 
 // ---------------------------------------------------------------------------
 // Global Mocks
@@ -58,7 +58,8 @@ vi.mock("../contracts/util", () => ({
 		rpcUrl: "http://localhost:8000/rpc",
 		horizonUrl: "https://horizon-testnet.stellar.org",
 	},
-	labPrefix: () => "https://lab.stellar.org/transaction-dashboard?$=network$id=testnet",
+	labPrefix: () =>
+		"https://lab.stellar.org/transaction-dashboard?$=network$id=testnet",
 }))
 
 // Mock import.meta.env for contract IDs
@@ -67,10 +68,14 @@ const mockEnv = {
 	PUBLIC_STELLAR_NETWORK_PASSPHRASE: "Test SDF Network ; September 2015",
 	PUBLIC_STELLAR_RPC_URL: "http://localhost:8000/rpc",
 	PUBLIC_STELLAR_HORIZON_URL: "https://horizon-testnet.stellar.org",
-	PUBLIC_LEARN_TOKEN_CONTRACT_ID: "CLEARN1234567890ABCDEFGHIJKLMN9876543210ZYXWVUTSRQPO",
-	PUBLIC_GOVERNANCE_TOKEN_CONTRACT_ID: "CGOV1234567890ABCDEFGHIJKLMN9876543210ZYXWVUTSRQPO",
-	PUBLIC_SCHOLARSHIP_TREASURY_CONTRACT_ID: "CSCHOL1234567890ABCDEFGHIJKLMN9876543210ZYXWVUTSRQPO",
-	PUBLIC_GUESS_THE_NUMBER_CONTRACT_ID: "CGUESS1234567890ABCDEFGHIJKLMN9876543210ZYXWVUTSRQPO",
+	PUBLIC_LEARN_TOKEN_CONTRACT_ID:
+		"CLEARN1234567890ABCDEFGHIJKLMN9876543210ZYXWVUTSRQPO",
+	PUBLIC_GOVERNANCE_TOKEN_CONTRACT_ID:
+		"CGOV1234567890ABCDEFGHIJKLMN9876543210ZYXWVUTSRQPO",
+	PUBLIC_SCHOLARSHIP_TREASURY_CONTRACT_ID:
+		"CSCHOL1234567890ABCDEFGHIJKLMN9876543210ZYXWVUTSRQPO",
+	PUBLIC_GUESS_THE_NUMBER_CONTRACT_ID:
+		"CGUESS1234567890ABCDEFGHIJKLMN9876543210ZYXWVUTSRQPO",
 }
 
 Object.defineProperty(window, "import", {
@@ -151,18 +156,18 @@ interface AllTheProvidersProps {
 	queryClient?: QueryClient
 }
 
-const AllTheProviders = ({ children, walletContext, queryClient }: AllTheProvidersProps) => {
+const AllTheProviders = ({
+	children,
+	walletContext,
+	queryClient,
+}: AllTheProvidersProps) => {
 	const testQueryClient = queryClient || createTestQueryClient()
 	const mockWalletCtx = walletContext || createMockWalletContext()
 
 	return createElement(
 		QueryClientProvider,
 		{ client: testQueryClient },
-		createElement(
-			"div",
-			{ "data-testid": "test-wrapper" },
-			children,
-		),
+		createElement("div", { "data-testid": "test-wrapper" }, children),
 	)
 }
 
@@ -177,7 +182,7 @@ const customRender = (
 	const { walletContext, queryClient, ...renderOptions } = options
 
 	return render(ui, {
-		wrapper: ({ children }) => 
+		wrapper: ({ children }) =>
 			AllTheProviders({ children, walletContext, queryClient }),
 		...renderOptions,
 	})
@@ -205,7 +210,7 @@ export { mockEnv }
 afterEach(() => {
 	// Clear all mocks
 	vi.clearAllMocks()
-	
+
 	// Reset localStorage mock
 	localStorageMock.getItem.mockClear()
 	localStorageMock.setItem.mockClear()

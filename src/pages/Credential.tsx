@@ -13,8 +13,7 @@ const Credential: React.FC = () => {
 		scholarName: "Alex Rivera",
 		completionDate: "October 24, 2024",
 		artworkUrl: "https://api.placeholder.com/600/600?text=ScholarNFT+Badge",
-		txHash:
-			"3f40a5c6f2e1471fa3f31ba6b59f7f0dcefc36e35d5b12fb96f0c8d9f6a8b4e1",
+		txHash: "3f40a5c6f2e1471fa3f31ba6b59f7f0dcefc36e35d5b12fb96f0c8d9f6a8b4e1",
 		issuer: "LearnVault DAO",
 		reputationPoints: "50 LRN",
 	}

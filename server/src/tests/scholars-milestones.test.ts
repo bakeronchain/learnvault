@@ -47,7 +47,10 @@ describe("GET /api/scholars/:address/milestones", () => {
 			evidence_description: null,
 		})
 
-		await inMemoryMilestoneStore.updateReportStatus(approvedReport.id, "approved")
+		await inMemoryMilestoneStore.updateReportStatus(
+			approvedReport.id,
+			"approved",
+		)
 		await inMemoryMilestoneStore.addAuditEntry({
 			report_id: approvedReport.id,
 			validator_address: "GADMIN123",
@@ -74,7 +77,10 @@ describe("GET /api/scholars/:address/milestones", () => {
 			evidence_description: null,
 		})
 
-		await inMemoryMilestoneStore.updateReportStatus(rejectedReport.id, "rejected")
+		await inMemoryMilestoneStore.updateReportStatus(
+			rejectedReport.id,
+			"rejected",
+		)
 		await inMemoryMilestoneStore.addAuditEntry({
 			report_id: rejectedReport.id,
 			validator_address: "GADMIN123",
@@ -155,4 +161,3 @@ describe("GET /api/scholars/:address/milestones", () => {
 		expect(res.body.error).toBe("Validation failed")
 	})
 })
-

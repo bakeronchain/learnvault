@@ -90,7 +90,11 @@ export const getCourses = async (
 		let offset = 0
 		let page = 1
 
-		if (offsetParam !== undefined && Number.isFinite(offsetParam) && offsetParam >= 0) {
+		if (
+			offsetParam !== undefined &&
+			Number.isFinite(offsetParam) &&
+			offsetParam >= 0
+		) {
 			offset = offsetParam
 			page = Math.floor(offset / limit) + 1
 		} else {
@@ -153,10 +157,7 @@ export const getCourses = async (
 	}
 }
 
-export const getCourse = async (
-	req: Request,
-	res: Response,
-): Promise<void> => {
+export const getCourse = async (req: Request, res: Response): Promise<void> => {
 	try {
 		const idOrSlug = req.params.idOrSlug
 		const isNumericId = /^\d+$/.test(idOrSlug)

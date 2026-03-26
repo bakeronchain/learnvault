@@ -26,8 +26,14 @@ export async function applyForScholarship(
 		return
 	}
 
-	const { applicant_address, full_name, course_id, motivation, evidence_url, amount } =
-		validation.data
+	const {
+		applicant_address,
+		full_name,
+		course_id,
+		motivation,
+		evidence_url,
+		amount,
+	} = validation.data
 
 	try {
 		// 1. Prepare contract parameters
@@ -35,13 +41,13 @@ export async function applyForScholarship(
 		const today = new Date()
 		const tomorrow = new Date(today)
 		tomorrow.setDate(tomorrow.getDate() + 1)
-		
+
 		const month1 = new Date(today)
 		month1.setMonth(month1.getMonth() + 1)
-		
+
 		const month2 = new Date(today)
 		month2.setMonth(month2.getMonth() + 2)
-		
+
 		const month3 = new Date(today)
 		month3.setMonth(month3.getMonth() + 3)
 
@@ -68,7 +74,8 @@ export async function applyForScholarship(
 		}
 
 		// 2. Call the on-chain contract
-		const result = await stellarContractService.submitScholarshipProposal(params)
+		const result =
+			await stellarContractService.submitScholarshipProposal(params)
 
 		// 3. Store in the database
 		const dbResult = await pool.query(

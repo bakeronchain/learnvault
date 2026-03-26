@@ -502,7 +502,10 @@ export function useCourse() {
 
 			const key = `${courseId}-${milestoneId}`
 			if (submissionStatusMap[key] === "pending") {
-				addNotification("Milestone already submitted and pending review", "secondary")
+				addNotification(
+					"Milestone already submitted and pending review",
+					"secondary",
+				)
 				return
 			}
 

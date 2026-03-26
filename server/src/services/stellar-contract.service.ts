@@ -36,11 +36,20 @@ const ADMIN_CACHE_TTL = 5 * 60 * 1000 // 5 minutes in milliseconds
 
 async function ensureAdminRole(): Promise<void> {
 	if (!STELLAR_SECRET_KEY) {
-		throw new Error("STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction")
+		throw new Error(
+			"STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction",
+		)
 	}
 
-	const { Keypair, Contract, TransactionBuilder, Networks, BASE_FEE, rpc, scValToNative } =
-		await import("@stellar/stellar-sdk")
+	const {
+		Keypair,
+		Contract,
+		TransactionBuilder,
+		Networks,
+		BASE_FEE,
+		rpc,
+		scValToNative,
+	} = await import("@stellar/stellar-sdk")
 
 	const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
 	const serverPubKey = keypair.publicKey()
@@ -48,15 +57,18 @@ async function ensureAdminRole(): Promise<void> {
 	// 1. Check if we have a valid cached result
 	if (Date.now() - lastAdminCheckTime < ADMIN_CACHE_TTL && cachedAdminAddress) {
 		if (serverPubKey !== cachedAdminAddress) {
-			throw new Error(`Server keypair ${serverPubKey} is not the contract admin. Update STELLAR_SECRET_KEY.`)
+			throw new Error(
+				`Server keypair ${serverPubKey} is not the contract admin. Update STELLAR_SECRET_KEY.`,
+			)
 		}
 		return
 	}
 
 	// 2. Cache expired or empty: Fetch from the blockchain
-	const serverUrl = STELLAR_NETWORK === "mainnet"
-		? "https://soroban-rpc.stellar.org"
-		: "https://soroban-testnet.stellar.org"
+	const serverUrl =
+		STELLAR_NETWORK === "mainnet"
+			? "https://soroban-rpc.stellar.org"
+			: "https://soroban-testnet.stellar.org"
 	const server = new rpc.Server(serverUrl)
 
 	const account = await server.getAccount(serverPubKey)
@@ -65,7 +77,8 @@ async function ensureAdminRole(): Promise<void> {
 	// Build a transaction solely to simulate the admin() getter
 	const tx = new TransactionBuilder(account, {
 		fee: BASE_FEE,
-		networkPassphrase: STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+		networkPassphrase:
+			STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
 	})
 		.addOperation(contract.call("admin"))
 		.setTimeout(30)
@@ -87,7 +100,9 @@ async function ensureAdminRole(): Promise<void> {
 
 	// 4. Verify Authorization
 	if (serverPubKey !== cachedAdminAddress) {
-		throw new Error(`Server keypair ${serverPubKey} is not the contract admin. Update STELLAR_SECRET_KEY.`)
+		throw new Error(
+			`Server keypair ${serverPubKey} is not the contract admin. Update STELLAR_SECRET_KEY.`,
+		)
 	}
 }
 
@@ -97,18 +112,29 @@ async function callVerifyMilestone(
 	milestoneId: number,
 ): Promise<ContractCallResult> {
 	if (!STELLAR_SECRET_KEY) {
-		throw new Error("STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction")
+		throw new Error(
+			"STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction",
+		)
 	}
 	if (!COURSE_MILESTONE_CONTRACT_ID) {
-		throw new Error("COURSE_MILESTONE_CONTRACT_ID not configured — cannot submit on-chain transaction")
+		throw new Error(
+			"COURSE_MILESTONE_CONTRACT_ID not configured — cannot submit on-chain transaction",
+		)
 	}
 
 	try {
 		// Enforce access control before doing anything
 		await ensureAdminRole()
 		// Dynamic import so the SDK is only loaded when actually needed
-		const { Keypair, Contract, TransactionBuilder, Networks, BASE_FEE, rpc, xdr } =
-			await import("@stellar/stellar-sdk")
+		const {
+			Keypair,
+			Contract,
+			TransactionBuilder,
+			Networks,
+			BASE_FEE,
+			rpc,
+			xdr,
+		} = await import("@stellar/stellar-sdk")
 
 		const server = new rpc.Server(
 			STELLAR_NETWORK === "mainnet"
@@ -150,7 +176,7 @@ async function callVerifyMilestone(
 		console.error("[stellar] Contract call failed:", err)
 		throw new Error(
 			"Contract call failed: " +
-			(err instanceof Error ? err.message : String(err)),
+				(err instanceof Error ? err.message : String(err)),
 		)
 	}
 }
@@ -162,10 +188,14 @@ async function emitRejectionEvent(
 	reason: string,
 ): Promise<ContractCallResult> {
 	if (!STELLAR_SECRET_KEY) {
-		throw new Error("STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction")
+		throw new Error(
+			"STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction",
+		)
 	}
 	if (!COURSE_MILESTONE_CONTRACT_ID) {
-		throw new Error("COURSE_MILESTONE_CONTRACT_ID not configured — cannot submit on-chain transaction")
+		throw new Error(
+			"COURSE_MILESTONE_CONTRACT_ID not configured — cannot submit on-chain transaction",
+		)
 	}
 
 	try {
@@ -222,7 +252,7 @@ async function emitRejectionEvent(
 		console.error("[stellar] Rejection event failed:", err)
 		throw new Error(
 			"Rejection event failed: " +
-			(err instanceof Error ? err.message : String(err)),
+				(err instanceof Error ? err.message : String(err)),
 		)
 	}
 }
@@ -232,10 +262,14 @@ async function callMintScholarNFT(
 	metadataUri: string,
 ): Promise<ContractCallResult> {
 	if (!STELLAR_SECRET_KEY) {
-		throw new Error("STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction")
+		throw new Error(
+			"STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction",
+		)
 	}
 	if (!SCHOLAR_NFT_CONTRACT_ID) {
-		throw new Error("SCHOLAR_NFT_CONTRACT_ID not configured — cannot submit on-chain transaction")
+		throw new Error(
+			"SCHOLAR_NFT_CONTRACT_ID not configured — cannot submit on-chain transaction",
+		)
 	}
 
 	try {
@@ -359,10 +393,14 @@ async function submitScholarshipProposal(
 	params: ScholarshipProposalParams,
 ): Promise<ContractCallResult & { proposalId: string | null }> {
 	if (!STELLAR_SECRET_KEY) {
-		throw new Error("STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction")
+		throw new Error(
+			"STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction",
+		)
 	}
 	if (!SCHOLARSHIP_TREASURY_CONTRACT_ID) {
-		throw new Error("SCHOLARSHIP_TREASURY_CONTRACT_ID not configured — cannot submit on-chain transaction")
+		throw new Error(
+			"SCHOLARSHIP_TREASURY_CONTRACT_ID not configured — cannot submit on-chain transaction",
+		)
 	}
 
 	try {
@@ -424,7 +462,9 @@ async function submitScholarshipProposal(
 
 async function getLearnTokenBalance(address: string): Promise<string> {
 	if (!LEARN_TOKEN_CONTRACT_ID) {
-		console.warn("[stellar] LEARN_TOKEN_CONTRACT_ID not set — simulating balance")
+		console.warn(
+			"[stellar] LEARN_TOKEN_CONTRACT_ID not set — simulating balance",
+		)
 		return "10000000000" // 1000 LRN
 	}
 	try {
@@ -442,12 +482,23 @@ async function getLearnTokenBalance(address: string): Promise<string> {
 			),
 			{
 				fee: "100",
-				networkPassphrase: STELLAR_NETWORK === "mainnet" ? (await import("@stellar/stellar-sdk")).Networks.PUBLIC : (await import("@stellar/stellar-sdk")).Networks.TESTNET,
-			}
-		).addOperation(contract.call("balance", new Address(address).toScVal())).setTimeout(30).build()
+				networkPassphrase:
+					STELLAR_NETWORK === "mainnet"
+						? (await import("@stellar/stellar-sdk")).Networks.PUBLIC
+						: (await import("@stellar/stellar-sdk")).Networks.TESTNET,
+			},
+		)
+			.addOperation(contract.call("balance", new Address(address).toScVal()))
+			.setTimeout(30)
+			.build()
 
 		const simResult = await server.simulateTransaction(tx)
-		if ((await import("@stellar/stellar-sdk")).rpc.Api.isSimulationError(simResult)) return "0"
+		if (
+			(await import("@stellar/stellar-sdk")).rpc.Api.isSimulationError(
+				simResult,
+			)
+		)
+			return "0"
 		const { scValToNative } = await import("@stellar/stellar-sdk")
 		return scValToNative(simResult.result?.retval!).toString()
 	} catch (err) {
@@ -458,7 +509,9 @@ async function getLearnTokenBalance(address: string): Promise<string> {
 
 async function getEnrolledCourses(address: string): Promise<string[]> {
 	if (!COURSE_MILESTONE_CONTRACT_ID) {
-		console.warn("[stellar] COURSE_MILESTONE_CONTRACT_ID not set — simulating enrollments")
+		console.warn(
+			"[stellar] COURSE_MILESTONE_CONTRACT_ID not set — simulating enrollments",
+		)
 		return ["stellar-basics", "defi-101"]
 	}
 	return ["stellar-basics", "defi-101"]
@@ -466,10 +519,24 @@ async function getEnrolledCourses(address: string): Promise<string[]> {
 
 async function getScholarCredentials(address: string): Promise<any[]> {
 	if (!SCHOLAR_NFT_CONTRACT_ID) {
-		console.warn("[stellar] SCHOLAR_NFT_CONTRACT_ID not set — simulating credentials")
-		return [{ token_id: 1, course_id: "stellar-basics", issued_at: new Date().toISOString() }]
+		console.warn(
+			"[stellar] SCHOLAR_NFT_CONTRACT_ID not set — simulating credentials",
+		)
+		return [
+			{
+				token_id: 1,
+				course_id: "stellar-basics",
+				issued_at: new Date().toISOString(),
+			},
+		]
 	}
-	return [{ token_id: 1, course_id: "stellar-basics", issued_at: new Date().toISOString() }]
+	return [
+		{
+			token_id: 1,
+			course_id: "stellar-basics",
+			issued_at: new Date().toISOString(),
+		},
+	]
 }
 
 export const stellarContractService = {

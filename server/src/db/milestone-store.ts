@@ -147,7 +147,10 @@ export const milestoneStore = {
 		filters: MilestoneReportFilters = {},
 	): Promise<MilestoneReport[]> {
 		if (!isRealPool()) {
-			return inMemoryMilestoneStore.getReportsForScholar(scholarAddress, filters)
+			return inMemoryMilestoneStore.getReportsForScholar(
+				scholarAddress,
+				filters,
+			)
 		}
 
 		const values: Array<string> = [scholarAddress]

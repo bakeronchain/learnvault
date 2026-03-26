@@ -1,5 +1,5 @@
+import express, { type Express } from "express"
 import request from "supertest"
-import { Express } from "express"
 
 // Mock internal modules
 jest.mock("../db/index", () => ({
@@ -11,8 +11,18 @@ jest.mock("../db/index", () => ({
 jest.mock("../services/stellar-contract.service", () => ({
 	stellarContractService: {
 		getLearnTokenBalance: jest.fn().mockResolvedValue("10000000000"),
-		getEnrolledCourses: jest.fn().mockResolvedValue(["stellar-basics", "defi-101"]),
-		getScholarCredentials: jest.fn().mockResolvedValue([{ token_id: 1, course_id: "stellar-basics", issued_at: "2026-03-26T15:00:00Z" }]),
+		getEnrolledCourses: jest
+			.fn()
+			.mockResolvedValue(["stellar-basics", "defi-101"]),
+		getScholarCredentials: jest
+			.fn()
+			.mockResolvedValue([
+				{
+					token_id: 1,
+					course_id: "stellar-basics",
+					issued_at: "2026-03-26T15:00:00Z",
+				},
+			]),
 	},
 }))
 
@@ -21,7 +31,6 @@ const mockedQuery = pool.query as jest.Mock
 
 // We need a helper to build the app with mocked dependencies
 import { scholarsRouter } from "../routes/scholars.routes"
-import express from "express"
 
 const buildApp = (): Express => {
 	const app = express()
@@ -56,7 +65,13 @@ describe("GET /api/scholars/:address", () => {
 			enrolled_courses: ["stellar-basics", "defi-101"],
 			completed_milestones: 1,
 			pending_milestones: 1,
-			credentials: [{ token_id: 1, course_id: "stellar-basics", issued_at: "2026-03-26T15:00:00Z" }],
+			credentials: [
+				{
+					token_id: 1,
+					course_id: "stellar-basics",
+					issued_at: "2026-03-26T15:00:00Z",
+				},
+			],
 			joined_at: "2026-01-15T10:00:00.000Z",
 		})
 	})
@@ -65,6 +80,6 @@ describe("GET /api/scholars/:address", () => {
 		// Express usually handles this via routing, but if we call without address:
 		// Note: /api/scholars/ without address might 404 due to route not matching
 		const res = await request(buildApp()).get("/api/scholars/")
-		expect(res.status).toBe(404) 
+		expect(res.status).toBe(404)
 	})
 })

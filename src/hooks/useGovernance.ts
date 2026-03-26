@@ -246,7 +246,9 @@ export function useGovernance() {
 			try {
 				const raw = await fn({})
 				const version = String(
-					(raw !== null && typeof raw === "object" && "result" in (raw as ContractRecord)
+					(raw !== null &&
+					typeof raw === "object" &&
+					"result" in (raw as ContractRecord)
 						? (raw as ContractRecord).result
 						: raw) ?? "",
 				)
@@ -275,7 +277,9 @@ export function useGovernance() {
 			try {
 				const raw = await fn({})
 				const version = String(
-					(raw !== null && typeof raw === "object" && "result" in (raw as ContractRecord)
+					(raw !== null &&
+					typeof raw === "object" &&
+					"result" in (raw as ContractRecord)
 						? (raw as ContractRecord).result
 						: raw) ?? "",
 				)
@@ -294,7 +298,8 @@ export function useGovernance() {
 	})
 
 	// Fetch voting power (GOV token balance)
-	const { data: votingPower = 0n } = useQuery({		queryKey: ["governance", "votingPower", address],
+	const { data: votingPower = 0n } = useQuery({
+		queryKey: ["governance", "votingPower", address],
 		queryFn: async () => {
 			if (!address || !GOVERNANCE_TOKEN_CONTRACT) return 0n
 			const client = await loadClient("../contracts/governance_token")

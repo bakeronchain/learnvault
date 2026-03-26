@@ -30,10 +30,10 @@ import jwt from "jsonwebtoken"
 import request from "supertest"
 
 import { milestoneStore } from "../db/milestone-store"
-import { credentialService } from "../services/credential.service"
-import { stellarContractService } from "../services/stellar-contract.service"
 import { errorHandler } from "../middleware/error.middleware"
 import { adminMilestonesRouter } from "../routes/admin-milestones.routes"
+import { credentialService } from "../services/credential.service"
+import { stellarContractService } from "../services/stellar-contract.service"
 
 // ── Typed mock helpers ───────────────────────────────────────────────────────
 
@@ -41,7 +41,9 @@ const mockStore = milestoneStore as jest.Mocked<typeof milestoneStore>
 const mockStellar = stellarContractService as jest.Mocked<
 	typeof stellarContractService
 >
-const mockCredential = credentialService as jest.Mocked<typeof credentialService>
+const mockCredential = credentialService as jest.Mocked<
+	typeof credentialService
+>
 
 // ── Shared fixtures ──────────────────────────────────────────────────────────
 

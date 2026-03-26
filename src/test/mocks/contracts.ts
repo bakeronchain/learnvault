@@ -45,9 +45,12 @@ export const mockContractMethods = {
 }
 
 // Contract client factory
-export const createMockContractClient = (contractName: string, methods: Record<string, any>) => {
+export const createMockContractClient = (
+	contractName: string,
+	methods: Record<string, any>,
+) => {
 	const mockClient = {}
-	
+
 	Object.entries(methods).forEach(([methodName, mockFn]) => {
 		mockClient[methodName] = mockFn
 	})
@@ -64,19 +67,19 @@ export const mockContracts = {
 		approve: mockContractMethods.approve,
 		allowance: mockContractMethods.allowance,
 	}),
-	
+
 	governanceToken: createMockContractClient("governance_token", {
 		vote: mockContractMethods.vote,
 		getProposal: mockContractMethods.getProposal,
 		getVotingPower: mockContractMethods.getVotingPower,
 	}),
-	
+
 	scholarshipTreasury: createMockContractClient("scholarship_treasury", {
 		apply: mockContractMethods.apply,
 		getApplication: mockContractMethods.getApplication,
 		withdraw: mockContractMethods.withdraw,
 	}),
-	
+
 	guessTheNumber: createMockContractClient("guess_the_number", {
 		guess: mockContractMethods.guess,
 		getGameState: mockContractMethods.getGameState,
@@ -92,33 +95,41 @@ export const mockContractImports = {
 }
 
 // Helper to mock contract imports in tests
-export const mockContractImport = (contractPath: string, customMethods?: Record<string, any>) => {
+export const mockContractImport = (
+	contractPath: string,
+	customMethods?: Record<string, any>,
+) => {
 	const baseMock = mockContractImports[contractPath] || {}
-	const customMock = customMethods ? createMockContractClient(contractPath, customMethods) : {}
-	
+	const customMock = customMethods
+		? createMockContractClient(contractPath, customMethods)
+		: {}
+
 	return {
-		default: { ...baseMock, ...customMock }
+		default: { ...baseMock, ...customMock },
 	}
 }
 
 // Helper to reset all contract mocks
 export const resetContractMocks = () => {
 	vi.clearAllMocks()
-	
+
 	// Re-create default mocks after clearing
 	Object.values(mockContractMethods).forEach((mockFn) => {
-		if (typeof mockFn.mockReset === 'function') {
+		if (typeof mockFn.mockReset === "function") {
 			mockFn.mockReset()
 		}
 	})
 }
 
 // Helper to setup contract mocks for a specific contract
-export const setupContractMock = (contractName: string, customMethods?: Record<string, any>) => {
+export const setupContractMock = (
+	contractName: string,
+	customMethods?: Record<string, any>,
+) => {
 	const contractPath = `../contracts/${contractName}`
 	const mock = mockContractImport(contractPath, customMethods)
-	
+
 	vi.doMock(contractPath, () => mock)
-	
+
 	return mock
 }

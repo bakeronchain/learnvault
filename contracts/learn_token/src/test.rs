@@ -2,9 +2,9 @@
 
 use proptest::prelude::*;
 use soroban_sdk::{
+    Address, Env,
     testutils::{Address as _, Ledger},
     token::{StellarAssetClient, TokenClient},
-    Address, Env,
 };
 
 proptest! {
@@ -21,7 +21,7 @@ proptest! {
         // Register the standard generic Soroban token (LearnToken equivalent)
         let token_contract_id = env.register_stellar_asset_contract_v2(admin.clone());
         let token_id = token_contract_id.address();
-        
+
         let client = StellarAssetClient::new(&env, &token_id);
         let token_client = TokenClient::new(&env, &token_id);
 
@@ -42,7 +42,10 @@ proptest! {
 
 extern crate std;
 
-use soroban_sdk::{IntoVal, testutils::{Address as _, Events as _}};
+use soroban_sdk::{
+    IntoVal,
+    testutils::{Address as _, Events as _},
+};
 
 use crate::{LRNError, LearnToken, LearnTokenClient};
 

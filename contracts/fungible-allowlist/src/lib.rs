@@ -1,6 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, Env, String};
+use soroban_sdk::{Env, String, contract, contractimpl};
 
 #[contract]
 pub struct FungibleAllowlist;

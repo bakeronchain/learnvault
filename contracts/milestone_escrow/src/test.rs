@@ -276,7 +276,7 @@ mod fuzz_tests {
         fn fuzz_ledger_timestamps(elapsed in 0..u64::MAX) {
             let (env, contract_id, _token, _admin, _treasury, scholar) = setup();
             let client = MilestoneEscrowClient::new(&env, &contract_id);
-            
+
             create_escrow(&client, 99, &scholar, 100, 2);
             // Must release at least one tranche to be active and claimable
             release_tranche_authorized(&client, 99).unwrap();
@@ -284,9 +284,9 @@ mod fuzz_tests {
             // Advance time, avoid overflowing u64
             let next_ts = START_TS.saturating_add(elapsed);
             set_timestamp(&env, next_ts);
-            
+
             let res = reclaim_inactive_authorized(&client, 99);
-            
+
             if elapsed >= THIRTY_DAYS {
                 assert!(res.is_ok());
             } else {
@@ -304,10 +304,10 @@ mod fuzz_tests {
         fn fuzz_tranche_disbursement_amounts(amount in 1..1_000_000_000_i128, tranches in 1..1000_u32) {
             let (env, contract_id, _token, _admin, _treasury, scholar) = setup();
             let client = MilestoneEscrowClient::new(&env, &contract_id);
-            
+
             // Overpayment check constraint: amounts must be enough for tranches
             if amount < tranches as i128 {
-                return;
+                return Ok(());
             }
 
             create_escrow(&client, 100, &scholar, amount, tranches);
@@ -320,7 +320,7 @@ mod fuzz_tests {
                 assert!(escrow.released_amount > released);
                 released = escrow.released_amount;
             }
-            
+
             // Releasing an extra one fails
             assert_eq!(
                 release_tranche_authorized(&client, 100).err(),
@@ -328,7 +328,7 @@ mod fuzz_tests {
                     Error::AllTranchesReleased as u32
                 )))
             );
-            
+
             let final_escrow = client.get_escrow(&100).unwrap();
             assert_eq!(final_escrow.released_amount, amount);
         }

@@ -1,8 +1,8 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, Address,
-    Env, String, Symbol,
+    Address, Env, String, Symbol, contract, contracterror, contractimpl, contracttype,
+    panic_with_error, symbol_short,
 };
 
 // ---------------------------------------------------------------------------
@@ -66,9 +66,7 @@ impl ScholarNFT {
         }
         admin.require_auth();
         env.storage().instance().set(&ADMIN_KEY, &admin);
-        env.storage()
-            .instance()
-            .set(&TOKEN_COUNTER_KEY, &0_u64);
+        env.storage().instance().set(&TOKEN_COUNTER_KEY, &0_u64);
     }
 
     /// Mint a soulbound Scholar NFT to `to`.
@@ -96,9 +94,7 @@ impl ScholarNFT {
             .set(&DataKey::Owner(next_token_id), &to);
 
         // Reverse lookup: scholar -> token id
-        env.storage()
-            .persistent()
-            .set(&scholar_key, &next_token_id);
+        env.storage().persistent().set(&scholar_key, &next_token_id);
 
         // Store the raw URI for token_uri() queries
         env.storage()
@@ -149,9 +145,7 @@ impl ScholarNFT {
 
     /// Return the rich metadata struct for `token_id`, if it exists.
     pub fn get_metadata(env: Env, token_id: u64) -> Option<ScholarMetadata> {
-        env.storage()
-            .persistent()
-            .get(&DataKey::Metadata(token_id))
+        env.storage().persistent().get(&DataKey::Metadata(token_id))
     }
 
     /// Check whether `scholar` already holds a credential.

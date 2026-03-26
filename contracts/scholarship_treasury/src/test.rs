@@ -1415,16 +1415,16 @@ mod fuzz_tests {
 
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(100))]
-        
+
         #[test]
         #[ignore]
         fn fuzz_deposit_amounts(amount in 1..i128::MAX) {
             let env = Env::default();
             let (client, _, donor, _, token_id, gov_client) = setup(&env);
             env.mock_all_auths();
-            
+
             client.deposit(&donor, &amount);
-            
+
             assert_eq!(client.get_donor_total(&donor), amount);
             assert_eq!(client.get_balance(), amount);
             assert_eq!(token_client(&env, &token_id).balance(&client.address), amount);
@@ -1441,7 +1441,7 @@ mod fuzz_tests {
 
             // Most proposals don't exist, we test graceful error handling
             let res = client.try_vote(&voter, &proposal_id, &true);
-            
+
             if proposal_id != 1 {
                 assert_eq!(
                     res.err(),

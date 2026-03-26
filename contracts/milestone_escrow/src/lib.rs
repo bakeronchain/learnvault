@@ -1,8 +1,8 @@
 #![no_std]
 
 use soroban_sdk::{
-    Address, Env, String, Symbol, contract, contracterror, contractevent, contractimpl, contracttype,
-    panic_with_error, symbol_short,
+    Address, Env, String, Symbol, contract, contracterror, contractevent, contractimpl,
+    contracttype, panic_with_error, symbol_short,
 };
 
 const INACTIVITY_WINDOW_SECONDS: u64 = 30 * 24 * 60 * 60;
@@ -91,7 +91,7 @@ impl MilestoneEscrow {
             panic_with_error!(&env, Error::EscrowExists);
         }
 
-        xlm::token_client(&env).transfer(&treasury, &env.current_contract_address(), &amount);
+        xlm::token_client(&env).transfer(&treasury, env.current_contract_address(), &amount);
 
         let record = EscrowRecord {
             scholar,

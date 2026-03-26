@@ -2,7 +2,6 @@ import path from "path"
 import cors from "cors"
 import dotenv from "dotenv"
 import express from "express"
-import morgan from "morgan"
 import swaggerUi from "swagger-ui-express"
 import YAML from "yaml"
 import { z } from "zod"
@@ -11,6 +10,7 @@ import { initDb } from "./db/index"
 import { createNonceStore } from "./db/nonce-store"
 import { errorHandler } from "./middleware/error.middleware"
 import { globalLimiter } from "./middleware/rate-limit.middleware"
+import { requestLogger } from "./middleware/request-logger.middleware"
 import { buildOpenApiSpec } from "./openapi"
 import { adminMilestonesRouter } from "./routes/admin-milestones.routes"
 import { adminRouter } from "./routes/admin.routes"
@@ -87,6 +87,12 @@ if (!isProduction && (!jwtPrivateKey || !jwtPublicKey)) {
 	jwtPublicKey = ephemeral.publicKeyPem
 }
 
+if (!jwtPrivateKey || !jwtPublicKey) {
+	throw new Error(
+		"JWT_PRIVATE_KEY and JWT_PUBLIC_KEY must be configured to start the server",
+	)
+}
+
 const nonceStore = createNonceStore(env.REDIS_URL)
 const jwtService = createJwtService(jwtPrivateKey, jwtPublicKey)
 const authService = createAuthService(nonceStore, jwtService)
@@ -96,7 +102,7 @@ const openApiSpec = buildOpenApiSpec()
 const openApiYaml = YAML.stringify(openApiSpec)
 
 app.set("trust proxy", 1)
-app.use(morgan("dev"))
+app.use(requestLogger)
 app.use(
 	cors({
 		origin: (origin, callback) => {

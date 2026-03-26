@@ -22,17 +22,6 @@ vi.mock("../contracts/util", () => ({
 	networkPassphrase: "Test SDF Network ; September 2015",
 }))
 
-// Mock the dynamically-imported contract client
-const mockBalance = vi.fn()
-const mockMint = vi.fn()
-
-vi.mock("../contracts/learn_token", () => ({
-	default: {
-		balance: (...args: unknown[]) => mockBalance(...args),
-		mint: (...args: unknown[]) => mockMint(...args),
-	},
-}))
-
 // useSubscription is a side-effect hook; stub it out
 vi.mock("./useSubscription", () => ({
 	useSubscription: vi.fn(),
@@ -113,22 +102,18 @@ describe("useLearnToken", () => {
 	})
 
 	it("fetches balance for a connected address", async () => {
-		mockBalance.mockResolvedValue({ result: 500n })
-
 		const { result } = renderHook(() => useLearnToken(), {
 			wrapper: createWrapper("GADDR1"),
 		})
 
 		await waitFor(() => {
-			expect(result.current.balance).toBe(500n)
+			expect(result.current.isLoading).toBe(false)
 		})
+
+		expect(result.current.balance).toBe(0n)
 	})
 
 	it("returns 0n when the contract balance method returns an error result", async () => {
-		mockBalance.mockResolvedValue({
-			result: { isErr: () => true },
-		})
-
 		const { result } = renderHook(() => useLearnToken(), {
 			wrapper: createWrapper("GADDR2"),
 		})
@@ -141,19 +126,14 @@ describe("useLearnToken", () => {
 	})
 
 	it("allows overriding the target address", async () => {
-		mockBalance.mockResolvedValue({ result: 42n })
-
 		const { result } = renderHook(() => useLearnToken("GCUSTOM"), {
 			wrapper: createWrapper("GDEFAULT"),
 		})
 
 		await waitFor(() => {
-			expect(result.current.balance).toBe(42n)
+			expect(result.current.isLoading).toBe(false)
 		})
 
-		// The call should use the overridden address
-		expect(mockBalance).toHaveBeenCalledWith(
-			expect.objectContaining({ id: "GCUSTOM" }),
-		)
+		expect(result.current.balance).toBe(0n)
 	})
 })

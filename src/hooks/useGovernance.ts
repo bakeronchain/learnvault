@@ -164,9 +164,10 @@ export function useGovernance() {
 		(value: unknown): unknown => {
 			const resolved = unwrapResult(value)
 			if (isErrResult(resolved)) {
+				const maybeUnwrapErr = (resolved as ContractRecord).unwrapErr
 				const errorValue =
-					typeof (resolved as ContractRecord).unwrapErr === "function"
-						? (resolved as ContractRecord).unwrapErr()
+					typeof maybeUnwrapErr === "function"
+						? (maybeUnwrapErr as () => unknown)()
 						: new Error("Transaction failed")
 				throw errorValue instanceof Error
 					? errorValue
@@ -177,7 +178,10 @@ export function useGovernance() {
 				typeof resolved === "object" &&
 				typeof (resolved as ContractRecord).unwrap === "function"
 			) {
-				return (resolved as ContractRecord).unwrap()
+				const maybeUnwrap = (resolved as ContractRecord).unwrap as
+					| (() => unknown)
+					| undefined
+				return maybeUnwrap ? maybeUnwrap() : resolved
 			}
 			return resolved
 		},
@@ -191,7 +195,9 @@ export function useGovernance() {
 			if (typeof resolved === "number") return resolved !== 0
 			if (typeof resolved === "string") {
 				const normalized = resolved.trim().toLowerCase()
-				return normalized === "true" || normalized === "yes" || normalized === "for"
+				return (
+					normalized === "true" || normalized === "yes" || normalized === "for"
+				)
 			}
 			if (resolved && typeof resolved === "object") {
 				const maybe = resolved as ContractRecord

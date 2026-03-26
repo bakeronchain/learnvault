@@ -3,11 +3,11 @@ import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import ConnectWalletGuard from "../components/ConnectWalletGuard"
 import MilestoneReportForm from "../components/MilestoneReportForm"
-import { getIpfsUrl, isCid, normaliseCid } from "../lib/ipfs"
 import { useWallet } from "../hooks/useWallet"
-import type {
-	MilestoneReportFormValues,
-	SubmittedMilestoneReport,
+import { getIpfsUrl, isCid, normaliseCid } from "../lib/ipfs"
+import {
+	type MilestoneReportFormValues,
+	type SubmittedMilestoneReport,
 } from "../types/milestone"
 import { shortenAddress } from "../util/scholarshipApplications"
 
@@ -109,90 +109,111 @@ export default function ScholarMilestones() {
 						/>
 
 						<div className="space-y-6">
-							<Card className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-xl">
-								<h2 className="text-xl font-black text-white">What to include</h2>
-								<ul className="mt-4 space-y-3 text-sm text-white/70">
-									<li>Use the exact course ID from the server course catalog.</li>
-									<li>Use the milestone number assigned to that course.</li>
-									<li>Paste a GitHub PR, repo, demo link, or IPFS CID as evidence.</li>
-									<li>Add clear milestone notes so validators can review fast.</li>
-								</ul>
-							</Card>
+							<div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-xl">
+								<Card>
+									<h2 className="text-xl font-black text-white">
+										What to include
+									</h2>
+									<ul className="mt-4 space-y-3 text-sm text-white/70">
+										<li>
+											Use the exact course ID from the server course catalog.
+										</li>
+										<li>Use the milestone number assigned to that course.</li>
+										<li>
+											Paste a GitHub PR, repo, demo link, or IPFS CID as
+											evidence.
+										</li>
+										<li>
+											Add clear milestone notes so validators can review fast.
+										</li>
+									</ul>
+								</Card>
+							</div>
 
-							<Card className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-xl">
-								<h2 className="text-xl font-black text-white">
-									Latest submission
-								</h2>
-								{submitError ? (
-									<p
-										className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
-										role="alert"
+							<div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-xl">
+								<Card>
+									<h2 className="text-xl font-black text-white">
+										Latest submission
+									</h2>
+									{submitError ? (
+										<p
+											className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+											role="alert"
+										>
+											{submitError}
+										</p>
+									) : null}
+
+									{submittedReport ? (
+										<div className="mt-4 space-y-3 text-sm text-white/70">
+											<p>
+												<span className="font-semibold text-white">
+													Report ID:
+												</span>{" "}
+												{submittedReport.id}
+											</p>
+											<p>
+												<span className="font-semibold text-white">
+													Course:
+												</span>{" "}
+												{submittedReport.course_id}
+											</p>
+											<p>
+												<span className="font-semibold text-white">
+													Milestone:
+												</span>{" "}
+												{submittedReport.milestone_id}
+											</p>
+											<p>
+												<span className="font-semibold text-white">
+													Status:
+												</span>{" "}
+												{submittedReport.status}
+											</p>
+											{submittedReport.evidence_github ? (
+												<a
+													href={submittedReport.evidence_github}
+													target="_blank"
+													rel="noreferrer"
+													className="block text-brand-cyan underline"
+												>
+													Open GitHub evidence
+												</a>
+											) : null}
+											{ipfsUrl ? (
+												<a
+													href={ipfsUrl}
+													target="_blank"
+													rel="noreferrer"
+													className="block text-brand-cyan underline"
+												>
+													Open IPFS evidence
+												</a>
+											) : null}
+										</div>
+									) : (
+										<p className="mt-4 text-sm text-white/60">
+											No milestone report submitted in this session yet.
+										</p>
+									)}
+								</Card>
+							</div>
+
+							<div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-xl">
+								<Card>
+									<h2 className="text-xl font-black text-white">Next steps</h2>
+									<p className="mt-4 text-sm text-white/70">
+										After submission, validators can review your evidence from
+										the admin milestones queue.
+									</p>
+									<Link
+										to="/dashboard"
+										className="mt-4 inline-flex text-sm font-semibold text-brand-cyan underline"
 									>
-										{submitError}
-									</p>
-								) : null}
-
-								{submittedReport ? (
-									<div className="mt-4 space-y-3 text-sm text-white/70">
-										<p>
-											<span className="font-semibold text-white">Report ID:</span>{" "}
-											{submittedReport.id}
-										</p>
-										<p>
-											<span className="font-semibold text-white">Course:</span>{" "}
-											{submittedReport.course_id}
-										</p>
-										<p>
-											<span className="font-semibold text-white">
-												Milestone:
-											</span>{" "}
-											{submittedReport.milestone_id}
-										</p>
-										<p>
-											<span className="font-semibold text-white">Status:</span>{" "}
-											{submittedReport.status}
-										</p>
-										{submittedReport.evidence_github ? (
-											<a
-												href={submittedReport.evidence_github}
-												target="_blank"
-												rel="noreferrer"
-												className="block text-brand-cyan underline"
-											>
-												Open GitHub evidence
-											</a>
-										) : null}
-										{ipfsUrl ? (
-											<a
-												href={ipfsUrl}
-												target="_blank"
-												rel="noreferrer"
-												className="block text-brand-cyan underline"
-											>
-												Open IPFS evidence
-											</a>
-										) : null}
-									</div>
-								) : (
-									<p className="mt-4 text-sm text-white/60">
-										No milestone report submitted in this session yet.
-									</p>
-								)}
-							</Card>
-
-							<Card className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-xl">
-								<h2 className="text-xl font-black text-white">Next steps</h2>
-								<p className="mt-4 text-sm text-white/70">
-									After submission, validators can review your evidence from the
-									admin milestones queue.
-								</p>
-								<Link
-									to="/dashboard"
-									className="mt-4 inline-flex text-sm font-semibold text-brand-cyan underline"
-								>
-									Back to dashboard
-								</Link>
-							</Card>
+										Back to dashboard
+									</Link>
+								</Card>
+							</div>
 						</div>
 					</div>
 				</div>

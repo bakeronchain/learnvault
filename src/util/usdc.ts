@@ -1,17 +1,8 @@
-﻿/**
+/**
  * Utility functions for USDC token operations on Stellar
  */
 
-import {
-	Asset,
-	Contract,
-	rpc as StellarRpc,
-	TransactionBuilder,
-	Operation,
-	Account,
-	TimeoutInfinite,
-} from "@stellar/stellar-sdk"
-import { rpcUrl, networkPassphrase, horizonUrl } from "../contracts/util"
+import { rpcUrl } from "../contracts/util"
 
 /**
  * Get the USDC contract ID from environment variables
@@ -47,78 +38,13 @@ export async function mintTestUSDC(
 ): Promise<string> {
 	try {
 		const contractId = getUSDCContractId()
-		const amountStroops = BigInt(Math.floor(amount * 10000000))
 
-		const rpcUrl =
+		const endpoint =
 			import.meta.env.PUBLIC_STELLAR_RPC_URL || "http://localhost:8000/rpc"
-
+		void signTransaction
 		throw new Error(
-			`Please use the CLI script to mint test USDC:\n\n` +
-				`./scripts/mint-test-usdc.sh ${recipientAddress} ${amount}\n\n` +
-				`The configured contract ${contractId} will be reachable via ${rpcUrl} once contract clients are generated.`,
+			`Please use the CLI script to mint test USDC:\n\n./scripts/mint-test-usdc.sh ${recipientAddress} ${amount}\n\nConfigured contract: ${contractId}\nRPC endpoint: ${endpoint}`,
 		)
-		const server = new StellarRpc.Server(rpcUrl)
-
-		// 1. Fetch account sequence
-		const accountResponse = await fetch(
-			`${horizonUrl}/accounts/${recipientAddress}`,
-		)
-		if (!accountResponse.ok) {
-			throw new Error("Could not fetch account details for sequence number")
-		}
-		const accountData = await accountResponse.json()
-		const sourceAccount = new Account(recipientAddress, accountData.sequence)
-
-		// 2. Build the transaction
-		const contract = new Contract(contractId)
-		const tx = new TransactionBuilder(sourceAccount, {
-			fee: "100",
-			networkPassphrase,
-		})
-			.addOperation(
-				contract.call("mint", {
-					to: recipientAddress,
-					amount: amountStroops,
-				}),
-			)
-			.setTimeout(TimeoutInfinite)
-			.build()
-
-		// 3. Prepare transaction (simulations, footprints, etc.)
-		const preparedTx = await server.prepareTransaction(tx)
-
-		// 4. Sign transaction via wallet
-		const { signedTransaction } = await signTransaction(preparedTx.toXDR())
-
-		// 5. Submit transaction
-		const submissionRes = await server.sendTransaction(
-			TransactionBuilder.fromXDR(signedTransaction, networkPassphrase),
-		)
-
-		if (submissionRes.status !== "PENDING") {
-			throw new Error(`Transaction submission failed: ${submissionRes.status}`)
-		}
-
-		// 6. Wait for result (polling)
-		let txResult = await server.getTransaction(submissionRes.hash)
-		let retries = 0
-		const maxRetries = 30 // 30 seconds max
-		
-		while (txResult.status === "NOT_FOUND" && retries < maxRetries) {
-			await new Promise((resolve) => setTimeout(resolve, 1000))
-			txResult = await server.getTransaction(submissionRes.hash)
-			retries++
-		}
-
-		if (txResult.status === "FAILED") {
-			throw new Error(`Transaction failed: ${JSON.stringify(txResult.resultXdr)}`)
-		}
-
-		if (txResult.status !== "SUCCESS") {
-			throw new Error(`Transaction timed out or had unexpected status: ${txResult.status}`)
-		}
-
-		return submissionRes.hash
 	} catch (error) {
 		console.error("Minting error:", error)
 		if (error instanceof Error) {
@@ -137,11 +63,10 @@ export async function mintTestUSDC(
 export async function getUSDCBalance(_address: string): Promise<number> {
 	try {
 		getUSDCContractId()
-		const rpcUrl =
-			import.meta.env.PUBLIC_STELLAR_RPC_URL || "http://localhost:8000/rpc"
+		const endpoint = import.meta.env.PUBLIC_STELLAR_RPC_URL || rpcUrl
 
 		throw new Error(
-			`Balance checking is not yet implemented. Query the configured RPC endpoint directly: ${rpcUrl}`,
+			`Balance checking is not yet implemented. Query the configured RPC endpoint directly: ${endpoint}`,
 		)
 	} catch (error) {
 		if (error instanceof Error) {

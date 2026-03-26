@@ -1,38 +1,38 @@
 import { Pool } from "pg"
 
 class MockPool {
-    async connect() {
-        return {
-            query: async () => ({ rows: [] }),
-            release: () => { },
-        }
-    }
-    async query(text: string, params?: any[]) {
-        return { rows: [] }
-    }
+	async connect() {
+		return {
+			query: async () => ({ rows: [] }),
+			release: () => {},
+		}
+	}
+	async query(text: string, params?: any[]) {
+		return { rows: [] }
+	}
 }
 
 let activePool: any
 try {
-    activePool = new Pool({
-        connectionString: process.env.DATABASE_URL,
-        ssl:
-            process.env.NODE_ENV === "production"
-                ? { rejectUnauthorized: false }
-                : false,
-    })
+	activePool = new Pool({
+		connectionString: process.env.DATABASE_URL,
+		ssl:
+			process.env.NODE_ENV === "production"
+				? { rejectUnauthorized: false }
+				: false,
+	})
 } catch {
-    console.warn("[db] Failed to create postgres pool, using mock")
-    activePool = new MockPool()
+	console.warn("[db] Failed to create postgres pool, using mock")
+	activePool = new MockPool()
 }
 
 export const pool = activePool
 
 export const initDb = async () => {
-    try {
-        if (activePool instanceof Pool) {
-            const client = await activePool.connect()
-            await client.query(`
+	try {
+		if (activePool instanceof Pool) {
+			const client = await activePool.connect()
+			await client.query(`
                 CREATE TABLE IF NOT EXISTS courses (
                     id SERIAL PRIMARY KEY,
                     slug TEXT NOT NULL UNIQUE,
@@ -203,6 +203,16 @@ export const initDb = async () => {
                 );
                 CREATE INDEX IF NOT EXISTS idx_proposals_status_created_at
                     ON proposals (status, created_at DESC);
+                CREATE TABLE IF NOT EXISTS platform_events (
+                    id SERIAL PRIMARY KEY,
+                    event_type TEXT NOT NULL,
+                    data JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_platform_events_type_created_at
+                    ON platform_events (event_type, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_platform_events_created_at
+                    ON platform_events (created_at DESC);
                 CREATE TABLE IF NOT EXISTS scholar_balances (
                     address TEXT PRIMARY KEY,
                     lrn_balance NUMERIC(30, 0) NOT NULL DEFAULT 0,
@@ -222,18 +232,18 @@ export const initDb = async () => {
                 CREATE INDEX IF NOT EXISTS idx_enrollments_learner_address ON enrollments (learner_address);
                 CREATE INDEX IF NOT EXISTS idx_enrollments_course_id ON enrollments (course_id);
             `)
-            client.release()
-            console.log("Postgres database initialized")
-        } else {
-            console.log("In-memory mock database initialized")
-        }
-    } catch (err) {
-        console.error("Database initialization failed, falling back to mock")
-        activePool = new MockPool()
-    }
+			client.release()
+			console.log("Postgres database initialized")
+		} else {
+			console.log("In-memory mock database initialized")
+		}
+	} catch (err) {
+		console.error("Database initialization failed, falling back to mock")
+		activePool = new MockPool()
+	}
 }
 
 export const db = {
-    query: (text: string, params?: any[]) => activePool.query(text, params),
-    connected: true,
+	query: (text: string, params?: any[]) => activePool.query(text, params),
+	connected: true,
 }

@@ -1,4 +1,5 @@
-import React from "react"
+import React, { Suspense } from "react"
+import { Helmet } from "react-helmet"
 import {
 	Area,
 	AreaChart,
@@ -49,7 +50,8 @@ const Treasury: React.FC = () => {
 					Treasury Dashboard
 				</h1>
 				<p className="text-white/40 text-lg max-w-2xl mx-auto font-medium">
-					Real-time transparency into the LearnVault decentralized scholarship fund.
+					Real-time transparency into the LearnVault decentralized scholarship
+					fund.
 				</p>
 			</header>
 
@@ -108,9 +110,6 @@ const Treasury: React.FC = () => {
 
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
 				<ActivityFeed
-					address={undefined}
-					limit={5}
-					filter="deposit"
 					title="Recent Community Deposits"
 					items={[
 						{
@@ -132,9 +131,6 @@ const Treasury: React.FC = () => {
 					]}
 				/>
 				<ActivityFeed
-					address={undefined}
-					limit={5}
-					filter="disburse"
 					title="Latest Disbursements"
 					items={[
 						{
@@ -194,6 +190,41 @@ const LegendItem: React.FC<{ color: string; label: string }> = ({
 		/>
 		<span className="text-xs font-bold text-white/60">{label}</span>
 	</div>
+)
+
+const TreasuryHealthChart: React.FC<{
+	data: { name: string; inflows: number; outflows: number }[]
+}> = ({ data }) => (
+	<ResponsiveContainer width="100%" height="100%">
+		<AreaChart data={data}>
+			<defs>
+				<linearGradient id="inflowGradient" x1="0" y1="0" x2="0" y2="1">
+					<stop offset="5%" stopColor="#00d2ff" stopOpacity={0.4} />
+					<stop offset="95%" stopColor="#00d2ff" stopOpacity={0} />
+				</linearGradient>
+				<linearGradient id="outflowGradient" x1="0" y1="0" x2="0" y2="1">
+					<stop offset="5%" stopColor="#8e2de2" stopOpacity={0.4} />
+					<stop offset="95%" stopColor="#8e2de2" stopOpacity={0} />
+				</linearGradient>
+			</defs>
+			<CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+			<XAxis dataKey="name" stroke="rgba(255,255,255,0.5)" />
+			<YAxis stroke="rgba(255,255,255,0.5)" />
+			<Tooltip />
+			<Area
+				type="monotone"
+				dataKey="inflows"
+				stroke="#00d2ff"
+				fill="url(#inflowGradient)"
+			/>
+			<Area
+				type="monotone"
+				dataKey="outflows"
+				stroke="#8e2de2"
+				fill="url(#outflowGradient)"
+			/>
+		</AreaChart>
+	</ResponsiveContainer>
 )
 
 const ActivityFeed: React.FC<{

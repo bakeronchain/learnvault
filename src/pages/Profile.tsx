@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react"
+import React, { useContext, useEffect, useState } from "react"
+import { Helmet } from "react-helmet"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import { ActivityFeed } from "../components/ActivityFeed"
@@ -45,6 +46,7 @@ const Profile: React.FC = () => {
 				artwork: "https://api.placeholder.com/150/150?text=SCM",
 				txHash:
 					"8e1df4f2efef3f4a39d24802f91b0f2a68501259b6bdca6354ec4f15d6a3bb27",
+				totalMilestones: 8,
 			},
 		],
 		history: [

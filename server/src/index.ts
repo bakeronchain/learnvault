@@ -1,8 +1,8 @@
+import path from "path"
 import cors from "cors"
 import dotenv from "dotenv"
 import express from "express"
 import morgan from "morgan"
-import path from "path"
 import swaggerUi from "swagger-ui-express"
 import YAML from "yaml"
 import { z } from "zod"
@@ -13,20 +13,21 @@ import { errorHandler } from "./middleware/error.middleware"
 import { globalLimiter } from "./middleware/rate-limit.middleware"
 import { buildOpenApiSpec } from "./openapi"
 import { adminMilestonesRouter } from "./routes/admin-milestones.routes"
+import { adminRouter } from "./routes/admin.routes"
 import { createAuthRouter } from "./routes/auth.routes"
 import { commentsRouter } from "./routes/comments.routes"
 import { coursesRouter } from "./routes/courses.routes"
 import { credentialsRouter } from "./routes/credentials.routes"
 import { enrollmentsRouter } from "./routes/enrollments.routes"
 import { eventsRouter } from "./routes/events.routes"
-import { healthRouter } from "./routes/health.routes"
 import { governanceRouter } from "./routes/governance.routes"
+import { healthRouter } from "./routes/health.routes"
 import { leaderboardRouter } from "./routes/leaderboard.routes"
 import { createMeRouter } from "./routes/me.routes"
 import { scholarsRouter } from "./routes/scholars.routes"
+import { scholarshipsRouter } from "./routes/scholarships.routes"
 import { uploadRouter } from "./routes/upload.routes"
 import { validatorRouter } from "./routes/validator.routes"
-import { scholarshipsRouter } from "./routes/scholarships.routes"
 import { createAuthService } from "./services/auth.service"
 import {
 	createJwtService,
@@ -130,6 +131,7 @@ app.use("/api", commentsRouter)
 app.use("/api", leaderboardRouter)
 app.use("/api", governanceRouter)
 app.use("/api", scholarsRouter)
+app.use("/api", adminRouter)
 app.use("/api", adminMilestonesRouter)
 app.use("/api", scholarsRouter)
 app.use("/api", uploadRouter)

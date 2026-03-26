@@ -24,6 +24,7 @@
     "morgan": "^1.10.0",
     "multer": "^2.0.0",
     "pg": "^8.20.0",
+    "side-channel": "^1.1.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "yaml": "^2.8.1",

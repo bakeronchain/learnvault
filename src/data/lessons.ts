@@ -3,6 +3,7 @@ export interface Lesson {
 	courseId: string
 	title: string
 	content: string
+	isMilestone?: boolean
 }
 
 const placeholderContent = `
@@ -74,6 +75,7 @@ export const lessons: Lesson[] = [
 		courseId: "web3-fundamentals",
 		title: "Signing your first transaction",
 		content: placeholderContent,
+		isMilestone: true,
 	},
 	{
 		id: 1,
@@ -86,6 +88,7 @@ export const lessons: Lesson[] = [
 		courseId: "defi-protocols",
 		title: "Automated Market Makers (AMMs)",
 		content: placeholderContent,
+		isMilestone: true,
 	},
 	{
 		id: 1,
@@ -98,6 +101,7 @@ export const lessons: Lesson[] = [
 		courseId: "smart-contract-foundations",
 		title: "Writing a basic storage contract",
 		content: placeholderContent,
+		isMilestone: true,
 	},
 	{
 		id: 1,
@@ -110,6 +114,7 @@ export const lessons: Lesson[] = [
 		courseId: "stellar-soroban-basics",
 		title: "Deploying a Soroban contract",
 		content: placeholderContent,
+		isMilestone: true,
 	},
 ]
 

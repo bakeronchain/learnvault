@@ -10,6 +10,7 @@ const STELLAR_NETWORK = process.env.STELLAR_NETWORK ?? "testnet"
 const STELLAR_SECRET_KEY = process.env.STELLAR_SECRET_KEY ?? ""
 const COURSE_MILESTONE_CONTRACT_ID =
 	process.env.COURSE_MILESTONE_CONTRACT_ID ?? ""
+const SCHOLAR_NFT_CONTRACT_ID = process.env.SCHOLAR_NFT_CONTRACT_ID ?? ""
 
 export interface ContractCallResult {
 	txHash: string | null
@@ -144,7 +145,72 @@ async function emitRejectionEvent(
 	}
 }
 
+async function callMintScholarNFT(
+	scholarAddress: string,
+	metadataUri: string,
+): Promise<ContractCallResult> {
+	if (!STELLAR_SECRET_KEY || !SCHOLAR_NFT_CONTRACT_ID) {
+		console.warn(
+			"[stellar] STELLAR_SECRET_KEY or SCHOLAR_NFT_CONTRACT_ID not set — simulating mint",
+		)
+		return {
+			txHash: `sim_mint_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+			simulated: true,
+		}
+	}
+
+	try {
+		const {
+			Keypair,
+			Contract,
+			TransactionBuilder,
+			Networks,
+			BASE_FEE,
+			rpc,
+			xdr,
+		} = await import("@stellar/stellar-sdk")
+
+		const server = new rpc.Server(
+			STELLAR_NETWORK === "mainnet"
+				? "https://soroban-rpc.stellar.org"
+				: "https://soroban-testnet.stellar.org",
+		)
+
+		const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
+		const account = await server.getAccount(keypair.publicKey())
+		const contract = new Contract(SCHOLAR_NFT_CONTRACT_ID)
+
+		const tx = new TransactionBuilder(account, {
+			fee: BASE_FEE,
+			networkPassphrase:
+				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+		})
+			.addOperation(
+				contract.call(
+					"mint",
+					xdr.ScVal.scvString(scholarAddress),
+					xdr.ScVal.scvString(metadataUri),
+				),
+			)
+			.setTimeout(30)
+			.build()
+
+		const prepared = await server.prepareTransaction(tx)
+		prepared.sign(keypair)
+
+		const result = await server.sendTransaction(prepared)
+		return { txHash: result.hash, simulated: false }
+	} catch (err) {
+		console.error("[stellar] ScholarNFT mint failed:", err)
+		throw new Error(
+			"ScholarNFT mint failed: " +
+				(err instanceof Error ? err.message : String(err)),
+		)
+	}
+}
+
 export const stellarContractService = {
 	callVerifyMilestone,
 	emitRejectionEvent,
+	callMintScholarNFT,
 }

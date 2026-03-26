@@ -112,9 +112,23 @@ export const templates: Record<string, (vars: EmailVariables) => string> = {
       vars,
     ),
 
-  "voted-on-proposal": (vars) =>
-    baseLayout(
-      `
+	"certificate-awarded": (vars) =>
+		baseLayout(
+			`
+    <p>Hi ${vars.name},</p>
+    <p><strong>Congratulations — you earned a certificate!</strong></p>
+    <p>You have completed all milestones in <strong>${vars.courseTitle}</strong> and a ScholarNFT credential has been minted to your wallet.</p>
+    <p>This soulbound token is your permanent on-chain proof of completion.</p>
+    <p><a href="${vars.certificateUrl}" class="button success">View Certificate</a></p>
+    <p>Keep building!</p>
+    <p>Best,<br>The LearnVault Team</p>
+  `,
+			vars,
+		),
+
+	"voted-on-proposal": (vars) =>
+		baseLayout(
+			`
     <p>Hi ${vars.name},</p>
     <p><strong>You voted on ${vars.proposalTitle}!</strong></p>
     <p>Thank you for supporting this scholar. Your vote helps empower the next generation of builders on Stellar.</p>

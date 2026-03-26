@@ -61,6 +61,32 @@ export class EmailService {
 			return false
 		}
 	}
+	async sendAdminMilestoneNotification(
+		scholarName: string,
+		courseSlug: string,
+		milestoneId: string
+	): Promise<boolean> {
+		const adminEmail = process.env.ADMIN_EMAIL;
+
+		if (!adminEmail) {
+			console.warn("[EmailService] ADMIN_EMAIL not set, skipping notification.");
+			return false;
+		}
+
+		const adminLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/admin/reviews`;
+
+		return this.sendNotification({
+			to: adminEmail,
+			subject: `New Submission: ${scholarName}`,
+			template: "admin-alert",
+			data: {
+				body: `Scholar <strong>${scholarName}</strong> has submitted a report for <strong>${courseSlug}</strong> (Milestone ${milestoneId}).`,
+				adminUrl: adminLink,
+				unsubscribeUrl: "#"
+			}
+		});
+	}
 }
 
 export const createEmailService = (apiKey: string) => new EmailService(apiKey)
+

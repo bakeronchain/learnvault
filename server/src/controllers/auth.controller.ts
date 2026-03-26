@@ -4,6 +4,57 @@ import { type AuthService } from "../services/auth.service"
 
 export function createAuthControllers(authService: AuthService) {
 	return {
+		async getChallenge(req: Request, res: Response): Promise<void> {
+			const address =
+				typeof req.query.address === "string" ? req.query.address.trim() : ""
+
+			if (!address) {
+				res.status(400).json({ error: "Missing query parameter: address" })
+				return
+			}
+
+			try {
+				const challenge = await authService.createChallenge(address)
+				res.status(200).json(challenge)
+			} catch (err) {
+				const message = err instanceof Error ? err.message : "Bad request"
+				res.status(400).json({ error: message })
+			}
+		},
+
+		async postChallengeVerify(req: Request, res: Response): Promise<void> {
+			const body = req.body as { signed_transaction?: unknown }
+			const signedTransaction =
+				typeof body.signed_transaction === "string"
+					? body.signed_transaction.trim()
+					: ""
+
+			if (!signedTransaction) {
+				res.status(400).json({ error: "Missing required field: signed_transaction" })
+				return
+			}
+
+			try {
+				const token = await authService.verifySignedTransaction(signedTransaction)
+				res.status(200).json({
+					token,
+					tokenType: "Bearer",
+					expiresIn: "24h",
+				})
+			} catch (err) {
+				const message = err instanceof Error ? err.message : "Unauthorized"
+				if (message.includes("Invalid") || message.includes("Missing")) {
+					res.status(400).json({ error: message })
+					return
+				}
+				if (message.includes("expired")) {
+					res.status(401).json({ error: message })
+					return
+				}
+				res.status(401).json({ error: message })
+			}
+		},
+
 		async getNonce(req: Request, res: Response): Promise<void> {
 			const address =
 				typeof req.query.address === "string" ? req.query.address.trim() : ""

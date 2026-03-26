@@ -1,10 +1,24 @@
 import crypto from "node:crypto"
-import { Keypair, StrKey } from "@stellar/stellar-sdk"
+import {
+	Account,
+	Keypair,
+	Memo,
+	Networks,
+	StrKey,
+	Transaction,
+	TransactionBuilder,
+} from "@stellar/stellar-sdk"
 
 import { type NonceStore } from "../db/nonce-store"
 import { type JwtService } from "./jwt.service"
 
 const NONCE_MESSAGE_PREFIX = "LearnVault sign-in: "
+const CHALLENGE_TTL_SECONDS = 300
+
+function getNetworkPassphrase(): string {
+	const network = (process.env.STELLAR_NETWORK ?? "testnet").toLowerCase()
+	return network === "mainnet" ? Networks.PUBLIC : Networks.TESTNET
+}
 
 export function isValidStellarPublicKey(address: string): boolean {
 	try {
@@ -22,6 +36,11 @@ function randomNoncePayload(): string {
 export type AuthService = {
 	getOrCreateNonce(address: string): Promise<{ nonce: string }>
 	verifyAndIssueToken(address: string, signatureBase64: string): Promise<string>
+	createChallenge(address: string): Promise<{
+		transaction: string
+		networkPassphrase: string
+	}>
+	verifySignedTransaction(signedTransactionXdr: string): Promise<string>
 }
 
 export function createAuthService(
@@ -29,6 +48,82 @@ export function createAuthService(
 	jwtService: JwtService,
 ): AuthService {
 	return {
+		async createChallenge(address: string): Promise<{
+			transaction: string
+			networkPassphrase: string
+		}> {
+			if (!isValidStellarPublicKey(address)) {
+				throw new Error("Invalid Stellar public key")
+			}
+
+			const nonce = crypto.randomBytes(12).toString("hex")
+			await nonceStore.getOrSetNonce(address, nonce, CHALLENGE_TTL_SECONDS)
+
+			const networkPassphrase = getNetworkPassphrase()
+			const account = new Account(address, "0")
+			const challengeTx = new TransactionBuilder(account, {
+				fee: "100",
+				networkPassphrase,
+			})
+				.addMemo(Memo.text(nonce))
+				.setTimeout(CHALLENGE_TTL_SECONDS)
+				.build()
+
+			return {
+				transaction: challengeTx.toXDR(),
+				networkPassphrase,
+			}
+		},
+
+		async verifySignedTransaction(
+			signedTransactionXdr: string,
+		): Promise<string> {
+			const networkPassphrase = getNetworkPassphrase()
+			let tx: Transaction
+
+			try {
+				tx = new Transaction(signedTransactionXdr, networkPassphrase)
+			} catch {
+				throw new Error("Invalid signed transaction")
+			}
+
+			const address = tx.source
+			if (!isValidStellarPublicKey(address)) {
+				throw new Error("Invalid Stellar public key")
+			}
+
+			if (tx.sequence !== "0") {
+				throw new Error("Invalid challenge sequence")
+			}
+
+			if (tx.memo.type !== "text" || typeof tx.memo.value !== "string") {
+				throw new Error("Invalid challenge memo")
+			}
+
+			const nonce = tx.memo.value.trim()
+			if (!nonce) {
+				throw new Error("Invalid challenge memo")
+			}
+
+			const stored = await nonceStore.getNonce(address)
+			if (!stored || stored !== nonce) {
+				throw new Error("Challenge expired or invalid")
+			}
+
+			const txHash = tx.hash()
+			const keypair = Keypair.fromPublicKey(address)
+			const hasValidSignature = tx.signatures.some((signature) =>
+				keypair.verify(txHash, signature.signature()),
+			)
+
+			if (!hasValidSignature) {
+				throw new Error("Invalid transaction signature")
+			}
+
+			await nonceStore.deleteNonce(address)
+			return jwtService.signWalletToken(address)
+		},
+
 		async getOrCreateNonce(address: string): Promise<{ nonce: string }> {
 			if (!isValidStellarPublicKey(address)) {
 				throw new Error("Invalid Stellar public key")

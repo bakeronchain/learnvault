@@ -6,7 +6,16 @@ import { type AuthService } from "../services/auth.service"
 
 export function createAuthRouter(authService: AuthService): Router {
 	const router = Router()
-	const { getNonce, postVerify } = createAuthControllers(authService)
+	const { getNonce, postVerify, getChallenge, postChallengeVerify } =
+		createAuthControllers(authService)
+
+	router.get("/challenge", nonceRateLimiter, (req, res) => {
+		void getChallenge(req, res)
+	})
+
+	router.post("/challenge/verify", (req, res) => {
+		void postChallengeVerify(req, res)
+	})
 
 	router.get("/nonce", nonceRateLimiter, (req, res) => {
 		void getNonce(req, res)

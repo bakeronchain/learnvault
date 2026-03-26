@@ -19,8 +19,10 @@ import { coursesRouter } from "./routes/courses.routes"
 import { credentialsRouter } from "./routes/credentials.routes"
 import { eventsRouter } from "./routes/events.routes"
 import { healthRouter } from "./routes/health.routes"
+import { governanceRouter } from "./routes/governance.routes"
 import { leaderboardRouter } from "./routes/leaderboard.routes"
 import { createMeRouter } from "./routes/me.routes"
+import { scholarsRouter } from "./routes/scholars.routes"
 import { uploadRouter } from "./routes/upload.routes"
 import { validatorRouter } from "./routes/validator.routes"
 import { createAuthService } from "./services/auth.service"
@@ -124,6 +126,8 @@ app.use("/api", validatorRouter)
 app.use("/api", eventsRouter)
 app.use("/api", commentsRouter)
 app.use("/api", leaderboardRouter)
+app.use("/api", governanceRouter)
+app.use("/api", scholarsRouter)
 app.use("/api", adminMilestonesRouter)
 app.use("/api", uploadRouter)
 

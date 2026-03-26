@@ -34,6 +34,8 @@ const DaoProposals: React.FC = () => {
 		castVote,
 		isVoting,
 		hasVoted,
+		getVoteChoice,
+		walletAddress,
 		isLoadingProposals,
 	} = useGovernance()
 
@@ -104,16 +106,20 @@ const DaoProposals: React.FC = () => {
 			: 0
 
 	const userHasVoted = selectedProposal ? hasVoted(selectedProposal.id) : false
+	const voteChoice = selectedProposal ? getVoteChoice(selectedProposal.id) : null
 	const governanceTokens = votingPower
 	const isTokenHolder = governanceTokens > 0n
+	const isWalletConnected = Boolean(walletAddress)
 	const voteDisabled =
 		!selectedProposal ||
 		userHasVoted ||
 		selectedProposal.status !== "Active" ||
-		!isTokenHolder
+		!isTokenHolder ||
+		!isWalletConnected
 
 	const getVoteDisabledMessage = () => {
 		if (!selectedProposal) return ""
+		if (!isWalletConnected) return "Connect wallet to vote"
 		if (!isTokenHolder) return "You must hold GOV tokens to vote."
 		if (userHasVoted) return "You have already cast your vote."
 		if (selectedProposal.status !== "Active")
@@ -235,25 +241,36 @@ const DaoProposals: React.FC = () => {
 								<p>Status: {userHasVoted ? "Voted" : "Not Voted"}</p>
 							</div>
 
-							<div className="flex gap-3">
-								<button
-									onClick={() => handleVote(true)}
-									disabled={voteDisabled || isVoting}
-									className="px-8 py-3 bg-brand-cyan/10 border border-brand-cyan/30 text-brand-cyan font-black uppercase tracking-widest rounded-full hover:bg-brand-cyan/20 disabled:opacity-30 transition-all font-bold"
-								>
-									{isVoting ? "Voting..." : "Vote YES"}
-								</button>
-								<button
-									onClick={() => handleVote(false)}
-									disabled={voteDisabled || isVoting}
-									className="px-8 py-3 bg-brand-purple/10 border border-brand-purple/30 text-brand-purple font-black uppercase tracking-widest rounded-full hover:bg-brand-purple/20 disabled:opacity-30 transition-all font-bold"
-								>
-									{isVoting ? "Voting..." : "Vote NO"}
-								</button>
-							</div>
+							{userHasVoted ? (
+								<div className="inline-flex items-center px-4 py-2 rounded-full border border-brand-cyan/30 bg-brand-cyan/10 text-brand-cyan text-xs font-black uppercase tracking-widest">
+									You voted {voteChoice === null ? "For/Against" : voteChoice ? "For" : "Against"}
+								</div>
+							) : (
+								<div className="flex gap-3">
+									<button
+										onClick={() => handleVote(true)}
+										disabled={voteDisabled || isVoting}
+										className="px-8 py-3 bg-brand-cyan/10 border border-brand-cyan/30 text-brand-cyan font-black uppercase tracking-widest rounded-full hover:bg-brand-cyan/20 disabled:opacity-30 transition-all font-bold"
+									>
+										{isVoting ? "Voting..." : "Vote YES"}
+									</button>
+									<button
+										onClick={() => handleVote(false)}
+										disabled={voteDisabled || isVoting}
+										className="px-8 py-3 bg-brand-purple/10 border border-brand-purple/30 text-brand-purple font-black uppercase tracking-widest rounded-full hover:bg-brand-purple/20 disabled:opacity-30 transition-all font-bold"
+									>
+										{isVoting ? "Voting..." : "Vote NO"}
+									</button>
+								</div>
+							)}
 							{getVoteDisabledMessage() && (
 								<p className="mt-4 text-xs text-white/40 font-medium italic">
 									{getVoteDisabledMessage()}
+								</p>
+							)}
+							{isWalletConnected && !isTokenHolder && (
+								<p className="mt-2 text-xs text-amber-300/80 font-medium">
+									Acquire GOV tokens to vote
 								</p>
 							)}
 						</div>

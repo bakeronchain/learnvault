@@ -1,12 +1,7 @@
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useWallet } from "../hooks/useWallet"
-import {
-	generateLeaderboard,
-	filterByTime,
-	shortenAddr,
-	type LeaderboardEntry,
-} from "../util/mockLeaderboardData"
+import { shortenAddr, type LeaderboardEntry } from "../util/mockLeaderboardData"
 import { formatLRN } from "../util/tokenFormat"
 
 const PAGE_SIZE = 25
@@ -30,6 +25,13 @@ interface RowProps {
 	isMine: boolean
 	onClick: () => void
 	isMyRankBanner?: boolean
+}
+
+type LeaderboardApiEntry = {
+	rank: number
+	address: string
+	lrn_balance: string
+	courses_completed: number
 }
 
 const LeaderboardRow: React.FC<RowProps> = ({
@@ -118,17 +120,36 @@ const Leaderboard: React.FC = () => {
 	const { t } = useTranslation()
 	const { address: currentUserAddress } = useWallet()
 	const [leaders, setLeaders] = useState<LeaderboardEntry[]>([])
+	const [myRank, setMyRank] = useState<number | null>(null)
 	const [isLoading, setIsLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 
 	useEffect(() => {
 		const fetchLeaderboard = async () => {
 			try {
-				// In production, this URL should come from an environment variable
-				const response = await fetch("http://localhost:4000/api/leaderboard?limit=25")
+				const response = await fetch(
+					"http://localhost:4000/api/scholars/leaderboard?page=1&limit=25",
+				)
 				if (!response.ok) throw new Error("Failed to fetch leaderboard")
-				const result = await response.json()
-				setLeaders(result.data)
+				const result = (await response.json()) as {
+					rankings?: LeaderboardApiEntry[]
+					your_rank?: number | null
+				}
+				const rankings = Array.isArray(result.rankings) ? result.rankings : []
+				const mapped = rankings.map((item, index) => ({
+					id: `leader-${item.address}-${item.rank}-${index}`,
+					address: item.address,
+					lrnBalance: Number(item.lrn_balance ?? 0),
+					coursesCompleted: item.courses_completed ?? 0,
+					joinedDate: new Date(),
+					lastActive: new Date(),
+					rank: item.rank,
+					balance: item.lrn_balance ?? "0",
+					completedCourses: item.courses_completed ?? 0,
+					fullAddress: item.address,
+				}))
+				setLeaders(mapped)
+				setMyRank(typeof result.your_rank === "number" ? result.your_rank : null)
 			} catch (err) {
 				console.error(err)
 				setError("Unable to load rankings. Please try again later.")
@@ -139,6 +160,22 @@ const Leaderboard: React.FC = () => {
 
 		fetchLeaderboard()
 	}, [])
+
+	const leaderboardRows = useMemo(
+		() =>
+			leaders.map((leader, index) => ({
+				...leader,
+				rank: (leader as LeaderboardEntry & { rank?: number }).rank ?? index + 1,
+				balance: String((leader as LeaderboardEntry & { balance?: string }).balance ?? leader.lrnBalance),
+				completedCourses:
+					(leader as LeaderboardEntry & { completedCourses?: number }).completedCourses ??
+					leader.coursesCompleted,
+				fullAddress:
+					(leader as LeaderboardEntry & { fullAddress?: string }).fullAddress ??
+					leader.address,
+			})),
+		[leaders],
+	)
 
 	const isCurrentUser = (fullAddress: string) => {
 		return currentUserAddress?.toLowerCase() === fullAddress.toLowerCase()
@@ -183,7 +220,7 @@ const Leaderboard: React.FC = () => {
 						Try Again
 					</button>
 				</div>
-			) : leaders.length === 0 ? (
+			) : leaderboardRows.length === 0 ? (
 				<div className="glass-card p-20 rounded-[4rem] text-center border border-white/5">
 					<div className="text-6xl mb-8">🌑</div>
 					<h2 className="text-3xl font-black mb-4">Empty Leaderboard</h2>
@@ -203,7 +240,7 @@ const Leaderboard: React.FC = () => {
 							</tr>
 						</thead>
 						<tbody className="divide-y divide-white/5">
-							{leaders.map((leader) => (
+							{leaderboardRows.map((leader) => (
 								<tr 
 									key={leader.fullAddress}
 									className={`group hover:bg-white/[0.02] transition-colors ${
@@ -255,7 +292,8 @@ const Leaderboard: React.FC = () => {
 					
 					<div className="p-8 bg-white/5 border-t border-white/5 flex justify-between items-center">
 						<div className="text-sm font-medium text-white/40">
-							Showing {leaders.length} top learners
+							Showing {leaderboardRows.length} top learners
+							{myRank ? ` • Your rank: #${myRank}` : ""}
 						</div>
 						<div className="text-[10px] uppercase tracking-widest font-black text-white/20">
 							Updated every block

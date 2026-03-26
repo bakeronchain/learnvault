@@ -184,6 +184,26 @@ export function useGovernance() {
 		[isErrResult, unwrapResult],
 	)
 
+	const toBooleanSafe = useCallback(
+		(value: unknown): boolean => {
+			const resolved = unwrapResult(value)
+			if (typeof resolved === "boolean") return resolved
+			if (typeof resolved === "number") return resolved !== 0
+			if (typeof resolved === "string") {
+				const normalized = resolved.trim().toLowerCase()
+				return normalized === "true" || normalized === "yes" || normalized === "for"
+			}
+			if (resolved && typeof resolved === "object") {
+				const maybe = resolved as ContractRecord
+				if (typeof maybe.support === "boolean") return maybe.support
+				if (typeof maybe.vote === "boolean") return maybe.vote
+				if (typeof maybe.value === "boolean") return maybe.value
+			}
+			return false
+		},
+		[unwrapResult],
+	)
+
 	// Helper to load contract clients
 	const loadClient = useCallback(async (path: string) => {
 		try {
@@ -289,13 +309,30 @@ export function useGovernance() {
 
 	// Check if voter has already voted on a specific proposal
 	const hasVoted = useCallback(
-		(proposalId: number) => {
+		(proposalId: number, voterAddress?: string) => {
+			const resolvedAddress = voterAddress ?? address
+			if (!resolvedAddress) return false
 			return !!queryClient.getQueryData([
 				"governance",
 				"voted",
 				proposalId,
-				address,
+				resolvedAddress,
 			])
+		},
+		[address, queryClient],
+	)
+
+	const getVoteChoice = useCallback(
+		(proposalId: number, voterAddress?: string): boolean | null => {
+			const resolvedAddress = voterAddress ?? address
+			if (!resolvedAddress) return null
+			const cached = queryClient.getQueryData([
+				"governance",
+				"voteChoice",
+				proposalId,
+				resolvedAddress,
+			])
+			return typeof cached === "boolean" ? cached : null
 		},
 		[address, queryClient],
 	)
@@ -310,6 +347,13 @@ export function useGovernance() {
 			if (!client) return {}
 
 			const hasVotedFn = asMethod(client, "has_voted", "hasVoted")
+			const voteChoiceFn = asMethod(
+				client,
+				"get_vote",
+				"getVote",
+				"vote_of",
+				"voteOf",
+			)
 			if (!hasVotedFn) return {}
 
 			const results: Record<number, boolean> = {}
@@ -326,6 +370,24 @@ export function useGovernance() {
 							["governance", "voted", p.id, address],
 							results[p.id],
 						)
+						if (results[p.id] && voteChoiceFn) {
+							for (const args of [
+								[{ voter: address, proposal_id: p.id }],
+								[{ address, proposal_id: p.id }],
+								[p.id, address],
+							]) {
+								try {
+									const choice = await voteChoiceFn(...args)
+									queryClient.setQueryData(
+										["governance", "voteChoice", p.id, address],
+										toBooleanSafe(choice),
+									)
+									break
+								} catch {
+									continue
+								}
+							}
+						}
 					} catch {
 						results[p.id] = false
 					}
@@ -367,7 +429,7 @@ export function useGovernance() {
 			const sendResult = await sendTxIfNeeded(tx)
 			unwrapSendResult(sendResult)
 		},
-		onSuccess: (_, { proposalId }) => {
+		onSuccess: (_, { proposalId, support }) => {
 			showSuccess("Vote submitted successfully!")
 			// Invalidate queries to refresh UI
 			void queryClient.invalidateQueries({
@@ -380,6 +442,10 @@ export function useGovernance() {
 			queryClient.setQueryData(
 				["governance", "voted", proposalId, address],
 				true,
+			)
+			queryClient.setQueryData(
+				["governance", "voteChoice", proposalId, address],
+				support,
 			)
 		},
 
@@ -407,5 +473,7 @@ export function useGovernance() {
 			castVote({ proposalId, support }),
 		isVoting,
 		hasVoted,
+		getVoteChoice,
+		walletAddress: address,
 	}
 }

@@ -17,6 +17,62 @@ export interface ContractCallResult {
 	simulated: boolean
 }
 
+// --- Admin Validation Cache ---
+let cachedAdminAddress: string | null = null
+let lastAdminCheckTime: number = 0
+const ADMIN_CACHE_TTL = 5 * 60 * 1000 // 5 minutes in milliseconds
+async function ensureAdminRole(): Promise<void> {
+	const { Keypair, Contract, TransactionBuilder, Networks, BASE_FEE, rpc, scValToNative } =
+		await import("@stellar/stellar-sdk")
+
+	const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
+	const serverPubKey = keypair.publicKey()
+
+	// 1. Check if we have a valid cached result
+	if (Date.now() - lastAdminCheckTime < ADMIN_CACHE_TTL && cachedAdminAddress) {
+		if (serverPubKey !== cachedAdminAddress) {
+			throw new Error(`Server keypair ${serverPubKey} is not the contract admin. Update STELLAR_SECRET_KEY.`)
+		}
+		return
+	}
+
+	// 2. Cache expired or empty: Fetch from the blockchain
+	const serverUrl = STELLAR_NETWORK === "mainnet"
+		? "https://soroban-rpc.stellar.org"
+		: "https://soroban-testnet.stellar.org"
+	const server = new rpc.Server(serverUrl)
+
+	const account = await server.getAccount(serverPubKey)
+	const contract = new Contract(COURSE_MILESTONE_CONTRACT_ID)
+
+	// Build a transaction solely to simulate the admin() getter
+	const tx = new TransactionBuilder(account, {
+		fee: BASE_FEE,
+		networkPassphrase: STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+	})
+		.addOperation(contract.call("admin"))
+		.setTimeout(30)
+		.build()
+
+	const simResult = await server.simulateTransaction(tx)
+
+	if (rpc.Api.isSimulationError(simResult)) {
+		throw new Error(`Failed to simulate admin() check: ${simResult.error}`)
+	}
+
+	if (!simResult.result || !simResult.result.retval) {
+		throw new Error("Contract admin() returned no value.")
+	}
+
+	// 3. Update the Cache
+	cachedAdminAddress = scValToNative(simResult.result.retval) as string
+	lastAdminCheckTime = Date.now()
+
+	// 4. Verify Authorization
+	if (serverPubKey !== cachedAdminAddress) {
+		throw new Error(`Server keypair ${serverPubKey} is not the contract admin. Update STELLAR_SECRET_KEY.`)
+	}
+}
 async function callVerifyMilestone(
 	scholarAddress: string,
 	courseId: string,
@@ -33,6 +89,8 @@ async function callVerifyMilestone(
 	}
 
 	try {
+		// Enforce access control before doing anything
+		await ensureAdminRole()
 		// Dynamic import so the SDK is only loaded when actually needed
 		const { Keypair, Contract, TransactionBuilder, Networks, BASE_FEE, rpc } =
 			await import("@stellar/stellar-sdk")
@@ -71,10 +129,15 @@ async function callVerifyMilestone(
 		const result = await server.sendTransaction(prepared)
 		return { txHash: result.hash, simulated: false }
 	} catch (err) {
+		const msg = err instanceof Error ? err.message : String(err)
+		// Bubble up our specific admin error without wrapping it
+		if (msg.includes("is not the contract admin")) {
+			throw err
+		}
 		console.error("[stellar] Contract call failed:", err)
 		throw new Error(
 			"Contract call failed: " +
-				(err instanceof Error ? err.message : String(err)),
+			(err instanceof Error ? err.message : String(err)),
 		)
 	}
 }
@@ -94,6 +157,8 @@ async function emitRejectionEvent(
 	}
 
 	try {
+		// Enforce access control before doing anything
+		await ensureAdminRole()
 		const {
 			Keypair,
 			Contract,
@@ -137,10 +202,15 @@ async function emitRejectionEvent(
 		const result = await server.sendTransaction(prepared)
 		return { txHash: result.hash, simulated: false }
 	} catch (err) {
+		const msg = err instanceof Error ? err.message : String(err)
+		// Bubble up our specific admin error without wrapping it
+		if (msg.includes("is not the contract admin")) {
+			throw err
+		}
 		console.error("[stellar] Rejection event failed:", err)
 		throw new Error(
 			"Rejection event failed: " +
-				(err instanceof Error ? err.message : String(err)),
+			(err instanceof Error ? err.message : String(err)),
 		)
 	}
 }

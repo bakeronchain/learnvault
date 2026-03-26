@@ -10,7 +10,7 @@ import { useWallet } from "../hooks/useWallet"
 
 const Donor: React.FC = () => {
 	const { address } = useWallet()
-	const { stats, contributions, votes, scholars, isLoading, error, isEmpty } = useDonor()
+	const { stats, contributions, votes, scholars, isLoading, error } = useDonor()
 	const [showDepositForm, setShowDepositForm] = useState(false)
 	const hasActivity =
 		stats.totalContributed > 0 ||
@@ -22,7 +22,7 @@ const Donor: React.FC = () => {
 	// Guard: Not connected
 	if (!address) {
 		return (
-			<div className="min-h-screen p-12 text-white animate-in fade-in">
+			<div className="min-h-screen p-4 sm:p-8 md:p-12 text-white animate-in fade-in">
 				<div className="max-w-6xl mx-auto">
 					<div className="text-center py-20">
 						<div className="text-6xl mb-6">🔓</div>
@@ -45,7 +45,7 @@ const Donor: React.FC = () => {
 	// Loading state
 	if (isLoading) {
 		return (
-			<div className="min-h-screen p-12 text-white flex items-center justify-center">
+			<div className="min-h-screen p-4 sm:p-8 md:p-12 text-white flex items-center justify-center">
 				<div className="text-center">
 					<div className="text-4xl mb-4 animate-spin">⚙️</div>
 					<p className="text-white/40">Loading donor dashboard...</p>
@@ -57,7 +57,7 @@ const Donor: React.FC = () => {
 	// Error state
 	if (error) {
 		return (
-			<div className="min-h-screen p-12 text-white">
+			<div className="min-h-screen p-4 sm:p-8 md:p-12 text-white">
 				<div className="max-w-6xl mx-auto">
 					<div className="glass-card p-12 rounded-[3rem] border border-white/5 text-center">
 						<div className="text-4xl mb-4">⚠️</div>
@@ -75,15 +75,15 @@ const Donor: React.FC = () => {
 	}
 
 	return (
-		<div className="p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
+		<div className="p-4 sm:p-8 md:p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
 			{/* Header */}
 			<header className="mb-20 relative">
 				<div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-brand-cyan/20 blur-[100px] rounded-full -z-10" />
 				<div className="mb-8">
-					<h1 className="text-6xl font-black mb-4 tracking-tighter text-gradient">
+					<h1 className="text-3xl sm:text-5xl md:text-6xl font-black mb-4 tracking-tighter text-gradient">
 						Donor Dashboard
 					</h1>
-					<p className="text-white/40 text-lg max-w-2xl font-medium">
+					<p className="text-white/40 text-base sm:text-lg max-w-2xl font-medium">
 						Track your contributions, governance power, and the impact of your
 						funded scholars.
 					</p>

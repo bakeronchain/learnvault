@@ -1,4 +1,4 @@
-﻿import { lazy, Suspense, type ReactNode } from "react"
+import { lazy, Suspense, type ReactNode } from "react"
 import { Outlet, Route, Routes } from "react-router-dom"
 import ErrorBoundary from "./components/ErrorBoundary"
 import Footer from "./components/Footer"
@@ -6,6 +6,7 @@ import NavBar from "./components/NavBar"
 import NetworkPreconnect from "./components/NetworkPreconnect"
 import { ToastProvider } from "./components/Toast/ToastProvider"
 import { WalletToastWatcher } from "./components/WalletToastWatcher"
+import Home from "./pages/Home"
 
 const Admin = lazy(() => import("./pages/Admin"))
 const Courses = lazy(() => import("./pages/Courses"))
@@ -16,7 +17,6 @@ const DaoPropose = lazy(() => import("./pages/DaoPropose"))
 const Dashboard = lazy(() => import("./pages/Dashboard"))
 const Debug = lazy(() => import("./pages/Debug"))
 const Donor = lazy(() => import("./pages/Donor"))
-const Home = lazy(() => import("./pages/Home"))
 const Leaderboard = lazy(() => import("./pages/Leaderboard"))
 const Learn = lazy(() => import("./pages/Learn"))
 const LessonView = lazy(() => import("./pages/LessonView"))
@@ -69,10 +69,7 @@ function App() {
 					/>
 					<Route path="/dashboard" element={renderRoute(<Dashboard />)} />
 					<Route path="/debug" element={renderRoute(<Debug />)} />
-					<Route
-						path="/debug/:contractName"
-						element={renderRoute(<Debug />)}
-					/>
+					<Route path="/debug/:contractName" element={renderRoute(<Debug />)} />
 					<Route path="*" element={renderRoute(<NotFound />)} />
 				</Route>
 			</Routes>

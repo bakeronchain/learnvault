@@ -95,6 +95,27 @@ textarea:focus-visible,
 	box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
 }
 
+@media (max-width: 768px) {
+	body {
+		/* Animated mesh and large repaints are expensive on low-end phones. */
+		animation: none;
+		background-image: radial-gradient(
+			at 50% 0%,
+			rgba(0, 210, 255, 0.1) 0px,
+			transparent 55%
+		);
+		background-size: auto;
+	}
+
+	.glass,
+	.glass-card {
+		/* Reduce GPU-heavy backdrop blur and deep shadows on mobile. */
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
+		box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.2);
+	}
+}
+
 .iridescent-border {
 	position: relative;
 	background: #11141a;

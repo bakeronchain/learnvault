@@ -81,7 +81,7 @@ export default function Dao() {
 	}
 
 	return (
-		<div>
+		<div className="mx-auto w-full max-w-6xl px-4 py-8 sm:py-12 space-y-6">
 			<Text as="h1" size="lg">
 				DAO
 			</Text>
@@ -95,7 +95,7 @@ export default function Dao() {
 						Connect wallet to submit.
 					</Text>
 				) : (
-					<div style={{ display: "grid", gap: "0.75rem", maxWidth: 520 }}>
+					<div className="grid gap-3 w-full max-w-[520px]">
 						<Input
 							id="proposal-title"
 							label="Title"
@@ -115,6 +115,7 @@ export default function Dao() {
 							size="md"
 							data-testid="submit-proposal"
 							onClick={submitProposal}
+							className="min-h-11"
 						>
 							Submit Proposal
 						</Button>
@@ -135,6 +136,7 @@ export default function Dao() {
 					data-testid="deposit-usdc"
 					disabled={!address}
 					onClick={depositUsdc}
+					className="min-h-11"
 				>
 					Deposit USDC
 				</Button>
@@ -152,7 +154,7 @@ export default function Dao() {
 						No proposals yet.
 					</Text>
 				) : (
-					<div style={{ display: "grid", gap: "0.75rem" }}>
+					<div className="grid gap-3">
 						{proposals.map((p) => (
 							<Card key={p.id}>
 								<Text as="div" size="sm" data-testid="proposal-title">
@@ -170,6 +172,7 @@ export default function Dao() {
 									data-testid="vote-yes"
 									disabled={!isGovHolder}
 									onClick={() => voteYes(p.id)}
+									className="min-h-11"
 								>
 									Vote YES
 								</Button>

@@ -18,6 +18,7 @@ playwright-report/
 
 # TypeScript incremental build info
 *.tsbuildinfo
+tsconfig.app.tsbuildinfo
 
 # dependencies
 node_modules/

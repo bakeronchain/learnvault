@@ -1,7 +1,6 @@
 import { useId, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { NavLink } from "react-router-dom"
-import { ReputationBadge } from "./ReputationBadge"
 import { WalletButton } from "./WalletButton"
 
 export default function NavBar() {
@@ -36,7 +35,7 @@ export default function NavBar() {
 				<nav
 					id={menuId}
 					aria-label="Primary"
-					className={`${menuOpen ? "flex" : "hidden"} md:flex absolute md:relative top-full left-0 w-full md:w-auto mt-4 md:mt-0 flex-col md:flex-row glass md:bg-transparent rounded-2xl p-6 md:p-0 gap-2 md:gap-8 border border-white/5 md:border-none shadow-2xl md:shadow-none animate-in fade-in slide-in-from-top-4 md:animate-none`}
+					className={`${menuOpen ? "flex" : "hidden"} md:flex absolute md:relative top-full left-0 w-full md:w-auto mt-4 md:mt-0 flex-col md:flex-row rounded-2xl p-4 md:p-0 gap-2 md:gap-8 border shadow-2xl md:shadow-none animate-in fade-in slide-in-from-top-4 md:animate-none bg-[#08131f]/95 backdrop-blur-2xl border-white/15 md:bg-transparent md:backdrop-blur-0 md:border-none`}
 				>
 					{navLinks.map(({ to, label }) => (
 						<NavLink
@@ -44,32 +43,30 @@ export default function NavBar() {
 							to={to}
 							onClick={() => setMenuOpen(false)}
 							className={({ isActive }) => `
-								px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all
+								px-4 py-3 md:py-2 min-h-11 rounded-xl text-sm md:text-xs font-black uppercase tracking-[0.12em] md:tracking-widest transition-all
 								${
 									isActive
-										? "text-brand-cyan bg-brand-cyan/5 shadow-[0_0_20px_rgba(0,210,255,0.1)]"
-										: "text-white/70 hover:text-white hover:bg-white/5"
+										? "text-brand-cyan bg-brand-cyan/15 shadow-[0_0_20px_rgba(0,210,255,0.15)]"
+										: "text-white/90 hover:text-white hover:bg-white/10"
 								}
 							`}
 						>
 							{label}
 						</NavLink>
 					))}
+					<div className="sm:hidden mt-2 border-t border-white/20 pt-3">
+						<WalletButton />
+					</div>
 				</nav>
 
 				<div className="flex items-center gap-3 md:gap-4">
-					<ReputationBadge
-						className="hidden sm:inline-flex shrink-0"
-						size="sm"
-						showBalance
-					/>
 					<div className="hidden sm:block scale-90">
 						<WalletButton />
 					</div>
 					<button
 						type="button"
 						onClick={() => setMenuOpen((current) => !current)}
-						className="md:hidden w-10 h-10 glass flex items-center justify-center rounded-xl text-white/70 hover:text-white transition-colors border border-white/10"
+						className="md:hidden w-11 h-11 glass flex items-center justify-center rounded-xl text-white/70 hover:text-white transition-colors border border-white/10"
 						aria-controls={menuId}
 						aria-expanded={menuOpen}
 						aria-label={

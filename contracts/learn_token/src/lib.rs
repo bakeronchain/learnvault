@@ -151,6 +151,10 @@ impl LearnToken {
             .get(&SYMBOL_KEY)
             .unwrap_or_else(|| String::from_str(&env, "LRN"))
     }
+
+    pub fn get_version(env: Env) -> String {
+        String::from_str(&env, "1.0.0")
+    }
 }
 
 // ---------------------------------------------------------------------------

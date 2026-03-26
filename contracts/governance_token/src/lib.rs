@@ -286,6 +286,10 @@ impl GovernanceToken {
             .unwrap_or_else(|| String::from_str(&env, "GOV"))
     }
 
+    pub fn get_version(env: Env) -> String {
+        String::from_str(&env, "1.0.0")
+    }
+
     // -----------------------------------------------------------------------
     // Internal helpers
     // -----------------------------------------------------------------------

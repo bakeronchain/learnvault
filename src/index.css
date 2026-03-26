@@ -20,6 +20,7 @@
 		100% {
 			background-position: 0% 50%;
 		}
+
 		50% {
 			background-position: 100% 50%;
 		}
@@ -29,6 +30,7 @@
 		0% {
 			transform: translateX(-100%);
 		}
+
 		100% {
 			transform: translateX(100%);
 		}
@@ -39,8 +41,18 @@
 	color-scheme: dark;
 }
 
+html {
+	scroll-behavior: smooth;
+}
+
+html,
 body {
 	margin: 0;
+	padding: 0;
+	width: 100%;
+}
+
+body {
 	background-color: #05070a;
 	background-image: var(--bg-mesh-gradient);
 	background-size: 200% 200%;
@@ -52,6 +64,17 @@ body {
 		-apple-system,
 		sans-serif;
 	-webkit-font-smoothing: antialiased;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
+	outline: 3px solid rgba(0, 210, 255, 0.9);
+	outline-offset: 3px;
+	box-shadow: 0 0 0 6px rgba(0, 210, 255, 0.18);
 }
 
 .glass {
@@ -119,4 +142,24 @@ body {
 		transparent
 	);
 	animation: shimmer 2s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+
+	body {
+		animation: none;
+		background-size: auto;
+	}
 }

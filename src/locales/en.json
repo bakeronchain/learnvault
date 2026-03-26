@@ -1,1 +1,136 @@
-{"nav":{"contractExplorer":"Contract Explorer","txExplorer":"Transaction Explorer","github":"GitHub","twitter":"Twitter","discord":"Discord","tutorial":"Tutorial","viewDocs":"View docs","debug":"Debug Contracts","learn":"Learn","dao":"DAO","leaderboard":"Leaderboard","profile":"My Profile","courses":"Courses","treasury":"Treasury","donor":"Donor"},"home":{"heroTitle":"Yay! You're on Stellar!","heroDesc":"A local development template designed to help you build dApps on the Stellar network. This environment lets you easily test wallet connections, smart contract interactions, transaction verifications, etc. ","courseProgress":{"title":"Course Progress (Testing Issue 55)","desc":"Track your learning journey and earn LRN rewards by completing on-chain milestones."},"milestones":{"1":"Complete Lesson 1","2":"Pass Quiz 1","3":"Build your first contract","locked":"Complete previous milestones to unlock.","inProgress":"Currently working on this milestone.","submittingText":"Submitting TX...","markComplete":"Mark as Complete","completedText":"Completed successfully!","tx":"TX","lrnReward":"+{{amount}} LRN"},"sampleContracts":{"title":"Sample Contracts","guess":"Guess The Number:","guessDesc1":"Interact with the sample contract from the ","guessLink":"LearnVault Tutorial","guessDesc2":" using an automatically generated contract client.","other":"Or take a look at other sample contracts to get you started:","oz":"OpenZeppelin sample contracts","soroban":"Soroban sample contracts"},"startBuilding":{"title":"Start Building","step1":"Add your contract under ","step2":"Contracts are built by LearnVault when you run ","step3":"Changes are rebuilt automatically by ","step4":"Interact with your contract immediately in the Contract Explorer","watch":"Watch the full process in our ","youtube":"Youtube tutorial","inspired":"Get inspired by our showcase of ","examples":"Example frontends","deploy":"Ready to deploy? ","mainnet":"Read the mainnet deployment guide"},"features":{"scholarNFTs":{"title":"ScholarNFTs","description":"Your hard-earned expertise, permanently immortalized as verifiable credentials on the Stellar network."},"automatedFunding":{"title":"Automated Funding","description":"Decentralized treasury disbursements triggered instantly upon milestone completion via Soroban contracts."},"communityDAO":{"title":"Community DAO","description":"A protocol governed by the scholars who use it. Vote on curriculum, treasury, and reputation standards."}},"courseCatalog":"Course Catalog","sorobanCourse":{"title":"Soroban Smart Contracts","description":"Learn how to build scalable decentralized apps on Stellar using Rust and Soroban.","difficulty":"Intermediate","estimatedHours":"5","lrnReward":"200","lessonCount":"12"},"defiCourse":{"title":"DeFi Fundamentals","description":"Understand the core concepts of Decentralized Finance and automated market makers.","difficulty":"Beginner","estimatedHours":"3","lrnReward":"100","lessonCount":"8"},"difficulty":{"beginner":"Beginner","intermediate":"Intermediate","advanced":"Advanced"},"courseCard":{"continue":"Continue","enroll":"Enroll","lessons":"lessons | about"},"coursesPage":{"learningTracks":"Learning Tracks","choosePath":"Choose a path and start with a focused first lesson.","firstLesson":"First lesson"},"comingSoon":{"title":"Under Construction","message":"This page is under construction. We're building something awesome for the LearnVault community!","stayTuned":"Stay tuned for updates 📚✨","issues":"View open issues →"},"notFound":{"title":"404","message":"This page doesn't exist — but your learning journey does.","goHome":"Go Home"},"footer":{"version":"LearnVault v1.0","poweredBy":"Powered by Soroban","copyright":"© 2024 LearnVault DAO. All Rights Reserved."},"connect":{"connectWallet":"Connect Wallet","fund":"Fund Account","faucetLoading":"Funding...","funded":"Account funded successfully!","fundErrorDetail":"Error funding account: {{detail}}","fundErrorUnknown":"Error funding account: Unknown error","fundErrorRetry":"Error funding account. Please try again.","alreadyFunded":"Account is already funded","local":"Local","networkConnect":"Connect your wallet using this network.","networkMismatch":"Wallet is on {{wallet}}, connect to {{app}} instead."},"usdc":{"getTestUSDC":"Get Test USDC","minting":"Minting...","mintSuccess":"Successfully minted {{amount}} USDC to {{address}}...","mintError":"Error minting USDC: {{error}}","tooltip":"Get {{amount}} test USDC tokens for testing donations and treasury operations"},"wallet":{"loading":"Loading...","connect":"Connect Wallet","balance":"Wallet Balance: {{amount}} LRN","connectedAs":"Connected as ","disconnectPrompt":". Do you want to disconnect?","disconnect":"Disconnect","cancel":"Cancel"},"pages":{"learn":{"title":"Learn","desc":"This is the Learn page."},"dao":{"title":"DAO","desc":"This is the DAO page."},"leaderboard":{"title":"Leaderboard","desc":"Top learners ranked by LRN token balance. Earn your place.","rank":"Rank","learner":"Learner","lrnBalance":"LRN Balance","courses":"Courses","joined":"Joined","searchPlaceholder":"Search by wallet address...","filterAll":"All Time","filterMonth":"This Month","filterWeek":"This Week","myRank":"My Rank","loadMore":"Load More","prev":"Previous","next":"Next","noResults":"No learners found matching your search.","connectPrompt":"Connect your wallet to see your rank.","notRanked":"Not ranked yet","page":"Page {{current}} of {{total}}"},"profile":{"title":"My Profile","desc":"This is the My Profile page."}}}
+{
+	"nav": {
+		"contractExplorer": "Contract Explorer",
+		"txExplorer": "Transaction Explorer",
+		"github": "GitHub",
+		"tutorial": "Tutorial",
+		"viewDocs": "View docs",
+		"debug": "Debug Contracts",
+		"learn": "Learn",
+		"dao": "DAO",
+		"leaderboard": "Leaderboard",
+		"profile": "My Profile",
+		"courses": "Courses",
+		"discord": "Discord",
+		"twitter": "Twitter",
+		"docs": "Docs"
+	},
+	"home": {
+		"heroTitle": "Yay! You're on Stellar!",
+		"heroDesc": "A local development template designed to help you build dApps on the Stellar network. This environment lets you easily test wallet connections, smart contract interactions, transaction verifications, etc. ",
+		"courseProgress": {
+			"title": "Course Progress (Testing Issue 55)",
+			"desc": "Track your learning journey and earn LRN rewards by completing on-chain milestones."
+		},
+		"milestones": {
+			"1": "Complete Lesson 1",
+			"2": "Pass Quiz 1",
+			"3": "Build your first contract",
+			"locked": "Complete previous milestones to unlock.",
+			"inProgress": "Currently working on this milestone.",
+			"submittingText": "Submitting TX...",
+			"markComplete": "Mark as Complete",
+			"completedText": "Completed successfully!",
+			"tx": "TX",
+			"lrnReward": "+{{amount}} LRN"
+		},
+		"sampleContracts": {
+			"title": "Sample Contracts",
+			"guess": "Guess The Number:",
+			"guessDesc1": "Interact with the sample contract from the ",
+			"guessLink": "LearnVault Tutorial",
+			"guessDesc2": " using an automatically generated contract client.",
+			"other": "Or take a look at other sample contracts to get you started:",
+			"oz": "OpenZeppelin sample contracts",
+			"soroban": "Soroban sample contracts"
+		},
+		"startBuilding": {
+			"title": "Start Building",
+			"step1": "Add your contract under ",
+			"step2": "Contracts are built by LearnVault when you run ",
+			"step3": "Changes are rebuilt automatically by ",
+			"step4": "Interact with your contract immediately in the Contract Explorer",
+			"watch": "Watch the full process in our ",
+			"youtube": "Youtube tutorial",
+			"inspired": "Get inspired by our showcase of ",
+			"examples": "Example frontends",
+			"deploy": "Ready to deploy? ",
+			"mainnet": "Read the mainnet deployment guide"
+		},
+		"footer": {
+			"invoke": "Invoke your smart contract using the ",
+			"contractLink": "Contract Explorer",
+			"browse": "Browse your local transactions with the ",
+			"txLink": "Transaction Explorer"
+		}
+	},
+	"connect": {
+		"connectWallet": "Connect Wallet",
+		"fund": "Fund Account",
+		"faucetLoading": "Funding...",
+		"funded": "Account funded successfully!",
+		"fundErrorDetail": "Error funding account: {{detail}}",
+		"fundErrorUnknown": "Error funding account: Unknown error",
+		"fundErrorRetry": "Error funding account. Please try again.",
+		"alreadyFunded": "Account is already funded",
+		"local": "Local",
+		"networkConnect": "Connect your wallet using this network.",
+		"networkMismatch": "Wallet is on {{wallet}}, connect to {{app}} instead."
+	},
+	"network": {
+		"testnetWarning": "You are on Stellar Testnet — tokens have no real value",
+		"futurenetWarning": "You are on Stellar Futurenet — experimental network for testing",
+		"localWarning": "You are on Local Network — for development only"
+	},
+	"usdc": {
+		"getTestUSDC": "Get Test USDC",
+		"minting": "Minting...",
+		"mintSuccess": "Successfully minted {{amount}} USDC to {{address}}...",
+		"mintError": "Error minting USDC: {{error}}",
+		"tooltip": "Get {{amount}} test USDC tokens for testing donations and treasury operations"
+	},
+	"wallet": {
+		"loading": "Loading...",
+		"connect": "Connect Wallet",
+		"balance": "Wallet Balance: {{amount}} LRN",
+		"connectedAs": "Connected as ",
+		"disconnectPrompt": ". Do you want to disconnect?",
+		"disconnect": "Disconnect",
+		"cancel": "Cancel"
+	},
+	"pages": {
+		"learn": {
+			"title": "Learn",
+			"desc": "This is the Learn page."
+		},
+		"dao": {
+			"title": "DAO",
+			"desc": "This is the DAO page."
+		},
+		"leaderboard": {
+			"title": "Leaderboard",
+			"desc": "Top learners ranked by LRN token balance. Earn your place.",
+			"rank": "Rank",
+			"learner": "Learner",
+			"lrnBalance": "LRN Balance",
+			"courses": "Courses",
+			"joined": "Joined",
+			"searchPlaceholder": "Search by wallet address...",
+			"filterAll": "All Time",
+			"filterMonth": "This Month",
+			"filterWeek": "This Week",
+			"myRank": "My Rank",
+			"loadMore": "Load More",
+			"prev": "Previous",
+			"next": "Next",
+			"noResults": "No learners found matching your search.",
+			"connectPrompt": "Connect your wallet to see your rank.",
+			"notRanked": "Not ranked yet",
+			"page": "Page {{current}} of {{total}}"
+		},
+		"profile": {
+			"title": "My Profile",
+			"desc": "This is the My Profile page."
+		}
+	}
+}

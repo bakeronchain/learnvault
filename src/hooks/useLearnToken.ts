@@ -1,8 +1,10 @@
 import { type Api } from "@stellar/stellar-sdk/rpc"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCallback } from "react"
+import { useToast } from "../components/Toast/ToastProvider"
+import { ErrorCode, createAppError } from "../types/errors"
+import { parseError, isUserRejection } from "../utils/errors"
 import { useContractIds } from "./useContractIds"
-import { useNotification } from "./useNotification"
 import { useSubscription } from "./useSubscription"
 import { useWallet } from "./useWallet"
 
@@ -12,16 +14,38 @@ import { useWallet } from "./useWallet"
 
 type ContractRecord = Record<string, unknown>
 
+const generatedContractModules = import.meta.glob("../contracts/*.ts")
+
 /**
  * Dynamically loads the generated LearnToken contract client (or its shim).
  * Returns null if the module cannot be found at all.
  */
 const loadLearnTokenClient = async (): Promise<ContractRecord | null> => {
+	const moduleLoader = generatedContractModules["../contracts/learn_token.ts"]
+	if (!moduleLoader) {
+		console.warn(
+			createAppError(
+				ErrorCode.CONTRACT_NOT_DEPLOYED,
+				"LearnToken contract module not found",
+				{ contractName: "learn_token" },
+			),
+		)
+		return null
+	}
+
 	try {
-		const path = "../contracts/learn_token"
-		const mod = (await import(/* @vite-ignore */ path)) as ContractRecord
+		const mod = (await moduleLoader()) as ContractRecord
+
 		return (mod.default as ContractRecord) ?? mod
-	} catch {
+	} catch (err) {
+		console.warn(
+			createAppError(
+				ErrorCode.CONTRACT_NOT_DEPLOYED,
+				"Failed to load LearnToken contract",
+				{ contractName: "learn_token" },
+				err,
+			),
+		)
 		return null
 	}
 }
@@ -103,7 +127,7 @@ export interface UseLearnTokenResult {
 export function useLearnToken(address?: string): UseLearnTokenResult {
 	const { address: walletAddress, signTransaction } = useWallet()
 	const { learnToken: contractId, isDeployed } = useContractIds()
-	const { addNotification } = useNotification()
+	const { showSuccess, showError, showInfo } = useToast()
 	const queryClient = useQueryClient()
 
 	const targetAddress = address ?? walletAddress
@@ -206,12 +230,22 @@ export function useLearnToken(address?: string): UseLearnTokenResult {
 		onSuccess: () => {
 			// Eagerly invalidate so callers see the updated balance immediately.
 			void queryClient.invalidateQueries({ queryKey: BALANCE_QUERY_KEY_PREFIX })
-			addNotification("LearnTokens minted successfully", "success")
+			showSuccess("LearnTokens minted successfully")
 		},
 
 		onError: (error: unknown) => {
-			const message = error instanceof Error ? error.message : "Mint failed"
-			addNotification(message, "error")
+			if (isUserRejection(error)) {
+				showInfo("Mint cancelled")
+				return
+			}
+			const appError = parseError(error)
+			const message =
+				appError.code === ErrorCode.CONTRACT_NOT_DEPLOYED
+					? "LearnToken contract is not available on this network"
+					: appError.code === ErrorCode.WALLET_NOT_CONNECTED
+						? "Please connect your wallet to mint tokens"
+						: "Mint failed. Please try again."
+			showError(message)
 		},
 	})
 

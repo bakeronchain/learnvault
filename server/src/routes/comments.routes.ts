@@ -1,6 +1,8 @@
 import { Router, type Response } from "express"
 import { pool } from "../db/index"
+import { createCommentBodySchema } from "../lib/zod-schemas"
 import { authMiddleware, type AuthRequest } from "../middleware/auth.middleware"
+import { validate } from "../middleware/validate.middleware"
 
 export const commentsRouter = Router()
 
@@ -23,7 +25,7 @@ commentsRouter.get("/proposals/:proposalId/comments", async (req, res) => {
 	const { proposalId } = req.params
 	try {
 		const result = await pool.query(
-			`SELECT * FROM comments WHERE proposal_id = $1 ORDER BY is_pinned DESC, created_at ASC`,
+			`SELECT * FROM comments WHERE proposal_id = $1 AND deleted_at IS NULL ORDER BY is_pinned DESC, created_at ASC`,
 			[proposalId],
 		)
 		res.json(result.rows)
@@ -43,12 +45,36 @@ commentsRouter.get("/proposals/:proposalId/comments", async (req, res) => {
 commentsRouter.post(
 	"/comments",
 	authMiddleware,
+	validate({
+		body: createCommentBodySchema,
+	}),
 	async (req: AuthRequest, res: Response) => {
-		const { proposalId, content, parentId } = req.body
-		const authorAddress = req.user?.address
+		const body = req.body as {
+			proposalId?: string
+			proposal_id?: string
+			content?: string
+			body?: string
+			parentId?: number
+			parent_id?: number
+			author_address?: string
+		}
+		const proposalId = body.proposalId ?? body.proposal_id ?? ""
+		const content = body.content ?? body.body ?? ""
+		const parentId = body.parentId ?? body.parent_id
+		const tokenAddress = req.user?.address ?? ""
+		const authorAddress = body.author_address ?? tokenAddress
 
-		if (!proposalId || !content) {
-			return res.status(400).json({ error: "Missing required fields" })
+		if (body.author_address && body.author_address !== tokenAddress) {
+			return res.status(400).json({
+				error: "Validation failed",
+				message: "Validation failed",
+				details: [
+					{
+						field: "author_address",
+						message: "author_address must match the authenticated user",
+					},
+				],
+			})
 		}
 
 		try {
@@ -83,7 +109,7 @@ commentsRouter.post(
  * @openapi
  * /api/comments/{id}:
  *   delete:
- *     summary: Delete own comment
+ *     summary: Delete own comment (soft delete)
  *     tags: [Comments]
  *     security: [{ bearerAuth: [] }]
  */
@@ -95,18 +121,25 @@ commentsRouter.delete(
 		const authorAddress = req.user?.address
 
 		try {
-			const result = await pool.query(
-				`DELETE FROM comments WHERE id = $1 AND author_address = $2 RETURNING *`,
+			// Check if comment exists and belongs to user (and not already deleted)
+			const checkResult = await pool.query(
+				`SELECT * FROM comments WHERE id = $1 AND author_address = $2 AND deleted_at IS NULL`,
 				[id, authorAddress],
 			)
 
-			if (result.rowCount === 0) {
+			if (checkResult.rowCount === 0) {
 				return res
 					.status(404)
 					.json({ error: "Comment not found or unauthorized" })
 			}
 
-			res.json({ message: "Comment deleted" })
+			// Soft delete: set deleted_at timestamp
+			await pool.query(
+				`UPDATE comments SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1`,
+				[id],
+			)
+
+			res.json({ success: true })
 		} catch (err) {
 			res.status(500).json({ error: "Failed to delete comment" })
 		}

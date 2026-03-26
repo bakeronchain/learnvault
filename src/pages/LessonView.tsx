@@ -9,6 +9,7 @@ import { useCourse } from "../hooks/useCourse"
 import { useWallet } from "../hooks/useWallet"
 import { connectWallet } from "../util/wallet"
 import NotFound from "./NotFound"
+import { LessonListSkeleton } from "../components/skeletons/LessonListSkeleton"
 
 const LessonView: React.FC = () => {
 	const { courseId, lessonId: lessonIdParam } = useParams<{
@@ -143,12 +144,16 @@ const LessonView: React.FC = () => {
 
 			<div className="grid grid-cols-1 lg:grid-cols-[1fr_2.5fr] gap-8">
 				<div className="lg:sticky lg:top-28 h-fit">
-					<LessonSidebar
-						courseId={course.id}
-						lessons={allLessons}
-						completedMilestones={completedMilestones}
-						currentLessonId={lessonId}
-					/>
+					{isLoadingContent ? (
+						<LessonListSkeleton />
+					) : (
+						<LessonSidebar
+							courseId={course.id}
+							lessons={allLessons}
+							completedMilestones={completedMilestones}
+							currentLessonId={lessonId}
+						/>
+					)}
 				</div>
 
 				<div>

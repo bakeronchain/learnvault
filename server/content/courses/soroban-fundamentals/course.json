@@ -1,0 +1,45 @@
+{
+	"id": "soroban-fundamentals",
+	"title": "Soroban Smart Contract Basics",
+	"level": "intermediate",
+	"published": true,
+	"description": "Build and test your first Soroban smart contracts using Rust, storage patterns, and practical testing workflows.",
+	"lessons": [
+		{
+			"id": "soroban-fundamentals-1",
+			"title": "Rust basics for smart contract devs",
+			"kind": "theory",
+			"markdown": "lessons/01-rust-basics-for-smart-contract-devs.md",
+			"quiz": "lessons/01-rust-basics-for-smart-contract-devs.quiz.json",
+			"reviewedBy": null
+		},
+		{
+			"id": "soroban-fundamentals-2",
+			"title": "Writing your first Soroban contract",
+			"kind": "practical",
+			"markdown": "lessons/02-writing-your-first-soroban-contract.md",
+			"quiz": "lessons/02-writing-your-first-soroban-contract.quiz.json",
+			"reviewedBy": null
+		},
+		{
+			"id": "soroban-fundamentals-3",
+			"title": "Contract storage and state",
+			"kind": "theory",
+			"markdown": "lessons/03-contract-storage-and-state.md",
+			"quiz": "lessons/03-contract-storage-and-state.quiz.json",
+			"reviewedBy": null
+		},
+		{
+			"id": "soroban-fundamentals-4",
+			"title": "Testing your contract",
+			"kind": "practical",
+			"markdown": "lessons/04-testing-your-contract.md",
+			"quiz": "lessons/04-testing-your-contract.quiz.json",
+			"reviewedBy": null
+		}
+	],
+	"milestoneQuiz": {
+		"passingScore": 80,
+		"quiz": "milestone.quiz.json"
+	}
+}

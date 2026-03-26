@@ -1,109 +1,6 @@
 import React, { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { courses as courseCatalog } from "../data/courses"
-
-type AdminSection =
-	| "courses"
-	| "milestones"
-	| "users"
-	| "treasury"
-	| "contracts"
-
-interface AdminCourse {
-	id: number
-	title: string
-	status: "published" | "draft"
-	students: number
-}
-
-interface MilestoneSubmission {
-	id: number
-	scholar: string
-	amount: string
-	date: string
-	proof: string
-}
-
-interface UserProfilePreview {
-	address: string
-	balance: string
-	enrollment: string
-	tier: string
-}
-
-interface ContractRecord {
-	name: string
-	address: string
-	updated: string
-	tag: string
-}
-
-const adminSections: AdminSection[] = [
-	"courses",
-	"milestones",
-	"users",
-	"treasury",
-	"contracts",
-]
-
-const initialCourses: AdminCourse[] = courseCatalog.map((course, index) => ({
-	id: index + 1,
-	title: course.title,
-	status: index % 2 === 0 ? "published" : "draft",
-	students: index % 2 === 0 ? 96 + index * 18 : 0,
-}))
-
-const initialSubmissions: MilestoneSubmission[] = [
-	{
-		id: 101,
-		scholar: "G...ABC",
-		amount: "50 USDC",
-		date: "2026-03-20",
-		proof: "ipfs://milestone-proof-101",
-	},
-	{
-		id: 102,
-		scholar: "G...XYZ",
-		amount: "100 USDC",
-		date: "2026-03-21",
-		proof: "ipfs://milestone-proof-102",
-	},
-]
-
-const contractRecords: ContractRecord[] = [
-	{
-		name: "ScholarshipTreasury",
-		address: "C...TREAS",
-		updated: "2026-03-20",
-		tag: "FINANCIAL",
-	},
-	{
-		name: "MilestoneEscrow",
-		address: "C...ESCROW",
-		updated: "2026-03-15",
-		tag: "OPERATIONAL",
-	},
-	{
-		name: "ScholarNFT",
-		address: "C...NFT",
-		updated: "2026-03-10",
-		tag: "ASSET",
-	},
-	{
-		name: "LearnToken",
-		address: "C...LRN",
-		updated: "2026-03-05",
-		tag: "REPUTATION",
-	},
-]
-
-const sectionDescriptions: Record<AdminSection, string> = {
-	courses: "Create, organize, and review the course catalog.",
-	milestones: "Approve learner milestones and release funding tranches.",
-	users: "Inspect learner reputation and enrollment activity.",
-	treasury: "Monitor treasury state and safety controls.",
-	contracts: "Review core LearnVault contract identifiers.",
-}
+import TxHashLink from "../components/TxHashLink"
 
 const Admin: React.FC = () => {
 	const [activeSection, setActiveSection] = useState<AdminSection>("courses")
@@ -142,40 +39,43 @@ const Admin: React.FC = () => {
 						<h2 className="text-xl font-black tracking-tighter text-gradient">
 							LEARNVAULT
 						</h2>
-						<p className="text-xs uppercase tracking-[0.25em] text-white/35">
+						<p className="text-xs uppercase tracking-[0.25em] text-white/85">
 							Admin Console
 						</p>
 					</div>
 				</div>
-
-				<nav className="flex flex-col gap-3" aria-label="Admin sections">
-					{adminSections.map((section) => (
-						<button
-							key={section}
-							type="button"
-							className={`w-full text-left px-5 py-3.5 rounded-xl capitalize transition-all duration-300 relative group overflow-hidden ${
-								activeSection === section
-									? "text-brand-cyan font-bold bg-white/5"
-									: "text-white/40 hover:text-white hover:bg-white/[0.03]"
-							}`}
-							onClick={() => setActiveSection(section)}
-						>
-							<span className="relative z-10 flex items-center gap-3">
-								<span
-									className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
-										activeSection === section
-											? "bg-brand-cyan scale-125 shadow-[0_0_10px_rgba(0,210,255,0.8)]"
-											: "bg-white/10"
-									}`}
-								/>
-								{section}
-							</span>
-						</button>
-					))}
+				<nav className="flex flex-col gap-3">
+					{["courses", "milestones", "users", "treasury", "contracts"].map(
+						(section) => (
+							<button
+								key={section}
+								className={`w-full text-left px-5 py-3.5 rounded-xl capitalize transition-all duration-300 relative group overflow-hidden ${
+									activeSection === section
+										? "text-brand-cyan font-bold"
+										: "text-white/40 hover:text-white"
+								}`}
+								onClick={() => setActiveSection(section)}
+							>
+								{activeSection === section && (
+									<div className="absolute inset-0 bg-white/5 animate-pulse" />
+								)}
+								<span className="relative z-10 flex items-center gap-3">
+									<span
+										className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+											activeSection === section
+												? "bg-brand-cyan scale-125 shadow-[0_0_10px_rgba(0,210,255,0.8)]"
+												: "bg-transparent"
+										}`}
+									/>
+									{section}
+								</span>
+							</button>
+						),
+					)}
 				</nav>
 
 				<div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-					<p className="text-[10px] uppercase tracking-[0.25em] text-white/35">
+					<p className="text-[10px] uppercase tracking-[0.25em] text-white/85">
 						Current Section
 					</p>
 					<p className="mt-2 text-sm text-white/70">
@@ -215,7 +115,7 @@ const CourseManagement: React.FC = () => {
 			<div className="flex justify-between items-center mb-12 gap-6">
 				<div>
 					<h3 className="text-3xl font-black mb-2">Course Management</h3>
-					<p className="text-white/40 text-sm">
+					<p className="text-white/70 text-sm">
 						Create and oversee your educational modules on-chain.
 					</p>
 				</div>
@@ -231,7 +131,7 @@ const CourseManagement: React.FC = () => {
 			<div className="overflow-hidden rounded-2xl border border-white/5">
 				<table className="w-full text-left border-collapse">
 					<thead>
-						<tr className="bg-white/5 text-white/40 text-[10px] uppercase tracking-[2px] font-black">
+						<tr className="bg-white/5 text-white/70 text-[10px] uppercase tracking-[2px] font-black">
 							<th className="p-5">Course ID</th>
 							<th className="p-5">Module Title</th>
 							<th className="p-5">Learners</th>
@@ -245,17 +145,17 @@ const CourseManagement: React.FC = () => {
 								key={course.id}
 								className="border-t border-white/5 hover:bg-white/[0.03] transition-colors"
 							>
-								<td className="p-5 font-mono text-xs text-white/50">
+								<td className="p-5 font-mono text-xs text-white/70">
 									#00{course.id}
 								</td>
 								<td className="p-5 font-bold">{course.title}</td>
-								<td className="p-5 text-white/60">{course.students}</td>
+								<td className="p-5 text-white/85">{course.students}</td>
 								<td className="p-5">
 									<span
 										className={`px-3 py-1 rounded-full text-[10px] uppercase font-black tracking-wider ${
 											course.status === "published"
 												? "bg-brand-emerald/10 text-brand-emerald border border-brand-emerald/20"
-												: "bg-white/10 text-white/40 border border-white/10"
+												: "bg-white/10 text-white/70 border border-white/10"
 										}`}
 									>
 										{course.status}
@@ -265,13 +165,13 @@ const CourseManagement: React.FC = () => {
 									<div className="flex justify-end gap-2">
 										<button
 											type="button"
-											className="px-3 py-2 hover:bg-white/10 rounded-lg transition-colors text-white/40 hover:text-white text-xs uppercase tracking-widest"
+											className="px-3 py-2 hover:bg-white/10 rounded-lg transition-colors text-white/70 hover:text-white text-xs uppercase tracking-widest"
 										>
 											Edit
 										</button>
 										<button
 											type="button"
-											className="px-3 py-2 hover:bg-white/10 rounded-lg transition-colors text-white/40 hover:text-brand-purple text-xs uppercase tracking-widest"
+											className="px-3 py-2 hover:bg-white/10 rounded-lg transition-colors text-white/70 hover:text-brand-purple text-xs uppercase tracking-widest"
 										>
 											Archive
 										</button>
@@ -287,9 +187,30 @@ const CourseManagement: React.FC = () => {
 }
 
 const MilestoneQueue: React.FC = () => {
-	const [submissions, setSubmissions] =
-		useState<MilestoneSubmission[]>(initialSubmissions)
-	const [notice, setNotice] = useState<string | null>(null)
+	const [submissions, setSubmissions] = useState([
+		{
+			id: 101,
+			scholar: "G...ABC",
+			amount: "50 USDC",
+			date: "2024-03-20",
+			proof: "ipfs://...",
+			reportTxHash:
+				"de6f42f58b785fd2292d9f79089ca7a8e6769f0aa65eb6fe2c56b1e4f82de6a1",
+			approvalTxHash:
+				"7d6a011db9a6f1cb966d2c1ed44b42d416f3b53d14f1277c59823d88efab4653",
+		},
+		{
+			id: 102,
+			scholar: "G...XYZ",
+			amount: "100 USDC",
+			date: "2024-03-21",
+			proof: "ipfs://...",
+			reportTxHash:
+				"f8b91a8d6c0553a46b8c273dc44efcc643c00d5ee12e45033cfc20a5c334f61a",
+			approvalTxHash:
+				"1ccf70a8e112cd40c2a86258183fbced9ae106470ab6ee741fe8e83f8d52b5a9",
+		},
+	])
 
 	const handleAction = (id: number, action: "approve" | "reject") => {
 		setSubmissions((current) =>
@@ -305,12 +226,16 @@ const MilestoneQueue: React.FC = () => {
 	return (
 		<section className="glass-card p-10 rounded-[2.5rem]">
 			<h3 className="text-3xl font-black mb-2">Milestone Queue</h3>
-			<p className="text-white/40 text-sm mb-12">
+			<p className="text-white/70 text-sm mb-12">
 				Verify completed milestones and release funding tranches.
 			</p>
 
 			{notice ? (
-				<div className="mb-6 rounded-2xl border border-brand-cyan/20 bg-brand-cyan/8 px-5 py-4 text-sm text-brand-cyan">
+				<div
+					className="mb-6 rounded-2xl border border-brand-cyan/20 bg-brand-cyan/8 px-5 py-4 text-sm text-brand-cyan"
+					role="status"
+					aria-live="polite"
+				>
 					{notice}
 				</div>
 			) : null}
@@ -328,13 +253,34 @@ const MilestoneQueue: React.FC = () => {
 							<div>
 								<h4 className="font-bold flex items-center gap-2">
 									Scholar: {submission.scholar}
-									<span className="text-xs text-brand-cyan/60 font-normal underline cursor-pointer">
-										{submission.proof}
-									</span>
+									<a
+										href={submission.proof}
+										target="_blank"
+										rel="noreferrer"
+										className="text-xs text-brand-cyan font-normal underline"
+									>
+										View Proof
+									</a>
 								</h4>
-								<p className="text-xs text-white/30 uppercase tracking-widest mt-1">
+								<p className="text-xs text-white/70 uppercase tracking-widest mt-1">
 									Requested: {submission.amount} | Submitted: {submission.date}
 								</p>
+								<div className="mt-3 flex flex-col gap-2">
+									<div className="flex items-center gap-2 text-[10px] uppercase font-black tracking-widest text-white/30">
+										<span>Report</span>
+										<TxHashLink
+											hash={sub.reportTxHash}
+											className="text-brand-cyan hover:underline"
+										/>
+									</div>
+									<div className="flex items-center gap-2 text-[10px] uppercase font-black tracking-widest text-white/30">
+										<span>Approval</span>
+										<TxHashLink
+											hash={sub.approvalTxHash}
+											className="text-brand-cyan hover:underline"
+										/>
+									</div>
+								</div>
 							</div>
 						</div>
 						<div className="flex gap-3">
@@ -377,24 +323,33 @@ const UserLookup: React.FC = () => {
 	return (
 		<section className="glass-card p-10 rounded-[2.5rem]">
 			<h3 className="text-3xl font-black mb-2 text-gradient">User Lookup</h3>
-			<p className="text-white/40 text-sm mb-12">
+			<p className="text-white/70 text-sm mb-12">
 				Track learner reputation and on-chain progress across modules.
 			</p>
-			<div className="flex gap-4 mb-12 max-w-2xl">
-				<input
-					type="text"
-					placeholder="Enter wallet address (G...)"
-					className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-brand-cyan/50 focus:bg-white/[0.08] transition-all text-sm font-mono"
-					value={search}
-					onChange={(e) => setSearch(e.target.value)}
-				/>
-				<button
-					type="button"
-					className="px-8 py-4 bg-linear-to-r from-brand-cyan to-brand-blue rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-[1.02] shadow-xl shadow-brand-cyan/10 transition-transform"
-					onClick={handleSearch}
+			<div className="max-w-2xl mb-12">
+				<label
+					htmlFor="admin-user-lookup"
+					className="block text-sm font-bold mb-3"
 				>
-					Lookup
-				</button>
+					Wallet address
+				</label>
+				<div className="flex gap-4">
+					<input
+						id="admin-user-lookup"
+						type="text"
+						placeholder="Enter wallet address (G...)"
+						className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-brand-cyan/50 focus:bg-white/[0.08] transition-all text-sm font-mono"
+						value={search}
+						onChange={(event) => setSearch(event.target.value)}
+					/>
+					<button
+						type="button"
+						className="px-8 py-4 bg-linear-to-r from-brand-cyan to-brand-blue rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-[1.02] shadow-xl shadow-brand-cyan/10 transition-transform"
+						onClick={handleSearch}
+					>
+						Lookup
+					</button>
+				</div>
 			</div>
 			{userData ? (
 				<div className="p-10 rounded-3xl bg-linear-to-br from-white/5 to-transparent border border-white/10 relative overflow-hidden">
@@ -403,26 +358,26 @@ const UserLookup: React.FC = () => {
 					</div>
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-10 relative z-10">
 						<div>
-							<label className="block text-[10px] uppercase font-black text-white/30 tracking-widest mb-2">
+							<p className="block text-[10px] uppercase font-black text-white/70 tracking-widest mb-2">
 								Authenticated Scholar
-							</label>
+							</p>
 							<p className="text-xl font-bold font-mono tracking-tighter text-brand-cyan">
 								{userData.address}
 							</p>
 						</div>
 						<div className="grid grid-cols-2 gap-6">
 							<div>
-								<label className="block text-[10px] uppercase font-black text-white/30 tracking-widest mb-1">
+								<p className="block text-[10px] uppercase font-black text-white/70 tracking-widest mb-1">
 									Reputation
-								</label>
+								</p>
 								<p className="text-2xl font-black text-brand-emerald">
 									{userData.balance}
 								</p>
 							</div>
 							<div>
-								<label className="block text-[10px] uppercase font-black text-white/30 tracking-widest mb-1">
+								<p className="block text-[10px] uppercase font-black text-white/70 tracking-widest mb-1">
 									Status
-								</label>
+								</p>
 								<p className="text-2xl font-black text-brand-purple">
 									{userData.tier}
 								</p>
@@ -430,9 +385,9 @@ const UserLookup: React.FC = () => {
 						</div>
 					</div>
 					<div className="mt-8 pt-8 border-t border-white/5">
-						<label className="block text-[10px] uppercase font-black text-white/30 tracking-widest mb-3">
+						<p className="block text-[10px] uppercase font-black text-white/70 tracking-widest mb-3">
 							Enrolled In
-						</label>
+						</p>
 						<span className="px-4 py-2 bg-white/5 rounded-full text-xs font-bold border border-white/10">
 							{userData.enrollment}
 						</span>
@@ -451,7 +406,7 @@ const TreasuryControls: React.FC = () => {
 			<div className="flex justify-between items-center mb-12 gap-6">
 				<div>
 					<h3 className="text-3xl font-black mb-2">Treasury Controls</h3>
-					<p className="text-white/40 text-sm">
+					<p className="text-white/70 text-sm">
 						Emergency override and balance monitoring for DAO funds.
 					</p>
 				</div>
@@ -463,6 +418,7 @@ const TreasuryControls: React.FC = () => {
 							: "bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500 shadow-orange-500/10 hover:text-black"
 					}`}
 					onClick={() => setIsPaused((value) => !value)}
+					aria-pressed={isPaused}
 				>
 					{isPaused ? "Resume DAO Treasury" : "Emergency Pause"}
 				</button>
@@ -470,12 +426,12 @@ const TreasuryControls: React.FC = () => {
 			<div className="grid grid-cols-1 md:grid-cols-3 gap-8">
 				<div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex flex-col items-center text-center relative overflow-hidden">
 					<div className="absolute top-0 right-0 w-24 h-24 bg-brand-cyan/10 blur-[40px] rounded-full" />
-					<label className="text-[10px] uppercase font-black text-white/30 tracking-widest mb-4">
+					<p className="text-[10px] uppercase font-black text-white/70 tracking-widest mb-4">
 						Total Liquidity
-					</label>
+					</p>
 					<p className="text-4xl font-black text-brand-cyan mb-6">
 						12,500.00{" "}
-						<span className="text-sm font-normal text-white/40 uppercase">
+						<span className="text-sm font-normal text-white/70 uppercase">
 							USDC
 						</span>
 					</p>
@@ -491,15 +447,15 @@ const TreasuryControls: React.FC = () => {
 						Safety Protocol
 					</h4>
 					<ul className="flex flex-col gap-3">
-						<li className="flex items-center gap-3 text-sm text-white/60">
+						<li className="flex items-center gap-3 text-sm text-white/85">
 							<span className="w-1.5 h-1.5 rounded-full bg-brand-emerald shadow-[0_0_8px_rgba(0,0,0,0.5)]" />
 							Multi-sig protection active
 						</li>
-						<li className="flex items-center gap-3 text-sm text-white/60">
+						<li className="flex items-center gap-3 text-sm text-white/85">
 							<span className="w-1.5 h-1.5 rounded-full bg-brand-emerald" />
 							Daily payout limit: 2,500 USDC
 						</li>
-						<li className="flex items-center gap-3 text-sm text-white/60">
+						<li className="flex items-center gap-3 text-sm text-white/85">
 							<span className="w-1.5 h-1.5 rounded-full bg-brand-cyan" />
 							Validator consensus: 3/5 confirmed
 						</li>
@@ -514,7 +470,7 @@ const ContractInfo: React.FC = () => {
 	return (
 		<section className="glass-card p-10 rounded-[2.5rem]">
 			<h3 className="text-3xl font-black mb-2">On-Chain Registry</h3>
-			<p className="text-white/40 text-sm mb-12">
+			<p className="text-white/70 text-sm mb-12">
 				Global registry of verified LearnVault smart contracts.
 			</p>
 			<div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -527,21 +483,20 @@ const ContractInfo: React.FC = () => {
 							<h4 className="font-black text-lg group-hover:text-brand-cyan transition-colors">
 								{contract.name}
 							</h4>
-							<span className="px-3 py-1 bg-white/5 rounded-full text-[8px] font-black uppercase tracking-widest text-white/30 border border-white/5">
+							<span className="px-3 py-1 bg-white/5 rounded-full text-[8px] font-black uppercase tracking-widest text-white/70 border border-white/5">
 								{contract.tag}
 							</span>
 						</div>
 						<div className="mb-6">
-							<label className="block text-[10px] uppercase font-black text-white/20 tracking-widest mb-2">
+							<p className="block text-[10px] uppercase font-black text-white/70 tracking-widest mb-2">
 								Contract Identifier
-							</label>
+							</p>
 							<code className="text-brand-cyan/80 font-mono text-sm bg-brand-cyan/5 px-4 py-2 rounded-xl block truncate border border-brand-cyan/10">
 								{contract.address}
 							</code>
 						</div>
 						<p className="text-[10px] text-white/30 uppercase tracking-[2px]">
-							Last Audit/Update:{" "}
-							<span className="text-white/60">{contract.updated}</span>
+							Last Audit/Update: <span className="text-white/60">{c.updated}</span>
 						</p>
 					</div>
 				))}

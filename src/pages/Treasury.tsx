@@ -1,17 +1,16 @@
 import React from "react"
-import { Helmet } from "react-helmet"
 import {
-	AreaChart,
 	Area,
+	AreaChart,
+	CartesianGrid,
+	ResponsiveContainer,
+	Tooltip,
 	XAxis,
 	YAxis,
-	CartesianGrid,
-	Tooltip,
-	ResponsiveContainer,
 } from "recharts"
+import TxHashLink from "../components/TxHashLink"
 
 const Treasury: React.FC = () => {
-	// Mock data for the treasury health chart
 	const data = [
 		{ name: "Mon", inflows: 4000, outflows: 2400 },
 		{ name: "Tue", inflows: 3000, outflows: 1398 },
@@ -30,7 +29,7 @@ const Treasury: React.FC = () => {
 	}
 
 	const siteUrl = "https://learnvault.app"
-	const title = `Treasury — ${stats.totalTreasury} · ${stats.scholarsFunded} Scholars Funded — LearnVault`
+	const title = `Treasury - ${stats.totalTreasury} - ${stats.scholarsFunded} Scholars Funded - LearnVault`
 	const description = `LearnVault's decentralized scholarship treasury holds ${stats.totalTreasury} and has funded ${stats.scholarsFunded} scholars. View real-time inflows and disbursements.`
 
 	return (
@@ -50,8 +49,7 @@ const Treasury: React.FC = () => {
 					Treasury Dashboard
 				</h1>
 				<p className="text-white/40 text-lg max-w-2xl mx-auto font-medium">
-					Real-time transparency into the LearnVault decentralized scholarship
-					fund.
+					Real-time transparency into the LearnVault decentralized scholarship fund.
 				</p>
 			</header>
 
@@ -59,25 +57,25 @@ const Treasury: React.FC = () => {
 				<StatCard
 					label="Total in Treasury"
 					value={stats.totalTreasury}
-					icon="💰"
+					icon={"\u{1F4B0}"}
 					color="text-brand-cyan"
 				/>
 				<StatCard
 					label="Total Disbursed"
 					value={stats.totalDisbursed}
-					icon="💸"
+					icon={"\u{1F4B8}"}
 					color="text-brand-purple"
 				/>
 				<StatCard
 					label="Scholars Funded"
 					value={stats.scholarsFunded}
-					icon="🎓"
+					icon={"\u{1F393}"}
 					color="text-brand-emerald"
 				/>
 				<StatCard
 					label="Global Donors"
 					value={stats.donorsCount}
-					icon="🌍"
+					icon={"\u{1F30D}"}
 					color="text-brand-blue"
 				/>
 			</div>
@@ -97,78 +95,22 @@ const Treasury: React.FC = () => {
 						</div>
 					</div>
 					<div className="w-full h-[400px]">
-						<ResponsiveContainer>
-							<AreaChart
-								data={data}
-								margin={{ top: 10, right: 10, left: 0, bottom: 10 }}
-							>
-								<defs>
-									<linearGradient id="colorIn" x1="0" y1="0" x2="0" y2="1">
-										<stop offset="5%" stopColor="#00d2ff" stopOpacity={0.3} />
-										<stop offset="95%" stopColor="#00d2ff" stopOpacity={0} />
-									</linearGradient>
-									<linearGradient id="colorOut" x1="0" y1="0" x2="0" y2="1">
-										<stop offset="5%" stopColor="#8e2de2" stopOpacity={0.3} />
-										<stop offset="95%" stopColor="#8e2de2" stopOpacity={0} />
-									</linearGradient>
-								</defs>
-								<CartesianGrid
-									strokeDasharray="3 3"
-									stroke="rgba(255,255,255,0.05)"
-									vertical={false}
-								/>
-								<XAxis
-									dataKey="name"
-									stroke="rgba(255,255,255,0.2)"
-									fontSize={12}
-									tickLine={false}
-									axisLine={false}
-								/>
-								<YAxis
-									stroke="rgba(255,255,255,0.2)"
-									fontSize={12}
-									tickLine={false}
-									axisLine={false}
-									tickFormatter={(val) => `$${val / 1000}k`}
-								/>
-								<Tooltip
-									contentStyle={{
-										backgroundColor: "rgba(5, 7, 10, 0.9)",
-										borderRadius: "16px",
-										border: "1px solid rgba(255,255,255,0.1)",
-										backdropFilter: "blur(10px)",
-										boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
-									}}
-									itemStyle={{
-										color: "#fff",
-										fontSize: "12px",
-										fontWeight: "bold",
-									}}
-								/>
-								<Area
-									type="monotone"
-									dataKey="inflows"
-									stroke="#00d2ff"
-									strokeWidth={3}
-									fillOpacity={1}
-									fill="url(#colorIn)"
-								/>
-								<Area
-									type="monotone"
-									dataKey="outflows"
-									stroke="#8e2de2"
-									strokeWidth={3}
-									fillOpacity={1}
-									fill="url(#colorOut)"
-								/>
-							</AreaChart>
-						</ResponsiveContainer>
+						<Suspense
+							fallback={
+								<div className="h-full animate-pulse rounded-[2rem] border border-white/5 bg-white/5" />
+							}
+						>
+							<TreasuryHealthChart data={data} />
+						</Suspense>
 					</div>
 				</div>
 			</div>
 
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
 				<ActivityFeed
+					address={undefined}
+					limit={5}
+					filter="deposit"
 					title="Recent Community Deposits"
 					items={[
 						{
@@ -176,16 +118,23 @@ const Treasury: React.FC = () => {
 							amount: "+500 USDC",
 							time: "2h ago",
 							type: "deposit",
+							txHash:
+								"018d4d55354a1d4f6726932712954d0f5b6797a0d58478a5e89f6a9d3451d3d8",
 						},
 						{
 							user: "G...C3D4",
 							amount: "+1,200 USDC",
 							time: "5h ago",
 							type: "deposit",
+							txHash:
+								"6bc1d844f4cf2700a0eb38ceccc3fb1d9dff3d5ab4be6b5480b6cfebe85e7d8f",
 						},
 					]}
 				/>
 				<ActivityFeed
+					address={undefined}
+					limit={5}
+					filter="disburse"
 					title="Latest Disbursements"
 					items={[
 						{
@@ -193,12 +142,16 @@ const Treasury: React.FC = () => {
 							amount: "-150 USDC",
 							time: "1h ago",
 							type: "disburse",
+							txHash:
+								"75c95f0dfcb6487f92f700db74c7028da65d2daff0bbca48af88b30ec74356d9",
 						},
 						{
 							user: "Scholar...GGG",
 							amount: "-150 USDC",
 							time: "3h ago",
 							type: "disburse",
+							txHash:
+								"93d1feea0f9993daf7d43f23cc5e29cf0d9d1e5078db3fdf0aa60c4fa6cab91e",
 						},
 					]}
 				/>
@@ -243,10 +196,16 @@ const LegendItem: React.FC<{ color: string; label: string }> = ({
 	</div>
 )
 
-const ActivityFeed: React.FC<{ title: string; items: any[] }> = ({
-	title,
-	items,
-}) => (
+const ActivityFeed: React.FC<{
+	title: string
+	items: {
+		user: string
+		amount: string
+		time: string
+		type: "deposit" | "disburse"
+		txHash: string
+	}[]
+}> = ({ title, items }) => (
 	<div className="glass p-8 rounded-[2.5rem] border border-white/5">
 		<h3 className="text-xl font-black mb-8 border-l-4 border-brand-cyan pl-4">
 			{title}
@@ -266,6 +225,10 @@ const ActivityFeed: React.FC<{ title: string; items: any[] }> = ({
 							<p className="text-[10px] text-white/30 uppercase font-black tracking-widest">
 								{item.time}
 							</p>
+							<TxHashLink
+								hash={item.txHash}
+								className="mt-2 inline-flex text-[10px] font-black uppercase tracking-widest text-brand-cyan hover:underline"
+							/>
 						</div>
 					</div>
 					<p

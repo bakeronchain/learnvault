@@ -12,6 +12,9 @@ version = "0.0.1"
 [workspace.dependencies.soroban-sdk]
 version = "23.1.0"
 
+[workspace.dependencies.proptest]
+version = "1.0"
+
 [profile.release]
 opt-level = "z"
 debug = false

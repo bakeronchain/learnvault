@@ -1,8 +1,8 @@
-import path from "path"
 import cors from "cors"
 import dotenv from "dotenv"
 import express from "express"
 import morgan from "morgan"
+import path from "path"
 import swaggerUi from "swagger-ui-express"
 import YAML from "yaml"
 import { z } from "zod"
@@ -15,7 +15,7 @@ import { buildOpenApiSpec } from "./openapi"
 import { adminMilestonesRouter } from "./routes/admin-milestones.routes"
 import { adminRouter } from "./routes/admin.routes"
 import { createAuthRouter } from "./routes/auth.routes"
-import { commentsRouter } from "./routes/comments.routes"
+import { createCommentsRouter } from "./routes/comments.routes"
 import { coursesRouter } from "./routes/courses.routes"
 import { credentialsRouter } from "./routes/credentials.routes"
 import { enrollmentsRouter } from "./routes/enrollments.routes"
@@ -27,12 +27,12 @@ import { createMeRouter } from "./routes/me.routes"
 import { scholarsRouter } from "./routes/scholars.routes"
 import { scholarshipsRouter } from "./routes/scholarships.routes"
 import { treasuryRouter } from "./routes/treasury.routes"
-import { uploadRouter } from "./routes/upload.routes"
+import { createUploadRouter } from "./routes/upload.routes"
 import { validatorRouter } from "./routes/validator.routes"
 import { createAuthService } from "./services/auth.service"
 import {
-	createJwtService,
-	generateEphemeralDevJwtKeys,
+    createJwtService,
+    generateEphemeralDevJwtKeys,
 } from "./services/jwt.service"
 
 // Load server/.env whether you run from repo root or from server/
@@ -78,7 +78,12 @@ let jwtPrivateKey = env.JWT_PRIVATE_KEY
 let jwtPublicKey = env.JWT_PUBLIC_KEY
 
 // Generate ephemeral keys in dev if not provided
-if (!isProduction && (!jwtPrivateKey || !jwtPublicKey)) {
+if (!jwtPrivateKey || !jwtPublicKey) {
+	if (isProduction) {
+		throw new Error(
+			"JWT_PRIVATE_KEY and JWT_PUBLIC_KEY environment variables are required in production",
+		)
+	}
 	console.warn(
 		"⚠️  JWT keys not found in .env — generating ephemeral keys (tokens will reset on restart)",
 	)
@@ -128,14 +133,14 @@ app.use("/api", coursesRouter)
 app.use("/api", credentialsRouter)
 app.use("/api", validatorRouter)
 app.use("/api", eventsRouter)
-app.use("/api", commentsRouter)
+app.use("/api", createCommentsRouter(jwtService))
 app.use("/api", leaderboardRouter)
 app.use("/api", governanceRouter)
 app.use("/api", scholarsRouter)
 app.use("/api", adminRouter)
 app.use("/api", adminMilestonesRouter)
 app.use("/api", scholarsRouter)
-app.use("/api", uploadRouter)
+app.use("/api", createUploadRouter(jwtService))
 app.use("/api", enrollmentsRouter)
 app.use("/api", scholarshipsRouter)
 app.use("/api", treasuryRouter)

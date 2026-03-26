@@ -1,27 +1,30 @@
 import { Router, type Response } from "express"
 import { pool } from "../db/index"
 import { createCommentBodySchema } from "../lib/zod-schemas"
-import { authMiddleware, type AuthRequest } from "../middleware/auth.middleware"
+import { createRequireAuth, type AuthRequest } from "../middleware/auth.middleware"
 import { validate } from "../middleware/validate.middleware"
+import { type JwtService } from "../services/jwt.service"
 
-export const commentsRouter = Router()
+export function createCommentsRouter(jwtService: JwtService): Router {
+	const router = Router()
+	const requireAuth = createRequireAuth(jwtService)
 
-/**
- * @openapi
- * /api/proposals/{proposalId}/comments:
- *   get:
- *     summary: Fetch comments for a proposal
- *     tags: [Comments]
- *     parameters:
- *       - in: path
- *         name: proposalId
- *         required: true
- *         schema: { type: string }
- *     responses:
- *       200:
- *         description: List of comments
- */
-commentsRouter.get("/proposals/:proposalId/comments", async (req, res) => {
+	/**
+	 * @openapi
+	 * /api/proposals/{proposalId}/comments:
+	 *   get:
+	 *     summary: Fetch comments for a proposal
+	 *     tags: [Comments]
+	 *     parameters:
+	 *       - in: path
+	 *         name: proposalId
+	 *         required: true
+	 *         schema: { type: string }
+	 *     responses:
+	 *       200:
+	 *         description: List of comments
+	 */
+	router.get("/proposals/:proposalId/comments", async (req, res) => {
 	const { proposalId } = req.params
 	const limit = Math.min(parseInt(req.query.limit as string) || 50, 100)
 	const offset = Math.max(parseInt(req.query.offset as string) || 0, 0)
@@ -36,17 +39,17 @@ commentsRouter.get("/proposals/:proposalId/comments", async (req, res) => {
 	}
 })
 
-/**
- * @openapi
- * /api/comments:
- *   post:
- *     summary: Post a new comment
- *     tags: [Comments]
- *     security: [{ bearerAuth: [] }]
- */
-commentsRouter.post(
-	"/comments",
-	authMiddleware,
+	/**
+	 * @openapi
+	 * /api/comments:
+	 *   post:
+	 *     summary: Post a new comment
+	 *     tags: [Comments]
+	 *     security: [{ bearerAuth: [] }]
+	 */
+	router.post(
+		"/comments",
+		requireAuth,
 	validate({
 		body: createCommentBodySchema,
 	}),
@@ -107,17 +110,17 @@ commentsRouter.post(
 	},
 )
 
-/**
- * @openapi
- * /api/comments/{id}:
- *   delete:
- *     summary: Delete own comment (soft delete)
- *     tags: [Comments]
- *     security: [{ bearerAuth: [] }]
- */
-commentsRouter.delete(
-	"/comments/:id",
-	authMiddleware,
+	/**
+	 * @openapi
+	 * /api/comments/{id}:
+	 *   delete:
+	 *     summary: Delete own comment (soft delete)
+	 *     tags: [Comments]
+	 *     security: [{ bearerAuth: [] }]
+	 */
+	router.delete(
+		"/comments/:id",
+		requireAuth,
 	async (req: AuthRequest, res: Response) => {
 		const { id } = req.params
 		const authorAddress = req.user?.address
@@ -148,17 +151,17 @@ commentsRouter.delete(
 	},
 )
 
-/**
- * @openapi
- * /api/comments/{id}/vote:
- *   put:
- *     summary: Upvote or downvote a comment
- *     tags: [Comments]
- *     security: [{ bearerAuth: [] }]
- */
-commentsRouter.put(
-	"/comments/:id/vote",
-	authMiddleware,
+	/**
+	 * @openapi
+	 * /api/comments/{id}/vote:
+	 *   put:
+	 *     summary: Upvote or downvote a comment
+	 *     tags: [Comments]
+	 *     security: [{ bearerAuth: [] }]
+	 */
+	router.put(
+		"/comments/:id/vote",
+		requireAuth,
 	async (req: AuthRequest, res: Response) => {
 		const { id } = req.params
 		const { type } = req.body // 'upvote' or 'downvote'
@@ -228,17 +231,17 @@ commentsRouter.put(
 	},
 )
 
-/**
- * @openapi
- * /api/comments/{id}/pin:
- *   put:
- *     summary: Pin a comment (proposal author only)
- *     tags: [Comments]
- *     security: [{ bearerAuth: [] }]
- */
-commentsRouter.put(
-	"/comments/:id/pin",
-	authMiddleware,
+	/**
+	 * @openapi
+	 * /api/comments/{id}/pin:
+	 *   put:
+	 *     summary: Pin a comment (proposal author only)
+	 *     tags: [Comments]
+	 *     security: [{ bearerAuth: [] }]
+	 */
+	router.put(
+		"/comments/:id/pin",
+		requireAuth,
 	async (req: AuthRequest, res: Response) => {
 		const { id } = req.params
 		const authorAddress = req.user?.address
@@ -289,4 +292,7 @@ commentsRouter.put(
 			res.status(500).json({ error: "Failed to pin comment" })
 		}
 	},
-)
+	)
+
+	return router
+}

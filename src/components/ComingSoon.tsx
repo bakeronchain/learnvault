@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from "react-i18next"
 import styles from './ComingSoon.module.css' // optional
 
 interface ComingSoonProps {
@@ -7,6 +8,7 @@ interface ComingSoonProps {
 }
 
 export function ComingSoon({ title, issueUrl }: ComingSoonProps) {
+  const { t } = useTranslation()
   return (
     <div className="max-w-2xl mx-auto p-8 text-center">
       <div className="mb-8">
@@ -21,12 +23,12 @@ export function ComingSoon({ title, issueUrl }: ComingSoonProps) {
       </h1>
       
       <p className="text-xl text-gray-600 mb-8 max-w-md mx-auto leading-relaxed">
-        This page is under construction. We're building something awesome for the LearnVault community!
+        {t('comingSoon.message')}
       </p>
       
       <div className="space-y-4">
         <p className="text-lg text-gray-500">
-          Stay tuned for updates 📚✨
+          {t('comingSoon.stayTuned')}
         </p>
         
         {issueUrl && (
@@ -36,11 +38,10 @@ export function ComingSoon({ title, issueUrl }: ComingSoonProps) {
             rel="noopener noreferrer"
             className="inline-flex items-center px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-900 font-medium rounded-lg transition-colors duration-200"
           >
-            View open issues →
+            {t('comingSoon.issues')}
           </Link>
         )}
       </div>
     </div>
   )
 }
-

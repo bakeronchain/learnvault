@@ -1,6 +1,8 @@
-import { Button, Card } from "@stellar/design-system"
 import React from "react"
+import { useTranslation } from "react-i18next"
+import { Button, Card } from "@stellar/design-system"
 import styles from "./CourseCard.module.css"
+import type { } from "react"
 
 interface CourseCardProps {
 	id: string
@@ -15,24 +17,6 @@ interface CourseCardProps {
 	onEnroll?: () => void
 }
 
-const difficultyConfig: Record<
-	CourseCardProps["difficulty"],
-	{ label: string; className: string }
-> = {
-	beginner: {
-		label: "Beginner",
-		className: styles.badgeBeginner ?? "",
-	},
-	intermediate: {
-		label: "Intermediate",
-		className: styles.badgeIntermediate ?? "",
-	},
-	advanced: {
-		label: "Advanced",
-		className: styles.badgeAdvanced ?? "",
-	},
-}
-
 const CourseCard: React.FC<CourseCardProps> = ({
 	title,
 	description,
@@ -44,6 +28,25 @@ const CourseCard: React.FC<CourseCardProps> = ({
 	isEnrolled = false,
 	onEnroll,
 }) => {
+  const { t } = useTranslation()
+	const difficultyConfig: Record<
+		CourseCardProps["difficulty"],
+		{ label: string; className: string }
+	> = {
+		beginner: {
+			label: t('difficulty.beginner'),
+			className: styles.badgeBeginner ?? "",
+		},
+		intermediate: {
+			label: t('difficulty.intermediate'),
+			className: styles.badgeIntermediate ?? "",
+		},
+		advanced: {
+			label: t('difficulty.advanced'),
+			className: styles.badgeAdvanced ?? "",
+		},
+	}
+
 	const difficultyData = difficultyConfig[difficulty]
 
 	return (
@@ -68,7 +71,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
 
 					<div className={styles.footer}>
 						<span className={styles.metrics}>
-							{lessonCount} lessons | about {estimatedHours}h
+							{t('courseCard.lessons', {lessonCount, estimatedHours})}
 						</span>
 
 						<span className={styles.rewardBadge}>+{lrnReward} LRN</span>
@@ -80,7 +83,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
 							onClick={onEnroll}
 							size="md"
 						>
-							{isEnrolled ? "Continue" : "Enroll"}
+							{isEnrolled ? t('courseCard.continue') : t('courseCard.enroll')}
 						</Button>
 					</div>
 				</div>

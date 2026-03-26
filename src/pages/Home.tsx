@@ -180,21 +180,22 @@ const Home: React.FC = () => {
 
 					{/* Features Cards */}
 					<div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-						<FeatureCard
+<FeatureCard
 							icon="🎓"
-							title="ScholarNFTs"
-							description="Your hard-earned expertise, permanently immortalized as verifiable credentials on the Stellar network."
+							title={t('home.features.scholarNFTs.title')}
+							description={t('home.features.scholarNFTs.description')}
 						/>
 						<FeatureCard
 							icon="💰"
-							title="Automated Funding"
-							description="Decentralized treasury disbursements triggered instantly upon milestone completion via Soroban contracts."
+							title={t('home.features.automatedFunding.title')}
+							description={t('home.features.automatedFunding.description')}
 						/>
 						<FeatureCard
 							icon="🏛"
-							title="Community DAO"
-							description="A protocol governed by the scholars who use it. Vote on curriculum, treasury, and reputation standards."
+							title={t('home.features.communityDAO.title')}
+							description={t('home.features.communityDAO.description')}
 						/>
+
 					</div>
 				</main>
 			</div>

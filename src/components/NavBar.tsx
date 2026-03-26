@@ -11,7 +11,7 @@ export default function NavBar() {
 		{ to: "/courses", label: t("nav.learn") },
 		{ to: "/dao", label: t("nav.dao") },
 		{ to: "/leaderboard", label: t("nav.leaderboard") },
-		{ to: "/donor", label: "Donor" },
+{ to: "/donor", label: t("nav.donor") },
 		{ to: "/treasury", label: t("nav.treasury") },
 	]
 

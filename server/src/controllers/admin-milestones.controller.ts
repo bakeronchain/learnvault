@@ -1,6 +1,7 @@
 import { type Request, type Response } from "express"
 import { milestoneStore } from "../db/milestone-store"
 import { type AdminRequest } from "../middleware/admin.middleware"
+import { credentialService } from "../services/credential.service"
 import { stellarContractService } from "../services/stellar-contract.service"
 
 // ── GET /api/admin/milestones/pending ────────────────────────────────────────
@@ -82,6 +83,22 @@ export async function approveMilestone(
 			contract_tx_hash: contractResult.txHash,
 		})
 
+		let certificate = null
+		try {
+			const mintResult = await credentialService.mintCertificateIfComplete(
+				report.scholar_address,
+				report.course_id,
+			)
+			if (mintResult.minted) {
+				certificate = mintResult
+				console.info(
+					`[admin] ScholarNFT minted for ${report.scholar_address} — course ${report.course_id} (tx: ${mintResult.mintTxHash})`,
+				)
+			}
+		} catch (mintErr) {
+			console.error("[admin] Certificate mint failed (non-blocking):", mintErr)
+		}
+
 		res.status(200).json({
 			data: {
 				reportId: id,
@@ -89,6 +106,7 @@ export async function approveMilestone(
 				contractTxHash: contractResult.txHash,
 				simulated: contractResult.simulated,
 				auditEntry,
+				certificate,
 			},
 		})
 	} catch (err) {

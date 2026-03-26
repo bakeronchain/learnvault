@@ -14,6 +14,7 @@ const DISBURSED_KEY: Symbol = symbol_short!("DISBURSED");
 const SCHOLARS_KEY: Symbol = symbol_short!("SCHOLARS");
 const DONORS_KEY: Symbol = symbol_short!("DONORS");
 const PAUSED_KEY: Symbol = symbol_short!("PAUSED");
+const GOV_PER_USDC: i128 = 100;
 
 #[derive(Clone)]
 #[contracttype]
@@ -74,6 +75,15 @@ pub struct DepositRecorded {
     #[topic]
     pub donor: Address,
     pub amount: i128,
+}
+
+#[contractevent(topics = ["gov_issued"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GovIssued {
+    #[topic]
+    pub donor: Address,
+    pub usdc_amount: i128,
+    pub gov_amount: i128,
 }
 
 #[contractevent(topics = ["disburse"])]
@@ -156,7 +166,16 @@ impl ScholarshipTreasury {
 
         let gov_contract = Self::governance_contract(&env);
         let gov_client = governance::client(&env, &gov_contract);
-        gov_client.mint(&donor, &amount);
+        let gov_amount = amount
+            .checked_mul(GOV_PER_USDC)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::InvalidAmount));
+        gov_client.mint(&donor, &gov_amount);
+        GovIssued {
+            donor: donor.clone(),
+            usdc_amount: amount,
+            gov_amount,
+        }
+        .publish(&env);
 
         let donor_key = DataKey::Donor(donor.clone());
         let current = env
@@ -249,6 +268,10 @@ impl ScholarshipTreasury {
             .instance()
             .get::<_, i128>(&DISBURSED_KEY)
             .unwrap_or(0)
+    }
+
+    pub fn get_exchange_rate(_env: Env) -> i128 {
+        GOV_PER_USDC
     }
 
     pub fn get_scholars_count(env: Env) -> u32 {

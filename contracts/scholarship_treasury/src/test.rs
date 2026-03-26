@@ -142,7 +142,8 @@ fn deposits_are_tracked_per_donor() {
     assert_eq!(client.get_balance(), 200);
     assert_eq!(token_client(&env, &token_id).balance(&client.address), 200);
     assert_eq!(token_client(&env, &token_id).balance(&donor), 800);
-    assert_eq!(gov_client.balance(&donor), 200);
+    let rate = client.get_exchange_rate();
+    assert_eq!(gov_client.balance(&donor), 200_i128 * rate);
 }
 
 #[test]
@@ -626,7 +627,20 @@ fn deposit_happy_path() {
     assert_eq!(client.get_donor_total(&donor), 100);
     assert_eq!(client.get_balance(), 100);
     assert_eq!(token_client(&env, &token_id).balance(&client.address), 100);
-    assert_eq!(gov_client.balance(&donor), 100);
+    let rate = client.get_exchange_rate();
+    assert_eq!(gov_client.balance(&donor), 100_i128 * rate);
+}
+
+#[test]
+fn deposit_mints_gov_at_exchange_rate() {
+    let env = Env::default();
+    let (client, _, donor, _, _, gov_client) = setup(&env);
+
+    env.mock_all_auths();
+    let rate = client.get_exchange_rate();
+    client.deposit(&donor, &500);
+
+    assert_eq!(gov_client.balance(&donor), 500_i128 * rate);
 }
 
 #[test]
@@ -1200,9 +1214,10 @@ fn full_flow_deposit_propose_vote_disburse() {
 
     // Step 1: Donor deposits USDC
     env.mock_all_auths();
+    let rate = client.get_exchange_rate();
     client.deposit(&donor, &1000);
     assert_eq!(client.get_balance(), 1000);
-    assert_eq!(gov_client.balance(&donor), 1000);
+    assert_eq!(gov_client.balance(&donor), 1000_i128 * rate);
 
     // Step 2: Applicant submits proposal
     let applicant = Address::generate(&env);
@@ -1221,7 +1236,7 @@ fn full_flow_deposit_propose_vote_disburse() {
     // Step 3: Donors vote on proposal
     client.vote(&donor, &proposal_id, &true);
     let proposal = client.get_proposal(&proposal_id).unwrap();
-    assert_eq!(proposal.yes_votes, 1000);
+    assert_eq!(proposal.yes_votes, 1000_i128 * rate);
 
     // Step 4: Governance approves and disburses
     env.set_auths(&[]);
@@ -1242,6 +1257,7 @@ fn full_flow_multiple_donors_and_proposals() {
     let (milestone_titles, milestone_dates) = sample_milestones(&env);
 
     env.mock_all_auths();
+    let rate = client.get_exchange_rate();
 
     // Both donors deposit (using same donor for simplicity in test)
     client.deposit(&donor1, &1000);
@@ -1280,8 +1296,8 @@ fn full_flow_multiple_donors_and_proposals() {
 
     let prop1 = client.get_proposal(&proposal_id1).unwrap();
     let prop2 = client.get_proposal(&proposal_id2).unwrap();
-    assert_eq!(prop1.yes_votes, 1000);
-    assert_eq!(prop2.yes_votes, 1000);
+    assert_eq!(prop1.yes_votes, 1000_i128 * rate);
+    assert_eq!(prop2.yes_votes, 1000_i128 * rate);
 
     // Disburse to both recipients
     env.set_auths(&[]);

@@ -41,6 +41,16 @@ beforeEach(() => {
 	inMemoryMilestoneStore["reportSeq"] = 1
 	// @ts-ignore
 	inMemoryMilestoneStore["auditSeq"] = 1
+
+	// Provide fake Stellar credentials so the approve/reject credential guard
+	// passes — the pool mock ensures no real SDK call is made.
+	process.env.STELLAR_SECRET_KEY = "FAKE_TEST_KEY"
+	process.env.COURSE_MILESTONE_CONTRACT_ID = "FAKE_TEST_CONTRACT"
+})
+
+afterEach(() => {
+	delete process.env.STELLAR_SECRET_KEY
+	delete process.env.COURSE_MILESTONE_CONTRACT_ID
 })
 
 describe("POST /api/milestones/submit", () => {

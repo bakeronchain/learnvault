@@ -53,6 +53,14 @@ export async function approveMilestone(
 		return
 	}
 
+	if (
+		!process.env.STELLAR_SECRET_KEY ||
+		!process.env.COURSE_MILESTONE_CONTRACT_ID
+	) {
+		res.status(503).json({ error: "Stellar credentials not configured" })
+		return
+	}
+
 	const validatorAddress = req.adminAddress ?? "unknown"
 
 	try {

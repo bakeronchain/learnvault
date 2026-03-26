@@ -9,7 +9,7 @@
 		"skipLibCheck": true,
 		"resolveJsonModule": true,
 		"outDir": "dist",
-		"types": ["node"]
+		"types": ["node", "jest"]
 	},
 	"include": ["src/**/*.ts", "scripts/**/*.ts"],
 	"exclude": ["dist", "node_modules"]

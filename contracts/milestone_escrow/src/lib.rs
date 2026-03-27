@@ -57,6 +57,23 @@ pub struct TrancheReleased {
     pub amount: i128,
 }
 
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EscrowCreated {
+    pub proposal_id: u32,
+    pub scholar: Address,
+    pub total_amount: i128,
+    pub total_tranches: u32,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EscrowReclaimed {
+    pub proposal_id: u32,
+    pub scholar: Address,
+    pub amount_reclaimed: i128,
+}
+
 #[contractimpl]
 impl MilestoneEscrow {
     pub fn initialize(
@@ -113,6 +130,13 @@ impl MilestoneEscrow {
             admin: Self::admin(&env),
         };
         env.storage().persistent().set(&key, &record);
+        EscrowCreated {
+            proposal_id,
+            scholar: record.scholar.clone(),
+            total_amount: record.total_amount,
+            total_tranches: record.total_tranches,
+        }
+        .publish(&env);
     }
 
     pub fn release_tranche(env: Env, proposal_id: u32) {
@@ -170,6 +194,12 @@ impl MilestoneEscrow {
         record.released_amount = record.total_amount;
         record.last_activity = now;
         env.storage().persistent().set(&key, &record);
+        EscrowReclaimed {
+            proposal_id,
+            scholar: record.scholar.clone(),
+            amount_reclaimed: unspent,
+        }
+        .publish(&env);
     }
 
     pub fn get_escrow(env: Env, proposal_id: u32) -> Option<EscrowRecord> {

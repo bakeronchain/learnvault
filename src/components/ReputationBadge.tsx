@@ -1,47 +1,7 @@
+import { getRank } from "../constants/reputation"
 import { useLearnToken } from "../hooks/useLearnToken"
 import { useWallet } from "../hooks/useWallet"
-import {
-	getReputationRankFromLrn,
-	lrnBalanceToNumber,
-	type ReputationTier,
-} from "../util/reputationRank"
 import { formatLrnBalance } from "../util/scholarshipApplications"
-
-const TIER_STYLES: Record<
-	ReputationTier,
-	{ border: string; text: string; dot: string }
-> = {
-	newcomer: {
-		border: "border-white/15",
-		text: "text-white/50",
-		dot: "bg-white/30",
-	},
-	committed: {
-		border: "border-emerald-500/35",
-		text: "text-emerald-300/90",
-		dot: "bg-emerald-400",
-	},
-	rising_star: {
-		border: "border-brand-cyan/40",
-		text: "text-brand-cyan",
-		dot: "bg-brand-cyan",
-	},
-	top_scholar: {
-		border: "border-sky-400/40",
-		text: "text-sky-300",
-		dot: "bg-sky-400",
-	},
-	elite: {
-		border: "border-brand-purple/45",
-		text: "text-brand-purple",
-		dot: "bg-brand-purple",
-	},
-	legend: {
-		border: "border-amber-400/50",
-		text: "text-amber-300",
-		dot: "bg-amber-400",
-	},
-}
 
 const SIZE_CLASSES = {
 	sm: {
@@ -99,23 +59,33 @@ export function ReputationBadge({
 		)
 	}
 
-	const rank = getReputationRankFromLrn(balance)
-	const tierStyle = TIER_STYLES[rank.tier]
-	const numeric = formatLrnBalance(lrnBalanceToNumber(balance))
+	const numericLrn =
+		balance <= BigInt(Number.MAX_SAFE_INTEGER)
+			? Number(balance)
+			: Number.MAX_SAFE_INTEGER
+	const rank = getRank(numericLrn)
+	const numeric = formatLrnBalance(numericLrn)
 
 	return (
 		<div
-			className={`glass inline-flex items-center rounded-full border ${tierStyle.border} ${styles.root} font-black uppercase ${className}`.trim()}
+			className={`glass inline-flex items-center rounded-full border ${styles.root} font-black uppercase ${className}`.trim()}
 			role="status"
-			aria-label={`Reputation rank ${rank.label}, ${numeric} LRN`}
+			aria-label={`Reputation rank ${rank.rank}, ${numeric} LRN`}
+			style={{ borderColor: rank.color }}
 		>
 			<span
-				className={`h-2 w-2 shrink-0 rounded-full ${tierStyle.dot} animate-pulse`}
+				className="h-2 w-2 shrink-0 rounded-full animate-pulse"
 				aria-hidden
+				style={{ backgroundColor: rank.color }}
 			/>
-			<span className={`${tierStyle.text} ${styles.rank}`}>{rank.label}</span>
+			<span className={styles.rank} style={{ color: rank.color }}>
+				{rank.rank}
+			</span>
 			{showBalance ? (
-				<span className={`${tierStyle.text} ${styles.balance} normal-case`}>
+				<span
+					className={`${styles.balance} normal-case`}
+					style={{ color: rank.color }}
+				>
 					{numeric} LRN
 				</span>
 			) : null}

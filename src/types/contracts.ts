@@ -1,50 +1,13 @@
 /**
- * Consolidated contract-related TypeScript interfaces used across the
- * frontend. This file intentionally includes both the existing runtime-lean
- * helper types (DonorData, Vote, etc.) as well as the new canonical
- * on-chain shapes requested in the issue so other modules can import a
- * single source of truth.
+ * Contract-related TypeScript interfaces.
+ *
+ * Single barrel file consolidating all on-chain contract data structures
+ * used across the application — governance, donor, and milestone types.
  */
 
 // ---------------------------------------------------------------------------
-// Canonical on-chain / shared contract types (as requested)
+// Governance types (on-chain ScholarshipTreasury)
 // ---------------------------------------------------------------------------
-
-export interface MilestoneReport {
-	id: string
-	learner_address: string
-	course_id: string
-	milestone_id: number
-	evidence_url: string
-	status: "pending" | "verified" | "rejected"
-}
-
-export interface ScholarCredential {
-	token_id: bigint
-	owner: string
-	course_id: string
-	issued_at: number
-	metadata_uri: string
-}
-
-export interface DonorStats {
-	total_contributed: bigint
-	votes_cast: number
-	scholars_funded: number
-}
-
-export interface DonorImpact {
-	total_donated_usdc: string
-	scholars_funded: number
-	milestones_completed: number
-	average_completion_rate: number
-}
-
-export interface LearnTokenInfo {
-	balance: bigint
-	reputation_score: bigint
-	total_supply: bigint
-}
 export type { Proposal, RawContractProposal } from "./governance"
 
 // ---------------------------------------------------------------------------
@@ -56,17 +19,22 @@ export type {
 } from "./milestone"
 
 // ---------------------------------------------------------------------------
-// Existing app-specific helper types kept for backward compatibility with
-// current hooks and components in the repo. These mirror the previous
-// contents of this file so consumers that expect `DonorData`, `Vote`, etc.
-// continue to function while we migrate other modules to the canonical
-// interfaces above.
+// Donor & contribution types (derived from contract events)
 // ---------------------------------------------------------------------------
+
 export interface DonorContribution {
 	txHash: string
 	amount: number
 	date: string
 	block: number
+}
+
+export interface DonorStats {
+	totalContributed: number
+	governanceBalance: number
+	governancePercentage: number
+	proposalsVoted: number
+	scholarsFunded: number
 }
 
 export interface Vote {
@@ -88,7 +56,6 @@ export interface Scholar {
 
 export interface DonorData {
 	stats: DonorStats
-	impact: DonorImpact | null
 	contributions: DonorContribution[]
 	votes: Vote[]
 	scholars: Scholar[]

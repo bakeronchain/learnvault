@@ -77,6 +77,11 @@
 		"networkConnect": "Connect your wallet using this network.",
 		"networkMismatch": "Wallet is on {{wallet}}, connect to {{app}} instead."
 	},
+	"network": {
+		"testnetWarning": "You are on Stellar Testnet — tokens have no real value",
+		"futurenetWarning": "You are on Stellar Futurenet — experimental network for testing",
+		"localWarning": "You are on Local Network — for development only"
+	},
 	"usdc": {
 		"getTestUSDC": "Get Test USDC",
 		"minting": "Minting...",

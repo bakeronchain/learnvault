@@ -27,8 +27,8 @@ laptop for your freelance work. Here is what traditional finance offers you:
 
 - **Savings account**: requires a formal address, ID documents, and a minimum
   balance you may not have
-- **Sending money home**: a remittance fee of 8–12% per transfer, plus a 2–3
-  day wait
+- **Sending money home**: a remittance fee of 8–12% per transfer, plus a 2–3 day
+  wait
 - **Loan**: rejected without a credit history or collateral, or offered at 30%+
   interest rates
 
@@ -47,12 +47,12 @@ encoded in smart contracts — programs that run automatically when conditions a
 met, without any human in the middle deciding whether you qualify.
 
 Think of it this way: a traditional bank account is a promise from an
-institution that they will keep your money safe and give it back when you ask.
-A DeFi protocol is a public program — anyone can read its code, anyone can use
-it, and it cannot discriminate.
+institution that they will keep your money safe and give it back when you ask. A
+DeFi protocol is a public program — anyone can read its code, anyone can use it,
+and it cannot discriminate.
 
-The most important characteristic of DeFi: **the rules apply equally to
-everyone who meets them**.
+The most important characteristic of DeFi: **the rules apply equally to everyone
+who meets them**.
 
 ---
 
@@ -60,9 +60,9 @@ everyone who meets them**.
 
 ### Stablecoins
 
-Regular cryptocurrencies like Bitcoin fluctuate in price wildly. Stablecoins
-are cryptocurrencies pegged to a stable currency — usually the US dollar. USDC
-(USD Coin) is a stablecoin: 1 USDC always equals approximately $1.
+Regular cryptocurrencies like Bitcoin fluctuate in price wildly. Stablecoins are
+cryptocurrencies pegged to a stable currency — usually the US dollar. USDC (USD
+Coin) is a stablecoin: 1 USDC always equals approximately $1.
 
 Stablecoins are the foundation of DeFi. They let you participate in financial
 activities without the volatility of regular crypto.
@@ -81,12 +81,12 @@ come from? The answer is liquidity pools.
 
 A liquidity pool is a shared pot of two tokens — for example, XLM and USDC —
 that people deposit to earn a share of trading fees. When you make a swap, you
-are trading against the pool, not against another person. People who deposit
-are called **liquidity providers (LPs)**, and they earn a portion of every
-trade fee.
+are trading against the pool, not against another person. People who deposit are
+called **liquidity providers (LPs)**, and they earn a portion of every trade
+fee.
 
-Stellar supports liquidity pools natively, allowing anyone to become a
-liquidity provider with minimal fees.
+Stellar supports liquidity pools natively, allowing anyone to become a liquidity
+provider with minimal fees.
 
 ### Yield
 
@@ -159,8 +159,8 @@ funding.
 - **On-chain credentials**: Your LearnTokens are soulbound tokens on Stellar.
   They are your verifiable proof of learning — a reputation score no one can
   fake or take away.
-- **Scholarship treasury**: Donor funds flow into a smart contract treasury.
-  No single person controls it; the community governs it through DAO voting.
+- **Scholarship treasury**: Donor funds flow into a smart contract treasury. No
+  single person controls it; the community governs it through DAO voting.
 - **Milestone disbursements**: Approved scholarship funds are released in stages
   via escrow contracts, only as learners complete verified milestones.
 

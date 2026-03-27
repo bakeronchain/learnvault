@@ -1,8 +1,8 @@
 #![no_std]
 
 use soroban_sdk::{
-    Address, Env, Symbol, contract, contracterror, contractevent, contractimpl, contracttype,
-    panic_with_error, symbol_short,
+    Address, Env, String, Symbol, contract, contracterror, contractevent, contractimpl,
+    contracttype, panic_with_error, symbol_short,
 };
 
 const INACTIVITY_WINDOW_SECONDS: u64 = 30 * 24 * 60 * 60;
@@ -91,7 +91,7 @@ impl MilestoneEscrow {
             panic_with_error!(&env, Error::EscrowExists);
         }
 
-        xlm::token_client(&env).transfer(&treasury, &env.current_contract_address(), &amount);
+        xlm::token_client(&env).transfer(&treasury, env.current_contract_address(), &amount);
 
         let record = EscrowRecord {
             scholar,
@@ -134,6 +134,9 @@ impl MilestoneEscrow {
     }
 
     pub fn reclaim_inactive(env: Env, proposal_id: u32) {
+        let admin = Self::admin(&env);
+        admin.require_auth();
+
         let key = DataKey::Escrow(proposal_id);
         let mut record = Self::get_or_panic(&env, &key);
 
@@ -201,6 +204,10 @@ impl MilestoneEscrow {
         } else {
             panic_with_error!(env, Error::NotInitialized);
         }
+    }
+
+    pub fn get_version(env: Env) -> String {
+        String::from_str(&env, "1.0.0")
     }
 }
 

@@ -35,6 +35,9 @@ jobs:
       - name: Run tests
         run: cargo test
 
+      - name: Run fuzz tests
+        run: cargo test -- --include-ignored fuzz
+
       - name: Run clippy
         run: cargo clippy -- -D warnings
 

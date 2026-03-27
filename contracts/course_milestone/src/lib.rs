@@ -1,23 +1,41 @@
 #![no_std]
+#![allow(deprecated)]
 
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, panic_with_error,
-    symbol_short, Address, Env, Symbol,
+    Address, Env, String, Symbol, Vec, contract, contracterror, contractimpl, contracttype,
+    panic_with_error, symbol_short,
 };
 
 #[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CourseConfig {
-    pub total_milestones: u32,
-    pub tokens_per_milestone: i128,
+pub enum DataKey {
+    Enrollment(Address, String),
+    MilestoneState(Address, String, u32),
+    MilestoneSubmission(Address, String, u32),
+    EnrolledCourses(Address),
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[contracttype]
-pub enum DataKey {
-    Admin,
-    LearnTokenContract,
-    Courses(u32),
-    Progress(Address, u32),
+pub enum MilestoneStatus {
+    NotStarted,
+    Pending,
+    Approved,
+    Rejected,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+pub struct MilestoneSubmission {
+    pub evidence_uri: String,
+    pub submitted_at: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+pub struct SubmittedEventData {
+    pub learner: Address,
+    pub course_id: String,
+    pub evidence_uri: String,
 }
 
 const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
@@ -68,125 +86,139 @@ impl CourseMilestone {
             panic_with_error!(&env, Error::AlreadyInitialized);
         }
         admin.require_auth();
-
         env.storage().instance().set(&ADMIN_KEY, &admin);
-        env.storage()
-            .instance()
-            .set(&LEARN_TOKEN_KEY, &learn_token_contract);
     }
 
-    pub fn add_course(env: Env, course_id: u32, total_milestones: u32, tokens_per_milestone: i128) {
-        let admin = Self::get_admin(&env);
-        admin.require_auth();
+    pub fn enroll(env: Env, learner: Address, course_id: String) {
+        Self::require_initialized(&env);
+        learner.require_auth();
 
-        if total_milestones == 0 {
-            panic_with_error!(&env, Error::InvalidMilestones);
+        let key = DataKey::Enrollment(learner.clone(), course_id.clone());
+        if env.storage().persistent().has(&key) {
+            panic_with_error!(&env, Error::AlreadyEnrolled);
         }
 
-        let key = DataKey::Courses(course_id);
-        if env.storage().instance().has(&key) {
-            panic_with_error!(&env, Error::CourseAlreadyExists);
-        }
+        env.storage().persistent().set(&key, &true);
 
-        let config = CourseConfig {
-            total_milestones,
-            tokens_per_milestone,
-        };
-        env.storage().instance().set(&key, &config);
-
-        CourseAdded {
-            course_id,
-            total_milestones,
-            tokens_per_milestone,
-        }
-        .publish(&env);
-    }
-
-    pub fn complete_milestone(env: Env, learner: Address, course_id: u32) {
-        let admin = Self::get_admin(&env);
-        admin.require_auth();
-
-        let course_key = DataKey::Courses(course_id);
-        let course: CourseConfig = env
+        let courses_key = DataKey::EnrolledCourses(learner.clone());
+        let mut courses: Vec<String> = env
             .storage()
-            .instance()
-            .get(&course_key)
-            .unwrap_or_else(|| panic_with_error!(&env, Error::CourseNotFound));
+            .persistent()
+            .get(&courses_key)
+            .unwrap_or_else(|| Vec::new(&env));
+        courses.push_back(course_id.clone());
+        env.storage().persistent().set(&courses_key, &courses);
 
-        let progress_key = DataKey::Progress(learner.clone(), course_id);
-        let current_progress: u32 = env.storage().instance().get(&progress_key).unwrap_or(0);
+        env.events().publish(
+            (symbol_short!("enrolled"),),
+            EnrolledEventData { learner, course_id },
+        );
+    }
 
-        if current_progress >= course.total_milestones {
-            panic_with_error!(&env, Error::CourseAlreadyComplete);
+    pub fn is_enrolled(env: Env, learner: Address, course_id: String) -> bool {
+        let key = DataKey::Enrollment(learner, course_id);
+        env.storage().persistent().get(&key).unwrap_or(false)
+    }
+
+    pub fn submit_milestone(
+        env: Env,
+        learner: Address,
+        course_id: String,
+        milestone_id: u32,
+        evidence_uri: String,
+    ) {
+        Self::require_initialized(&env);
+        learner.require_auth();
+
+        if !Self::is_enrolled(env.clone(), learner.clone(), course_id.clone()) {
+            panic_with_error!(&env, Error::NotEnrolled);
         }
 
-        let new_progress = current_progress + 1;
-        env.storage().instance().set(&progress_key, &new_progress);
-
-        let tokens_to_mint = course.tokens_per_milestone;
-        Self::mint_tokens(&env, learner.clone(), tokens_to_mint);
-
-        MilestoneCompleted {
-            learner: learner.clone(),
-            course_id,
-            milestones_completed: new_progress,
-            tokens_minted: tokens_to_mint,
-        }
-        .publish(&env);
-
-        if new_progress == course.total_milestones {
-            CourseCompleted { learner, course_id }.publish(&env);
-        }
-    }
-
-    pub fn get_progress(env: Env, learner: Address, course_id: u32) -> u32 {
-        let progress_key = DataKey::Progress(learner, course_id);
-        env.storage().instance().get(&progress_key).unwrap_or(0)
-    }
-
-    pub fn is_course_complete(env: Env, learner: Address, course_id: u32) -> bool {
-        let course_key = DataKey::Courses(course_id);
-        let course: CourseConfig = match env.storage().instance().get(&course_key) {
-            Some(c) => c,
-            None => return false,
-        };
-
-        let progress_key = DataKey::Progress(learner, course_id);
-        let progress: u32 = env.storage().instance().get(&progress_key).unwrap_or(0);
-
-        progress >= course.total_milestones
-    }
-
-    pub fn get_course_config(env: Env, course_id: u32) -> Option<CourseConfig> {
-        let course_key = DataKey::Courses(course_id);
-        env.storage().instance().get(&course_key)
-    }
-
-    fn get_admin(env: &Env) -> Address {
-        env.storage()
-            .instance()
-            .get(&ADMIN_KEY)
-            .unwrap_or_else(|| panic_with_error!(env, Error::NotInitialized))
-    }
-
-    fn mint_tokens(env: &Env, to: Address, amount: i128) {
-        let learn_token_addr: Address = env
+        let state_key = DataKey::MilestoneState(learner.clone(), course_id.clone(), milestone_id);
+        let current_state = env
             .storage()
-            .instance()
-            .get(&LEARN_TOKEN_KEY)
-            .unwrap_or_else(|| panic_with_error!(env, Error::NotInitialized));
+            .persistent()
+            .get::<_, MilestoneStatus>(&state_key)
+            .unwrap_or(MilestoneStatus::NotStarted);
 
-        let learn_token_client = crate::LearnTokenClient::new(env, &learn_token_addr);
-        learn_token_client.mint(&to, &amount);
+        if current_state != MilestoneStatus::NotStarted {
+            panic_with_error!(&env, Error::DuplicateSubmission);
+        }
+
+        let submission = MilestoneSubmission {
+            evidence_uri: evidence_uri.clone(),
+            submitted_at: env.ledger().timestamp(),
+        };
+        let submission_key =
+            DataKey::MilestoneSubmission(learner.clone(), course_id.clone(), milestone_id);
+
+        env.storage().persistent().set(&submission_key, &submission);
+        env.storage()
+            .persistent()
+            .set(&state_key, &MilestoneStatus::Pending);
+
+        env.events().publish(
+            (symbol_short!("submitted"), milestone_id),
+            SubmittedEventData {
+                learner,
+                course_id,
+                evidence_uri,
+            },
+        );
     }
-}
 
-mod learn_token_client {
-    use soroban_sdk::{contractclient, Address, Env};
+    pub fn get_milestone_state(
+        env: Env,
+        learner: Address,
+        course_id: String,
+        milestone_id: u32,
+    ) -> MilestoneStatus {
+        let key = DataKey::MilestoneState(learner, course_id, milestone_id);
+        env.storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or(MilestoneStatus::NotStarted)
+    }
 
-    #[contractclient(name = "LearnTokenClient")]
-    pub trait LearnTokenInterface {
-        fn mint(env: Env, to: Address, amount: i128);
+    pub fn get_milestone_submission(
+        env: Env,
+        learner: Address,
+        course_id: String,
+        milestone_id: u32,
+    ) -> Option<MilestoneSubmission> {
+        let key = DataKey::MilestoneSubmission(learner, course_id, milestone_id);
+        env.storage().persistent().get(&key)
+    }
+
+    pub fn get_milestone_status(
+        env: Env,
+        learner: Address,
+        course_id: String,
+        milestone_id: u32,
+    ) -> MilestoneStatus {
+        let key = DataKey::MilestoneState(learner, course_id, milestone_id);
+        env.storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or(MilestoneStatus::NotStarted)
+    }
+
+    pub fn get_enrolled_courses(env: Env, learner: Address) -> Vec<String> {
+        let key = DataKey::EnrolledCourses(learner);
+        env.storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or_else(|| Vec::new(&env))
+    }
+
+    pub fn get_version(env: Env) -> String {
+        String::from_str(&env, "1.0.0")
+    }
+
+    fn require_initialized(env: &Env) {
+        if !env.storage().instance().has(&ADMIN_KEY) {
+            panic_with_error!(env, Error::NotInitialized);
+        }
     }
 }
 

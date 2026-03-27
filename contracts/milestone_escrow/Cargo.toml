@@ -20,3 +20,4 @@ stellar-registry = "0.0.4"
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+proptest = { workspace = true }

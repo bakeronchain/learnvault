@@ -1,6 +1,6 @@
 [package]
 name = "course_milestone"
-description = "The CourseMilestone contract tracks each learner's progress. When a verified milestone is completed, it triggers LearnToken minting."
+description = "The CourseMilestone contract tracks each learner's progress and on-chain milestone submissions."
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

@@ -26,6 +26,7 @@ export const buildOpenApiSpec = () => {
 				{ name: "Courses", description: "Course catalog endpoints" },
 				{ name: "Validator", description: "Milestone validation endpoints" },
 				{ name: "Events", description: "Event stream endpoints" },
+				{ name: "Leaderboard", description: "Learner ranking endpoints" },
 			],
 			components: {
 				securitySchemes: {

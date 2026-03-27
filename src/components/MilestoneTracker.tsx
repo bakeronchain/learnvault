@@ -2,6 +2,7 @@ import React, { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useCourse } from "../hooks/useCourse"
 import styles from "./MilestoneTracker.module.css"
+import TxHashLink from "./TxHashLink"
 
 export interface Milestone {
 	id: number
@@ -43,8 +44,6 @@ function MilestoneStep({
 
 		setIsCompleting(true)
 		try {
-			// Optimistically UI changes within useCourse
-			// wait for completion
 			await completeMilestone(courseId, milestone.id)
 		} catch (err) {
 			console.error("Failed to complete milestone:", err)
@@ -116,16 +115,7 @@ function MilestoneStep({
 						>
 							{t("home.milestones.completedText")}
 						</p>
-						{txHash && (
-							<a
-								href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
-								target="_blank"
-								rel="noopener noreferrer"
-								className={styles.txLink}
-							>
-								{t("home.milestones.tx")}: {txHash} ↗
-							</a>
-						)}
+						{txHash && <TxHashLink hash={txHash} className={styles.txLink} />}
 					</div>
 				)}
 			</div>

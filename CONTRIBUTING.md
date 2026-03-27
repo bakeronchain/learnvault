@@ -74,6 +74,27 @@ The `.env.example` ships with defaults for a **local Stellar network**. If you
 want to develop against the public testnet instead, uncomment the `TESTNET`
 block in `.env`.
 
+### Generate Soroban Contract Clients (optional)
+
+If you have deployed the contracts and populated contract IDs in your `.env`
+file, you can generate TypeScript client packages for all six contracts:
+
+```bash
+# Generate TypeScript bindings for all deployed contracts
+npm run generate:clients
+
+# Then build the generated packages
+npm run install:contracts
+```
+
+`generate:clients` runs `scripts/generate-clients.sh`, which calls
+`stellar contract bindings typescript` for each contract whose ID is set in
+`.env`. Any contract with a missing ID is skipped with a warning — you do not
+need all six deployed to generate clients for the ones you have.
+
+> [!TIP] **Frontend-only work?** You can skip this step entirely. The frontend
+> falls back to mock data when the generated packages are absent.
+
 ---
 
 ## Run the Frontend (No Blockchain Required)
@@ -157,6 +178,7 @@ learnvault/
 ├── src/                    # Frontend source (React + TypeScript)
 ├── server/                 # Backend API (Node.js)
 ├── packages/               # Auto-generated contract client packages
+├── scripts/                # Helper shell scripts (e.g. generate-clients.sh)
 ├── docs/                   # Whitepaper and documentation
 ├── public/                 # Static assets
 ├── .github/                # CI workflows, issue & PR templates

@@ -3,6 +3,7 @@ type Schema = {
 	walletAddress: string
 	walletNetwork: string
 	networkPassphrase: string
+	walletType: string
 	"learnvault:theme": "light" | "dark"
 	"learnvault:onboarding-complete": boolean
 	"learnvault:onboarding-track": string

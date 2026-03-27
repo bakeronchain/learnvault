@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { useState, useCallback } from "react"
 import { rpcUrl, stellarNetwork } from "../contracts/util"
 
 export type ActivityEventType =
@@ -9,6 +9,8 @@ export type ActivityEventType =
 	| "scholar_nft_minted"
 	| "vote_cast"
 	| "funds_disbursed"
+
+export type ActivityEventFilter = "deposit" | "disburse" | "all"
 
 export interface ActivityEvent {
 	id: string
@@ -90,8 +92,9 @@ function describeEvent(type: ActivityEventType, event: RpcEvent): string {
 }
 
 async function fetchActivityEvents(
-	walletAddress: string,
+	walletAddress: string | undefined,
 	limit: number,
+	filter?: ActivityEventFilter,
 ): Promise<ActivityEvent[]> {
 	const ids = [
 		contractIds.learnToken,
@@ -124,16 +127,35 @@ async function fetchActivityEvents(
 	}
 	const events = payload.result?.events ?? []
 
-	const relevant = events.filter((e) =>
-		JSON.stringify({
-			topic: e.topics ?? e.topic,
-			value: e.value,
-		})
-			.toLowerCase()
-			.includes(walletAddress.toLowerCase()),
-	)
+	const relevant = walletAddress
+		? events.filter((e) =>
+				JSON.stringify({
+					topic: e.topics ?? e.topic,
+					value: e.value,
+				})
+					.toLowerCase()
+					.includes(walletAddress.toLowerCase()),
+			)
+		: events
 
-	return relevant.slice(0, limit).map((event, idx) => {
+	// Apply filter by event type
+	let filtered = relevant
+	if (filter && filter !== "all") {
+		filtered = relevant.filter((e) => {
+			const type = classifyEvent(e)
+			if (filter === "deposit") {
+				// Deposits are token mint/transfer events
+				return type === "lrn_minted"
+			}
+			if (filter === "disburse") {
+				// Disbursements are funds_disbursed events
+				return type === "funds_disbursed"
+			}
+			return true
+		})
+	}
+
+	return filtered.slice(0, limit).map((event, idx) => {
 		const type = classifyEvent(event)
 		return {
 			id: event.id ?? `activity-${idx}`,
@@ -145,13 +167,17 @@ async function fetchActivityEvents(
 	})
 }
 
-export function useActivityFeed(address: string | undefined, limit = 10) {
+export function useActivityFeed(
+	address: string | undefined,
+	limit = 10,
+	filter: ActivityEventFilter = "all",
+) {
 	const [displayCount, setDisplayCount] = useState(limit)
 
 	const { data, isLoading, error } = useQuery({
-		queryKey: ["activity-feed", address],
-		queryFn: () => fetchActivityEvents(address!, 100),
-		enabled: Boolean(address),
+		queryKey: ["activity-feed", address, filter],
+		queryFn: () => fetchActivityEvents(address, 100, filter),
+		enabled: true,
 		staleTime: 30_000,
 		refetchInterval: 60_000,
 	})

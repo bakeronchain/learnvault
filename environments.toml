@@ -9,56 +9,32 @@ name = "me" # Required. Keys for this account will be saved to `./.stellar/ident
 default = true # Optional. Whether to use this account as the `--source` for commands that need one.
 
 [development.contracts]
-fungible_allowlist_example = { client = true, constructor_args = "--admin me --manager me --initial_supply 1000000000000000000000000" }
-nft_enumerable_example = { client = true, constructor_args = "--owner me" }
 # USDC test token for local development - deployed as a Stellar Asset Contract
 usdc_test_token = { client = true, constructor_args = "--admin me --initial_supply 1000000000000000" }
 
-# Rather than in one list, TOML allows specifying contracts in their own "sections"
-[development.contracts.guess_the_number]
-# Generate a contract client (NPM package) for this contract. This means:
-#   - compile (build) the contract source to Wasm
-#   - deploy the contract to the `network` specified above
-#   - run any `init` script specified below
-#   - generate an NPM client (also called the "TS Bindings") for the deployed
-#     contract to the NPM workspace in `packages/*`
-#   - import the contract for easy access in the frontend in `src/contracts`
-#
-# You can only use `client = true` when:
-#   - the contract source must be part of the local Cargo workspace (in the
-#     PROJECT_ROOT/contracts folder)
-#   - The specified name here ("guess_the_number") must match the
-#     underscored-version of the `name` in the contract's Cargo.toml.
-#   - The environment is `development` or `testing`
+[development.contracts.learn_token]
 client = true
+constructor_args = "--admin me"
 
-# If your contract has a `__constructor`, specify your arguments to it here.
-# These are the same arguments you could pass after the `--` in a call to
-# `stellar contract deploy`
-# Only available in `development` and `testing` environments
-constructor_args = """
---admin me
-"""
+[development.contracts.governance_token]
+client = true
+constructor_args = "--admin me"
 
-# Calls to the contract to make after it's deployed and initialized with
-# `constructor_args`. Commands here will be appended to:
-#
-#     stellar contract invoke \
-#         --id [this contract's id] \
-#         --source [first (or `default`) account, specified above] \
-#         --network [specified above] \
-#         --
-#
-# That is, each line in this `init` script is *only* the part after the `--` in
-# a `stellar contract invoke` command.
-#
-# To use another account as the `--source`, prefix the line with
-# `STELLAR_ACCOUNT=other-account`.
-#
-# Only supported in `development` and `testing` environments.
-after_deploy = """
-reset
-"""
+[development.contracts.scholar_nft]
+client = true
+constructor_args = "--admin me"
+
+[development.contracts.course_milestone]
+client = true
+constructor_args = "--admin me"
+
+[development.contracts.scholarship_treasury]
+client = true
+constructor_args = "--admin me"
+
+[development.contracts.milestone_escrow]
+client = true
+constructor_args = "--admin me --treasury me"
 
 # Coming Soon: Specify live contracts to bind & import in this project using the given name.
 # During initialization, these contracts will also be "spooned" into the development network,
@@ -85,7 +61,12 @@ default = true
 # soroban-increment-contract = { id = "C567..." }
 # soroban-token-contract = { id = "C678..." }
 # eurc = { id = "C789..." }
-guess_the_number = { client = true, constructor_args = "--admin me", after_deploy = "reset" }
+learn_token = { id = "C..." }
+governance_token = { id = "C..." }
+scholar_nft = { id = "C..." }
+course_milestone = { id = "C..." }
+scholarship_treasury = { id = "C..." }
+milestone_escrow = { id = "C..." }
 
 # USDC on Stellar Testnet
 # For testnet, we use a test USDC token deployed as a Stellar Asset Contract

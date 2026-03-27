@@ -9,10 +9,14 @@ import { useNotification } from "../hooks/useNotification"
 import { useWallet } from "../hooks/useWallet"
 import { getFriendbotUrl } from "../util/friendbot"
 import storage from "../util/storage"
-import { connectWallet } from "../util/wallet"
 
 const ONBOARDING_COMPLETE_KEY = "learnvault:onboarding-complete"
 const ONBOARDING_TRACK_KEY = "learnvault:onboarding-track"
+const MAINNET_ACCOUNT_DOCS_URL =
+	"https://developers.stellar.org/docs/build/apps/example-application-tutorial/manage-accounts#create-a-new-account"
+const STELLAR_DEX_URL = "https://stellarx.com/"
+const STELLAR_ANCHOR_DIRECTORY_URL = "https://stellar.org/anchors"
+const BALANCE_POLL_INTERVAL_MS = 4000
 
 const beginnerTracks = courses.filter((course) => course.level === "Beginner")
 
@@ -73,6 +77,7 @@ export default function OnboardingWizard({
 	)
 	const [isFunding, setIsFunding] = useState(false)
 	const [fundingAttempted, setFundingAttempted] = useState(false)
+	const [isCheckingBalance, setIsCheckingBalance] = useState(false)
 	const [isEnrolling, setIsEnrolling] = useState(false)
 	const [isHidden, setIsHidden] = useState(false)
 
@@ -85,6 +90,7 @@ export default function OnboardingWizard({
 	const currentStep = steps[stepIndex]
 	const xlmBalance = parseBalance(balances.xlm?.balance)
 	const hasFunds = xlmBalance > 0
+	const isPublicNetwork = stellarNetwork === "PUBLIC"
 	const isReturningUser = Boolean(
 		storage.getItem("walletId", "safe") ||
 		storage.getItem("walletAddress", "safe"),
@@ -137,7 +143,7 @@ export default function OnboardingWizard({
 			hasFunds ||
 			isFunding ||
 			fundingAttempted ||
-			stellarNetwork === "PUBLIC"
+			isPublicNetwork
 		) {
 			return
 		}
@@ -182,8 +188,71 @@ export default function OnboardingWizard({
 		fundingAttempted,
 		hasFunds,
 		isFunding,
+		isPublicNetwork,
 		updateBalances,
 	])
+
+	useEffect(() => {
+		if (
+			currentStep !== "Get testnet funds" ||
+			!isPublicNetwork ||
+			!address ||
+			hasFunds ||
+			!isCheckingBalance
+		) {
+			return
+		}
+
+		let cancelled = false
+		let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+		const pollBalances = async () => {
+			try {
+				await updateBalances()
+			} catch {
+				if (!cancelled) {
+					addNotification(
+						"We couldn't refresh your mainnet balance just now. We'll keep checking.",
+						"warning",
+					)
+				}
+			}
+
+			if (cancelled) {
+				return
+			}
+
+			timeoutId = setTimeout(() => {
+				void pollBalances()
+			}, BALANCE_POLL_INTERVAL_MS)
+		}
+
+		void pollBalances()
+
+		return () => {
+			cancelled = true
+			if (timeoutId) {
+				clearTimeout(timeoutId)
+			}
+		}
+	}, [
+		address,
+		addNotification,
+		currentStep,
+		hasFunds,
+		isCheckingBalance,
+		isPublicNetwork,
+		updateBalances,
+	])
+
+	useEffect(() => {
+		if (!isCheckingBalance || !hasFunds) {
+			return
+		}
+
+		setIsCheckingBalance(false)
+		addNotification("Wallet funded. You can continue onboarding.", "success")
+	}, [addNotification, hasFunds, isCheckingBalance])
 
 	const completeOnboarding = () => {
 		storage.setItem(ONBOARDING_COMPLETE_KEY, true)
@@ -213,6 +282,23 @@ export default function OnboardingWizard({
 	const handleRetryFunding = async () => {
 		if (!address) return
 		setFundingAttempted(false)
+		await updateBalances()
+	}
+
+	const handleConnectWallet = async () => {
+		const { connectWallet } = await import("../util/wallet")
+		await connectWallet()
+	}
+
+	const handleCheckAccountBalance = async () => {
+		if (!address || hasFunds) return
+
+		if (isCheckingBalance) {
+			setIsCheckingBalance(false)
+			return
+		}
+
+		setIsCheckingBalance(true)
 		await updateBalances()
 	}
 
@@ -473,7 +559,7 @@ export default function OnboardingWizard({
 											<Button
 												size="lg"
 												variant="primary"
-												onClick={() => void connectWallet()}
+												onClick={() => void handleConnectWallet()}
 												disabled={Boolean(address) || isPending}
 											>
 												{address ? "Wallet connected" : "Connect wallet"}
@@ -492,11 +578,14 @@ export default function OnboardingWizard({
 											tabIndex={-1}
 											className="mt-4 text-3xl md:text-4xl font-black focus:outline-none"
 										>
-											Fund your wallet for testnet actions.
+											{isPublicNetwork
+												? "Fund your wallet for Stellar mainnet."
+												: "Fund your wallet for testnet actions."}
 										</h3>
 										<p className="mt-4 text-white/65 leading-relaxed">
-											This step runs automatically when your XLM balance is
-											zero, so new learners don&apos;t need to hunt for faucets.
+											{isPublicNetwork
+												? "On Stellar mainnet, fund your account by purchasing XLM from an exchange or having someone send you at least 1 XLM. Once the account is activated, LearnVault can detect the balance and unlock the next step."
+												: "This step runs automatically when your XLM balance is zero, so new learners don&apos;t need to hunt for faucets."}
 										</p>
 										<div className="mt-6 grid gap-4 md:grid-cols-2">
 											<div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-5">
@@ -516,14 +605,62 @@ export default function OnboardingWizard({
 												</p>
 											</div>
 										</div>
+										{isPublicNetwork && !hasFunds ? (
+											<div className="mt-6 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+												<div className="rounded-[1.5rem] border border-amber-300/25 bg-amber-300/10 p-5">
+													<p className="text-sm uppercase tracking-[0.25em] text-amber-100/80">
+														Account activation
+													</p>
+													<p className="mt-3 text-base leading-relaxed text-amber-50">
+														Mainnet accounts must hold enough XLM to exist
+														on-chain. If this wallet is brand new, send at least
+														1 XLM to the address above so Horizon can return a
+														live balance.
+													</p>
+													<a
+														href={MAINNET_ACCOUNT_DOCS_URL}
+														target="_blank"
+														rel="noreferrer"
+														className="mt-4 inline-flex text-sm font-semibold text-amber-100 underline decoration-amber-200/60 underline-offset-4 hover:text-white"
+													>
+														Read Stellar&apos;s account creation guide
+													</a>
+												</div>
+												<div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-5">
+													<p className="text-sm uppercase tracking-[0.25em] text-white/40">
+														Get XLM
+													</p>
+													<p className="mt-3 text-sm leading-relaxed text-white/65">
+														Use any exchange or on-ramp that supports XLM, or
+														swap directly on the Stellar ecosystem.
+													</p>
+													<div className="mt-4 flex flex-col gap-3 text-sm">
+														<a
+															href={STELLAR_ANCHOR_DIRECTORY_URL}
+															target="_blank"
+															rel="noreferrer"
+															className="font-semibold text-brand-cyan underline decoration-brand-cyan/50 underline-offset-4 hover:text-white"
+														>
+															Browse Stellar anchors and on-ramps
+														</a>
+														<a
+															href={STELLAR_DEX_URL}
+															target="_blank"
+															rel="noreferrer"
+															className="font-semibold text-brand-cyan underline decoration-brand-cyan/50 underline-offset-4 hover:text-white"
+														>
+															Open the Stellar DEX on StellarX
+														</a>
+													</div>
+												</div>
+											</div>
+										) : null}
 										<div className="mt-8 flex flex-wrap gap-4">
 											<Button
 												size="lg"
 												variant="primary"
 												onClick={() => void handleRetryFunding()}
-												disabled={
-													stellarNetwork === "PUBLIC" || hasFunds || isFunding
-												}
+												disabled={isPublicNetwork || hasFunds || isFunding}
 											>
 												{isFunding
 													? "Requesting funds..."
@@ -531,6 +668,20 @@ export default function OnboardingWizard({
 														? "Wallet funded"
 														: "Retry funding"}
 											</Button>
+											{isPublicNetwork ? (
+												<Button
+													size="lg"
+													variant="secondary"
+													onClick={() => void handleCheckAccountBalance()}
+													disabled={!address || hasFunds}
+												>
+													{hasFunds
+														? "Balance detected"
+														: isCheckingBalance
+															? "Stop checking balance"
+															: "Check account balance"}
+												</Button>
+											) : null}
 											<Button
 												size="lg"
 												variant="tertiary"
@@ -540,10 +691,14 @@ export default function OnboardingWizard({
 												Continue
 											</Button>
 										</div>
-										{stellarNetwork === "PUBLIC" && !hasFunds ? (
-											<p className="mt-4 text-sm text-amber-200">
-												Public network wallets are not auto-funded. Add XLM in
-												your wallet, then continue.
+										{isPublicNetwork && !hasFunds ? (
+											<p
+												className="mt-4 text-sm text-amber-200"
+												aria-live="polite"
+											>
+												{isCheckingBalance
+													? "Checking Horizon for new XLM every few seconds. Leave this step open and we'll detect funding as soon as it lands."
+													: "Public network wallets are not auto-funded. Add XLM to this wallet, then use the balance checker to confirm funding."}
 											</p>
 										) : null}
 									</>

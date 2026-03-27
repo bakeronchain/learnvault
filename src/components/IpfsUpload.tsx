@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useId, useRef, useState } from "react"
 import { getIpfsUrl } from "../lib/ipfs"
 
 // ---------------------------------------------------------------------------
@@ -44,17 +44,21 @@ export function IpfsUpload({
 	showPreview = false,
 }: IpfsUploadProps) {
 	const inputRef = useRef<HTMLInputElement>(null)
+	const inputId = useId()
+	const helperId = `${inputId}-help`
+	const errorId = `${inputId}-error`
+	const statusId = `${inputId}-status`
 	const [isUploading, setIsUploading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 	const [result, setResult] = useState<IpfsUploadResult | null>(null)
 
 	const handleFileChange = async (
-		e: React.ChangeEvent<HTMLInputElement>,
+		event: React.ChangeEvent<HTMLInputElement>,
 	): Promise<void> => {
-		const file = e.target.files?.[0]
+		const file = event.target.files?.[0]
 		if (!file) return
 
-		// Client-side size guard (10 MB) — mirrors the server limit.
+		// Client-side size guard (10 MB) mirrors the server limit.
 		if (file.size > 10 * 1024 * 1024) {
 			setError("File exceeds the 10 MB limit.")
 			return
@@ -87,7 +91,7 @@ export function IpfsUpload({
 			setError(err instanceof Error ? err.message : "Upload failed")
 		} finally {
 			setIsUploading(false)
-			// Reset so the same file can be re-selected if needed
+			// Reset so the same file can be re-selected if needed.
 			if (inputRef.current) inputRef.current.value = ""
 		}
 	}
@@ -96,49 +100,67 @@ export function IpfsUpload({
 		result !== null &&
 		/\.(png|jpe?g|gif|webp)$/i.test(result.gatewayUrl.split("?")[0] ?? "")
 
+	const descriptionIds = [
+		helperId,
+		error ? errorId : undefined,
+		result ? statusId : undefined,
+	]
+		.filter(Boolean)
+		.join(" ")
+
 	return (
 		<div className="flex flex-col gap-2">
-			{/* Hidden native input */}
+			<label htmlFor={inputId} className="sr-only">
+				{label}
+			</label>
+			<p id={helperId} className="text-sm text-gray-700 dark:text-gray-300">
+				Accepted formats: PDF, PNG, JPG, JPEG, or MP4. Maximum file size: 10 MB.
+			</p>
 			<input
 				ref={inputRef}
+				id={inputId}
 				type="file"
 				accept={accept}
-				className="hidden"
+				className="sr-only"
 				onChange={handleFileChange}
 				disabled={isUploading}
+				aria-describedby={descriptionIds || undefined}
 			/>
 
-			{/* Trigger button */}
 			<button
 				type="button"
 				onClick={() => inputRef.current?.click()}
 				disabled={isUploading}
+				aria-controls={inputId}
+				aria-describedby={descriptionIds || undefined}
 				className="inline-flex items-center gap-2 rounded-lg border border-dashed border-gray-400 px-4 py-2 text-sm text-gray-700 hover:border-blue-500 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:border-blue-400 dark:hover:text-blue-400"
 			>
 				{isUploading ? (
 					<>
 						<span
 							className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-							role="status"
-							aria-label="Uploading"
+							aria-hidden="true"
 						/>
-						Uploading…
+						Uploading...
 					</>
 				) : (
 					label
 				)}
 			</button>
 
-			{/* Error */}
 			{error !== null && (
-				<p className="text-sm text-red-500" role="alert">
+				<p id={errorId} className="text-sm text-red-500" role="alert">
 					{error}
 				</p>
 			)}
 
-			{/* Success */}
 			{result !== null && (
-				<div className="flex flex-col gap-1 rounded-md bg-gray-50 p-3 text-xs dark:bg-gray-800">
+				<div
+					id={statusId}
+					className="flex flex-col gap-1 rounded-md bg-gray-50 p-3 text-xs dark:bg-gray-800"
+					role="status"
+					aria-live="polite"
+				>
 					<p className="break-all font-mono text-gray-500 dark:text-gray-400">
 						<span className="font-semibold text-gray-700 dark:text-gray-300">
 							CID:{" "}
@@ -154,11 +176,10 @@ export function IpfsUpload({
 						View on IPFS gateway
 					</a>
 
-					{/* Optional image preview */}
 					{showPreview && isImage && (
 						<img
 							src={result.gatewayUrl}
-							alt="Uploaded file preview"
+							alt="Preview of uploaded file stored on IPFS"
 							className="mt-2 max-h-48 rounded object-contain"
 						/>
 					)}

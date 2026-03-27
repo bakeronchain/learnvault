@@ -5,11 +5,14 @@ import {
 	useActivityFeed,
 	type ActivityEvent,
 	type ActivityEventType,
+	type ActivityEventFilter,
 } from "../hooks/useActivityFeed"
 
 export interface ActivityFeedProps {
 	address: string | undefined
 	limit?: number
+	filter?: ActivityEventFilter
+	title?: string
 }
 
 const EVENT_CONFIG: Record<
@@ -134,16 +137,22 @@ function EmptyState() {
 	)
 }
 
-export function ActivityFeed({ address, limit = 10 }: ActivityFeedProps) {
+export function ActivityFeed({
+	address,
+	limit = 10,
+	filter = "all",
+	title = "Activity Feed",
+}: ActivityFeedProps) {
 	const { events, isLoading, error, hasMore, loadMore } = useActivityFeed(
 		address,
 		limit,
+		filter,
 	)
 
 	return (
-		<section className="mt-16">
+		<section>
 			<div className="flex items-center gap-4 mb-8">
-				<h2 className="text-2xl font-black tracking-tight">Activity Feed</h2>
+				<h2 className="text-2xl font-black tracking-tight">{title}</h2>
 				<div className="h-px flex-1 bg-linear-to-r from-white/10 to-transparent" />
 			</div>
 

@@ -1,21 +1,22 @@
 #![no_std]
+#![allow(deprecated)]
 
 //! # LearnToken (LRN)
 //!
 //! A **soulbound** (non-transferable) SEP-41 fungible token minted to learners
-//! when they complete verified course milestones.
+//! on verified course milestone completion. Represents real, on-chain proof of
+//! effort — it cannot be sold or transferred.
 //!
-//! - Minting is restricted to the `CourseMilestone` contract (admin role).
-//! - Transfer and `transfer_from` always revert — tokens represent proof of
-//!   effort, not speculative value.
-//! - The LRN balance is a learner's on-chain reputation score.
+//! - Only the admin (CourseMilestone contract) can mint.
+//! - Non-transferable by design.
+//! - No burning in V1.
 //!
 //! ## Relevant issue
 //! Implements: https://github.com/bakeronchain/learnvault/issues/5
 
 use soroban_sdk::{
-    Address, Env, String, Symbol, contract, contracterror, contractevent, contractimpl,
-    contracttype, panic_with_error, symbol_short,
+    Address, Env, String, Symbol, contract, contracterror, contractimpl, contracttype,
+    panic_with_error, symbol_short,
 };
 
 // ---------------------------------------------------------------------------
@@ -26,14 +27,14 @@ use soroban_sdk::{
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u32)]
 pub enum LRNError {
-    /// Transfers are permanently disabled — LRN is soulbound.
-    Soulbound = 1,
     /// Caller is not the contract admin.
-    Unauthorized = 2,
-    /// Mint amount must be greater than zero.
-    ZeroAmount = 3,
+    Unauthorized = 1,
+    /// Amount must be greater than zero.
+    ZeroAmount = 2,
     /// Contract has not been initialized.
-    NotInitialized = 4,
+    NotInitialized = 3,
+    /// Token is soulbound and cannot be transferred.
+    Soulbound = 4,
 }
 
 // ---------------------------------------------------------------------------
@@ -52,43 +53,17 @@ pub enum DataKey {
 }
 
 // ---------------------------------------------------------------------------
-// Events
-// ---------------------------------------------------------------------------
-
-/// Emitted on every successful `mint` call.
-///
-/// Fields:
-/// - `learner`   — the address that received LRN
-/// - `amount`    — the number of LRN tokens minted
-/// - `course_id` — the course identifier that triggered the mint
-#[contractevent]
-pub struct MilestoneCompleted {
-    pub learner: Address,
-    pub amount: i128,
-    pub course_id: String,
-}
-
-// ---------------------------------------------------------------------------
 // Contract
 // ---------------------------------------------------------------------------
 
 #[contract]
 pub struct LearnToken;
 
-#[contractevent(topics = ["mint"])]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct LRNMinted {
-    #[topic]
-    pub learner: Address,
-    pub amount: i128,
-}
-
 #[contractimpl]
 impl LearnToken {
-    /// Initialise the contract.
+    /// Initialise the contract. Can only be called once.
     ///
-    /// Must be called once by the deployer. `admin` should be set to the
-    /// `CourseMilestone` contract address once that is deployed.
+    /// Sets name = "LearnVault Learn Token", symbol = "LRN", decimals = 7.
     pub fn initialize(env: Env, admin: Address) {
         if env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(&env, LRNError::Unauthorized);
@@ -96,7 +71,7 @@ impl LearnToken {
         env.storage().instance().set(&ADMIN_KEY, &admin);
         env.storage()
             .instance()
-            .set(&NAME_KEY, &String::from_str(&env, "LearnToken"));
+            .set(&NAME_KEY, &String::from_str(&env, "LearnVault Learn Token"));
         env.storage()
             .instance()
             .set(&SYMBOL_KEY, &String::from_str(&env, "LRN"));
@@ -107,8 +82,9 @@ impl LearnToken {
     // Admin
     // -----------------------------------------------------------------------
 
-    /// Mint `amount` LRN to `to`.  Only callable by the admin.
+    /// Mint `amount` LRN to `to`. Admin only.
     pub fn mint(env: Env, to: Address, amount: i128) {
+        // 1. Load admin from storage, call admin.require_auth()
         let admin: Address = env
             .storage()
             .instance()
@@ -116,35 +92,32 @@ impl LearnToken {
             .unwrap_or_else(|| panic_with_error!(&env, LRNError::NotInitialized));
         admin.require_auth();
 
+        // 2. Panic with ZeroAmount if amount <= 0
         if amount <= 0 {
             panic_with_error!(&env, LRNError::ZeroAmount);
         }
 
-        // Update balance
-        let balance_key = DataKey::Balance(to.clone());
-        let current_balance: i128 = env.storage().persistent().get(&balance_key).unwrap_or(0);
-        env.storage()
-            .persistent()
-            .set(&balance_key, &(current_balance + amount));
+        // 3. Add amount to Balance(to) in persistent storage
+        let bal_key = DataKey::Balance(to.clone());
+        let bal: i128 = env.storage().persistent().get(&bal_key).unwrap_or(0);
+        env.storage().persistent().set(&bal_key, &(bal + amount));
 
-        // Update total supply
-        let total_supply: i128 = env
+        // 4. Add amount to TotalSupply in persistent storage
+        let supply: i128 = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::TotalSupply)
             .unwrap_or(0);
         env.storage()
-            .instance()
-            .set(&DataKey::TotalSupply, &(total_supply + amount));
+            .persistent()
+            .set(&DataKey::TotalSupply, &(supply + amount));
 
-        LRNMinted {
-            learner: to,
-            amount,
-        }
-        .publish(&env);
+        // 5. Emit event
+        env.events()
+            .publish((symbol_short!("lrn_mint"), to.clone()), amount);
     }
 
-    /// Transfer the admin role to a new address (e.g. the CourseMilestone contract).
+    /// Transfer the admin role to a new address. Admin only.
     pub fn set_admin(env: Env, new_admin: Address) {
         let admin: Address = env
             .storage()
@@ -153,12 +126,32 @@ impl LearnToken {
             .unwrap_or_else(|| panic_with_error!(&env, LRNError::NotInitialized));
         admin.require_auth();
         env.storage().instance().set(&ADMIN_KEY, &new_admin);
+        env.events()
+            .publish((symbol_short!("set_admin"),), new_admin);
+    }
+
+    /// Transfer is not allowed — LRN is soulbound.
+    pub fn transfer(_env: Env, _from: Address, _to: Address, _amount: i128) {
+        panic_with_error!(&_env, LRNError::Soulbound);
+    }
+
+    /// Transfer from is not allowed — LRN is soulbound.
+    pub fn transfer_from(_env: Env, _spender: Address, _from: Address, _to: Address, _amount: i128) {
+        panic_with_error!(&_env, LRNError::Soulbound);
+    }
+
+    /// Approve is not allowed — LRN is soulbound.
+    pub fn approve(_env: Env, _from: Address, _spender: Address, _amount: i128) {
+        panic_with_error!(&_env, LRNError::Soulbound);
+    }
+
+    /// Allowance always returns 0 — LRN is soulbound and cannot be transferred.
+    pub fn allowance(_env: Env, _from: Address, _spender: Address) -> i128 {
+        0
     }
 
     // -----------------------------------------------------------------------
-    // SEP-41 read functions (fungible token interface)
-    // These functions comply with Stellar Enhancement Proposal 41
-    // https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0041.md
+    // Read functions
     // -----------------------------------------------------------------------
 
     pub fn balance(env: Env, account: Address) -> i128 {
@@ -168,28 +161,15 @@ impl LearnToken {
             .unwrap_or(0)
     }
 
-    /// Returns the learner's on-chain reputation score.
-    ///
-    /// Mirrors `balance` — the LRN balance IS the reputation score.
-    pub fn reputation_score(env: Env, account: Address) -> i128 {
-        env.storage()
-            .persistent()
-            .get(&DataKey::Balance(account))
-            .unwrap_or(0)
-    }
-
     pub fn total_supply(env: Env) -> i128 {
         env.storage()
-            .instance()
+            .persistent()
             .get(&DataKey::TotalSupply)
             .unwrap_or(0)
     }
 
     pub fn decimals(env: Env) -> u32 {
-        env.storage()
-            .instance()
-            .get(&DECIMALS_KEY)
-            .unwrap_or(7)
+        env.storage().instance().get(&DECIMALS_KEY).unwrap_or(7)
     }
 
     pub fn name(env: Env) -> String {
@@ -206,32 +186,21 @@ impl LearnToken {
             .unwrap_or_else(|| String::from_str(&env, "LRN"))
     }
 
-    // -----------------------------------------------------------------------
-    // SEP-41 transfer functions — soulbound: always revert
-    // -----------------------------------------------------------------------
-
-    pub fn transfer(env: Env, _from: Address, _to: Address, _amount: i128) {
-        panic_with_error!(&env, LRNError::Soulbound)
+    pub fn get_version(env: Env) -> String {
+        String::from_str(&env, "1.0.0")
     }
 
-    pub fn transfer_from(env: Env, _spender: Address, _from: Address, _to: Address, _amount: i128) {
-        panic_with_error!(&env, LRNError::Soulbound)
-    }
-
-    pub fn approve(
-        env: Env,
-        _from: Address,
-        _spender: Address,
-        _amount: i128,
-        _expiration_ledger: u32,
-    ) {
-        panic_with_error!(&env, LRNError::Soulbound)
-    }
-
-    pub fn allowance(_env: Env, _from: Address, _spender: Address) -> i128 {
-        0
+    /// Calculate reputation score based on balance.
+    /// Formula: reputation = balance / 100 (integer division)
+    pub fn reputation_score(env: Env, account: Address) -> i128 {
+        let balance = Self::balance(env, account);
+        balance / 100
     }
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod test;

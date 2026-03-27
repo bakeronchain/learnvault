@@ -61,9 +61,7 @@ export const validateMilestone = async (
 					data: {
 						approved: false,
 						validator: "learnvault-validator",
-						reasons: [
-							`Report ${body.report_id} is already ${report.status}`,
-						],
+						reasons: [`Report ${body.report_id} is already ${report.status}`],
 					},
 				})
 				return

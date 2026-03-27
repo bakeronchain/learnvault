@@ -1,7 +1,7 @@
 import { type Request, type Response } from "express"
-import { z } from "zod"
 import { milestoneStore } from "../db/milestone-store"
 import { type AdminRequest } from "../middleware/admin.middleware"
+import { credentialService } from "../services/credential.service"
 import { stellarContractService } from "../services/stellar-contract.service"
 
 // ── GET /api/admin/milestones/pending ────────────────────────────────────────
@@ -18,8 +18,6 @@ export async function getPendingMilestones(
 		res.status(500).json({ error: "Failed to fetch pending milestones" })
 	}
 }
-
-// ── GET /api/admin/milestones/:id ────────────────────────────────────────────
 
 export async function getMilestoneById(
 	req: Request,
@@ -44,8 +42,6 @@ export async function getMilestoneById(
 		res.status(500).json({ error: "Failed to fetch milestone report" })
 	}
 }
-
-// ── POST /api/admin/milestones/:id/approve ───────────────────────────────────
 
 export async function approveMilestone(
 	req: AdminRequest,
@@ -87,6 +83,22 @@ export async function approveMilestone(
 			contract_tx_hash: contractResult.txHash,
 		})
 
+		let certificate = null
+		try {
+			const mintResult = await credentialService.mintCertificateIfComplete(
+				report.scholar_address,
+				report.course_id,
+			)
+			if (mintResult.minted) {
+				certificate = mintResult
+				console.info(
+					`[admin] ScholarNFT minted for ${report.scholar_address} — course ${report.course_id} (tx: ${mintResult.mintTxHash})`,
+				)
+			}
+		} catch (mintErr) {
+			console.error("[admin] Certificate mint failed (non-blocking):", mintErr)
+		}
+
 		res.status(200).json({
 			data: {
 				reportId: id,
@@ -94,19 +106,19 @@ export async function approveMilestone(
 				contractTxHash: contractResult.txHash,
 				simulated: contractResult.simulated,
 				auditEntry,
+				certificate,
 			},
 		})
 	} catch (err) {
 		console.error("[admin] approveMilestone error:", err)
+		const msg = err instanceof Error ? err.message : String(err)
+		if (msg.includes("not configured")) {
+			res.status(503).json({ error: "Stellar credentials not configured" })
+			return
+		}
 		res.status(500).json({ error: "Failed to approve milestone" })
 	}
 }
-
-// ── POST /api/admin/milestones/:id/reject ────────────────────────────────────
-
-const rejectBodySchema = z.object({
-	reason: z.string().min(1, "Rejection reason is required"),
-})
 
 export async function rejectMilestone(
 	req: AdminRequest,
@@ -118,15 +130,7 @@ export async function rejectMilestone(
 		return
 	}
 
-	const parsed = rejectBodySchema.safeParse(req.body)
-	if (!parsed.success) {
-		res
-			.status(400)
-			.json({ error: "Invalid request body", issues: parsed.error.issues })
-		return
-	}
-
-	const { reason } = parsed.data
+	const { reason } = req.body as { reason: string }
 	const validatorAddress = req.adminAddress ?? "unknown"
 
 	try {
@@ -175,6 +179,11 @@ export async function rejectMilestone(
 		})
 	} catch (err) {
 		console.error("[admin] rejectMilestone error:", err)
+		const msg = err instanceof Error ? err.message : String(err)
+		if (msg.includes("not configured")) {
+			res.status(503).json({ error: "Stellar credentials not configured" })
+			return
+		}
 		res.status(500).json({ error: "Failed to reject milestone" })
 	}
 }

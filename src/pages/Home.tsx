@@ -1,5 +1,5 @@
 ﻿import { Button, Icon } from "@stellar/design-system"
-import React, { lazy, Suspense, useState } from "react"
+import React, { lazy, Suspense } from "react"
 import { Helmet } from "react-helmet"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
@@ -16,11 +16,9 @@ const MilestoneTracker = lazy(() =>
 		default: module.MilestoneTracker,
 	})),
 )
-const OnboardingWizard = lazy(() => import("../components/OnboardingWizard"))
 
 const Home: React.FC = () => {
 	const { t } = useTranslation()
-	const [showOnboarding, setShowOnboarding] = useState(false)
 
 	const mockMilestones = [
 		{ id: 1, label: t("home.milestones.1"), lrnReward: 10 },
@@ -48,37 +46,6 @@ const Home: React.FC = () => {
 				<div className="absolute top-0 left-0 w-full h-full animate-mesh opacity-30 -z-20" />
 				<div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-brand-cyan/20 blur-[150px] rounded-full -z-10 animate-pulse" />
 				<div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-brand-purple/20 blur-[150px] rounded-full -z-10 animate-pulse delay-700" />
-
-				{showOnboarding ? (
-					<Suspense fallback={<SectionSkeleton className="mb-20 min-h-64" />}>
-						<OnboardingWizard />
-					</Suspense>
-				) : (
-					<section className="mb-16 w-full max-w-6xl rounded-[2rem] border border-white/10 bg-black/20 px-6 py-8 shadow-2xl backdrop-blur-xl md:px-8">
-						<div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-							<div className="max-w-3xl">
-								<p className="text-xs uppercase tracking-[0.35em] text-brand-cyan/80">
-									New Learner Flow
-								</p>
-								<h2 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">
-									Launch the guided wallet-and-enrollment setup only when you need it.
-								</h2>
-								<p className="mt-3 text-base leading-relaxed text-white/60">
-									The onboarding assistant is still available, but it now loads on
-									demand so the dashboard shell reaches first paint faster on mobile
-									data.
-								</p>
-							</div>
-							<Button
-								size="lg"
-								variant="primary"
-								onClick={() => setShowOnboarding(true)}
-							>
-								Start guided setup
-							</Button>
-						</div>
-					</section>
-				)}
 
 				<header className="text-center max-w-4xl mx-auto mb-24">
 					<div className="inline-block mb-10 animate-in fade-in zoom-in duration-1000">

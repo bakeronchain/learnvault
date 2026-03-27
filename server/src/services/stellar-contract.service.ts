@@ -348,8 +348,6 @@ async function isEnrolled(
 			TransactionBuilder,
 			Keypair,
 		} = await import("@stellar/stellar-sdk")
-		const { Contract, rpc, xdr, Address, Networks } =
-			await import("@stellar/stellar-sdk")
 
 		const server = new rpc.Server(
 			STELLAR_NETWORK === "mainnet"
@@ -357,24 +355,26 @@ async function isEnrolled(
 				: "https://soroban-testnet.stellar.org",
 		)
 
-		const contract = new Contract(COURSE_MILESTONE_CONTRACT_ID)
-		const mockAccount = new Address(learnerAddress)
+		// Get a dummy account for simulation
+		const dummyKeypair = Keypair.random()
+		const dummyAccount = await server.getAccount(dummyKeypair.publicKey())
 
-		const tx = new (await import("@stellar/stellar-sdk")).TransactionBuilder(
-			new (await import("@stellar/stellar-sdk")).Account(
-				"GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBF3UKJQ2K5RQDD",
-				"0",
-			),
-			{
-				fee: "100",
-				networkPassphrase:
-					STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-			},
+		const contract = new Contract(COURSE_MILESTONE_CONTRACT_ID)
+
+		// Create address from learner address
+		const learnerScVal = xdr.ScVal.scvAddress(
+			new Address(learnerAddress).toScVal() as any,
 		)
+
+		const tx = new TransactionBuilder(dummyAccount, {
+			fee: "100",
+			networkPassphrase:
+				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+		})
 			.addOperation(
 				contract.call(
 					"is_enrolled",
-					xdr.ScVal.scvAddress(mockAccount.toScAddress()),
+					learnerScVal,
 					xdr.ScVal.scvU32(courseId),
 				),
 			)

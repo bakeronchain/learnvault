@@ -50,9 +50,11 @@ export const buildOpenApiSpec = () => {
             type: "object",
             properties: {
               status: { type: "string", example: "ok" },
+              db: { type: "string", example: "connected" },
+              uptime: { type: "number", example: 123.4 },
               timestamp: { type: "string", format: "date-time" }
             },
-            required: ["status", "timestamp"]
+            required: ["status", "db", "uptime", "timestamp"]
           },
           Course: {
             type: "object",

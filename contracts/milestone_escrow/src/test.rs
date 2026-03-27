@@ -37,6 +37,12 @@ fn stellar_asset_client<'a>(env: &Env, token: &Address) -> StellarAssetClient<'a
 }
 
 fn setup() -> (Env, Address, Address, Address, Address, Address) {
+    setup_with_inactivity_window(THIRTY_DAYS)
+}
+
+fn setup_with_inactivity_window(
+    inactivity_window_seconds: u64,
+) -> (Env, Address, Address, Address, Address, Address) {
     let env = Env::default();
     set_timestamp(&env, START_TS);
 
@@ -51,7 +57,7 @@ fn setup() -> (Env, Address, Address, Address, Address, Address) {
     stellar_asset_client(&env, &token).mint(&treasury, &1_000);
 
     let client = MilestoneEscrowClient::new(&env, &contract_id);
-    client.initialize(&admin, &treasury);
+    client.initialize(&admin, &treasury, &inactivity_window_seconds);
 
     (env, contract_id, token, admin, treasury, scholar)
 }
@@ -224,6 +230,25 @@ fn reclaim_inactive_requires_admin_and_deadline() {
 }
 
 #[test]
+fn reclaim_inactive_uses_configured_window_size() {
+    let (env, contract_id, token, _admin, treasury, scholar) = setup_with_inactivity_window(1);
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+
+    create_escrow(&client, 12, &scholar, 100, 4);
+    release_tranche_authorized(&client, 12).unwrap();
+
+    set_timestamp(&env, START_TS);
+    let early = reclaim_inactive_authorized(&client, 12);
+    assert_eq!(
+        early.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InactivityNotReached as u32
+        )))
+    );
+
+    set_timestamp(&env, START_TS + 1);
+    reclaim_inactive_authorized(&client, 12).unwrap();
+    assert_eq!(token_client(&env, &token).balance(&treasury), 975);
 fn reclaim_inactive_emits_event() {
     let (env, contract_id, _token, _admin, treasury, scholar) = setup();
     let client = MilestoneEscrowClient::new(&env, &contract_id);

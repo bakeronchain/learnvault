@@ -35,6 +35,23 @@ graph TD
 - `MilestoneEscrow` → `ScholarNFT`: calls `mint` when a scholar completes all
   funded milestones
 
+### CourseMilestone Management
+
+- Courses must be registered on-chain by the configured contract admin using
+  `add_course(admin, course_id, milestone_count)`.
+- Course management is admin-only: only the same admin address stored during
+  `initialize` can add or remove courses.
+- Course lookup is available through:
+  - `get_course(course_id)` to fetch one course configuration
+  - `list_courses()` to return active course IDs
+- Enrollment is validated against course registry state:
+  - `enroll(learner, course_id)` rejects unknown or inactive courses
+- Course removal uses lifecycle deactivation:
+  - `remove_course(admin, course_id)` marks the course inactive instead of
+    deleting its record
+  - inactive courses remain readable via `get_course` but are excluded from
+    `list_courses` and cannot be newly enrolled into
+
 ---
 
 ## Deployment Order

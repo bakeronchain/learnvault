@@ -12,6 +12,15 @@ pub enum DataKey {
     MilestoneState(Address, String, u32),
     MilestoneSubmission(Address, String, u32),
     EnrolledCourses(Address),
+    Course(String),
+    CourseIds,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+pub struct CourseConfig {
+    pub milestone_count: u32,
+    pub active: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -60,10 +69,6 @@ pub enum Error {
     CourseAlreadyComplete = 6,
     InvalidMilestones = 7,
     CourseAlreadyExists = 8,
-    NotEnrolled = 9,
-    DuplicateSubmission = 10,
-    InvalidState = 11,
-    ContractPaused = 12,
 }
 
 #[contractevent]
@@ -98,42 +103,7 @@ impl CourseMilestone {
         }
         admin.require_auth();
         env.storage().instance().set(&ADMIN_KEY, &admin);
-        env.storage().instance().set(&LEARN_TOKEN_KEY, &learn_token_contract);
     }
-
-    // =======================
-    // ✅ PAUSE FUNCTIONS
-    // =======================
-
-    pub fn pause(env: Env, admin: Address) {
-        admin.require_auth();
-
-        let stored_admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap();
-        if admin != stored_admin {
-            panic_with_error!(&env, Error::Unauthorized);
-        }
-
-        env.storage().instance().set(&PAUSED_KEY, &true);
-    }
-
-    pub fn unpause(env: Env, admin: Address) {
-        admin.require_auth();
-
-        let stored_admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap();
-        if admin != stored_admin {
-            panic_with_error!(&env, Error::Unauthorized);
-        }
-
-        env.storage().instance().set(&PAUSED_KEY, &false);
-    }
-
-    pub fn is_paused(env: Env) -> bool {
-        env.storage().instance().get(&PAUSED_KEY).unwrap_or(false)
-    }
-
-    // =======================
-    // MAIN FUNCTIONS
-    // =======================
 
     pub fn enroll(env: Env, learner: Address, course_id: String) {
         if Self::is_paused(env.clone()) {
@@ -142,6 +112,11 @@ impl CourseMilestone {
 
         Self::require_initialized(&env);
         learner.require_auth();
+
+        // Enrollment is only allowed for registered, active courses.
+        if !Self::is_course_active(&env, &course_id) {
+            panic_with_error!(&env, Error::CourseNotFound);
+        }
 
         let key = DataKey::Enrollment(learner.clone(), course_id.clone());
         if env.storage().persistent().has(&key) {
@@ -392,6 +367,8 @@ impl CourseMilestone {
         }
     }
 }
+
+pub use learn_token_client::LearnTokenClient;
 
 #[cfg(test)]
 mod test;

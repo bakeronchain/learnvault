@@ -6,11 +6,13 @@ import { GovernancePower } from "../components/donor/GovernancePower"
 import { MyContributions } from "../components/donor/MyContributions"
 import { ScholarsFunded } from "../components/donor/ScholarsFunded"
 import { useDonor } from "../hooks/useDonor"
+import { useUSDC } from "../hooks/useUSDC"
 import { useWallet } from "../hooks/useWallet"
 
 const Donor: React.FC = () => {
 	const { address } = useWallet()
-	const { stats, contributions, votes, scholars, isLoading, error, isEmpty } = useDonor()
+	const { stats, contributions, votes, scholars, isLoading, error } = useDonor()
+	const { balance: usdcBalance, isLoading: usdcLoading } = useUSDC(address)
 	const [showDepositForm, setShowDepositForm] = useState(false)
 	const hasActivity =
 		stats.totalContributed > 0 ||
@@ -91,6 +93,18 @@ const Donor: React.FC = () => {
 
 				{/* Stats Overview */}
 				<div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+					<StatCard
+						label="USDC Balance"
+						value={
+							usdcLoading
+								? "…"
+								: usdcBalance !== undefined
+									? `$${usdcBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+									: "—"
+						}
+						icon="💵"
+						color="text-brand-cyan"
+					/>
 					<StatCard
 						label="Total Contributed"
 						value={`$${stats.totalContributed.toLocaleString()}`}

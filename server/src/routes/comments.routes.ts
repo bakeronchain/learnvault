@@ -1,32 +1,37 @@
 import { Router, type Response } from "express"
 import { pool } from "../db/index"
 import { createCommentBodySchema } from "../lib/zod-schemas"
-import { authMiddleware, type AuthRequest } from "../middleware/auth.middleware"
+import { createRequireAuth, type AuthRequest } from "../middleware/auth.middleware"
 import { validate } from "../middleware/validate.middleware"
+import { type JwtService } from "../services/jwt.service"
 
-export const commentsRouter = Router()
+export function createCommentsRouter(jwtService: JwtService): Router {
+	const router = Router()
+	const requireAuth = createRequireAuth(jwtService)
 
-/**
- * @openapi
- * /api/proposals/{proposalId}/comments:
- *   get:
- *     summary: Fetch comments for a proposal
- *     tags: [Comments]
- *     parameters:
- *       - in: path
- *         name: proposalId
- *         required: true
- *         schema: { type: string }
- *     responses:
- *       200:
- *         description: List of comments
- */
-commentsRouter.get("/proposals/:proposalId/comments", async (req, res) => {
+	/**
+	 * @openapi
+	 * /api/proposals/{proposalId}/comments:
+	 *   get:
+	 *     summary: Fetch comments for a proposal
+	 *     tags: [Comments]
+	 *     parameters:
+	 *       - in: path
+	 *         name: proposalId
+	 *         required: true
+	 *         schema: { type: string }
+	 *     responses:
+	 *       200:
+	 *         description: List of comments
+	 */
+	router.get("/proposals/:proposalId/comments", async (req, res) => {
 	const { proposalId } = req.params
+	const limit = Math.min(parseInt(req.query.limit as string) || 50, 100)
+	const offset = Math.max(parseInt(req.query.offset as string) || 0, 0)
 	try {
 		const result = await pool.query(
-			`SELECT * FROM comments WHERE proposal_id = $1 AND deleted_at IS NULL ORDER BY is_pinned DESC, created_at ASC`,
-			[proposalId],
+			`SELECT * FROM comments WHERE proposal_id = $1 AND deleted_at IS NULL ORDER BY is_pinned DESC, created_at ASC LIMIT $2 OFFSET $3`,
+			[proposalId, limit, offset],
 		)
 		res.json(result.rows)
 	} catch (err) {
@@ -34,17 +39,17 @@ commentsRouter.get("/proposals/:proposalId/comments", async (req, res) => {
 	}
 })
 
-/**
- * @openapi
- * /api/comments:
- *   post:
- *     summary: Post a new comment
- *     tags: [Comments]
- *     security: [{ bearerAuth: [] }]
- */
-commentsRouter.post(
-	"/comments",
-	authMiddleware,
+	/**
+	 * @openapi
+	 * /api/comments:
+	 *   post:
+	 *     summary: Post a new comment
+	 *     tags: [Comments]
+	 *     security: [{ bearerAuth: [] }]
+	 */
+	router.post(
+		"/comments",
+		requireAuth,
 	validate({
 		body: createCommentBodySchema,
 	}),
@@ -105,17 +110,17 @@ commentsRouter.post(
 	},
 )
 
-/**
- * @openapi
- * /api/comments/{id}:
- *   delete:
- *     summary: Delete own comment (soft delete)
- *     tags: [Comments]
- *     security: [{ bearerAuth: [] }]
- */
-commentsRouter.delete(
-	"/comments/:id",
-	authMiddleware,
+	/**
+	 * @openapi
+	 * /api/comments/{id}:
+	 *   delete:
+	 *     summary: Delete own comment (soft delete)
+	 *     tags: [Comments]
+	 *     security: [{ bearerAuth: [] }]
+	 */
+	router.delete(
+		"/comments/:id",
+		requireAuth,
 	async (req: AuthRequest, res: Response) => {
 		const { id } = req.params
 		const authorAddress = req.user?.address
@@ -146,17 +151,17 @@ commentsRouter.delete(
 	},
 )
 
-/**
- * @openapi
- * /api/comments/{id}/vote:
- *   put:
- *     summary: Upvote or downvote a comment
- *     tags: [Comments]
- *     security: [{ bearerAuth: [] }]
- */
-commentsRouter.put(
-	"/comments/:id/vote",
-	authMiddleware,
+	/**
+	 * @openapi
+	 * /api/comments/{id}/vote:
+	 *   put:
+	 *     summary: Upvote or downvote a comment
+	 *     tags: [Comments]
+	 *     security: [{ bearerAuth: [] }]
+	 */
+	router.put(
+		"/comments/:id/vote",
+		requireAuth,
 	async (req: AuthRequest, res: Response) => {
 		const { id } = req.params
 		const { type } = req.body // 'upvote' or 'downvote'
@@ -226,17 +231,17 @@ commentsRouter.put(
 	},
 )
 
-/**
- * @openapi
- * /api/comments/{id}/pin:
- *   put:
- *     summary: Pin a comment (proposal author only)
- *     tags: [Comments]
- *     security: [{ bearerAuth: [] }]
- */
-commentsRouter.put(
-	"/comments/:id/pin",
-	authMiddleware,
+	/**
+	 * @openapi
+	 * /api/comments/{id}/pin:
+	 *   put:
+	 *     summary: Pin a comment (proposal author only)
+	 *     tags: [Comments]
+	 *     security: [{ bearerAuth: [] }]
+	 */
+	router.put(
+		"/comments/:id/pin",
+		requireAuth,
 	async (req: AuthRequest, res: Response) => {
 		const { id } = req.params
 		const authorAddress = req.user?.address
@@ -251,17 +256,26 @@ commentsRouter.put(
 			// I'll need a way to verify this.
 
 			const commentRes = await pool.query(
-				`SELECT proposal_id FROM comments WHERE id = $1`,
+				`SELECT proposal_id FROM comments WHERE id = $1 AND deleted_at IS NULL`,
 				[id],
 			)
 			if (commentRes.rowCount === 0)
 				return res.status(404).json({ error: "Comment not found" })
-
+			
 			const proposalId = commentRes.rows[0].proposal_id
 
-			// We'll need a proposals table or a way to store authors.
-			// Let's assume there's a simple mapping or we just check if the address matches the "proposal_author"
-
+			// Verify the requesting user is the proposal author
+			const proposalRes = await pool.query(
+				`SELECT author_address FROM proposals WHERE id = $1`,
+				[proposalId],
+			)
+			if (proposalRes.rowCount === 0)
+				return res.status(404).json({ error: "Proposal not found" })
+			
+			const proposalAuthor = proposalRes.rows[0].author_address
+			if (proposalAuthor.toLowerCase() !== authorAddress?.toLowerCase())
+				return res.status(403).json({ error: "Only the proposal author can pin comments" })
+			
 			// UPDATE: Reset pins for this proposal and pin this one
 			await pool.query(
 				`UPDATE comments SET is_pinned = FALSE WHERE proposal_id = $1`,
@@ -276,4 +290,7 @@ commentsRouter.put(
 			res.status(500).json({ error: "Failed to pin comment" })
 		}
 	},
-)
+	)
+
+	return router
+}

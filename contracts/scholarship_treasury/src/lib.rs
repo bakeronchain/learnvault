@@ -15,7 +15,10 @@ const DISBURSED_KEY: Symbol = symbol_short!("DISBURSED");
 const SCHOLARS_KEY: Symbol = symbol_short!("SCHOLARS");
 const DONORS_KEY: Symbol = symbol_short!("DONORS");
 const PAUSED_KEY: Symbol = symbol_short!("PAUSED");
+const TOTAL_GOV_KEY: Symbol = symbol_short!("TOTALGOV");
 const GOV_PER_USDC: i128 = 100;
+/// Minimum quorum in basis points (1 000 bps = 10 % of total GOV supply must vote).
+const MIN_QUORUM_BPS: i128 = 1_000;
 
 #[derive(Clone)]
 #[contracttype]
@@ -24,7 +27,8 @@ pub enum DataKey {
     Proposal(u32),
     ApplicantProposals(Address),
     Scholar(Address),
-    VoteCast(u32, Address), // (proposal_id, voter) -> bool
+    VoteCast(u32, Address),       // (proposal_id, voter) -> bool
+    FinalizedProposal(u32),       // proposal_id -> ProposalStatus (set by finalize_proposal)
 }
 
 #[derive(Clone)]
@@ -65,6 +69,12 @@ pub enum Error {
     ProposalNotFound = 6,
     AlreadyVoted = 7,
     VotingClosed = 8,
+    /// Votes cast after the proposal's voting deadline.
+    VotingPeriodEnded = 9,
+    /// finalize_proposal called before the voting deadline has passed.
+    TooEarlyToFinalize = 10,
+    /// Proposal finalized but total votes cast did not reach MIN_QUORUM_BPS.
+    QuorumNotMet = 11,
 }
 
 #[contract]
@@ -177,6 +187,16 @@ impl ScholarshipTreasury {
             gov_amount,
         }
         .publish(&env);
+
+        // Track total GOV issued for quorum calculations
+        let total_gov = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&TOTAL_GOV_KEY)
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&TOTAL_GOV_KEY, &(total_gov + gov_amount));
 
         let donor_key = DataKey::Donor(donor.clone());
         let current = env
@@ -432,9 +452,9 @@ impl ScholarshipTreasury {
             .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
             .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
 
-        // 3. Panic VotingClosed if past deadline
+        // 3. Panic VotingPeriodEnded if past deadline
         if env.ledger().sequence() > proposal.deadline_ledger {
-            panic_with_error!(&env, Error::VotingClosed);
+            panic_with_error!(&env, Error::VotingPeriodEnded);
         }
 
         // 4. Panic AlreadyVoted if VoteCast(proposal_id, voter) exists
@@ -477,6 +497,77 @@ impl ScholarshipTreasury {
             weight,
         }
         .publish(&env);
+    }
+
+    /// Finalize a proposal once its voting deadline has passed.
+    ///
+    /// Only the admin may call this. The outcome is:
+    /// - **Rejected** if total votes cast < MIN_QUORUM_BPS of total GOV supply.
+    /// - **Approved** if quorum is met and `yes_votes > no_votes`.
+    /// - **Rejected** otherwise (tie or majority against).
+    ///
+    /// The result is stored under `DataKey::FinalizedProposal(proposal_id)` so
+    /// it can be read back without re-running the tally.
+    pub fn finalize_proposal(env: Env, admin: Address, proposal_id: u32) -> ProposalStatus {
+        admin.require_auth();
+        let stored_admin = Self::admin(&env);
+        if admin != stored_admin {
+            panic_with_error!(&env, Error::NotInitialized);
+        }
+
+        let proposal = env
+            .storage()
+            .persistent()
+            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
+
+        // Must be called after the voting deadline
+        if env.ledger().sequence() <= proposal.deadline_ledger {
+            panic_with_error!(&env, Error::TooEarlyToFinalize);
+        }
+
+        // Quorum check: (yes + no) / total_gov >= MIN_QUORUM_BPS / 10_000
+        let total_gov = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&TOTAL_GOV_KEY)
+            .unwrap_or(0);
+
+        let total_votes = proposal.yes_votes + proposal.no_votes;
+        let quorum_met = total_gov > 0
+            && total_votes.checked_mul(10_000)
+                .map(|tv| tv / total_gov >= MIN_QUORUM_BPS)
+                .unwrap_or(false);
+
+        let status = if !quorum_met {
+            ProposalStatus::Rejected
+        } else if proposal.yes_votes > proposal.no_votes {
+            ProposalStatus::Approved
+        } else {
+            ProposalStatus::Rejected
+        };
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::FinalizedProposal(proposal_id), &status.clone());
+
+        status
+    }
+
+    /// Returns the finalized status for a proposal if `finalize_proposal` has
+    /// been called, or `None` if it hasn't been finalized yet.
+    pub fn get_finalized_status(env: Env, proposal_id: u32) -> Option<ProposalStatus> {
+        env.storage()
+            .persistent()
+            .get::<_, ProposalStatus>(&DataKey::FinalizedProposal(proposal_id))
+    }
+
+    /// Returns the total GOV tokens issued so far (used for quorum calculation).
+    pub fn get_total_gov_issued(env: Env) -> i128 {
+        env.storage()
+            .instance()
+            .get::<_, i128>(&TOTAL_GOV_KEY)
+            .unwrap_or(0)
     }
 
     fn governance_contract(env: &Env) -> Address {

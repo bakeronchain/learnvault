@@ -64,29 +64,40 @@ export class EmailService {
 	async sendAdminMilestoneNotification(
 		scholarName: string,
 		courseSlug: string,
-		milestoneId: string
+		milestoneId: string,
 	): Promise<boolean> {
-		const adminEmail = process.env.ADMIN_EMAIL;
+		const adminEmails = process.env.ADMIN_EMAILS
 
-		if (!adminEmail) {
-			console.warn("[EmailService] ADMIN_EMAIL not set, skipping notification.");
-			return false;
+		if (!adminEmails) {
+			console.warn(
+				"[EmailService] ADMIN_EMAILS not set, skipping notification.",
+			)
+			return false
 		}
 
-		const adminLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/admin/reviews`;
+		const adminLink = `${process.env.FRONTEND_URL || "http://localhost:3000"}/admin/reviews`
 
-		return this.sendNotification({
-			to: adminEmail,
-			subject: `New Submission: ${scholarName}`,
-			template: "admin-alert",
-			data: {
-				body: `Scholar <strong>${scholarName}</strong> has submitted a report for <strong>${courseSlug}</strong> (Milestone ${milestoneId}).`,
-				adminUrl: adminLink,
-				unsubscribeUrl: "#"
-			}
-		});
+		const body = `New milestone submission from ${scholarName} for course ${courseSlug}, milestone ${milestoneId}. Review it here: ${adminLink}`
+
+		const emails = adminEmails.split(",").map((email) => email.trim())
+
+		let allSent = true
+		for (const email of emails) {
+			const success = await this.sendNotification({
+				to: email,
+				subject: `New Milestone Submission`,
+				template: "admin-alert",
+				data: {
+					body,
+					adminUrl: adminLink,
+					unsubscribeUrl: "#",
+				},
+			})
+			if (!success) allSent = false
+		}
+
+		return allSent
 	}
 }
 
 export const createEmailService = (apiKey: string) => new EmailService(apiKey)
-

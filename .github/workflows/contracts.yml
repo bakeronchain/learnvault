@@ -1,0 +1,32 @@
+name: Contract Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  contract-tests:
+    name: Contract Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup stable Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run contract tests
+        run: |
+          set -euo pipefail
+          # If the root Cargo.toml declares a workspace, run workspace tests.
+          if grep -qE '^\[workspace\]' Cargo.toml 2>/dev/null; then
+            echo "Cargo workspace detected; running 'cargo test --workspace'"
+            cargo test --workspace
+          else
+            echo "No workspace detected; running tests per contract"
+            for dir in contracts/*/; do
+              echo "==> Testing $dir"
+              (cd "$dir" && cargo test)
+            done
+          fi

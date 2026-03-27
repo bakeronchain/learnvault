@@ -49,7 +49,7 @@ export const createMockContractClient = (
 	contractName: string,
 	methods: Record<string, any>,
 ) => {
-	const mockClient = {}
+	const mockClient: Record<string, any> = {}
 
 	Object.entries(methods).forEach(([methodName, mockFn]) => {
 		mockClient[methodName] = mockFn
@@ -92,7 +92,7 @@ export const mockContracts = {
 }
 
 // Dynamic import mock for contract clients
-export const mockContractImports = {
+export const mockContractImports: Record<string, any> = {
 	"../contracts/learn_token": mockContracts.learnToken,
 	"../contracts/governance_token": mockContracts.governanceToken,
 	"../contracts/scholarship_treasury": mockContracts.scholarshipTreasury,

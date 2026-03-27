@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { LEDGERS_PER_DAY } from "../constants/network"
 
 interface Props {
 	deadlineLedger: number
@@ -14,7 +15,7 @@ interface CountdownState {
 	secondsRemaining: number
 }
 
-const LEDGER_SECONDS = 6
+const LEDGER_SECONDS = (24 * 60 * 60) / LEDGERS_PER_DAY
 const DAY_SECONDS = 24 * 60 * 60
 const HOUR_SECONDS = 60 * 60
 const MINUTE_SECONDS = 60
@@ -83,16 +84,20 @@ export default function ProposalCountdown({
 			setState(newState)
 
 			// Announce time changes for screen readers (every minute)
-			if (newState.secondsRemaining % 60 === 0 && newState.secondsRemaining > 0) {
+			if (
+				newState.secondsRemaining % 60 === 0 &&
+				newState.secondsRemaining > 0
+			) {
 				setAnnouncement(`Voting time remaining: ${newState.label}`)
 			}
-		}, 6000) // Update every 6 seconds (1 ledger time)
+		}, LEDGER_SECONDS * 1000) // Update every 6 seconds (1 ledger time)
 
 		return () => clearInterval(intervalId)
 	}, [deadlineLedger, currentLedger])
 
 	// Calculate progress for visual indicator
-	const totalLedgers = deadlineLedger - currentLedger + state.secondsRemaining / 6
+	const totalLedgers =
+		deadlineLedger - currentLedger + state.secondsRemaining / 6
 	const progress = Math.min(
 		100,
 		Math.max(0, (state.secondsRemaining / (totalLedgers * 6)) * 100),

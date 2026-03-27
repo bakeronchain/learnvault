@@ -2,18 +2,16 @@
 #![allow(deprecated)]
 
 use soroban_sdk::{
-    Address, Env, String, Symbol, contract, contracterror, contractimpl, contracttype,
+    Address, Env, String, Symbol, Vec, contract, contracterror, contractimpl, contracttype,
     panic_with_error, symbol_short,
 };
 
-const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
-
-#[derive(Clone)]
 #[contracttype]
 pub enum DataKey {
     Enrollment(Address, String),
     MilestoneState(Address, String, u32),
     MilestoneSubmission(Address, String, u32),
+    EnrolledCourses(Address),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -40,12 +38,9 @@ pub struct SubmittedEventData {
     pub evidence_uri: String,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-#[contracttype]
-pub struct EnrolledEventData {
-    pub learner: Address,
-    pub course_id: String,
-}
+const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
+const LEARN_TOKEN_KEY: Symbol = symbol_short!("LRN_TKN");
+const PAUSED_KEY: Symbol = symbol_short!("PAUSED"); // ✅ NEW
 
 #[contracterror]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -53,9 +48,33 @@ pub struct EnrolledEventData {
 pub enum Error {
     AlreadyInitialized = 1,
     NotInitialized = 2,
-    AlreadyEnrolled = 3,
-    NotEnrolled = 4,
-    DuplicateSubmission = 5,
+    Unauthorized = 3,
+    CourseNotFound = 4,
+    MilestoneAlreadyCompleted = 5,
+    CourseAlreadyComplete = 6,
+    InvalidMilestones = 7,
+    CourseAlreadyExists = 8,
+}
+
+#[contractevent]
+pub struct MilestoneCompleted {
+    pub learner: Address,
+    pub course_id: u32,
+    pub milestones_completed: u32,
+    pub tokens_minted: i128,
+}
+
+#[contractevent]
+pub struct CourseCompleted {
+    pub learner: Address,
+    pub course_id: u32,
+}
+
+#[contractevent]
+pub struct CourseAdded {
+    pub course_id: u32,
+    pub total_milestones: u32,
+    pub tokens_per_milestone: i128,
 }
 
 #[contract]
@@ -63,7 +82,7 @@ pub struct CourseMilestone;
 
 #[contractimpl]
 impl CourseMilestone {
-    pub fn initialize(env: Env, admin: Address) {
+    pub fn initialize(env: Env, admin: Address, learn_token_contract: Address) {
         if env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(&env, Error::AlreadyInitialized);
         }
@@ -71,19 +90,67 @@ impl CourseMilestone {
         env.storage().instance().set(&ADMIN_KEY, &admin);
     }
 
+    // =======================
+    // ✅ PAUSE FUNCTIONS
+    // =======================
+
+    pub fn pause(env: Env, admin: Address) {
+        admin.require_auth();
+
+        let stored_admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap();
+        if admin != stored_admin {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
+
+        env.storage().instance().set(&PAUSED_KEY, &true);
+    }
+
+    pub fn unpause(env: Env, admin: Address) {
+        admin.require_auth();
+
+        let stored_admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap();
+        if admin != stored_admin {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
+
+        env.storage().instance().set(&PAUSED_KEY, &false);
+    }
+
+    pub fn is_paused(env: Env) -> bool {
+        env.storage().instance().get(&PAUSED_KEY).unwrap_or(false)
+    }
+
+    // =======================
+    // MAIN FUNCTIONS
+    // =======================
+
     pub fn enroll(env: Env, learner: Address, course_id: String) {
+        if Self::is_paused(env.clone()) {
+            panic!("Contract is paused");
+        }
+
         Self::require_initialized(&env);
         learner.require_auth();
 
         let key = DataKey::Enrollment(learner.clone(), course_id.clone());
         if env.storage().persistent().has(&key) {
-            panic_with_error!(&env, Error::AlreadyEnrolled);
+            panic_with_error!(&env, Error::Unauthorized);
         }
 
         env.storage().persistent().set(&key, &true);
+
+        let courses_key = DataKey::EnrolledCourses(learner.clone());
+        let mut courses: Vec<String> = env
+            .storage()
+            .persistent()
+            .get(&courses_key)
+            .unwrap_or_else(|| Vec::new(&env));
+        courses.push_back(course_id.clone());
+        env.storage().persistent().set(&courses_key, &courses);
+
         env.events().publish(
             (symbol_short!("enrolled"),),
-            EnrolledEventData { learner, course_id },
+            SubmittedEventData { learner, course_id, evidence_uri: String::from_str(&env, "") },
         );
     }
 
@@ -99,11 +166,15 @@ impl CourseMilestone {
         milestone_id: u32,
         evidence_uri: String,
     ) {
+        if Self::is_paused(env.clone()) {
+            panic!("Contract is paused");
+        }
+
         Self::require_initialized(&env);
         learner.require_auth();
 
         if !Self::is_enrolled(env.clone(), learner.clone(), course_id.clone()) {
-            panic_with_error!(&env, Error::NotEnrolled);
+            panic_with_error!(&env, Error::Unauthorized);
         }
 
         let state_key = DataKey::MilestoneState(learner.clone(), course_id.clone(), milestone_id);
@@ -114,13 +185,14 @@ impl CourseMilestone {
             .unwrap_or(MilestoneStatus::NotStarted);
 
         if current_state != MilestoneStatus::NotStarted {
-            panic_with_error!(&env, Error::DuplicateSubmission);
+            panic_with_error!(&env, Error::Unauthorized);
         }
 
         let submission = MilestoneSubmission {
             evidence_uri: evidence_uri.clone(),
             submitted_at: env.ledger().timestamp(),
         };
+
         let submission_key =
             DataKey::MilestoneSubmission(learner.clone(), course_id.clone(), milestone_id);
 
@@ -162,6 +234,14 @@ impl CourseMilestone {
         env.storage().persistent().get(&key)
     }
 
+    pub fn get_enrolled_courses(env: Env, learner: Address) -> Vec<String> {
+        let key = DataKey::EnrolledCourses(learner);
+        env.storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or_else(|| Vec::new(&env))
+    }
+
     pub fn get_version(env: Env) -> String {
         String::from_str(&env, "1.0.0")
     }
@@ -172,6 +252,8 @@ impl CourseMilestone {
         }
     }
 }
+
+pub use learn_token_client::LearnTokenClient;
 
 #[cfg(test)]
 mod test;

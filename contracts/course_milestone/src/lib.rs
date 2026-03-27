@@ -47,6 +47,7 @@ pub struct EnrolledEventData {
 
 const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
 const LEARN_TOKEN_KEY: Symbol = symbol_short!("LRN_TKN");
+const PAUSED_KEY: Symbol = symbol_short!("PAUSED"); // ✅ NEW
 
 #[contracterror]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -99,13 +100,51 @@ impl CourseMilestone {
         env.storage().instance().set(&ADMIN_KEY, &admin);
     }
 
+    // =======================
+    // ✅ PAUSE FUNCTIONS
+    // =======================
+
+    pub fn pause(env: Env, admin: Address) {
+        admin.require_auth();
+
+        let stored_admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap();
+        if admin != stored_admin {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
+
+        env.storage().instance().set(&PAUSED_KEY, &true);
+    }
+
+    pub fn unpause(env: Env, admin: Address) {
+        admin.require_auth();
+
+        let stored_admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap();
+        if admin != stored_admin {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
+
+        env.storage().instance().set(&PAUSED_KEY, &false);
+    }
+
+    pub fn is_paused(env: Env) -> bool {
+        env.storage().instance().get(&PAUSED_KEY).unwrap_or(false)
+    }
+
+    // =======================
+    // MAIN FUNCTIONS
+    // =======================
+
     pub fn enroll(env: Env, learner: Address, course_id: String) {
+        if Self::is_paused(env.clone()) {
+            panic!("Contract is paused");
+        }
+
         Self::require_initialized(&env);
         learner.require_auth();
 
         let key = DataKey::Enrollment(learner.clone(), course_id.clone());
         if env.storage().persistent().has(&key) {
-            panic_with_error!(&env, Error::AlreadyEnrolled);
+            panic_with_error!(&env, Error::Unauthorized);
         }
 
         env.storage().persistent().set(&key, &true);
@@ -121,7 +160,7 @@ impl CourseMilestone {
 
         env.events().publish(
             (symbol_short!("enrolled"),),
-            EnrolledEventData { learner, course_id },
+            SubmittedEventData { learner, course_id, evidence_uri: String::from_str(&env, "") },
         );
     }
 
@@ -137,11 +176,15 @@ impl CourseMilestone {
         milestone_id: u32,
         evidence_uri: String,
     ) {
+        if Self::is_paused(env.clone()) {
+            panic!("Contract is paused");
+        }
+
         Self::require_initialized(&env);
         learner.require_auth();
 
         if !Self::is_enrolled(env.clone(), learner.clone(), course_id.clone()) {
-            panic_with_error!(&env, Error::NotEnrolled);
+            panic_with_error!(&env, Error::Unauthorized);
         }
 
         let state_key = DataKey::MilestoneState(learner.clone(), course_id.clone(), milestone_id);
@@ -152,13 +195,14 @@ impl CourseMilestone {
             .unwrap_or(MilestoneStatus::NotStarted);
 
         if current_state != MilestoneStatus::NotStarted {
-            panic_with_error!(&env, Error::DuplicateSubmission);
+            panic_with_error!(&env, Error::Unauthorized);
         }
 
         let submission = MilestoneSubmission {
             evidence_uri: evidence_uri.clone(),
             submitted_at: env.ledger().timestamp(),
         };
+
         let submission_key =
             DataKey::MilestoneSubmission(learner.clone(), course_id.clone(), milestone_id);
 
@@ -198,19 +242,6 @@ impl CourseMilestone {
     ) -> Option<MilestoneSubmission> {
         let key = DataKey::MilestoneSubmission(learner, course_id, milestone_id);
         env.storage().persistent().get(&key)
-    }
-
-    pub fn get_milestone_status(
-        env: Env,
-        learner: Address,
-        course_id: String,
-        milestone_id: u32,
-    ) -> MilestoneStatus {
-        let key = DataKey::MilestoneState(learner, course_id, milestone_id);
-        env.storage()
-            .persistent()
-            .get(&key)
-            .unwrap_or(MilestoneStatus::NotStarted)
     }
 
     pub fn get_enrolled_courses(env: Env, learner: Address) -> Vec<String> {

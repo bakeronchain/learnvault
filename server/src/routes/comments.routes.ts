@@ -258,37 +258,35 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 				// Actually, the user says "Proposal author can pin one comment".
 				// I'll need a way to verify this.
 
-				const commentRes = await pool.query(
-					`SELECT proposal_id FROM comments WHERE id = $1 AND deleted_at IS NULL`,
-					[id],
-				)
-				if (commentRes.rowCount === 0)
-					return res.status(404).json({ error: "Comment not found" })
+			const commentRes = await pool.query(
+				`SELECT proposal_id FROM comments WHERE id = $1 AND deleted_at IS NULL`,
+				[id],
+			)
+			if (commentRes.rowCount === 0)
+				return res.status(404).json({ error: "Comment not found" })
+			
+			const proposalId = commentRes.rows[0].proposal_id
 
-				const proposalId = commentRes.rows[0].proposal_id
-
-				// Verify caller is the author of the proposal
-				const proposalRes = await pool.query(
-					`SELECT author_address FROM proposals WHERE id = $1`,
-					[proposalId],
-				)
-				if (!proposalRes.rowCount || proposalRes.rowCount === 0) {
-					return res.status(404).json({ error: "Proposal not found" })
-				}
-				if (proposalRes.rows[0].author_address !== authorAddress) {
-					return res
-						.status(403)
-						.json({ error: "Only the proposal author can pin comments" })
-				}
-
-				// Reset pins for this proposal and pin this one
-				await pool.query(
-					`UPDATE comments SET is_pinned = FALSE WHERE proposal_id = $1`,
-					[proposalId],
-				)
-				await pool.query(`UPDATE comments SET is_pinned = TRUE WHERE id = $1`, [
-					id,
-				])
+			// Verify the requesting user is the proposal author
+			const proposalRes = await pool.query(
+				`SELECT author_address FROM proposals WHERE id = $1`,
+				[proposalId],
+			)
+			if (proposalRes.rowCount === 0)
+				return res.status(404).json({ error: "Proposal not found" })
+			
+			const proposalAuthor = proposalRes.rows[0].author_address
+			if (proposalAuthor.toLowerCase() !== authorAddress?.toLowerCase())
+				return res.status(403).json({ error: "Only the proposal author can pin comments" })
+			
+			// UPDATE: Reset pins for this proposal and pin this one
+			await pool.query(
+				`UPDATE comments SET is_pinned = FALSE WHERE proposal_id = $1`,
+				[proposalId],
+			)
+			await pool.query(`UPDATE comments SET is_pinned = TRUE WHERE id = $1`, [
+				id,
+			])
 
 				res.json({ message: "Comment pinned" })
 			} catch (err) {

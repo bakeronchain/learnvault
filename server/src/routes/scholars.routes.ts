@@ -5,6 +5,7 @@ import {
 	getScholarMilestones,
 	getScholarsLeaderboard,
 	getScholarProfile,
+	getScholarCredentials,
 } from "../controllers/scholars.controller"
 import { pool } from "../db/index"
 import { validate } from "../middleware/validate.middleware"
@@ -21,6 +22,10 @@ const scholarMilestonesQuerySchema = z.object({
 })
 
 const lrnHistoryParamsSchema = z.object({
+	address: z.string().trim().min(1, "address is required"),
+})
+
+const scholarCredentialsParamsSchema = z.object({
 	address: z.string().trim().min(1, "address is required"),
 })
 
@@ -169,6 +174,48 @@ scholarsRouter.get(
 			res.status(500).json({ error: "Failed to fetch LRN history" })
 		}
 	},
+)
+
+/**
+ * @openapi
+ * /api/scholars/{address}/credentials:
+ *   get:
+ *     tags: [Scholars]
+ *     summary: List ScholarNFT credentials for a wallet
+ *     parameters:
+ *       - in: path
+ *         name: address
+ *         required: true
+ *         schema: { type: string }
+ *         description: Scholar wallet address
+ *     responses:
+ *       200:
+ *         description: ScholarNFT credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 credentials:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       token_id: { type: integer }
+ *                       course_id: { type: string }
+ *                       course_title: { type: string }
+ *                       issued_at: { type: string, format: date-time }
+ *                       metadata_uri: { type: string }
+ *                       revoked: { type: boolean }
+ *       400:
+ *         $ref: '#/components/responses/BadRequestError'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+scholarsRouter.get(
+	"/scholars/:address/credentials",
+	validate({ params: scholarCredentialsParamsSchema }),
+	getScholarCredentials,
 )
 
 scholarsRouter.get("/scholars/leaderboard", (req, res) => {

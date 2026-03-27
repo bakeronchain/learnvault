@@ -5,6 +5,64 @@ use soroban_sdk::{
     Env, String,
 };
 
+// ---------------------------------------------------------------------------
+// Storage keys
+// ---------------------------------------------------------------------------
+
+const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
+const TOKEN_COUNTER_KEY: Symbol = symbol_short!("CTR");
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+#[derive(Clone)]
+#[contracttype]
+pub struct ScholarMetadata {
+    pub scholar: Address,
+    pub program_name: String,
+    pub completion_date: u64,
+    pub ipfs_uri: Option<String>,
+}
+
+#[derive(Clone)]
+#[contracttype]
+pub enum DataKey {
+    Owner(u64),
+    ScholarToken(Address),
+    Metadata(u64),
+    TokenUri(u64),
+}
+
+// ---------------------------------------------------------------------------
+// Event data types
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+pub struct MintEventData {
+    pub owner: Address,
+    pub metadata_uri: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+pub struct TransferAttemptEventData {
+    pub from: Address,
+    pub to: Address,
+    pub token_id: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+pub struct InitializedEventData {
+    pub admin: Address,
+}
+
+// ---------------------------------------------------------------------------
+// Errors
+// ---------------------------------------------------------------------------
+
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
@@ -35,7 +93,17 @@ impl ScholarNFT {
         if env.storage().instance().has(&DataKey::Admin) {
             panic_with_error!(&env, Error::AlreadyInitialized);
         }
-        env.storage().instance().set(&DataKey::Admin, &admin);
+        admin.require_auth();
+        env.storage().instance().set(&ADMIN_KEY, &admin);
+        env.storage()
+            .instance()
+            .set(&TOKEN_COUNTER_KEY, &0_u64);
+
+        // Emit initialized event
+        env.events().publish(
+            (symbol_short!("init"),),
+            InitializedEventData { admin },
+        );
     }
 
     /// Mint a new soulbound NFT. Only callable by admin.
@@ -65,6 +133,33 @@ impl ScholarNFT {
             panic_with_error!(&env, Error::Unauthorized);
         }
 
+        // Store the raw URI for token_uri() queries
+        env.storage()
+            .persistent()
+            .set(&DataKey::TokenUri(next_token_id), &metadata_uri);
+
+        // Rich metadata
+        let metadata = ScholarMetadata {
+            scholar: to.clone(),
+            program_name: metadata_uri.clone(),
+            completion_date: env.ledger().timestamp(),
+            ipfs_uri: Some(metadata_uri.clone()),
+        };
+        env.storage()
+            .persistent()
+            .set(&DataKey::Metadata(next_token_id), &metadata);
+
+        // Emit mint event
+        env.events().publish(
+            (symbol_short!("mint"), next_token_id),
+            MintEventData {
+                owner: to,
+                metadata_uri,
+            },
+        );
+
+        next_token_id
+    }
         let key = DataKey::Owner(token_id);
         if !env.storage().persistent().has(&key) {
             panic_with_error!(&env, Error::TokenNotFound);
@@ -85,6 +180,19 @@ impl ScholarNFT {
         );
     }
 
+    /// Transfers are **always** rejected — Scholar NFTs are soulbound.
+    pub fn transfer(env: Env, from: Address, to: Address, token_id: u64) {
+        // Emit transfer attempted event before panicking
+        env.events().publish(
+            (symbol_short!("xfer_att"),),
+            TransferAttemptEventData {
+                from,
+                to,
+                token_id,
+            },
+        );
+        panic_with_error!(&env, ScholarNFTError::Soulbound)
+    }
     /// Returns the owner of the token.
     /// owner_of() should return an error or special value for revoked tokens.
     pub fn owner_of(env: Env, token_id: u64) -> Address {

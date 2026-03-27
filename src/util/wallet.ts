@@ -28,9 +28,11 @@ export const connectWallet = async () => {
 				if (address.address) {
 					storage.setItem("walletId", selectedId)
 					storage.setItem("walletAddress", address.address)
+					storage.setItem("walletType", selectedId)
 				} else {
 					storage.setItem("walletId", "")
 					storage.setItem("walletAddress", "")
+					storage.setItem("walletType", "")
 				}
 			})
 			if (selectedId == "freighter" || selectedId == "hot-wallet") {
@@ -51,6 +53,7 @@ export const connectWallet = async () => {
 export const disconnectWallet = async () => {
 	await kit.disconnect()
 	storage.removeItem("walletId")
+	storage.removeItem("walletType")
 }
 
 function getHorizonHost(mode: string) {

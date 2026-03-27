@@ -2,20 +2,32 @@ import { Button, Icon, Text, Modal, Profile } from "@stellar/design-system"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useWallet } from "../hooks/useWallet"
-import { connectWallet, disconnectWallet } from "../util/wallet"
 
 export const WalletButton = () => {
 	const [showDisconnectModal, setShowDisconnectModal] = useState(false)
-	const { address, isPending, balances } = useWallet()
+	const { address, isPending, isReconnecting, balances } = useWallet()
 	const { t } = useTranslation()
-	const buttonLabel = isPending ? t("wallet.loading") : t("wallet.connect")
+	const buttonLabel =
+		isPending || isReconnecting ? t("wallet.loading") : t("wallet.connect")
+
+	const handleConnect = async () => {
+		const { connectWallet } = await import("../util/wallet")
+		await connectWallet()
+	}
+
+	const handleDisconnect = async () => {
+		const { disconnectWallet } = await import("../util/wallet")
+		await disconnectWallet()
+		setShowDisconnectModal(false)
+	}
 
 	if (!address) {
 		return (
 			<Button
 				variant="secondary"
 				size="md"
-				onClick={() => void connectWallet()}
+				onClick={() => void handleConnect()}
+				disabled={isReconnecting}
 			>
 				<Icon.Wallet02 />
 				{buttonLabel}
@@ -30,7 +42,7 @@ export const WalletButton = () => {
 				flexDirection: "row",
 				alignItems: "center",
 				gap: "5px",
-				opacity: isPending ? 0.6 : 1,
+				opacity: isPending || isReconnecting ? 0.6 : 1,
 			}}
 		>
 			<Text as="div" size="sm">
@@ -52,11 +64,7 @@ export const WalletButton = () => {
 						<Button
 							size="md"
 							variant="primary"
-							onClick={() => {
-								void disconnectWallet().then(() =>
-									setShowDisconnectModal(false),
-								)
-							}}
+							onClick={() => void handleDisconnect()}
 						>
 							{t("wallet.disconnect")}
 						</Button>

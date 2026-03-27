@@ -1,15 +1,26 @@
-import { Button, Icon } from "@stellar/design-system"
-import React from "react"
+﻿import { Button, Icon } from "@stellar/design-system"
+import React, { lazy, Suspense, useState } from "react"
 import { Helmet } from "react-helmet"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
-import { GuessTheNumber } from "../components/GuessTheNumber"
-import { MilestoneTracker } from "../components/MilestoneTracker"
-import OnboardingWizard from "../components/OnboardingWizard"
+import DeferredSection from "../components/DeferredSection"
 import { WalletAddressPill } from "../components/WalletAddressPill"
+
+const GuessTheNumber = lazy(() =>
+	import("../components/GuessTheNumber").then((module) => ({
+		default: module.GuessTheNumber,
+	})),
+)
+const MilestoneTracker = lazy(() =>
+	import("../components/MilestoneTracker").then((module) => ({
+		default: module.MilestoneTracker,
+	})),
+)
+const OnboardingWizard = lazy(() => import("../components/OnboardingWizard"))
 
 const Home: React.FC = () => {
 	const { t } = useTranslation()
+	const [showOnboarding, setShowOnboarding] = useState(false)
 
 	const mockMilestones = [
 		{ id: 1, label: t("home.milestones.1"), lrnReward: 10 },
@@ -18,7 +29,7 @@ const Home: React.FC = () => {
 	]
 
 	const siteUrl = "https://learnvault.app"
-	const title = "LearnVault — Learn Stellar & Soroban Development"
+	const title = "LearnVault - Learn Stellar & Soroban Development"
 	const description =
 		"Master Stellar blockchain and Soroban smart contract development. Earn ScholarNFTs, unlock LRN rewards, and join a community-governed learning DAO."
 
@@ -34,12 +45,41 @@ const Home: React.FC = () => {
 			</Helmet>
 
 			<div className="min-h-screen flex flex-col items-center py-20 px-6 relative overflow-hidden">
-				{/* Immersive Background Elements */}
 				<div className="absolute top-0 left-0 w-full h-full animate-mesh opacity-30 -z-20" />
-				<div className="absolute top-1/4 left-1/4 w-150 h-150 bg-brand-cyan/20 blur-[150px] rounded-full -z-10 animate-pulse" />
-				<div className="absolute bottom-1/4 right-1/4 w-150 h-150 bg-brand-purple/20 blur-[150px] rounded-full -z-10 animate-pulse delay-700" />
+				<div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-brand-cyan/20 blur-[150px] rounded-full -z-10 animate-pulse" />
+				<div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-brand-purple/20 blur-[150px] rounded-full -z-10 animate-pulse delay-700" />
 
-				<OnboardingWizard />
+				{showOnboarding ? (
+					<Suspense fallback={<SectionSkeleton className="mb-20 min-h-64" />}>
+						<OnboardingWizard />
+					</Suspense>
+				) : (
+					<section className="mb-16 w-full max-w-6xl rounded-[2rem] border border-white/10 bg-black/20 px-6 py-8 shadow-2xl backdrop-blur-xl md:px-8">
+						<div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+							<div className="max-w-3xl">
+								<p className="text-xs uppercase tracking-[0.35em] text-brand-cyan/80">
+									New Learner Flow
+								</p>
+								<h2 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">
+									Launch the guided wallet-and-enrollment setup only when you
+									need it.
+								</h2>
+								<p className="mt-3 text-base leading-relaxed text-white/60">
+									The onboarding assistant is still available, but it now loads
+									on demand so the dashboard shell reaches first paint faster on
+									mobile data.
+								</p>
+							</div>
+							<Button
+								size="lg"
+								variant="primary"
+								onClick={() => setShowOnboarding(true)}
+							>
+								Start guided setup
+							</Button>
+						</div>
+					</section>
+				)}
 
 				<header className="text-center max-w-4xl mx-auto mb-24">
 					<div className="inline-block mb-10 animate-in fade-in zoom-in duration-1000">
@@ -59,7 +99,7 @@ const Home: React.FC = () => {
 							to="/courses"
 							className="iridescent-border px-12 py-5 rounded-2xl font-black text-lg uppercase tracking-widest hover:scale-105 active:scale-95 transition-all group relative overflow-hidden shadow-2xl shadow-brand-cyan/20"
 						>
-							<span className="relative z-10">Browse Tracks</span>
+							<span className="relative z-10">{t("nav.courses")}</span>
 						</Link>
 						<Link
 							to="/learn"
@@ -69,16 +109,13 @@ const Home: React.FC = () => {
 						</Link>
 					</div>
 				</header>
+
 				<div className="flex justify-center mb-8">
-					<WalletAddressPill
-						address="GABC1234567890ABCDEFGHWXYZ"
-						showLink={true}
-					/>
+					<WalletAddressPill address="GABC1234567890ABCDEFGHWXYZ" showLink />
 				</div>
 
 				<main className="w-full max-w-6xl flex flex-col gap-12 relative z-10 animate-in slide-in-from-bottom-12 duration-1000 delay-800">
-					{/* Upstream Content: Course Progress */}
-					<div className="iridescent-border p-1px rounded-[3.5rem] shadow-2xl">
+					<div className="iridescent-border p-[1px] rounded-[3.5rem] shadow-2xl">
 						<div className="glass-card p-12 rounded-[3.5rem] border border-white/5">
 							<div className="flex flex-col md:flex-row gap-12 items-start">
 								<div className="md:w-1/3">
@@ -91,16 +128,23 @@ const Home: React.FC = () => {
 									</p>
 								</div>
 								<div className="md:w-2/3 w-full">
-									<MilestoneTracker
-										courseId="stellar-basics"
-										milestones={mockMilestones}
-									/>
+									<DeferredSection
+										fallback={<SectionSkeleton className="min-h-40" />}
+									>
+										<Suspense
+											fallback={<SectionSkeleton className="min-h-40" />}
+										>
+											<MilestoneTracker
+												courseId="stellar-basics"
+												milestones={mockMilestones}
+											/>
+										</Suspense>
+									</DeferredSection>
 								</div>
 							</div>
 						</div>
 					</div>
 
-					{/* Upstream Content: Sample Contracts */}
 					<div className="glass-card p-12 rounded-[3.5rem] border border-white/10 shadow-2xl">
 						<h2 className="text-3xl font-black mb-10 flex items-center gap-4">
 							<Icon.File06 size="lg" className="text-brand-purple" />
@@ -125,7 +169,13 @@ const Home: React.FC = () => {
 									</Link>{" "}
 									{t("home.sampleContracts.guessDesc2")}
 								</p>
-								<GuessTheNumber />
+								<DeferredSection
+									fallback={<SectionSkeleton className="min-h-40" />}
+								>
+									<Suspense fallback={<SectionSkeleton className="min-h-40" />}>
+										<GuessTheNumber />
+									</Suspense>
+								</DeferredSection>
 							</div>
 
 							<div className="space-y-10 flex flex-col justify-center border-l border-white/10 pl-12">
@@ -156,20 +206,19 @@ const Home: React.FC = () => {
 						</div>
 					</div>
 
-					{/* Features Cards */}
 					<div className="grid grid-cols-1 md:grid-cols-3 gap-8">
 						<FeatureCard
-							icon="🎓"
+							icon={"\u{1F393}"}
 							title="ScholarNFTs"
 							description="Your hard-earned expertise, permanently immortalized as verifiable credentials on the Stellar network."
 						/>
 						<FeatureCard
-							icon="💰"
+							icon={"\u{1F4B0}"}
 							title="Automated Funding"
 							description="Decentralized treasury disbursements triggered instantly upon milestone completion via Soroban contracts."
 						/>
 						<FeatureCard
-							icon="🏛"
+							icon={"\u{1F3DB}"}
 							title="Community DAO"
 							description="A protocol governed by the scholars who use it. Vote on curriculum, treasury, and reputation standards."
 						/>
@@ -192,6 +241,12 @@ const FeatureCard: React.FC<{
 		<h3 className="text-2xl font-black mb-4 tracking-tight">{title}</h3>
 		<p className="text-white/40 leading-relaxed font-medium">{description}</p>
 	</div>
+)
+
+const SectionSkeleton = ({ className = "" }: { className?: string }) => (
+	<div
+		className={`glass-card animate-pulse rounded-[2rem] border border-white/5 bg-white/5 ${className}`.trim()}
+	/>
 )
 
 export default Home

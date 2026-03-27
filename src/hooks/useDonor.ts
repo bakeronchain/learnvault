@@ -1,258 +1,186 @@
 import { useEffect, useState } from "react"
+import { useToast } from "../components/Toast/ToastProvider"
 import { rpcUrl } from "../contracts/util"
+import {
+	type DonorData,
+	type DonorContribution,
+	type Vote,
+	type RpcEvent,
+} from "../types/contracts"
+import { useContractIds } from "./useContractIds"
 import { useWallet } from "./useWallet"
 
-export interface DonorContribution {
-	txHash: string
-	amount: number
-	date: string
-	block: number
+export type {
+	DonorContribution,
+	DonorStats,
+	Vote,
+	Scholar,
+	DonorData,
+} from "../types/contracts"
+
+const emptyStats: DonorStats = {
+	totalContributed: 0,
+	governanceBalance: 0,
+	governancePercentage: 0,
+	proposalsVoted: 0,
+	scholarsFunded: 0,
 }
 
-export interface DonorStats {
-	totalContributed: number
-	governanceBalance: number
-	governancePercentage: number
-	activeVotes: number
-	scholarsEnabled: number
+const makeEmptyData = (): DonorData => ({
+	stats: emptyStats,
+	contributions: [],
+	votes: [],
+	scholars: [],
+	isLoading: false,
+	error: null,
+	isEmpty: true,
+})
+
+const toDate = (input?: string): string => {
+	if (!input) return new Date().toISOString().split("T")[0] ?? ""
+	const d = new Date(input)
+	return Number.isNaN(d.getTime())
+		? (new Date().toISOString().split("T")[0] ?? "")
+		: (d.toISOString().split("T")[0] ?? "")
 }
 
-export interface Vote {
-	proposalId: string
-	proposalTitle: string
-	voteChoice: "for" | "against"
-	votePower: number
-	status: "active" | "passed" | "rejected"
+const stringify = (value: unknown): string =>
+	JSON.stringify(value ?? null).toLowerCase()
+
+const extractNumber = (value: unknown): number => {
+	const text = stringify(value)
+	const match = text.match(/(\d{1,18})/)
+	return match ? Number.parseInt(match[1] ?? "0", 10) : 0
 }
 
-export interface Scholar {
-	id: string
-	name: string
-	proposalAmount: number
-	fundedPercentage: number
-	progressPercentage: number
-	status: "active" | "completed"
-}
-
-export interface DonorData {
-	stats: DonorStats
-	contributions: DonorContribution[]
-	votes: Vote[]
-	scholars: Scholar[]
-	isLoading: boolean
-	error: string | null
-}
-
-const readEnv = (key: string): string | undefined => {
-	const value = (import.meta.env as Record<string, unknown>)[key]
-	return typeof value === "string" && value.length ? value : undefined
-}
-
-const TREASURY_CONTRACT = readEnv("PUBLIC_SCHOLARSHIP_TREASURY_CONTRACT")
-const GOVERNANCE_CONTRACT = readEnv("PUBLIC_GOVERNANCE_TOKEN_CONTRACT")
-
-const fetchContractEvents = async (
+const readContractEvents = async (
 	contractIds: string[],
 	walletAddress: string,
-): Promise<Array<Record<string, unknown>>> => {
+): Promise<RpcEvent[]> => {
 	if (!contractIds.length) return []
-
-	try {
-		const response = await fetch(rpcUrl, {
-			method: "POST",
-			headers: { "content-type": "application/json" },
-			body: JSON.stringify({
-				jsonrpc: "2.0",
-				id: "donor-events",
-				method: "getEvents",
-				params: {
-					filters: [{ type: "contract", contractIds }],
-					pagination: { limit: 100 },
-				},
-			}),
-		})
-
-		if (!response.ok) return []
-		const payload = (await response.json()) as {
-			result?: { events?: Array<Record<string, unknown>> }
-		}
-		const events = payload.result?.events ?? []
-		return events.filter((evt) =>
-			JSON.stringify(evt).toLowerCase().includes(walletAddress.toLowerCase()),
-		)
-	} catch {
-		return []
+	const response = await fetch(rpcUrl, {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify({
+			jsonrpc: "2.0",
+			id: "donor-events",
+			method: "getEvents",
+			params: {
+				filters: [{ type: "contract", contractIds }],
+				pagination: { limit: 200 },
+			},
+		}),
+	})
+	if (!response.ok) return []
+	const payload = (await response.json()) as {
+		result?: { events?: RpcEvent[] }
 	}
-}
-
-// Mock data generator for development
-const generateMockDonorData = (_address: string): DonorData => {
-	const contributions: DonorContribution[] = [
-		{
-			txHash: "abc123def456...",
-			amount: 5000,
-			date: "2024-03-10",
-			block: 48234523,
-		},
-		{
-			txHash: "xyz789uvw123...",
-			amount: 2500,
-			date: "2024-02-15",
-			block: 48123456,
-		},
-		{
-			txHash: "pqr456stu890...",
-			amount: 10000,
-			date: "2024-01-20",
-			block: 48012345,
-		},
-	]
-
-	const votes: Vote[] = [
-		{
-			proposalId: "1",
-			proposalTitle: "Incentivize Soroban Developers with LRN",
-			voteChoice: "for",
-			votePower: 5000,
-			status: "active",
-		},
-		{
-			proposalId: "2",
-			proposalTitle: "Upgrade Protocol to v22",
-			voteChoice: "for",
-			votePower: 5000,
-			status: "passed",
-		},
-	]
-
-	const scholars: Scholar[] = [
-		{
-			id: "scholar-001",
-			name: "Amara Okafor",
-			proposalAmount: 5000,
-			fundedPercentage: 100,
-			progressPercentage: 75,
-			status: "active",
-		},
-		{
-			id: "scholar-002",
-			name: "Jordan Zhang",
-			proposalAmount: 2500,
-			fundedPercentage: 100,
-			progressPercentage: 100,
-			status: "completed",
-		},
-	]
-
-	return {
-		stats: {
-			totalContributed: 17500,
-			governanceBalance: 17500,
-			governancePercentage: 2.3,
-			activeVotes: 2,
-			scholarsEnabled: 2,
-		},
-		contributions,
-		votes,
-		scholars,
-		isLoading: false,
-		error: null,
-	}
+	const events = payload.result?.events ?? []
+	return events.filter((evt) =>
+		stringify(evt).includes(walletAddress.toLowerCase()),
+	)
 }
 
 export const useDonor = (): DonorData => {
 	const { address } = useWallet()
+	const { scholarshipTreasury, governanceToken } = useContractIds()
+	const { showError } = useToast()
 	const [data, setData] = useState<DonorData>({
-		stats: {
-			totalContributed: 0,
-			governanceBalance: 0,
-			governancePercentage: 0,
-			activeVotes: 0,
-			scholarsEnabled: 0,
-		},
-		contributions: [],
-		votes: [],
-		scholars: [],
+		...makeEmptyData(),
 		isLoading: true,
-		error: null,
 	})
 
 	useEffect(() => {
-		const loadData = async () => {
+		let cancelled = false
+
+		const run = async () => {
 			if (!address) {
-				setData((prev) => ({ ...prev, isLoading: false }))
+				if (!cancelled) setData(makeEmptyData())
 				return
 			}
 
+			setData((prev) => ({ ...prev, isLoading: true, error: null }))
 			try {
-				// Fetch events from contracts
-				const contractIds = [TREASURY_CONTRACT, GOVERNANCE_CONTRACT].filter(
+				const contractIds = [scholarshipTreasury, governanceToken].filter(
 					(id): id is string => Boolean(id),
 				)
-
-				if (!contractIds.length) {
-					// Development mode: use mock data
-					setData(generateMockDonorData(address))
-					return
-				}
-
-				const events = await fetchContractEvents(contractIds, address)
-
-				// Parse contribution events
+				const events = await readContractEvents(contractIds, address)
 				const contributions: DonorContribution[] = events
 					.filter((evt) =>
-						JSON.stringify(evt).toLowerCase().includes("deposit"),
+						stringify({
+							topic: evt.topics ?? evt.topic,
+							value: evt.value,
+						}).includes("deposit"),
 					)
-					.slice(0, 10)
-					.map((evt, idx) => ({
-						txHash: `tx_${evt.id ?? idx}`,
-						amount: Math.floor(Math.random() * 10000) + 1000,
-						date: new Date(
-							(evt.ledgerCloseTime as string) ?? new Date().toISOString(),
-						)
-							.toISOString()
-							.split("T")[0],
-						block: (evt.ledger as number) ?? 0,
+					.map((evt, i) => ({
+						txHash: evt.txHash ?? evt.id ?? `deposit-${i}`,
+						amount: extractNumber(evt.value),
+						date: toDate(evt.ledgerCloseTime),
+						block: evt.ledger ?? 0,
 					}))
-					.filter((c): c is DonorContribution => Boolean(c))
+					.filter((entry) => entry.amount > 0)
 
-				// In production, parse actual vote and scholar data from events
-				// For now, use mock data as a fallback
-				setData((prev) => ({
-					...prev,
-					contributions,
-					isLoading: false,
-				}))
+				const votes: Vote[] = events
+					.filter((evt) =>
+						stringify({
+							topic: evt.topics ?? evt.topic,
+							value: evt.value,
+						}).includes("vote"),
+					)
+					.map((evt, i): Vote => {
+						const text = stringify(evt.value)
+						return {
+							proposalId: String(i + 1),
+							proposalTitle: `Proposal #${i + 1}`,
+							voteChoice: text.includes("false") ? "against" : "for",
+							votePower: extractNumber(evt.value),
+							status: "active" as const,
+						}
+					})
+					.filter((entry) => entry.votePower > 0)
 
-				// Load additional data (mock for now)
-				const mockData = generateMockDonorData(address)
-				setData((prev) => ({
-					...prev,
-					votes: mockData.votes,
-					scholars: mockData.scholars,
+				const totalContributed = contributions.reduce(
+					(sum, c) => sum + c.amount,
+					0,
+				)
+				const scholarsFunded = new Set(
+					events
+						.filter((evt) => stringify(evt).includes("disburse"))
+						.map((evt) => evt.txHash ?? evt.id ?? ""),
+				).size
+
+				const next: DonorData = {
 					stats: {
-						...prev.stats,
-						totalContributed: contributions.reduce(
-							(sum, c) => sum + c.amount,
-							0,
-						),
-						governanceBalance: contributions.reduce(
-							(sum, c) => sum + c.amount,
-							0,
-						),
+						totalContributed,
+						governanceBalance: totalContributed,
+						governancePercentage: 0,
+						proposalsVoted: votes.length,
+						scholarsFunded,
 					},
-				}))
-			} catch (_err) {
-				setData((prev) => ({
-					...prev,
-					error: "Failed to load donor data",
+					contributions,
+					votes,
+					scholars: [],
 					isLoading: false,
-				}))
+					error: null,
+					isEmpty: contributions.length === 0 && votes.length === 0,
+				}
+				if (!cancelled) setData(next)
+			} catch {
+				if (!cancelled) {
+					setData({
+						...makeEmptyData(),
+						error: "Failed to load donor data",
+					})
+				}
+				showError("Failed to load donor data")
 			}
 		}
 
-		void loadData()
-	}, [address])
+		void run()
+		return () => {
+			cancelled = true
+		}
+	}, [address, scholarshipTreasury, governanceToken, showError])
 
 	return data
 }

@@ -1,5 +1,11 @@
 # LearnVault — Official Documentation
 
+<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
+
+[![All Contributors](https://img.shields.io/badge/all_contributors-1-orange.svg?style=flat-square)](#contributors-)
+
+<!-- ALL-CONTRIBUTORS-BADGE:END -->
+
 [![Contracts CI](https://github.com/robertocarlous/learnvault/actions/workflows/contracts-ci.yml/badge.svg)](https://github.com/robertocarlous/learnvault/actions/workflows/contracts-ci.yml)
 [![Frontend CI](https://github.com/bakeronchain/learnvault/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/bakeronchain/learnvault/actions/workflows/frontend-ci.yml)
 
@@ -89,6 +95,7 @@ stablecoins — real, stable value delivered directly to their wallets.
 ---
 
 ## Platform Architecture
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │                     LEARNVAULT                       │
@@ -185,7 +192,8 @@ Shareable with employers, DAOs, and the broader ecosystem.
 ## The Earn Loop
 
 LearnVault's flywheel is designed so that effort compounds over time:
-```
+
+````
 Complete Lesson
        │
        ▼
@@ -201,21 +209,18 @@ Submit Scholarship Proposal
    ```bash
    # Fund your deployer address for testing
    stellar friendbot fund <NETWORK> <ADDRESS>
-   
+
    # Example:
    stellar friendbot fund testnet GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-   ```
+````
 
 **Deployer Address:**
+
 - For testing on Stellar Testnet, use the friendbot-funded deployer:
-  `GDU2P3YJ5K7E6ZK3Q2K7E6ZK3Q2K7E6ZK3Q2K7E6ZK3`
-       │
-       ▼
-Mint ScholarNFT Credential
-       │
-       ▼
-Higher Reputation ──▶ Larger Future Proposals ──▶ Loop Continues
-```
+  `GDU2P3YJ5K7E6ZK3Q2K7E6ZK3Q2K7E6ZK3Q2K7E6ZK3` │ ▼ Mint ScholarNFT Credential │
+  ▼ Higher Reputation ──▶ Larger Future Proposals ──▶ Loop Continues
+
+````
 
 The more you learn, the more power and opportunity you unlock. Wealth is not the
 barrier — effort is the currency.
@@ -333,13 +338,15 @@ two-step build process:
 
    ```bash
    npx @mermaid-js/mermaid-cli -i docs/architecture.mmd -o docs/architecture.png
-```
+````
 
 2. **Generate the PDF:** Once the diagrams are compiled and embedded as standard
    markdown image links, generate the final PDF using `md-to-pdf`:
    ```bash
    npx md-to-pdf docs/whitepaper.md
-```
+   ```
+
+````
 
 ---
 
@@ -351,9 +358,10 @@ two-step build process:
    ```bash
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    npm install -g @stellar/stellar-cli
-   ```
+````
 
 2. **Install Visual Studio Build Tools (Windows):**
+
    ```bash
    # Download Visual Studio Build Tools installer
    # Visit: https://visualstudio.microsoft.com/downloads/
@@ -361,15 +369,17 @@ two-step build process:
    ```
 
 3. **Configure Environment:**
+
    ```bash
    # Copy environment template
    cp .env.example .env
-   
+
    # Edit .env with your configuration
    # Set STELLAR_SCAFFOLD_ENV=testnet for testnet deployment
    ```
 
 ### Run Tests
+
 ```bash
 npm test                 # runs all Soroban contract tests
 npm run test:contracts   # alias for the above
@@ -394,13 +404,15 @@ To contribute:
 
 All contributors are recognized on-chain and in our official documentation.
 
-Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing. We expect all participants to uphold these standards.
+Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing. We
+expect all participants to uphold these standards.
 
 ---
 
 ## Resources
 
-- [Glossary](docs/glossary.md) — Key terms, tokens, and contracts explained in plain English
+- [Glossary](docs/glossary.md) — Key terms, tokens, and contracts explained in
+  plain English
 
 ---
 
@@ -421,3 +433,37 @@ effort._ \n## Architecture Decisions\n\n- [ADR-001.md](docs/adr/ADR-001.md)\n-
 [ADR-002.md](docs/adr/ADR-002.md)\n- [ADR-003.md](docs/adr/ADR-003.md)\n-
 [ADR-004.md](docs/adr/ADR-004.md)\n- [ADR-005.md](docs/adr/ADR-005.md)\n-
 [ADR-006.md](docs/adr/ADR-006.md)\n- [ADR-007.md](docs/adr/ADR-007.md)\n
+
+## Contributors ✨
+
+Thanks goes to these wonderful people
+([emoji key](https://allcontributors.org/docs/en/emoji-key)):
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/bakeronchain"><img src="https://avatars.githubusercontent.com/u/242071730?v=4?s=100" width="100px;" alt="bakeronchain"/><br /><sub><b>bakeronchain</b></sub></a><br /><a href="https://github.com/bakeronchain/learnvault/commits?author=bakeronchain" title="Code">💻</a> <a href="https://github.com/bakeronchain/learnvault/commits?author=bakeronchain" title="Documentation">📖</a></td>
+    </tr>
+  </tbody>
+  <tfoot>
+    <tr>
+      <td align="center" size="13px" colspan="7">
+        <img src="https://raw.githubusercontent.com/all-contributors/all-contributors-cli/1b8533af435da9854653492b1327a23a4dbd0a10/assets/logo-small.svg">
+          <a href="https://all-contributors.js.org/docs/en/bot/usage">Add your contributions</a>
+        </img>
+      </td>
+    </tr>
+  </tfoot>
+</table>
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+
+This project follows the
+[all-contributors](https://github.com/all-contributors/all-contributors)
+specification. Contributions of any kind welcome!

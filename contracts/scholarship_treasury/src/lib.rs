@@ -1,8 +1,9 @@
 #![no_std]
+#![allow(clippy::too_many_arguments)]
 
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, panic_with_error,
-    symbol_short, Address, Env, String, Symbol, Vec,
+    Address, Env, String, Symbol, Vec, contract, contracterror, contractevent, contractimpl,
+    contracttype, panic_with_error, symbol_short,
 };
 
 const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
@@ -14,6 +15,10 @@ const DISBURSED_KEY: Symbol = symbol_short!("DISBURSED");
 const SCHOLARS_KEY: Symbol = symbol_short!("SCHOLARS");
 const DONORS_KEY: Symbol = symbol_short!("DONORS");
 const PAUSED_KEY: Symbol = symbol_short!("PAUSED");
+const TOTAL_GOV_KEY: Symbol = symbol_short!("TOTALGOV");
+const GOV_PER_USDC: i128 = 100;
+/// Minimum quorum in basis points (1 000 bps = 10 % of total GOV supply must vote).
+const MIN_QUORUM_BPS: i128 = 1_000;
 
 #[derive(Clone)]
 #[contracttype]
@@ -22,7 +27,8 @@ pub enum DataKey {
     Proposal(u32),
     ApplicantProposals(Address),
     Scholar(Address),
-    VoteCast(u32, Address),   // (proposal_id, voter) -> bool
+    VoteCast(u32, Address),       // (proposal_id, voter) -> bool
+    FinalizedProposal(u32),       // proposal_id -> ProposalStatus (set by finalize_proposal)
 }
 
 #[derive(Clone)]
@@ -43,6 +49,14 @@ pub struct Proposal {
     pub deadline_ledger: u32,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+pub enum ProposalStatus {
+    Pending,
+    Approved,
+    Rejected,
+}
+
 #[contracterror]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
@@ -55,6 +69,12 @@ pub enum Error {
     ProposalNotFound = 6,
     AlreadyVoted = 7,
     VotingClosed = 8,
+    /// Votes cast after the proposal's voting deadline.
+    VotingPeriodEnded = 9,
+    /// finalize_proposal called before the voting deadline has passed.
+    TooEarlyToFinalize = 10,
+    /// Proposal finalized but total votes cast did not reach MIN_QUORUM_BPS.
+    QuorumNotMet = 11,
 }
 
 #[contract]
@@ -66,6 +86,15 @@ pub struct DepositRecorded {
     #[topic]
     pub donor: Address,
     pub amount: i128,
+}
+
+#[contractevent(topics = ["gov_issued"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GovIssued {
+    #[topic]
+    pub donor: Address,
+    pub usdc_amount: i128,
+    pub gov_amount: i128,
 }
 
 #[contractevent(topics = ["disburse"])]
@@ -144,11 +173,30 @@ impl ScholarshipTreasury {
         donor.require_auth();
 
         let usdc = token::client(&env);
-        usdc.transfer(&donor, &env.current_contract_address(), &amount);
+        usdc.transfer(&donor, env.current_contract_address(), &amount);
 
         let gov_contract = Self::governance_contract(&env);
         let gov_client = governance::client(&env, &gov_contract);
-        gov_client.mint(&donor, &amount);
+        let gov_amount = amount
+            .checked_mul(GOV_PER_USDC)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::InvalidAmount));
+        gov_client.mint(&donor, &gov_amount);
+        GovIssued {
+            donor: donor.clone(),
+            usdc_amount: amount,
+            gov_amount,
+        }
+        .publish(&env);
+
+        // Track total GOV issued for quorum calculations
+        let total_gov = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&TOTAL_GOV_KEY)
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&TOTAL_GOV_KEY, &(total_gov + gov_amount));
 
         let donor_key = DataKey::Donor(donor.clone());
         let current = env
@@ -241,6 +289,10 @@ impl ScholarshipTreasury {
             .instance()
             .get::<_, i128>(&DISBURSED_KEY)
             .unwrap_or(0)
+    }
+
+    pub fn get_exchange_rate(_env: Env) -> i128 {
+        GOV_PER_USDC
     }
 
     pub fn get_scholars_count(env: Env) -> u32 {
@@ -356,6 +408,31 @@ impl ScholarshipTreasury {
             .unwrap_or(Vec::new(&env))
     }
 
+    pub fn get_proposals_by_status(env: Env, status: ProposalStatus) -> Vec<Proposal> {
+        let proposal_count = Self::get_proposal_count(env.clone());
+        let mut proposal_id = 1_u32;
+        let mut proposals = Vec::new(&env);
+
+        while proposal_id <= proposal_count {
+            if let Some(proposal) = env
+                .storage()
+                .persistent()
+                .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+            {
+                if Self::proposal_status(&env, &proposal) == status {
+                    proposals.push_back(proposal);
+                }
+            }
+            proposal_id += 1;
+        }
+
+        proposals
+    }
+
+    pub fn get_active_proposals(env: Env) -> Vec<Proposal> {
+        Self::get_proposals_by_status(env, ProposalStatus::Pending)
+    }
+
     pub fn get_proposal_count(env: Env) -> u32 {
         env.storage()
             .instance()
@@ -375,9 +452,9 @@ impl ScholarshipTreasury {
             .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
             .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
 
-        // 3. Panic VotingClosed if past deadline
+        // 3. Panic VotingPeriodEnded if past deadline
         if env.ledger().sequence() > proposal.deadline_ledger {
-            panic_with_error!(&env, Error::VotingClosed);
+            panic_with_error!(&env, Error::VotingPeriodEnded);
         }
 
         // 4. Panic AlreadyVoted if VoteCast(proposal_id, voter) exists
@@ -394,7 +471,7 @@ impl ScholarshipTreasury {
         // 5. Get voter's GOV token balance as weight
         let gov_contract = Self::governance_contract(&env);
         let gov_client = governance::client(&env, &gov_contract);
-        let weight = gov_client.balance(&voter);
+        let weight = gov_client.get_voting_power(&voter);
         // Weight of 0 is permitted; vote is recorded but has no numerical effect on outcome
 
         // 6. Add weight to yes_votes or no_votes
@@ -422,6 +499,77 @@ impl ScholarshipTreasury {
         .publish(&env);
     }
 
+    /// Finalize a proposal once its voting deadline has passed.
+    ///
+    /// Only the admin may call this. The outcome is:
+    /// - **Rejected** if total votes cast < MIN_QUORUM_BPS of total GOV supply.
+    /// - **Approved** if quorum is met and `yes_votes > no_votes`.
+    /// - **Rejected** otherwise (tie or majority against).
+    ///
+    /// The result is stored under `DataKey::FinalizedProposal(proposal_id)` so
+    /// it can be read back without re-running the tally.
+    pub fn finalize_proposal(env: Env, admin: Address, proposal_id: u32) -> ProposalStatus {
+        admin.require_auth();
+        let stored_admin = Self::admin(&env);
+        if admin != stored_admin {
+            panic_with_error!(&env, Error::NotInitialized);
+        }
+
+        let proposal = env
+            .storage()
+            .persistent()
+            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
+
+        // Must be called after the voting deadline
+        if env.ledger().sequence() <= proposal.deadline_ledger {
+            panic_with_error!(&env, Error::TooEarlyToFinalize);
+        }
+
+        // Quorum check: (yes + no) / total_gov >= MIN_QUORUM_BPS / 10_000
+        let total_gov = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&TOTAL_GOV_KEY)
+            .unwrap_or(0);
+
+        let total_votes = proposal.yes_votes + proposal.no_votes;
+        let quorum_met = total_gov > 0
+            && total_votes.checked_mul(10_000)
+                .map(|tv| tv / total_gov >= MIN_QUORUM_BPS)
+                .unwrap_or(false);
+
+        let status = if !quorum_met {
+            ProposalStatus::Rejected
+        } else if proposal.yes_votes > proposal.no_votes {
+            ProposalStatus::Approved
+        } else {
+            ProposalStatus::Rejected
+        };
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::FinalizedProposal(proposal_id), &status.clone());
+
+        status
+    }
+
+    /// Returns the finalized status for a proposal if `finalize_proposal` has
+    /// been called, or `None` if it hasn't been finalized yet.
+    pub fn get_finalized_status(env: Env, proposal_id: u32) -> Option<ProposalStatus> {
+        env.storage()
+            .persistent()
+            .get::<_, ProposalStatus>(&DataKey::FinalizedProposal(proposal_id))
+    }
+
+    /// Returns the total GOV tokens issued so far (used for quorum calculation).
+    pub fn get_total_gov_issued(env: Env) -> i128 {
+        env.storage()
+            .instance()
+            .get::<_, i128>(&TOTAL_GOV_KEY)
+            .unwrap_or(0)
+    }
+
     fn governance_contract(env: &Env) -> Address {
         if let Some(governance) = env.storage().instance().get::<_, Address>(&GOV_KEY) {
             governance
@@ -443,11 +591,25 @@ impl ScholarshipTreasury {
         }
     }
 
+    fn proposal_status(env: &Env, proposal: &Proposal) -> ProposalStatus {
+        if env.ledger().sequence() <= proposal.deadline_ledger {
+            ProposalStatus::Pending
+        } else if proposal.yes_votes > proposal.no_votes {
+            ProposalStatus::Approved
+        } else {
+            ProposalStatus::Rejected
+        }
+    }
+
     fn admin(env: &Env) -> Address {
         env.storage()
             .instance()
             .get(&ADMIN_KEY)
             .unwrap_or_else(|| panic_with_error!(env, Error::NotInitialized))
+    }
+
+    pub fn get_version(env: Env) -> String {
+        String::from_str(&env, "1.0.0")
     }
 }
 
@@ -459,9 +621,11 @@ mod governance {
     }
 
     #[soroban_sdk::contractclient(name = "GovernanceTokenClient")]
+    #[allow(dead_code)]
     pub trait GovernanceTokenInterface {
         fn mint(env: Env, to: Address, amount: i128);
         fn balance(env: Env, account: Address) -> i128;
+        fn get_voting_power(env: Env, address: Address) -> i128;
     }
 }
 
@@ -470,9 +634,8 @@ pub use governance::GovernanceTokenClient;
 mod token {
     #[cfg(test)]
     mod test_token {
-        use soroban_sdk::{symbol_short, Address, Env, Symbol};
+        use soroban_sdk::{Address, Env};
 
-        // const TOKEN_KEY: Symbol = symbol_short!("TOK");
         use super::super::USDC_KEY;
 
         pub fn contract_id(env: &Env) -> Address {

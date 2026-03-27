@@ -1,4 +1,3 @@
-import { Icon } from "@stellar/design-system"
 import { motion, AnimatePresence } from "framer-motion"
 import { useState } from "react"
 import { stellarNetwork } from "../contracts/util"

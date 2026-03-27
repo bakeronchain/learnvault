@@ -3,6 +3,8 @@ import React, { useEffect, useMemo, useState } from "react"
 import { useParams, Navigate } from "react-router-dom"
 import LessonContent from "../components/LessonContent"
 import LessonSidebar from "../components/LessonSidebar"
+import MilestoneSubmitPanel from "../components/MilestoneSubmitPanel"
+import { LessonListSkeleton } from "../components/skeletons/LessonListSkeleton"
 import { courses } from "../data/courses"
 import { getCourseLessons, getLesson } from "../data/lessons"
 import { useCourse } from "../hooks/useCourse"
@@ -143,12 +145,16 @@ const LessonView: React.FC = () => {
 
 			<div className="grid grid-cols-1 lg:grid-cols-[1fr_2.5fr] gap-8">
 				<div className="lg:sticky lg:top-28 h-fit">
-					<LessonSidebar
-						courseId={course.id}
-						lessons={allLessons}
-						completedMilestones={completedMilestones}
-						currentLessonId={lessonId}
-					/>
+					{isLoadingContent ? (
+						<LessonListSkeleton />
+					) : (
+						<LessonSidebar
+							courseId={course.id}
+							lessons={allLessons}
+							completedMilestones={completedMilestones}
+							currentLessonId={lessonId}
+						/>
+					)}
 				</div>
 
 				<div>
@@ -162,6 +168,15 @@ const LessonView: React.FC = () => {
 						nextLessonId={nextLessonId}
 						isNextLocked={isNextLocked}
 					/>
+
+					{lesson.isMilestone && !isLoadingContent && (
+						<div className="mt-12 animate-in fade-in slide-in-from-top-4 duration-1000">
+							<MilestoneSubmitPanel
+								courseId={course.id}
+								milestoneId={lesson.id}
+							/>
+						</div>
+					)}
 				</div>
 			</div>
 		</div>

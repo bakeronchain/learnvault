@@ -1,14 +1,10 @@
-import { ContractExplorer, loadContracts } from "@theahaco/contract-explorer"
+import { lazy, Suspense } from "react"
 import { useTranslation } from "react-i18next"
-import { network } from "../contracts/util"
-import { useWallet } from "../hooks/useWallet"
-
-// Import contract clients and load them for the Contract Explorer
-const contractModules = import.meta.glob("../contracts/*.ts")
-const contracts = await loadContracts(contractModules)
+const ContractExplorerPanel = lazy(
+	() => import("../components/debug/ContractExplorerPanel"),
+)
 
 const Debugger: React.FC = () => {
-	const { address, signTransaction } = useWallet()
 	const { t } = useTranslation()
 
 	return (
@@ -29,12 +25,17 @@ const Debugger: React.FC = () => {
 				<div className="absolute top-0 right-0 p-8 opacity-5">
 					<div className="text-8xl font-black tracking-tighter">DEBUG</div>
 				</div>
-				<ContractExplorer
-					contracts={contracts}
-					network={network}
-					address={address}
-					signTransaction={signTransaction}
-				/>
+				<Suspense
+					fallback={
+						<div className="space-y-5 rounded-[2rem] border border-white/5 bg-white/5 p-8">
+							<div className="h-8 w-48 animate-pulse rounded-full bg-white/10" />
+							<div className="h-24 animate-pulse rounded-[1.5rem] bg-white/6" />
+							<div className="h-56 animate-pulse rounded-[1.5rem] bg-white/6" />
+						</div>
+					}
+				>
+					<ContractExplorerPanel />
+				</Suspense>
 			</div>
 		</div>
 	)

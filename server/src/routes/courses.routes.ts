@@ -7,10 +7,7 @@ import {
 	getCourses,
 	updateCourse,
 } from "../controllers/courses.controller"
-import {
-	requireCourseAdmin,
-	requireCourseAdminIfRequested,
-} from "../middleware/course-admin.middleware"
+import { requireCourseAdmin } from "../middleware/course-admin.middleware"
 
 export const coursesRouter = Router()
 
@@ -33,11 +30,6 @@ export const coursesRouter = Router()
  *           type: string
  *           enum: [beginner, intermediate, advanced]
  *         description: Filter by difficulty level
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *         description: Case-insensitive search across course title and description
  *       - in: query
  *         name: page
  *         schema:
@@ -76,24 +68,25 @@ export const coursesRouter = Router()
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-coursesRouter.get("/courses", requireCourseAdminIfRequested, getCourses)
+coursesRouter.get("/courses", getCourses)
+
 /**
  * @openapi
- * /api/courses/{idOrSlug}:
+ * /api/courses/{slug}:
  *   get:
  *     tags: [Courses]
- *     summary: Get a single course with lessons
- *     description: Returns course details and all associated lessons by numeric ID or slug.
+ *     summary: Get a course by slug
+ *     description: Returns a single course with all its lessons and quiz data.
  *     parameters:
  *       - in: path
- *         name: idOrSlug
+ *         name: slug
  *         required: true
  *         schema:
  *           type: string
- *         description: Course numeric ID or slug
+ *         description: The course slug
  *     responses:
  *       200:
- *         description: Course details with lessons
+ *         description: Course with lessons
  *         content:
  *           application/json:
  *             schema:
@@ -114,25 +107,24 @@ coursesRouter.get("/courses/:idOrSlug", getCourse)
 
 /**
  * @openapi
- * /api/courses/{idOrSlug}/lessons/{id}:
+ * /api/courses/{slug}/lessons/{id}:
  *   get:
  *     tags: [Courses]
- *     summary: Get a single lesson
- *     description: Returns a specific lesson by ID within a published course.
+ *     summary: Get a specific lesson
+ *     description: Returns a single lesson by ID within a course, including quiz questions.
  *     parameters:
  *       - in: path
- *         name: idOrSlug
+ *         name: slug
  *         required: true
  *         schema:
  *           type: string
- *         description: Course numeric ID or slug
+ *         description: The course slug
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: integer
- *           minimum: 1
- *         description: Lesson ID
+ *         description: The lesson ID
  *     responses:
  *       200:
  *         description: Lesson details
@@ -153,7 +145,7 @@ coursesRouter.get("/courses/:idOrSlug/lessons/:id", getCourseLessonById)
  *   post:
  *     tags: [Courses]
  *     summary: Create a new course
- *     description: Creates an unpublished course. Requires course admin privileges.
+ *     description: Creates a new unpublished course. Requires course admin privileges.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -193,6 +185,8 @@ coursesRouter.get("/courses/:idOrSlug/lessons/:id", getCourseLessonById)
  *         $ref: '#/components/responses/BadRequestError'
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
  *       409:
  *         description: Slug already exists
  *         content:
@@ -203,67 +197,4 @@ coursesRouter.get("/courses/:idOrSlug/lessons/:id", getCourseLessonById)
  *         $ref: '#/components/responses/InternalServerError'
  */
 coursesRouter.post("/courses", requireCourseAdmin, createCourse)
-
-/**
- * @openapi
- * /api/courses/{id}:
- *   patch:
- *     tags: [Courses]
- *     summary: Update a course
- *     description: Partially updates an existing course. Requires course admin privileges.
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *           minimum: 1
- *         description: Course ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               title:
- *                 type: string
- *               slug:
- *                 type: string
- *               description:
- *                 type: string
- *               coverImage:
- *                 type: string
- *                 nullable: true
- *               track:
- *                 type: string
- *               difficulty:
- *                 type: string
- *                 enum: [beginner, intermediate, advanced]
- *               published:
- *                 type: boolean
- *     responses:
- *       200:
- *         description: Updated course
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/CourseDetail'
- *       400:
- *         $ref: '#/components/responses/BadRequestError'
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
- *       404:
- *         $ref: '#/components/responses/NotFoundError'
- *       409:
- *         description: Slug already exists
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       500:
- *         $ref: '#/components/responses/InternalServerError'
- */
-coursesRouter.patch("/courses/:id", requireCourseAdmin, updateCourse)
+coursesRouter.put("/courses/:id", requireCourseAdmin, updateCourse)

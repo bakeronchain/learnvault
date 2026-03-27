@@ -38,10 +38,6 @@ export const buildOpenApiSpec = () => {
 				{ name: "Events", description: "Event stream endpoints" },
 				{ name: "Leaderboard", description: "Learner ranking endpoints" },
 				{ name: "Comments", description: "Proposal comment endpoints" },
-				{
-					name: "Treasury",
-					description: "Treasury statistics and activity endpoints",
-				},
 				{ name: "Upload", description: "IPFS file upload endpoints" },
 			],
 			components: {
@@ -65,78 +61,10 @@ export const buildOpenApiSpec = () => {
 					HealthResponse: {
 						type: "object",
 						properties: {
-							status: {
-								type: "string",
-								enum: ["healthy", "degraded", "unhealthy"],
-								example: "healthy",
-							},
-							db: {
-								type: "string",
-								enum: ["connected", "disconnected"],
-							},
-							uptime: { type: "number", format: "float" },
+							status: { type: "string", example: "ok" },
 							timestamp: { type: "string", format: "date-time" },
-							version: { type: "string" },
-							commitHash: { type: "string" },
-							dbPool: {
-								type: "object",
-								properties: {
-									totalConnections: { type: "integer", nullable: true },
-									idleConnections: { type: "integer", nullable: true },
-									waitingClients: { type: "integer", nullable: true },
-								},
-								required: [
-									"totalConnections",
-									"idleConnections",
-									"waitingClients",
-								],
-							},
-							checks: {
-								type: "object",
-								properties: {
-									database: {
-										type: "object",
-										properties: {
-											status: { type: "string" },
-											responseTimeMs: { type: "integer", nullable: true },
-											error: { type: "string" },
-										},
-										required: ["status", "responseTimeMs"],
-									},
-									redis: {
-										type: "object",
-										properties: {
-											status: { type: "string" },
-											responseTimeMs: { type: "integer", nullable: true },
-											error: { type: "string" },
-											details: { type: "string" },
-										},
-										required: ["status", "responseTimeMs"],
-									},
-									stellarHorizon: {
-										type: "object",
-										properties: {
-											status: { type: "string" },
-											responseTimeMs: { type: "integer", nullable: true },
-											url: { type: "string" },
-											error: { type: "string" },
-										},
-										required: ["status", "responseTimeMs", "url"],
-									},
-								},
-								required: ["database", "redis", "stellarHorizon"],
-							},
 						},
-						required: [
-							"status",
-							"db",
-							"uptime",
-							"timestamp",
-							"version",
-							"commitHash",
-							"dbPool",
-							"checks",
-						],
+						required: ["status", "timestamp"],
 					},
 					Course: {
 						type: "object",
@@ -194,7 +122,6 @@ export const buildOpenApiSpec = () => {
 								type: "string",
 								enum: ["pending", "approved", "rejected"],
 							},
-							cancelled: { type: "boolean" },
 							deadline: { type: "string", format: "date-time" },
 						},
 						required: ["id", "author_address", "title", "status"],
@@ -283,137 +210,6 @@ export const buildOpenApiSpec = () => {
 							updatedAt: { type: "string", format: "date-time" },
 						},
 						required: ["id", "courseId", "title", "content", "order"],
-					},
-					GovernanceProposalInput: {
-						type: "object",
-						properties: {
-							author_address: {
-								type: "string",
-								minLength: 50,
-								maxLength: 56,
-								example: "GABCD123456789...",
-							},
-							title: { type: "string", minLength: 5, maxLength: 200 },
-							description: { type: "string", minLength: 10 },
-							requested_amount: {
-								type: "string",
-								pattern: "^\\d+(\\.\\d+)?$",
-								description:
-									"Numeric string representing requested USDC amount",
-							},
-							evidence_url: { type: "string", format: "uri" },
-						},
-						required: [
-							"author_address",
-							"title",
-							"description",
-							"requested_amount",
-							"evidence_url",
-						],
-					},
-					GovernanceProposalCreated: {
-						type: "object",
-						properties: {
-							proposal_id: { type: "integer" },
-							tx_hash: { type: "string" },
-						},
-						required: ["proposal_id", "tx_hash"],
-					},
-					VotingPower: {
-						type: "object",
-						properties: {
-							address: {
-								type: "string",
-								example: "GABCD123456789...",
-							},
-							gov_balance: {
-								type: "string",
-								description: "Raw governance token balance",
-							},
-							formatted: {
-								type: "string",
-								description: "Human-readable balance",
-								example: "100.50",
-							},
-							can_vote: { type: "boolean" },
-						},
-						required: ["address", "gov_balance", "formatted", "can_vote"],
-					},
-					ScholarProfile: {
-						type: "object",
-						properties: {
-							address: { type: "string" },
-							lrn_balance: {
-								type: "string",
-								description: "Raw LRN token balance",
-							},
-							enrolled_courses: {
-								type: "array",
-								items: { type: "string" },
-							},
-							completed_milestones: { type: "integer" },
-							pending_milestones: { type: "integer" },
-							credentials: {
-								type: "array",
-								items: {
-									$ref: "#/components/schemas/Credential",
-								},
-							},
-							joined_at: { type: "string", format: "date-time" },
-						},
-						required: [
-							"address",
-							"lrn_balance",
-							"enrolled_courses",
-							"completed_milestones",
-							"pending_milestones",
-							"credentials",
-							"joined_at",
-						],
-					},
-					ScholarMilestone: {
-						type: "object",
-						properties: {
-							id: { type: "string" },
-							course_id: { type: "string" },
-							milestone_id: { type: "integer" },
-							status: {
-								type: "string",
-								enum: ["pending", "verified", "rejected"],
-							},
-							evidence_url: { type: "string", nullable: true },
-							submitted_at: {
-								type: "string",
-								format: "date-time",
-								nullable: true,
-							},
-							verified_at: {
-								type: "string",
-								format: "date-time",
-								nullable: true,
-							},
-							tx_hash: { type: "string", nullable: true },
-						},
-						required: ["id", "course_id", "milestone_id", "status"],
-					},
-					Credential: {
-						type: "object",
-						properties: {
-							token_id: { type: "integer" },
-							course_id: { type: "string" },
-							course_title: { type: "string" },
-							issued_at: { type: "string", format: "date-time" },
-							metadata_uri: { type: "string" },
-							revoked: { type: "boolean" },
-						},
-						required: [
-							"token_id",
-							"course_id",
-							"course_title",
-							"issued_at",
-							"metadata_uri",
-							"revoked",
-						],
 					},
 				},
 				responses: {

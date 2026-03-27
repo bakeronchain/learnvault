@@ -2,6 +2,12 @@ import path from "node:path"
 
 import cors from "cors"
 import dotenv from "dotenv"
+import path from "path"
+
+// Load server/.env whether you run from repo root or from server/
+dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
+
+import cors from "cors"
 import express from "express"
 import morgan from "morgan"
 import swaggerUi from "swagger-ui-express"
@@ -27,9 +33,6 @@ import {
 	createJwtService,
 	generateEphemeralDevJwtKeys,
 } from "./services/jwt.service"
-
-// Load server/.env whether you run from repo root or from server/
-dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
 
 const pemString = z
 	.string()

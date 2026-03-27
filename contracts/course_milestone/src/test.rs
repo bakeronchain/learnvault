@@ -1,8 +1,11 @@
 extern crate std;
 
-use soroban_sdk::{Address, Env, String, testutils::Address as _};
+use soroban_sdk::{
+    Address, Env, String,
+    testutils::{Address as _, Ledger, LedgerInfo},
+};
 
-use crate::{CourseConfig, CourseMilestone, CourseMilestoneClient, Error, MilestoneStatus};
+use crate::{CourseConfig, CourseMilestone, CourseMilestoneClient, DataKey, Error, MilestoneStatus};
 
 fn sid(env: &Env, value: &str) -> String {
     String::from_str(env, value)
@@ -17,6 +20,19 @@ fn setup() -> (Env, Address, Address, CourseMilestoneClient<'static>) {
     let client = CourseMilestoneClient::new(&env, &contract_id);
     client.initialize(&admin, &learn_token);
     (env, contract_id, admin, client)
+}
+
+fn set_ledger_sequence(env: &Env, sequence_number: u32) {
+    env.ledger().set(LedgerInfo {
+        timestamp: 1_700_000_000,
+        protocol_version: 23,
+        sequence_number,
+        network_id: Default::default(),
+        base_reserve: 10,
+        min_temp_entry_ttl: 16,
+        min_persistent_entry_ttl: 16,
+        max_entry_ttl: 6312000,
+    });
 }
 
 #[test]
@@ -374,4 +390,27 @@ fn multiple_courses_are_stored() {
     client.add_course(&admin, &sid(&env, "soroban-301"), &8);
 
     assert_eq!(client.list_courses().len(), 3);
+}
+
+#[test]
+fn progress_persists_beyond_instance_ttl_window() {
+    let (env, contract_id, admin, client) = setup();
+    let learner = Address::generate(&env);
+    let course_id = sid(&env, "rust-101");
+
+    set_ledger_sequence(&env, 1);
+    client.add_course(&admin, &course_id, &3);
+    client.enroll(&learner, &course_id);
+
+    set_ledger_sequence(&env, 400);
+
+    let enrollment_key = DataKey::Enrollment(learner, course_id);
+    let still_present = env.as_contract(&contract_id, || {
+        env.storage()
+            .persistent()
+            .get::<_, bool>(&enrollment_key)
+            .unwrap_or(false)
+    });
+
+    assert!(still_present);
 }

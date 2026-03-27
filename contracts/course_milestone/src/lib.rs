@@ -67,6 +67,8 @@ pub struct EnrolledEventData {
 const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
 const LEARN_TOKEN_KEY: Symbol = symbol_short!("LRN_TKN");
 const PAUSED_KEY: Symbol = symbol_short!("PAUSED"); // ✅ NEW
+const PERSISTENT_TTL_THRESHOLD: u32 = 100;
+const PERSISTENT_TTL_BUMP: u32 = 1_000;
 
 #[contracterror]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -149,6 +151,7 @@ impl CourseMilestone {
             active: true,
         };
         env.storage().persistent().set(&course_key, &config);
+        Self::bump_persistent_ttl(&env, &course_key);
 
         let mut course_ids: Vec<String> = env
             .storage()
@@ -177,11 +180,16 @@ impl CourseMilestone {
             .unwrap_or_else(|| panic_with_error!(&env, Error::CourseNotFound));
         config.active = false;
         env.storage().persistent().set(&course_key, &config);
+        Self::bump_persistent_ttl(&env, &course_key);
     }
 
     pub fn get_course(env: Env, course_id: String) -> Option<CourseConfig> {
         let course_key = DataKey::Course(course_id);
-        env.storage().persistent().get(&course_key)
+        let course: Option<CourseConfig> = env.storage().persistent().get(&course_key);
+        if course.is_some() {
+            Self::bump_persistent_ttl(&env, &course_key);
+        }
+        course
     }
 
     pub fn list_courses(env: Env) -> Vec<String> {
@@ -198,6 +206,7 @@ impl CourseMilestone {
             let course_key = DataKey::Course(course_id.clone());
             let config: Option<CourseConfig> = env.storage().persistent().get(&course_key);
             if let Some(current) = config {
+                Self::bump_persistent_ttl(&env, &course_key);
                 if current.active {
                     active_courses.push_back(course_id);
                 }
@@ -264,6 +273,7 @@ impl CourseMilestone {
         }
 
         env.storage().persistent().set(&key, &true);
+        Self::bump_persistent_ttl(&env, &key);
         Self::extend_persistent(&env, &key);
 
         let courses_key = DataKey::EnrolledCourses(learner.clone());
@@ -274,6 +284,7 @@ impl CourseMilestone {
             .unwrap_or_else(|| Vec::new(&env));
         courses.push_back(course_id.clone());
         env.storage().persistent().set(&courses_key, &courses);
+        Self::bump_persistent_ttl(&env, &courses_key);
         Self::extend_persistent(&env, &courses_key);
 
         env.events().publish(
@@ -284,7 +295,11 @@ impl CourseMilestone {
 
     pub fn is_enrolled(env: Env, learner: Address, course_id: String) -> bool {
         let key = DataKey::Enrollment(learner, course_id);
-        env.storage().persistent().get(&key).unwrap_or(false)
+        let enrolled = env.storage().persistent().get(&key).unwrap_or(false);
+        if enrolled {
+            Self::bump_persistent_ttl(&env, &key);
+        }
+        enrolled
     }
 
     pub fn submit_milestone(
@@ -311,6 +326,7 @@ impl CourseMilestone {
             .persistent()
             .get::<_, MilestoneStatus>(&state_key)
             .unwrap_or(MilestoneStatus::NotStarted);
+        Self::bump_persistent_ttl(&env, &state_key);
 
         if current_state != MilestoneStatus::NotStarted {
             panic_with_error!(&env, Error::DuplicateSubmission);
@@ -325,6 +341,7 @@ impl CourseMilestone {
             DataKey::MilestoneSubmission(learner.clone(), course_id.clone(), milestone_id);
 
         env.storage().persistent().set(&submission_key, &submission);
+        Self::bump_persistent_ttl(&env, &submission_key);
         env.storage()
             .persistent()
             .set(&state_key, &MilestoneStatus::Pending);
@@ -374,15 +391,24 @@ impl CourseMilestone {
         milestone_id: u32,
     ) -> Option<MilestoneSubmission> {
         let key = DataKey::MilestoneSubmission(learner, course_id, milestone_id);
-        env.storage().persistent().get(&key)
+        let submission: Option<MilestoneSubmission> = env.storage().persistent().get(&key);
+        if submission.is_some() {
+            Self::bump_persistent_ttl(&env, &key);
+        }
+        submission
     }
 
     pub fn get_enrolled_courses(env: Env, learner: Address) -> Vec<String> {
         let key = DataKey::EnrolledCourses(learner);
-        env.storage()
+        let courses: Vec<String> = env
+            .storage()
             .persistent()
             .get(&key)
-            .unwrap_or_else(|| Vec::new(&env))
+            .unwrap_or_else(|| Vec::new(&env));
+        if courses.len() > 0 {
+            Self::bump_persistent_ttl(&env, &key);
+        }
+        courses
     }
 
     pub fn get_version(env: Env) -> String {

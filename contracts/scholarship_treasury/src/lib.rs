@@ -127,7 +127,7 @@ pub struct ProposalSubmitted {
 
 #[contractevent(topics = ["vote"])]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct VoteCast {
+pub struct VoteCastEvent {
     #[topic]
     pub voter: Address,
     #[topic]
@@ -517,7 +517,7 @@ impl ScholarshipTreasury {
         Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
 
         // 9. Emit event
-        VoteCast {
+        VoteCastEvent {
             voter,
             proposal_id,
             support,

@@ -34,6 +34,12 @@ export interface ScholarshipProposalParams {
 	milestoneDates: string[]
 }
 
+export interface CastVoteParams {
+	voter: string
+	proposalId: number
+	support: boolean
+}
+
 // --- Admin Validation Cache ---
 let cachedAdminAddress: string | null = null
 let lastAdminCheckTime: number = 0
@@ -477,6 +483,71 @@ async function submitScholarshipProposal(
 	}
 }
 
+async function castVote(params: CastVoteParams): Promise<ContractCallResult> {
+	if (!STELLAR_SECRET_KEY) {
+		throw new Error(
+			"STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction",
+		)
+	}
+	if (!SCHOLARSHIP_TREASURY_CONTRACT_ID) {
+		throw new Error(
+			"SCHOLARSHIP_TREASURY_CONTRACT_ID not configured — cannot submit on-chain transaction",
+		)
+	}
+
+	try {
+		const {
+			Keypair,
+			Contract,
+			TransactionBuilder,
+			Networks,
+			BASE_FEE,
+			rpc,
+			nativeToScVal,
+			Address,
+		} = await import("@stellar/stellar-sdk")
+
+		const server = new rpc.Server(
+			STELLAR_NETWORK === "mainnet"
+				? "https://soroban-rpc.stellar.org"
+				: "https://soroban-testnet.stellar.org",
+		)
+
+		const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
+		const account = await server.getAccount(keypair.publicKey())
+		const contract = new Contract(SCHOLARSHIP_TREASURY_CONTRACT_ID)
+
+		const tx = new TransactionBuilder(account, {
+			fee: BASE_FEE,
+			networkPassphrase:
+				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+		})
+			.addOperation(
+				contract.call(
+					"vote",
+					nativeToScVal(params.voter, { type: "address" }),
+					nativeToScVal(params.proposalId, { type: "u32" }),
+					nativeToScVal(params.support, { type: "bool" }),
+				),
+			)
+			.setTimeout(30)
+			.build()
+
+		const prepared = await server.prepareTransaction(tx)
+		prepared.sign(keypair)
+
+		const result = await server.sendTransaction(prepared)
+
+		return { txHash: result.hash, simulated: false }
+	} catch (err) {
+		console.error("[stellar] Cast vote failed:", err)
+		throw new Error(
+			"Cast vote failed: " +
+				(err instanceof Error ? err.message : String(err)),
+		)
+	}
+}
+
 async function getLearnTokenBalance(address: string): Promise<string> {
 	if (!LEARN_TOKEN_CONTRACT_ID) {
 		console.warn(
@@ -618,6 +689,7 @@ export const stellarContractService = {
 	callMintScholarNFT,
 	isEnrolled,
 	submitScholarshipProposal,
+	castVote,
 	getLearnTokenBalance,
 	getGovernanceTokenBalance,
 	getEnrolledCourses,

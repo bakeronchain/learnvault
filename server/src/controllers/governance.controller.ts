@@ -117,6 +117,17 @@ const createProposalSchema = z.object({
 	evidence_url: z.string().url(),
 })
 
+const castVoteSchema = z.object({
+	proposal_id: z.number().int().positive("proposal_id must be a positive integer"),
+	voter_address: z
+		.string()
+		.min(56, "voter_address must be a valid Stellar address")
+		.max(56, "voter_address must be a valid Stellar address")
+		.startsWith("G", "voter_address must be a valid Stellar address"),
+	support: z.boolean(),
+	signature: z.string().optional(),
+})
+
 export async function createGovernanceProposal(
 	req: Request,
 	res: Response,
@@ -201,6 +212,111 @@ export async function createGovernanceProposal(
 		console.error("[governance] Proposal creation failed:", err)
 		res.status(500).json({
 			error: "Failed to create governance proposal",
+			message: err instanceof Error ? err.message : String(err),
+		})
+	}
+}
+
+export async function castVote(req: Request, res: Response): Promise<void> {
+	const validation = castVoteSchema.safeParse(req.body)
+	if (!validation.success) {
+		res.status(400).json({
+			error: "Invalid vote data",
+			details: validation.error.flatten().fieldErrors,
+		})
+		return
+	}
+
+	const { proposal_id, voter_address, support } = validation.data
+
+	try {
+		// 1. Check if proposal exists
+		const proposalResult = await pool.query(
+			"SELECT id, status FROM proposals WHERE id = $1",
+			[proposal_id],
+		)
+
+		if (proposalResult.rows.length === 0) {
+			res.status(404).json({ error: "Proposal not found" })
+			return
+		}
+
+		// 2. Check if proposal is still pending
+		if (proposalResult.rows[0].status !== "pending") {
+			res.status(400).json({
+				error: "Voting is closed for this proposal",
+			})
+			return
+		}
+
+		// 3. Check if voter already voted
+		const existingVote = await pool.query(
+			"SELECT id FROM votes WHERE proposal_id = $1 AND voter_address = $2",
+			[proposal_id, voter_address],
+		)
+
+		if (existingVote.rows.length > 0) {
+			res.status(409).json({ error: "You have already voted on this proposal" })
+			return
+		}
+
+		// 4. Check voter's GOV token balance (voting power)
+		const rawBalance =
+			await stellarContractService.getGovernanceTokenBalance(voter_address)
+		const balanceBigInt = BigInt(rawBalance)
+
+		if (balanceBigInt <= 0n) {
+			res.status(400).json({
+				error: "You have no voting power",
+				details: "Voter has no GOV tokens",
+			})
+			return
+		}
+
+		// 5. Call the on-chain vote contract
+		const contractResult = await stellarContractService.castVote({
+			voter: voter_address,
+			proposalId: proposal_id,
+			support,
+		})
+
+		// 6. Write to DB after successful contract call
+		const votingPower = balanceBigInt
+		const dbResult = await pool.query(
+			`INSERT INTO votes (proposal_id, voter_address, support, voting_power, tx_hash)
+			 VALUES ($1, $2, $3, $4, $5)
+			 RETURNING id`,
+			[
+				proposal_id,
+				voter_address,
+				support,
+				votingPower.toString(),
+				contractResult.txHash,
+			],
+		)
+
+		// 7. Update proposal vote counts
+		const updateColumn = support ? "votes_for" : "votes_against"
+		await pool.query(
+			`UPDATE proposals SET ${updateColumn} = ${updateColumn} + $1 WHERE id = $2`,
+			[votingPower.toString(), proposal_id],
+		)
+
+		// 8. Fetch updated vote counts for response
+		const updatedProposal = await pool.query(
+			"SELECT votes_for, votes_against FROM proposals WHERE id = $1",
+			[proposal_id],
+		)
+
+		res.status(201).json({
+			tx_hash: contractResult.txHash,
+			votes_for: updatedProposal.rows[0]?.votes_for ?? "0",
+			votes_against: updatedProposal.rows[0]?.votes_against ?? "0",
+		})
+	} catch (err) {
+		console.error("[governance] Vote casting failed:", err)
+		res.status(500).json({
+			error: "Failed to cast vote",
 			message: err instanceof Error ? err.message : String(err),
 		})
 	}

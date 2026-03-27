@@ -1,6 +1,7 @@
 import { Router } from "express"
 
 import {
+	castVote,
 	createGovernanceProposal,
 	getGovernanceProposals,
 	getVotingPower,
@@ -18,4 +19,8 @@ governanceRouter.post("/governance/proposals", (req, res) => {
 
 governanceRouter.get("/governance/voting-power/:address", (req, res) => {
 	void getVotingPower(req, res)
+})
+
+governanceRouter.post("/governance/vote", (req, res) => {
+	void castVote(req, res)
 })

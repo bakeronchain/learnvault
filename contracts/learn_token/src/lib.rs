@@ -135,6 +135,21 @@ impl LearnToken {
         panic_with_error!(&_env, LRNError::Soulbound);
     }
 
+    /// Transfer from is not allowed — LRN is soulbound.
+    pub fn transfer_from(_env: Env, _spender: Address, _from: Address, _to: Address, _amount: i128) {
+        panic_with_error!(&_env, LRNError::Soulbound);
+    }
+
+    /// Approve is not allowed — LRN is soulbound.
+    pub fn approve(_env: Env, _from: Address, _spender: Address, _amount: i128) {
+        panic_with_error!(&_env, LRNError::Soulbound);
+    }
+
+    /// Allowance always returns 0 — LRN is soulbound and cannot be transferred.
+    pub fn allowance(_env: Env, _from: Address, _spender: Address) -> i128 {
+        0
+    }
+
     // -----------------------------------------------------------------------
     // Read functions
     // -----------------------------------------------------------------------

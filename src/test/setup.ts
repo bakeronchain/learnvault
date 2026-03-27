@@ -2,10 +2,10 @@ import "@testing-library/jest-dom/vitest"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, type RenderOptions } from "@testing-library/react"
 import { createElement, type ReactElement, type ReactNode } from "react"
-import { vi } from "vitest"
+import { afterEach, vi } from "vitest"
 
 // Import our custom mocks
-import { mockContractImports } from "./mocks/contracts"
+import { mockContracts } from "./mocks/contracts"
 import { mockStellarWalletsKit, mockWalletUtils } from "./mocks/wallet"
 
 // ---------------------------------------------------------------------------
@@ -18,62 +18,39 @@ vi.mock("@creit.tech/stellar-wallets-kit", () => mockStellarWalletsKit)
 // Mock wallet utility functions
 vi.mock("../util/wallet", () => mockWalletUtils)
 
-// Mock contract client dynamic imports
+// Mock contract client imports
 vi.mock("../contracts/learn_token", () => ({
-	default: {
-		balance: vi.fn().mockResolvedValue({ result: 1000n }),
-		mint: vi.fn().mockResolvedValue({ result: undefined }),
-		transfer: vi.fn().mockResolvedValue({ result: undefined }),
-		approve: vi.fn().mockResolvedValue({ result: undefined }),
-		allowance: vi.fn().mockResolvedValue({ result: 500n }),
-	},
+	default: mockContracts.learnToken,
 }))
+
 vi.mock("../contracts/governance_token", () => ({
-	default: {
-		balance: vi.fn().mockResolvedValue(0n),
-		vote: vi.fn().mockResolvedValue({ result: undefined }),
-		getProposal: vi.fn().mockResolvedValue({
-			result: {
-				title: "Test Proposal",
-				description: "Test Description",
-				yes_votes: 100n,
-				no_votes: 50n,
-			},
-		}),
-		getVotingPower: vi.fn().mockResolvedValue({ result: 1000n }),
-	},
+	default: mockContracts.governanceToken,
 }))
+
 vi.mock("../contracts/scholarship_treasury", () => ({
-	default: {
-		apply: vi.fn().mockResolvedValue({ result: undefined }),
-		getApplication: vi.fn().mockResolvedValue({
-			result: {
-				applicant: "GTEST1234567890ABCDEFGHIJKLMN9876543210ZYXWVUTSRQPO",
-				status: "pending",
-			},
-		}),
-		withdraw: vi.fn().mockResolvedValue({ result: undefined }),
-		vote: vi.fn().mockResolvedValue({
-			signAndSend: vi.fn().mockResolvedValue({
-				result: { isErr: () => false, unwrap: () => undefined },
-			}),
-		}),
-		cast_vote: vi.fn().mockResolvedValue({ result: undefined }),
-		get_active_proposals: vi.fn().mockResolvedValue([]),
-		get_proposals_by_status: vi.fn().mockResolvedValue([]),
-		has_voted: vi.fn().mockResolvedValue(false),
-	},
+	default: mockContracts.scholarshipTreasury,
 }))
+
 vi.mock("../contracts/guess_the_number", () => ({
-	default: {
-		guess: vi
-			.fn()
-			.mockResolvedValue({ result: { correct: true, reward: 100n } }),
-		getGameState: vi
-			.fn()
-			.mockResolvedValue({ result: { number: 42, reward_pool: 1000n } }),
-	},
+	default: mockContracts.guessTheNumber,
 }))
+// Mock contract client dynamic imports
+vi.mock(
+	"../contracts/learn_token",
+	() => mockContractImports["../contracts/learn_token"],
+)
+vi.mock(
+	"../contracts/governance_token",
+	() => mockContractImports["../contracts/governance_token"],
+)
+vi.mock(
+	"../contracts/scholarship_treasury",
+	() => mockContractImports["../contracts/scholarship_treasury"],
+)
+vi.mock(
+	"../contracts/guess_the_number",
+	() => mockContractImports["../contracts/guess_the_number"],
+)
 
 // Mock @stellar/design-system to avoid CSS import issues
 vi.mock("@stellar/design-system", () => ({
@@ -220,11 +197,10 @@ interface AllTheProvidersProps {
 
 const AllTheProviders = ({
 	children,
-	walletContext,
+	walletContext: _walletContext,
 	queryClient,
 }: AllTheProvidersProps) => {
 	const testQueryClient = queryClient || createTestQueryClient()
-	const mockWalletCtx = walletContext || createMockWalletContext()
 
 	return createElement(
 		QueryClientProvider,

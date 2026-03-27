@@ -203,6 +203,18 @@ export const initDb = async () => {
                 );
                 CREATE INDEX IF NOT EXISTS idx_proposals_status_created_at
                     ON proposals (status, created_at DESC);
+                CREATE TABLE IF NOT EXISTS votes (
+                    id SERIAL PRIMARY KEY,
+                    proposal_id INTEGER NOT NULL REFERENCES proposals(id),
+                    voter_address TEXT NOT NULL,
+                    support BOOLEAN NOT NULL,
+                    voting_power NUMERIC NOT NULL,
+                    tx_hash TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(proposal_id, voter_address)
+                );
+                CREATE INDEX IF NOT EXISTS idx_votes_proposal_id ON votes (proposal_id);
+                CREATE INDEX IF NOT EXISTS idx_votes_voter_address ON votes (voter_address);
                 CREATE TABLE IF NOT EXISTS platform_events (
                     id SERIAL PRIMARY KEY,
                     event_type TEXT NOT NULL,

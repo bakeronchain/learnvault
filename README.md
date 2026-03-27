@@ -1,6 +1,9 @@
 # LearnVault — Official Documentation
+
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
+
 [![All Contributors](https://img.shields.io/badge/all_contributors-1-orange.svg?style=flat-square)](#contributors-)
+
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 [![Contracts CI](https://github.com/robertocarlous/learnvault/actions/workflows/contracts-ci.yml/badge.svg)](https://github.com/robertocarlous/learnvault/actions/workflows/contracts-ci.yml)
@@ -401,6 +404,9 @@ To contribute:
 
 All contributors are recognized on-chain and in our official documentation.
 
+Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing. We
+expect all participants to uphold these standards.
+
 ---
 
 ## Resources
@@ -430,7 +436,8 @@ effort._ \n## Architecture Decisions\n\n- [ADR-001.md](docs/adr/ADR-001.md)\n-
 
 ## Contributors ✨
 
-Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
+Thanks goes to these wonderful people
+([emoji key](https://allcontributors.org/docs/en/emoji-key)):
 
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <!-- prettier-ignore-start -->
@@ -457,4 +464,6 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
 
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
-This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
+This project follows the
+[all-contributors](https://github.com/all-contributors/all-contributors)
+specification. Contributions of any kind welcome!

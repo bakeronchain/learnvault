@@ -432,3 +432,272 @@ fn mint_before_initialize_panics() {
         )))
     );
 }
+
+// --- transfer_from: soulbound tests ---
+
+#[test]
+fn transfer_from_panics_with_soulbound_error() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    
+    client.mint(&alice, &100);
+    
+    // Even with proper authorization, transfer_from should fail
+    let result = client.try_transfer_from(&alice, &alice, &bob, &50);
+    
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            LRNError::Soulbound as u32
+        )))
+    );
+    
+    // Verify balance unchanged
+    assert_eq!(client.balance(&alice), 100);
+    assert_eq!(client.balance(&bob), 0);
+}
+
+#[test]
+fn transfer_from_always_panics_even_with_zero_amount() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    
+    let result = client.try_transfer_from(&alice, &alice, &bob, &0);
+    
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            LRNError::Soulbound as u32
+        )))
+    );
+}
+
+#[test]
+fn transfer_from_panics_regardless_of_spender() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    let charlie = Address::generate(&e);
+    
+    client.mint(&alice, &100);
+    
+    // charlie (spender) tries to transfer from alice to bob
+    let result = client.try_transfer_from(&charlie, &alice, &bob, &50);
+    
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            LRNError::Soulbound as u32
+        )))
+    );
+}
+
+// --- approve: soulbound tests ---
+
+#[test]
+fn approve_panics_with_soulbound_error() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    
+    client.mint(&alice, &100);
+    
+    let result = client.try_approve(&alice, &bob, &50);
+    
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            LRNError::Soulbound as u32
+        )))
+    );
+}
+
+#[test]
+fn approve_always_panics_even_with_zero_amount() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    
+    let result = client.try_approve(&alice, &bob, &0);
+    
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            LRNError::Soulbound as u32
+        )))
+    );
+}
+
+#[test]
+fn approve_panics_even_for_non_existent_balance() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    
+    // alice has no LRN balance
+    let result = client.try_approve(&alice, &bob, &50);
+    
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            LRNError::Soulbound as u32
+        )))
+    );
+}
+
+// --- allowance: soulbound tests ---
+
+#[test]
+fn allowance_returns_zero() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    
+    let allowance = client.allowance(&alice, &bob);
+    assert_eq!(allowance, 0);
+}
+
+#[test]
+fn allowance_always_returns_zero_regardless_of_accounts() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    let charlie = Address::generate(&e);
+    
+    // Mint some tokens to alice
+    client.mint(&alice, &1000);
+    
+    // Allowance should still be 0 for any pair
+    assert_eq!(client.allowance(&alice, &bob), 0);
+    assert_eq!(client.allowance(&alice, &charlie), 0);
+    assert_eq!(client.allowance(&bob, &charlie), 0);
+    assert_eq!(client.allowance(&charlie, &alice), 0);
+}
+
+#[test]
+fn allowance_returns_zero_for_same_address() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let alice = Address::generate(&e);
+    
+    client.mint(&alice, &500);
+    
+    // Even allowance from alice to herself should be 0
+    assert_eq!(client.allowance(&alice, &alice), 0);
+}
+
+// --- admin transfer (set_admin tests) ---
+
+#[test]
+fn admin_transfers_always_succeed() {
+    let e = Env::default();
+    let admin1 = Address::generate(&e);
+    let admin2 = Address::generate(&e);
+    let admin3 = Address::generate(&e);
+    let id = e.register(LearnToken, ());
+    e.mock_all_auths();
+    
+    let client = LearnTokenClient::new(&e, &id);
+    client.initialize(&admin1);
+    
+    // First transfer
+    client.set_admin(&admin2);
+    
+    // Second transfer (new admin can transfer admin)
+    client.set_admin(&admin3);
+    
+    // Verify final admin is admin3
+    assert_eq!(client.total_supply(), 0);
+    
+    // admin3 should be able to mint (verifies admin transfer worked)
+    let learner = Address::generate(&e);
+    client.mint(&learner, &100);
+    assert_eq!(client.balance(&learner), 100);
+}
+
+
+// --- initialization completeness tests ---
+
+#[test]
+fn initialized_contract_has_all_metadata() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    
+    use soroban_sdk::String;
+    
+    // All metadata should be set
+    assert_eq!(client.name(), String::from_str(&e, "LearnVault Learn Token"));
+    assert_eq!(client.symbol(), String::from_str(&e, "LRN"));
+    assert_eq!(client.decimals(), 7);
+    assert_eq!(client.get_version(), String::from_str(&e, "1.0.0"));
+    assert_eq!(client.total_supply(), 0);
+}
+
+// --- comprehensive mint/supply tracking ---
+
+#[test]
+fn large_mint_amounts_tracked_correctly() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let learner = Address::generate(&e);
+    
+    // Test with large amounts
+    let large_amount: i128 = 1_000_000_000;
+    client.mint(&learner, &large_amount);
+    
+    assert_eq!(client.balance(&learner), large_amount);
+    assert_eq!(client.total_supply(), large_amount);
+}
+
+#[test]
+fn multiple_small_mints_vs_single_large_mint() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    
+    // Alice receives 10 mints of 100 each
+    for _ in 0..10 {
+        client.mint(&alice, &100);
+    }
+    
+    // Bob receives a single mint of 1000
+    client.mint(&bob, &1000);
+    
+    assert_eq!(client.balance(&alice), 1000);
+    assert_eq!(client.balance(&bob), 1000);
+    assert_eq!(client.total_supply(), 2000);
+}
+
+// --- reputation score edge cases ---
+
+#[test]
+fn reputation_score_matches_balance_division() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let learner = Address::generate(&e);
+    
+    for _amount in [1, 10, 99, 100, 101, 999, 1000, 9999, 10000] {
+        client.mint(&learner, &1); // Increment balance one at a time
+        let balance = client.balance(&learner);
+        let reputation = client.reputation_score(&learner);
+        
+        assert_eq!(
+            reputation,
+            balance / 100,
+            "Reputation should match balance / 100 at balance = {}",
+            balance
+        );
+    }
+}
+

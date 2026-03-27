@@ -1,60 +1,22 @@
 import { useEffect, useState } from "react"
 import { useToast } from "../components/Toast/ToastProvider"
 import { rpcUrl } from "../contracts/util"
+import type {
+	DonorData,
+	DonorContribution,
+	Vote,
+	RpcEvent,
+} from "../types/contracts"
 import { useContractIds } from "./useContractIds"
 import { useWallet } from "./useWallet"
 
-export interface DonorContribution {
-	txHash: string
-	amount: number
-	date: string
-	block: number
-}
-
-export interface DonorStats {
-	totalContributed: number
-	governanceBalance: number
-	governancePercentage: number
-	proposalsVoted: number
-	scholarsFunded: number
-}
-
-export interface Vote {
-	proposalId: string
-	proposalTitle: string
-	voteChoice: "for" | "against"
-	votePower: number
-	status: "active" | "passed" | "rejected"
-}
-
-export interface Scholar {
-	id: string
-	name: string
-	proposalAmount: number
-	fundedPercentage: number
-	progressPercentage: number
-	status: "active" | "completed"
-}
-
-export interface DonorData {
-	stats: DonorStats
-	contributions: DonorContribution[]
-	votes: Vote[]
-	scholars: Scholar[]
-	isLoading: boolean
-	error: string | null
-	isEmpty: boolean
-}
-
-interface RpcEvent {
-	id?: string
-	ledger?: number
-	ledgerCloseTime?: string
-	txHash?: string
-	topic?: unknown[]
-	topics?: unknown[]
-	value?: unknown
-}
+export type {
+	DonorContribution,
+	DonorStats,
+	Vote,
+	Scholar,
+	DonorData,
+} from "../types/contracts"
 
 const emptyStats: DonorStats = {
 	totalContributed: 0,

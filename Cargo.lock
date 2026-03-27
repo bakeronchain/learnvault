@@ -701,9 +701,6 @@ name = "governance-token"
 version = "0.0.1"
 dependencies = [
  "soroban-sdk",
- "stellar-access",
- "stellar-macros",
- "stellar-tokens",
 ]
 
 [[package]]
@@ -878,9 +875,6 @@ version = "0.0.1"
 dependencies = [
  "proptest",
  "soroban-sdk",
- "stellar-access",
- "stellar-macros",
- "stellar-tokens",
 ]
 
 [[package]]
@@ -1264,8 +1258,6 @@ name = "scholar-nft"
 version = "0.0.1"
 dependencies = [
  "soroban-sdk",
- "stellar-access",
- "stellar-tokens",
 ]
 
 [[package]]
@@ -1629,14 +1621,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
-name = "stellar-access"
-version = "0.5.1"
-source = "git+https://github.com/OpenZeppelin/stellar-contracts?tag=v0.5.1#372a162a6df8aed108befa5573d30a8ca49cb271"
-dependencies = [
- "soroban-sdk",
-]
-
-[[package]]
 name = "stellar-build"
 version = "0.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1646,24 +1630,6 @@ dependencies = [
  "sha2",
  "thiserror",
  "topological-sort",
-]
-
-[[package]]
-name = "stellar-contract-utils"
-version = "0.5.1"
-source = "git+https://github.com/OpenZeppelin/stellar-contracts?tag=v0.5.1#372a162a6df8aed108befa5573d30a8ca49cb271"
-dependencies = [
- "soroban-sdk",
-]
-
-[[package]]
-name = "stellar-macros"
-version = "0.5.1"
-source = "git+https://github.com/OpenZeppelin/stellar-contracts?tag=v0.5.1#372a162a6df8aed108befa5573d30a8ca49cb271"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.101",
 ]
 
 [[package]]
@@ -1699,15 +1665,6 @@ checksum = "ee1832fb50c651ad10f734aaf5d31ca5acdfb197a6ecda64d93fcdb8885af913"
 dependencies = [
  "crate-git-revision",
  "data-encoding",
-]
-
-[[package]]
-name = "stellar-tokens"
-version = "0.5.1"
-source = "git+https://github.com/OpenZeppelin/stellar-contracts?tag=v0.5.1#372a162a6df8aed108befa5573d30a8ca49cb271"
-dependencies = [
- "soroban-sdk",
- "stellar-contract-utils",
 ]
 
 [[package]]

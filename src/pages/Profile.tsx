@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import { ActivityFeed } from "../components/ActivityFeed"
 import AddressDisplay from "../components/AddressDisplay"
+import LRNHistoryChart from "../components/LRNHistoryChart"
 import { ReputationBadge } from "../components/ReputationBadge"
 import {
 	NoCredentialsEmptyState,
@@ -158,6 +159,14 @@ const Profile: React.FC = () => {
 						))}
 					</div>
 				)}
+			</section>
+
+			<section className="mt-16">
+				<div className="flex items-center gap-4 mb-8">
+					<h2 className="text-2xl font-black tracking-tight">LRN History</h2>
+					<div className="h-px flex-1 bg-linear-to-r from-white/10 to-transparent" />
+				</div>
+				<LRNHistoryChart address={walletAddress} />
 			</section>
 
 			<ActivityFeed address={walletAddress} limit={10} />

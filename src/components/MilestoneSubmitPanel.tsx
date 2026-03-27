@@ -29,7 +29,7 @@ const MilestoneSubmitPanel: React.FC<MilestoneSubmitPanelProps> = ({
 
 	if (status === "pending") {
 		return (
-			<Card className="p-8 rounded-[2rem] border border-brand-cyan/30 bg-brand-cyan/5 text-center">
+			<div className="p-8 rounded-[2rem] border border-brand-cyan/30 bg-brand-cyan/5 text-center">
 				<div className="w-16 h-16 mx-auto bg-brand-cyan/20 rounded-full flex items-center justify-center mb-4">
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -56,13 +56,13 @@ const MilestoneSubmitPanel: React.FC<MilestoneSubmitPanelProps> = ({
 					</span>
 					. You'll be notified once it's verified.
 				</p>
-			</Card>
+			</div>
 		)
 	}
 
 	if (status === "verified") {
 		return (
-			<Card className="p-8 rounded-[2rem] border border-green-500/30 bg-green-500/5 text-center">
+			<div className="p-8 rounded-[2rem] border border-green-500/30 bg-green-500/5 text-center">
 				<div className="w-16 h-16 mx-auto bg-green-500/20 rounded-full flex items-center justify-center mb-4">
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -86,12 +86,12 @@ const MilestoneSubmitPanel: React.FC<MilestoneSubmitPanelProps> = ({
 					Congratulations! Your work has been reviewed and verified by the
 					committee.
 				</p>
-			</Card>
+			</div>
 		)
 	}
 
 	return (
-		<Card className="p-8 rounded-[2rem] border border-white/10 bg-white/5 backdrop-blur-md shadow-2xl">
+		<div className="p-8 rounded-[2rem] border border-white/10 bg-white/5 backdrop-blur-md shadow-2xl">
 			<div className="mb-6">
 				<h3 className="text-2xl font-bold text-white mb-2">
 					Submit Milestone Evidence
@@ -133,6 +133,7 @@ const MilestoneSubmitPanel: React.FC<MilestoneSubmitPanelProps> = ({
 					<Button
 						type="submit"
 						variant="primary"
+						size="md"
 						className="w-full py-6 rounded-2xl font-bold text-lg tracking-wide hover:shadow-[0_0_20px_rgba(0,195,255,0.3)] transition-all duration-300"
 						disabled={isCompletingMilestone || (!githubUrl && !description)}
 					>
@@ -166,7 +167,7 @@ const MilestoneSubmitPanel: React.FC<MilestoneSubmitPanelProps> = ({
 					</Button>
 				</div>
 			</form>
-		</Card>
+		</div>
 	)
 }
 

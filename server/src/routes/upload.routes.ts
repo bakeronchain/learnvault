@@ -1,9 +1,12 @@
 import { Router } from "express"
 import { pinNftMetadata, uploadFile } from "../controllers/upload.controller"
-import { authMiddleware } from "../middleware/auth.middleware"
+import { createRequireAuth } from "../middleware/auth.middleware"
 import { upload } from "../middleware/upload.middleware"
+import { type JwtService } from "../services/jwt.service"
 
-export const uploadRouter = Router()
+export function createUploadRouter(jwtService: JwtService): Router {
+	const router = Router()
+	const requireAuth = createRequireAuth(jwtService)
 
 /**
  * @openapi
@@ -48,50 +51,7 @@ export const uploadRouter = Router()
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-uploadRouter.post("/upload", authMiddleware, upload.single("file"), uploadFile)
-
-/**
- * @openapi
- * /api/upload/nft-metadata:
- *   post:
- *     tags: [Upload]
- *     summary: Pin ScholarNFT JSON metadata to IPFS
- *     description: >
- *       Pins ERC-721-compatible JSON metadata to IPFS. The `image` field must
- *       be a CID already uploaded via POST /api/upload. Returns a `tokenUri`
- *       in ipfs:// format for direct use in the ScholarNFT contract.
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [name, description, image]
- *             properties:
- *               name:
- *                 type: string
- *                 example: LearnVault Scholar — Web3 Foundations
- *               description:
- *                 type: string
- *               image:
- *                 type: string
- *                 description: CID of the NFT image (from POST /api/upload)
- *               attributes:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     trait_type: { type: string }
- *                     value: { type: string }
- *     responses:
- *       201:
- *         description: Metadata pinned
- *         content:
- *           application/json:
- *             schema:
- *               type: object
+	router.post("/upload", requireAuth, upload.single("file"), uploadFile)
  *               properties:
  *                 cid:
  *                   type: string
@@ -105,4 +65,7 @@ uploadRouter.post("/upload", authMiddleware, upload.single("file"), uploadFile)
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-uploadRouter.post("/upload/nft-metadata", authMiddleware, pinNftMetadata)
+	router.post("/upload/nft-metadata", requireAuth, pinNftMetadata)
+
+	return router
+}

@@ -509,7 +509,7 @@ fn vote_after_deadline_panics() {
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::VotingClosed as u32
+            Error::VotingPeriodEnded as u32
         )))
     );
 }
@@ -1452,4 +1452,203 @@ mod fuzz_tests {
             }
         }
     }
+}
+
+// ── Deadline and quorum tests (Issue #339) ────────────────────────────────────
+
+/// Like `setup` but also returns the admin address so finalize tests can use it.
+fn setup_with_admin<'a>(
+    env: &'a Env,
+) -> (
+    ScholarshipTreasuryClient<'a>,
+    Address,
+    Address,
+    Address,
+    Address,
+    MockGovernanceClient<'a>,
+    Address, // admin
+) {
+    let admin = Address::generate(env);
+    let donor = Address::generate(env);
+    let recipient = Address::generate(env);
+
+    let contract_id = env.register(ScholarshipTreasury, ());
+    let client = ScholarshipTreasuryClient::new(env, &contract_id);
+
+    let gov_contract_id = env.register(MockGovernance, ());
+    let gov_client = MockGovernanceClient::new(env, &gov_contract_id);
+
+    env.mock_all_auths();
+    env.as_contract(&contract_id, || token::register(env, &admin));
+    let token_id = env.as_contract(&contract_id, || token::contract_id(env));
+    let sac = StellarAssetClient::new(env, &token_id);
+    sac.mint(&donor, &1_000);
+
+    gov_client.initialize(&contract_id);
+    client.initialize(&admin, &token_id, &gov_contract_id);
+    env.set_auths(&[]);
+
+    (client, gov_contract_id, donor, recipient, token_id, gov_client, admin)
+}
+
+#[test]
+fn finalize_proposal_before_deadline_panics() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, _gov_client, admin) =
+        setup_with_admin(&env);
+
+    env.mock_all_auths();
+    let proposal_id = submit_sample_proposal(&env, &client, &donor, 500);
+
+    // Deadline has NOT passed yet — finalize should fail with TooEarlyToFinalize
+    let result = client.try_finalize_proposal(&admin, &proposal_id);
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::TooEarlyToFinalize as u32
+        )))
+    );
+}
+
+#[test]
+fn finalize_proposal_approved_when_quorum_met_and_yes_wins() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client, admin) =
+        setup_with_admin(&env);
+    let (milestone_titles, milestone_dates) = sample_milestones(&env);
+
+    env.mock_all_auths();
+
+    // Deposit so GOV is in circulation (total_gov = 1_000 * 100 = 100_000)
+    client.deposit(&donor, &1_000);
+
+    // A second voter also holds GOV
+    let voter2 = Address::generate(&env);
+    gov_client.mint(&voter2, &50_000); // simulate large stake
+
+    let applicant = Address::generate(&env);
+    let proposal_id = client.submit_proposal(
+        &applicant,
+        &500,
+        &String::from_str(&env, "Test Program"),
+        &String::from_str(&env, "https://example.com"),
+        &String::from_str(&env, "Test description"),
+        &String::from_str(&env, "2026-05-01"),
+        &milestone_titles,
+        &milestone_dates,
+    );
+
+    // Cast enough votes to meet quorum
+    client.vote(&donor, &proposal_id, &true);
+    client.vote(&voter2, &proposal_id, &true);
+
+    // Advance past deadline
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger().set_sequence_number(proposal.deadline_ledger + 1);
+
+    let status = client.finalize_proposal(&admin, &proposal_id);
+
+    assert_eq!(status, crate::ProposalStatus::Approved);
+    assert_eq!(
+        client.get_finalized_status(&proposal_id),
+        Some(crate::ProposalStatus::Approved)
+    );
+}
+
+#[test]
+fn finalize_proposal_rejected_when_quorum_not_met() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, token_id, _gov_client, admin) =
+        setup_with_admin(&env);
+    let (milestone_titles, milestone_dates) = sample_milestones(&env);
+
+    env.mock_all_auths();
+
+    // donor's deposit mints 1_000 * 100 = 100_000 GOV (tracked in TOTAL_GOV_KEY).
+    client.deposit(&donor, &1_000);
+
+    // Deposit a large amount from a whale to inflate TOTAL_GOV_KEY so donor's
+    // share falls well below the 10 % quorum threshold.
+    let whale = Address::generate(&env);
+    // Give whale 9_001 USDC → deposit mints 900_100 GOV → TOTAL_GOV_KEY = 1_000_100
+    // donor fraction = 100_000 / 1_000_100 ≈ 9.999 % < 10 %
+    StellarAssetClient::new(&env, &token_id).mint(&whale, &9_001);
+    client.deposit(&whale, &9_001);
+
+    let applicant = Address::generate(&env);
+    let proposal_id = client.submit_proposal(
+        &applicant,
+        &500,
+        &String::from_str(&env, "Low-turnout Proposal"),
+        &String::from_str(&env, "https://example.com"),
+        &String::from_str(&env, "Description"),
+        &String::from_str(&env, "2026-05-01"),
+        &milestone_titles,
+        &milestone_dates,
+    );
+
+    // Only donor votes; their weight (100_000) < 10 % of total_gov (1_000_100) → quorum not met
+    client.vote(&donor, &proposal_id, &true);
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger().set_sequence_number(proposal.deadline_ledger + 1);
+
+    let status = client.finalize_proposal(&admin, &proposal_id);
+
+    // Quorum not met → always Rejected
+    assert_eq!(status, crate::ProposalStatus::Rejected);
+}
+
+#[test]
+fn finalize_proposal_rejected_when_no_votes_win() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client, admin) =
+        setup_with_admin(&env);
+    let (milestone_titles, milestone_dates) = sample_milestones(&env);
+
+    env.mock_all_auths();
+
+    client.deposit(&donor, &1_000); // 100_000 GOV minted, tracked in TOTAL_GOV_KEY
+
+    let voter2 = Address::generate(&env);
+    gov_client.mint(&voter2, &50_000); // give voter2 GOV weight (not tracked in TOTAL_GOV_KEY)
+
+    let applicant = Address::generate(&env);
+    let proposal_id = client.submit_proposal(
+        &applicant,
+        &200,
+        &String::from_str(&env, "Rejected Proposal"),
+        &String::from_str(&env, "https://example.com"),
+        &String::from_str(&env, "Will be voted down"),
+        &String::from_str(&env, "2026-06-01"),
+        &milestone_titles,
+        &milestone_dates,
+    );
+
+    // Quorum met (donor has 100_000 / 100_000 = 100 %) but NO wins
+    client.vote(&donor, &proposal_id, &false);
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger().set_sequence_number(proposal.deadline_ledger + 1);
+
+    let status = client.finalize_proposal(&admin, &proposal_id);
+
+    assert_eq!(status, crate::ProposalStatus::Rejected);
+}
+
+#[test]
+fn get_total_gov_issued_tracks_deposits() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, _gov_client, _admin) =
+        setup_with_admin(&env);
+
+    env.mock_all_auths();
+    assert_eq!(client.get_total_gov_issued(), 0);
+
+    client.deposit(&donor, &100);
+    assert_eq!(client.get_total_gov_issued(), 100 * 100); // GOV_PER_USDC = 100
+
+    client.deposit(&donor, &400);
+    assert_eq!(client.get_total_gov_issued(), 500 * 100);
 }

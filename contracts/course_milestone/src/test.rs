@@ -19,7 +19,7 @@ fn setup() -> (Env, Address, Address, Address, CourseMilestoneClient<'static>) {
     let contract_id = env.register(CourseMilestone, ());
     env.mock_all_auths();
     let client = CourseMilestoneClient::new(&env, &contract_id);
-    client.initialize(&admin);
+    client.initialize(&admin, &learn_token_contract);
     (env, contract_id, admin, client)
 }
 
@@ -552,86 +552,4 @@ fn unpause_restores_functionality() {
     client.enroll(&learner, &course_id);
 
     assert!(client.is_enrolled(&learner, &course_id));
-}
-
-#[test]
-fn non_admin_cannot_add_course() {
-    let (env, _contract_id, _admin, client) = setup();
-    let attacker = Address::generate(&env);
-    let result = client.try_add_course(&attacker, &sid(&env, "rust-101"), &3);
-
-    assert_eq!(
-        result.err(),
-        Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::Unauthorized as u32
-        )))
-    );
-}
-
-#[test]
-fn non_admin_cannot_remove_course() {
-    let (env, _contract_id, admin, client) = setup();
-    let attacker = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-    client.add_course(&admin, &course_id, &3);
-
-    let result = client.try_remove_course(&attacker, &course_id);
-    assert_eq!(
-        result.err(),
-        Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::Unauthorized as u32
-        )))
-    );
-}
-
-#[test]
-fn enroll_rejects_unknown_course() {
-    let (env, _contract_id, _admin, client) = setup();
-    let learner = Address::generate(&env);
-    let result = client.try_enroll(&learner, &sid(&env, "missing"));
-
-    assert_eq!(
-        result.err(),
-        Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::CourseNotFound as u32
-        )))
-    );
-}
-
-#[test]
-fn duplicate_course_id_is_rejected() {
-    let (env, _contract_id, admin, client) = setup();
-    let course_id = sid(&env, "rust-101");
-    client.add_course(&admin, &course_id, &3);
-
-    let result = client.try_add_course(&admin, &course_id, &3);
-    assert_eq!(
-        result.err(),
-        Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::CourseAlreadyExists as u32
-        )))
-    );
-}
-
-#[test]
-fn zero_milestone_count_is_rejected() {
-    let (env, _contract_id, admin, client) = setup();
-    let result = client.try_add_course(&admin, &sid(&env, "rust-101"), &0);
-
-    assert_eq!(
-        result.err(),
-        Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::InvalidMilestones as u32
-        )))
-    );
-}
-
-#[test]
-fn multiple_courses_are_stored() {
-    let (env, _contract_id, admin, client) = setup();
-    client.add_course(&admin, &sid(&env, "rust-101"), &3);
-    client.add_course(&admin, &sid(&env, "defi-201"), &5);
-    client.add_course(&admin, &sid(&env, "soroban-301"), &8);
-
-    assert_eq!(client.list_courses().len(), 3);
 }

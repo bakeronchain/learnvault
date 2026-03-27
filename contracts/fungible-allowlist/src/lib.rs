@@ -5,6 +5,5 @@ use soroban_sdk::{contract, contractimpl};
 
 #[contract]
 pub struct FungibleAllowlist;
-
-#[contractimpl]
+#[soroban_sdk::contract]
 impl FungibleAllowlist {}

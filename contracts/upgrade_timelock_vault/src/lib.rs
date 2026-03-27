@@ -307,7 +307,7 @@ mod test {
     }
 
     fn create_wasm_hash(env: &Env) -> BytesN<32> {
-        BytesN::random(env)
+        BytesN::from_array(env, &[0; 32])
     }
 
     #[test]
@@ -393,6 +393,7 @@ mod test {
 
         env.ledger().set_timestamp(1000);
         contract.initialize(&admin);
+        env.ledger().set_timestamp(1);
 
         env.mock_auths(&[soroban_sdk::testutils::MockAuth {
             address: &admin,

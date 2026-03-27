@@ -2,8 +2,8 @@
 #![allow(deprecated)]
 
 use soroban_sdk::{
-    Address, Env, String, Symbol, Vec, contract, contracterror, contractevent, contractimpl,
-    contracttype, panic_with_error, symbol_short,
+    Address, Env, String, Symbol, Vec, contract, contracterror, contractimpl, contracttype,
+    panic_with_error, symbol_short,
 };
 
 #[contracttype]
@@ -72,6 +72,9 @@ pub enum Error {
     CourseAlreadyComplete = 6,
     InvalidMilestones = 7,
     CourseAlreadyExists = 8,
+    NotEnrolled = 9,
+    DuplicateSubmission = 10,
+    ContractPaused = 11,
 }
 
 #[contractevent]
@@ -106,86 +109,6 @@ impl CourseMilestone {
         }
         admin.require_auth();
         env.storage().instance().set(&ADMIN_KEY, &admin);
-        env.storage()
-            .instance()
-            .set(&LEARN_TOKEN_KEY, &learn_token_contract);
-    }
-
-    // Design decision: only the initialized admin can create course records.
-    // Design decision: course IDs are unique forever and removed courses stay on-chain as inactive records.
-    // Design decision: milestone_count must be > 0 so course configuration cannot represent an empty track.
-    pub fn add_course(env: Env, admin: Address, course_id: String, milestone_count: u32) {
-        Self::require_initialized(&env);
-        Self::require_admin(&env, &admin);
-
-        if milestone_count == 0 {
-            panic_with_error!(&env, Error::InvalidMilestones);
-        }
-
-        let course_key = DataKey::Course(course_id.clone());
-        if env.storage().persistent().has(&course_key) {
-            panic_with_error!(&env, Error::CourseAlreadyExists);
-        }
-
-        let config = CourseConfig {
-            milestone_count,
-            active: true,
-        };
-        env.storage().persistent().set(&course_key, &config);
-
-        let mut course_ids: Vec<String> = env
-            .storage()
-            .persistent()
-            .get(&DataKey::CourseIds)
-            .unwrap_or_else(|| Vec::new(&env));
-        course_ids.push_back(course_id);
-        env.storage()
-            .persistent()
-            .set(&DataKey::CourseIds, &course_ids);
-    }
-
-    // Design decision: removed courses are marked inactive instead of deleted so historical references remain valid.
-    pub fn remove_course(env: Env, admin: Address, course_id: String) {
-        Self::require_initialized(&env);
-        Self::require_admin(&env, &admin);
-
-        let course_key = DataKey::Course(course_id);
-        let mut config: CourseConfig = env
-            .storage()
-            .persistent()
-            .get(&course_key)
-            .unwrap_or_else(|| panic_with_error!(&env, Error::CourseNotFound));
-        config.active = false;
-        env.storage().persistent().set(&course_key, &config);
-    }
-
-    pub fn get_course(env: Env, course_id: String) -> Option<CourseConfig> {
-        let course_key = DataKey::Course(course_id);
-        env.storage().persistent().get(&course_key)
-    }
-
-    pub fn list_courses(env: Env) -> Vec<String> {
-        let course_ids: Vec<String> = env
-            .storage()
-            .persistent()
-            .get(&DataKey::CourseIds)
-            .unwrap_or_else(|| Vec::new(&env));
-
-        let mut active_courses = Vec::new(&env);
-        let mut i = 0;
-        while i < course_ids.len() {
-            let course_id = course_ids.get(i).unwrap();
-            let course_key = DataKey::Course(course_id.clone());
-            let config: Option<CourseConfig> = env.storage().persistent().get(&course_key);
-            if let Some(current) = config {
-                if current.active {
-                    active_courses.push_back(course_id);
-                }
-            }
-            i += 1;
-        }
-
-        active_courses
     }
 
     // =======================
@@ -352,6 +275,15 @@ impl CourseMilestone {
         Self::get_milestone_state(env, learner, course_id, milestone_id)
     }
 
+    pub fn get_milestone_status(
+        env: Env,
+        learner: Address,
+        course_id: String,
+        milestone_id: u32,
+    ) -> MilestoneStatus {
+        Self::get_milestone_state(env, learner, course_id, milestone_id)
+    }
+
     pub fn get_milestone_submission(
         env: Env,
         learner: Address,
@@ -486,8 +418,6 @@ impl CourseMilestone {
             .extend_ttl(key, PERSISTENT_TTL_THRESHOLD, PERSISTENT_TTL_BUMP);
     }
 }
-
-pub use learn_token_client::LearnTokenClient;
 
 #[cfg(test)]
 mod test;

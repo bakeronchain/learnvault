@@ -7,7 +7,6 @@ import {
 	CartesianGrid,
 	Tooltip,
 	ResponsiveContainer,
-	type ValueType,
 } from "recharts"
 
 interface LRNEvent {
@@ -120,7 +119,7 @@ const LRNHistoryChart: React.FC<LRNHistoryChartProps> = ({ address }) => {
 							color: "#fff",
 							fontSize: 12,
 						}}
-						formatter={(value: ValueType) => [
+						formatter={(value) => [
 							typeof value === "number"
 								? value.toLocaleString()
 								: String(value),

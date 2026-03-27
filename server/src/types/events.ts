@@ -6,6 +6,7 @@ export const CONTRACT_IDS = {
 	courseMilestone: process.env.COURSE_MILESTONE_CONTRACT_ID!,
 	scholarshipTreasury: process.env.SCHOLARSHIP_TREASURY_CONTRACT_ID!,
 	milestoneEscrow: process.env.MILESTONE_ESCROW_CONTRACT_ID!,
+	scholarNft: process.env.SCHOLAR_NFT_CONTRACT_ID!,
 } as const
 
 export type ContractName = keyof typeof CONTRACT_IDS
@@ -18,6 +19,8 @@ export const EVENT_TOPICS = {
 	ScholarshipTreasury_ProposalCreated: "ScholarshipTreasury::ProposalCreated",
 	ScholarshipTreasury_VoteCast: "ScholarshipTreasury::VoteCast",
 	MilestoneEscrow_FundsDisbursed: "MilestoneEscrow::FundsDisbursed",
+	ScholarNft_Minted: "ScholarNFT::minted",
+	ScholarNft_Revoked: "ScholarNFT::revoked",
 } as const
 
 export type EventTopic = keyof typeof EVENT_TOPICS
@@ -33,6 +36,7 @@ export const EVENTS_TO_INDEX: Record<ContractName, EventTopic[]> = {
 		"ScholarshipTreasury_VoteCast",
 	],
 	milestoneEscrow: ["MilestoneEscrow_FundsDisbursed"],
+	scholarNft: ["ScholarNft_Minted", "ScholarNft_Revoked"],
 } as const
 
 // Zod schemas for event data parsing (extend as needed)
@@ -46,6 +50,14 @@ export const EVENT_DATA_SCHEMAS: Partial<Record<EventTopicValue, z.ZodSchema>> =
 			address: z.string(),
 			courseId: z.string(),
 			milestoneId: z.string().regex(/^\d+$/), // u32
+		}),
+		"ScholarNFT::minted": z.object({
+			token_id: z.string().regex(/^\d+$/),
+			owner: z.string(),
+		}),
+		"ScholarNFT::revoked": z.object({
+			token_id: z.string().regex(/^\d+$/),
+			reason: z.string(),
 		}),
 		// Add others...
 	}

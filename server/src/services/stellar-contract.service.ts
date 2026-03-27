@@ -4,6 +4,8 @@
  * In production this calls the CourseMilestone contract via the Stellar SDK.
  */
 
+import { pool } from "../db/index"
+
 const STELLAR_NETWORK = process.env.STELLAR_NETWORK ?? "testnet"
 const STELLAR_SECRET_KEY = process.env.STELLAR_SECRET_KEY ?? ""
 const COURSE_MILESTONE_CONTRACT_ID =
@@ -18,6 +20,7 @@ const GOVERNANCE_TOKEN_CONTRACT_ID =
 export interface ContractCallResult {
 	txHash: string | null
 	simulated: boolean
+	tokenId?: number
 }
 
 export interface ScholarshipProposalParams {
@@ -262,7 +265,7 @@ async function emitRejectionEvent(
 async function callMintScholarNFT(
 	scholarAddress: string,
 	metadataUri: string,
-): Promise<ContractCallResult> {
+): Promise<ContractCallResult & { tokenId?: number }> {
 	if (!STELLAR_SECRET_KEY) {
 		throw new Error(
 			"STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction",
@@ -283,6 +286,7 @@ async function callMintScholarNFT(
 			BASE_FEE,
 			rpc,
 			xdr,
+			Address,
 		} = await import("@stellar/stellar-sdk")
 
 		const server = new rpc.Server(
@@ -295,6 +299,9 @@ async function callMintScholarNFT(
 		const account = await server.getAccount(keypair.publicKey())
 		const contract = new Contract(SCHOLAR_NFT_CONTRACT_ID)
 
+		// Generate a unique token ID (simple approach: use timestamp)
+		const tokenId = Date.now()
+
 		const tx = new TransactionBuilder(account, {
 			fee: BASE_FEE,
 			networkPassphrase:
@@ -303,8 +310,8 @@ async function callMintScholarNFT(
 			.addOperation(
 				contract.call(
 					"mint",
-					xdr.ScVal.scvString(scholarAddress),
-					xdr.ScVal.scvString(metadataUri),
+					new Address(scholarAddress).toScVal(),
+					xdr.ScVal.scvU64(tokenId),
 				),
 			)
 			.setTimeout(30)
@@ -314,12 +321,11 @@ async function callMintScholarNFT(
 		prepared.sign(keypair)
 
 		const result = await server.sendTransaction(prepared)
-		return { txHash: result.hash, simulated: false }
+		return { txHash: result.hash, simulated: false, tokenId }
 	} catch (err) {
 		console.error("[stellar] ScholarNFT mint failed:", err)
 		throw new Error(
-			"ScholarNFT mint failed: " +
-				(err instanceof Error ? err.message : String(err)),
+			`ScholarNFT mint failed: ${err instanceof Error ? err.message : String(err)}`,
 		)
 	}
 }
@@ -348,8 +354,6 @@ async function isEnrolled(
 			TransactionBuilder,
 			Keypair,
 		} = await import("@stellar/stellar-sdk")
-		const { Contract, rpc, xdr, Address, Networks } =
-			await import("@stellar/stellar-sdk")
 
 		const server = new rpc.Server(
 			STELLAR_NETWORK === "mainnet"
@@ -357,24 +361,26 @@ async function isEnrolled(
 				: "https://soroban-testnet.stellar.org",
 		)
 
-		const contract = new Contract(COURSE_MILESTONE_CONTRACT_ID)
-		const mockAccount = new Address(learnerAddress)
+		// Get a dummy account for simulation
+		const dummyKeypair = Keypair.random()
+		const dummyAccount = await server.getAccount(dummyKeypair.publicKey())
 
-		const tx = new (await import("@stellar/stellar-sdk")).TransactionBuilder(
-			new (await import("@stellar/stellar-sdk")).Account(
-				"GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBF3UKJQ2K5RQDD",
-				"0",
-			),
-			{
-				fee: "100",
-				networkPassphrase:
-					STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-			},
+		const contract = new Contract(COURSE_MILESTONE_CONTRACT_ID)
+
+		// Create address from learner address
+		const learnerScVal = xdr.ScVal.scvAddress(
+			new Address(learnerAddress).toScVal() as any,
 		)
+
+		const tx = new TransactionBuilder(dummyAccount, {
+			fee: "100",
+			networkPassphrase:
+				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+		})
 			.addOperation(
 				contract.call(
 					"is_enrolled",
-					xdr.ScVal.scvAddress(mockAccount.toScAddress()),
+					learnerScVal,
 					xdr.ScVal.scvU32(courseId),
 				),
 			)
@@ -576,25 +582,34 @@ async function getEnrolledCourses(address: string): Promise<string[]> {
 }
 
 async function getScholarCredentials(address: string): Promise<any[]> {
-	if (!SCHOLAR_NFT_CONTRACT_ID) {
-		console.warn(
-			"[stellar] SCHOLAR_NFT_CONTRACT_ID not set — simulating credentials",
+	try {
+		const result = await pool.query(
+			`SELECT 
+				sn.token_id,
+				sn.course_id,
+				c.title as course_title,
+				sn.metadata_uri,
+				sn.minted_at as issued_at,
+				sn.revoked
+			 FROM scholar_nfts sn
+			 LEFT JOIN courses c ON sn.course_id = c.slug
+			 WHERE sn.scholar_address = $1
+			 ORDER BY sn.minted_at DESC`,
+			[address],
 		)
-		return [
-			{
-				token_id: 1,
-				course_id: "stellar-basics",
-				issued_at: new Date().toISOString(),
-			},
-		]
+
+		return result.rows.map(row => ({
+			token_id: Number(row.token_id),
+			course_id: row.course_id,
+			course_title: row.course_title || "Unknown Course",
+			issued_at: row.issued_at.toISOString(),
+			metadata_uri: row.metadata_uri,
+			revoked: row.revoked,
+		}))
+	} catch (err) {
+		console.error("[stellar] getScholarCredentials failed:", err)
+		return []
 	}
-	return [
-		{
-			token_id: 1,
-			course_id: "stellar-basics",
-			issued_at: new Date().toISOString(),
-		},
-	]
 }
 
 export const stellarContractService = {

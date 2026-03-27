@@ -1,0 +1,57 @@
+name: Backend Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Run server tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: learnvault
+          POSTGRES_PASSWORD: learnvault
+          POSTGRES_DB: learnvault_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U learnvault"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://learnvault:learnvault@localhost:5432/learnvault_test
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Run migrations
+        run: |
+          psql $DATABASE_URL \
+            -f server/src/db/migrations/001_milestone_reports.sql \
+            -f server/src/db/migrations/002_ipfs_cids.sql \
+            -f server/src/db/migrations/003_course_content_schema.sql \
+            -f server/src/db/migrations/004_events.sql
+
+      - name: Run tests
+        working-directory: server
+        run: npm test

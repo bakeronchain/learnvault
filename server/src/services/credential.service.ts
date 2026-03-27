@@ -1,4 +1,5 @@
 import { milestoneStore } from "../db/milestone-store"
+import { pool } from "../db/index"
 import { pinJsonToIPFS } from "./pinata.service"
 import {
 	stellarContractService,
@@ -56,6 +57,15 @@ async function mintCertificateIfComplete(
 
 	const mintResult: ContractCallResult =
 		await stellarContractService.callMintScholarNFT(scholarAddress, tokenUri)
+
+	// Store in database
+	if (mintResult.tokenId) {
+		await pool.query(
+			`INSERT INTO scholar_nfts (token_id, scholar_address, course_id, metadata_uri)
+			 VALUES ($1, $2, $3, $4)`,
+			[mintResult.tokenId, scholarAddress, courseId, tokenUri],
+		)
+	}
 
 	return {
 		minted: true,

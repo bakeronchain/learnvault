@@ -209,3 +209,23 @@ export async function getScholarProfile(
 		res.status(500).json({ error: "Failed to fetch scholar profile" })
 	}
 }
+
+export async function getScholarCredentials(
+	req: Request,
+	res: Response,
+): Promise<void> {
+	const { address } = req.params
+
+	if (!address) {
+		res.status(400).json({ error: "Scholar address is required" })
+		return
+	}
+
+	try {
+		const credentials = await stellarContractService.getScholarCredentials(address)
+		res.status(200).json({ credentials })
+	} catch (error) {
+		console.error("[scholars] Error fetching scholar credentials:", error)
+		res.status(500).json({ error: "Failed to fetch scholar credentials" })
+	}
+}

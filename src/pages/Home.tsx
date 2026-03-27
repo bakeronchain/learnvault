@@ -1,5 +1,5 @@
 ﻿import { Button, Icon } from "@stellar/design-system"
-import React, { lazy, Suspense, useState } from "react"
+import React, { lazy, Suspense } from "react"
 import { Helmet } from "react-helmet"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
@@ -16,11 +16,9 @@ const MilestoneTracker = lazy(() =>
 		default: module.MilestoneTracker,
 	})),
 )
-const OnboardingWizard = lazy(() => import("../components/OnboardingWizard"))
 
 const Home: React.FC = () => {
 	const { t } = useTranslation()
-	const [showOnboarding, setShowOnboarding] = useState(false)
 
 	const mockMilestones = [
 		{ id: 1, label: t("home.milestones.1"), lrnReward: 10 },

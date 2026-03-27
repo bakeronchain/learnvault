@@ -15,13 +15,9 @@
 //! Implements: https://github.com/bakeronchain/learnvault/issues/5
 
 use soroban_sdk::{
-    Address, BytesN, Env, String, Symbol, contract, contracterror, contractimpl, contracttype,
+    Address, Env, String, Symbol, contract, contracterror, contractimpl, contracttype,
     panic_with_error, symbol_short,
 };
-
-use learnvault_shared::upgrade;
-
-pub use upgrade::ContractUpgraded;
 
 // ---------------------------------------------------------------------------
 // Storage Constants (assuming ~6s ledger time)
@@ -49,8 +45,6 @@ pub enum LRNError {
     NotInitialized = 3,
     /// Token is soulbound and cannot be transferred.
     Soulbound = 4,
-    /// Arithmetic overflow or underflow was detected.
-    ArithmeticOverflow = 5,
 }
 
 // ---------------------------------------------------------------------------
@@ -84,9 +78,7 @@ impl LearnToken {
         if env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(&env, LRNError::Unauthorized);
         }
-        admin.require_auth();
         env.storage().instance().set(&ADMIN_KEY, &admin);
-        upgrade::init(&env);
         env.storage()
             .instance()
             .set(&NAME_KEY, &String::from_str(&env, "LearnVault Learn Token"));
@@ -94,7 +86,7 @@ impl LearnToken {
             .instance()
             .set(&SYMBOL_KEY, &String::from_str(&env, "LRN"));
         env.storage().instance().set(&DECIMALS_KEY, &7_u32);
-
+        
         Self::extend_instance(&env);
     }
 
@@ -121,8 +113,7 @@ impl LearnToken {
         // 3. Add amount to Balance(to) in persistent storage
         let bal_key = DataKey::Balance(to.clone());
         let bal: i128 = env.storage().persistent().get(&bal_key).unwrap_or(0);
-        let new_balance = Self::checked_add_amount(&env, bal, amount);
-        env.storage().persistent().set(&bal_key, &new_balance);
+        env.storage().persistent().set(&bal_key, &(bal + amount));
 
         // 4. Add amount to TotalSupply in persistent storage
         let supply: i128 = env
@@ -130,22 +121,13 @@ impl LearnToken {
             .persistent()
             .get(&DataKey::TotalSupply)
             .unwrap_or(0);
-        let new_supply = Self::checked_add_amount(&env, supply, amount);
         env.storage()
             .persistent()
-            .set(&DataKey::TotalSupply, &new_supply);
+            .set(&DataKey::TotalSupply, &(supply + amount));
 
         // Extend persistent storage for balance entries
-        env.storage().persistent().extend_ttl(
-            &bal_key,
-            PERSISTENT_BUMP_THRESHOLD,
-            PERSISTENT_EXTEND_TO,
-        );
-        env.storage().persistent().extend_ttl(
-            &DataKey::TotalSupply,
-            PERSISTENT_BUMP_THRESHOLD,
-            PERSISTENT_EXTEND_TO,
-        );
+        env.storage().persistent().extend_ttl(&bal_key, PERSISTENT_BUMP_THRESHOLD, PERSISTENT_EXTEND_TO);
+        env.storage().persistent().extend_ttl(&DataKey::TotalSupply, PERSISTENT_BUMP_THRESHOLD, PERSISTENT_EXTEND_TO);
 
         // 5. Emit event
         env.events()
@@ -164,18 +146,6 @@ impl LearnToken {
         env.storage().instance().set(&ADMIN_KEY, &new_admin);
         env.events()
             .publish((symbol_short!("set_admin"),), new_admin);
-    }
-
-    /// Replace the current contract WASM with a new uploaded hash. Admin only.
-    pub fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
-        Self::extend_instance(&env);
-        let admin: Address = env
-            .storage()
-            .instance()
-            .get(&ADMIN_KEY)
-            .unwrap_or_else(|| panic_with_error!(&env, LRNError::NotInitialized));
-        admin.require_auth();
-        upgrade::apply(&env, &admin, &new_wasm_hash);
     }
 
     /// Transfer is not allowed — LRN is soulbound.
@@ -212,11 +182,7 @@ impl LearnToken {
         Self::extend_instance(&env);
         let key = DataKey::Balance(account);
         if let Some(bal) = env.storage().persistent().get::<_, i128>(&key) {
-            env.storage().persistent().extend_ttl(
-                &key,
-                PERSISTENT_BUMP_THRESHOLD,
-                PERSISTENT_EXTEND_TO,
-            );
+            env.storage().persistent().extend_ttl(&key, PERSISTENT_BUMP_THRESHOLD, PERSISTENT_EXTEND_TO);
             bal
         } else {
             0
@@ -227,11 +193,7 @@ impl LearnToken {
         Self::extend_instance(&env);
         let key = DataKey::TotalSupply;
         if let Some(supply) = env.storage().persistent().get::<_, i128>(&key) {
-            env.storage().persistent().extend_ttl(
-                &key,
-                PERSISTENT_BUMP_THRESHOLD,
-                PERSISTENT_EXTEND_TO,
-            );
+            env.storage().persistent().extend_ttl(&key, PERSISTENT_BUMP_THRESHOLD, PERSISTENT_EXTEND_TO);
             supply
         } else {
             0
@@ -275,11 +237,6 @@ impl LearnToken {
         env.storage()
             .instance()
             .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_EXTEND_TO);
-    }
-
-    fn checked_add_amount(env: &Env, left: i128, right: i128) -> i128 {
-        left.checked_add(right)
-            .unwrap_or_else(|| panic_with_error!(env, LRNError::ArithmeticOverflow))
     }
 }
 

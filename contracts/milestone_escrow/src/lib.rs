@@ -1,23 +1,13 @@
 #![no_std]
 
 use soroban_sdk::{
-    Address, BytesN, Env, String, Symbol, contract, contracterror, contractevent, contractimpl,
+    Address, Env, String, Symbol, contract, contracterror, contractevent, contractimpl,
     contracttype, panic_with_error, symbol_short,
 };
 
-use learnvault_shared::upgrade;
-
-pub use upgrade::ContractUpgraded;
-
-const CONFIG_KEY: Symbol = symbol_short!("CONFIG");
-
-#[derive(Clone)]
-#[contracttype]
-pub struct Config {
-    pub admin: Address,
-    pub treasury: Address,
-    pub inactivity_window: u64,
-}
+const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
+const TREASURY_KEY: Symbol = symbol_short!("TREAS");
+const INACTIVITY_WINDOW_KEY: Symbol = symbol_short!("INACT_W");
 
 #[derive(Clone)]
 #[contracttype]
@@ -86,19 +76,23 @@ pub struct EscrowReclaimed {
 
 #[contractimpl]
 impl MilestoneEscrow {
-    pub fn initialize(env: Env, admin: Address, treasury: Address, inactivity_window_seconds: u64) {
-        if env.storage().instance().has(&CONFIG_KEY) {
+    pub fn initialize(
+        env: Env,
+        admin: Address,
+        treasury: Address,
+        inactivity_window_seconds: u64,
+    ) {
+        if env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(&env, Error::AlreadyInitialized);
         }
         admin.require_auth();
 
-        let config = Config {
-            admin,
-            treasury,
-            inactivity_window: inactivity_window_seconds,
-        };
-        env.storage().instance().set(&CONFIG_KEY, &config);
-        upgrade::init(&env);
+        // Keep 30 days (30 * 24 * 60 * 60) as the recommended default at deployment.
+        env.storage().instance().set(&ADMIN_KEY, &admin);
+        env.storage().instance().set(&TREASURY_KEY, &treasury);
+        env.storage()
+            .instance()
+            .set(&INACTIVITY_WINDOW_KEY, &inactivity_window_seconds);
     }
 
     pub fn create_escrow(
@@ -108,8 +102,8 @@ impl MilestoneEscrow {
         amount: i128,
         tranches: u32,
     ) {
-        let config = Self::get_config(&env);
-        config.treasury.require_auth();
+        let treasury = Self::treasury(&env);
+        treasury.require_auth();
 
         if amount <= 0 {
             panic_with_error!(&env, Error::InvalidAmount);
@@ -123,7 +117,7 @@ impl MilestoneEscrow {
             panic_with_error!(&env, Error::EscrowExists);
         }
 
-        xlm::token_client(&env).transfer(&config.treasury, env.current_contract_address(), &amount);
+        xlm::token_client(&env).transfer(&treasury, env.current_contract_address(), &amount);
 
         let record = EscrowRecord {
             scholar,
@@ -132,8 +126,8 @@ impl MilestoneEscrow {
             total_tranches: tranches,
             tranches_released: 0,
             last_activity: env.ledger().timestamp(),
-            treasury: config.treasury.clone(),
-            admin: config.admin.clone(),
+            treasury: treasury.clone(),
+            admin: Self::admin(&env),
         };
         env.storage().persistent().set(&key, &record);
         EscrowCreated {
@@ -146,10 +140,11 @@ impl MilestoneEscrow {
     }
 
     pub fn release_tranche(env: Env, proposal_id: u32) {
+        let admin = Self::admin(&env);
+        admin.require_auth();
+
         let key = DataKey::Escrow(proposal_id);
         let mut record = Self::get_or_panic(&env, &key);
-
-        record.admin.require_auth();
 
         if record.tranches_released >= record.total_tranches {
             panic_with_error!(&env, Error::AllTranchesReleased);
@@ -172,15 +167,16 @@ impl MilestoneEscrow {
     }
 
     pub fn reclaim_inactive(env: Env, proposal_id: u32) {
+        let admin = Self::admin(&env);
+        admin.require_auth();
+
         let key = DataKey::Escrow(proposal_id);
         let mut record = Self::get_or_panic(&env, &key);
 
-        record.admin.require_auth();
-
         let now = env.ledger().timestamp();
         let inactive_for = now.saturating_sub(record.last_activity);
-        let config = Self::get_config(&env);
-        if inactive_for < config.inactivity_window {
+        let inactivity_window = Self::inactivity_window(&env);
+        if inactive_for < inactivity_window {
             panic_with_error!(&env, Error::InactivityNotReached);
         }
 
@@ -198,7 +194,6 @@ impl MilestoneEscrow {
         record.released_amount = record.total_amount;
         record.last_activity = now;
         env.storage().persistent().set(&key, &record);
-
         EscrowReclaimed {
             proposal_id,
             scholar: record.scholar.clone(),
@@ -236,25 +231,35 @@ impl MilestoneEscrow {
     }
 
     fn admin(env: &Env) -> Address {
-        Self::get_config(env).admin
+        if let Some(admin) = env.storage().instance().get::<_, Address>(&ADMIN_KEY) {
+            admin
+        } else {
+            panic_with_error!(env, Error::NotInitialized);
+        }
     }
 
-    fn get_config(env: &Env) -> Config {
-        env.storage()
+    fn treasury(env: &Env) -> Address {
+        if let Some(treasury) = env.storage().instance().get::<_, Address>(&TREASURY_KEY) {
+            treasury
+        } else {
+            panic_with_error!(env, Error::NotInitialized);
+        }
+    }
+
+    fn inactivity_window(env: &Env) -> u64 {
+        if let Some(window) = env
+            .storage()
             .instance()
-            .get(&CONFIG_KEY)
-            .unwrap_or_else(|| panic_with_error!(env, Error::NotInitialized))
+            .get::<_, u64>(&INACTIVITY_WINDOW_KEY)
+        {
+            window
+        } else {
+            panic_with_error!(env, Error::NotInitialized);
+        }
     }
 
     pub fn get_version(env: Env) -> String {
         String::from_str(&env, "1.0.0")
-    }
-
-    /// Replace the current contract WASM with a new uploaded hash. Admin only.
-    pub fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
-        let admin = Self::admin(&env);
-        admin.require_auth();
-        upgrade::apply(&env, &admin, &new_wasm_hash);
     }
 }
 

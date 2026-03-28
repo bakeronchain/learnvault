@@ -4,6 +4,8 @@ import { useWallet } from "../hooks/useWallet"
 import { getAuthToken } from "../util/auth"
 import CommentCard from "./CommentCard"
 
+const API_BASE = import.meta.env.VITE_SERVER_URL ?? "http://localhost:4000"
+
 export interface Comment {
 	id: number
 	proposal_id: string
@@ -42,7 +44,7 @@ function CommentSection({ proposalId, proposalAuthor }: CommentSectionProps) {
 			if (!isSilent) setLoading(true)
 			try {
 				const res = await fetch(
-					`${import.meta.env.VITE_SERVER_URL}/api/proposals/${proposalId}/comments`,
+					`${API_BASE}/api/proposals/${proposalId}/comments`,
 				)
 				if (!res.ok) throw new Error("Failed to fetch comments")
 				const data = await res.json()
@@ -90,21 +92,18 @@ function CommentSection({ proposalId, proposalAuthor }: CommentSectionProps) {
 		setSubmissionStatus(null)
 
 		try {
-			const res = await fetch(
-				`${import.meta.env.VITE_SERVER_URL}/api/comments`,
-				{
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${token}`,
-					},
-					body: JSON.stringify({
-						proposalId,
-						content: newComment,
-						parentId,
-					}),
+			const res = await fetch(`${API_BASE}/api/comments`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
 				},
-			)
+				body: JSON.stringify({
+					proposalId,
+					content: newComment,
+					parentId,
+				}),
+			})
 
 			if (res.ok) {
 				setNewComment("")

@@ -255,7 +255,10 @@ const DaoProposals: React.FC = () => {
 				<section className="glass-card p-10 rounded-[2.5rem] border border-white/5 mb-10">
 					<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-8">
 						<div>
-							<h2 className="text-4xl font-black tracking-tight mb-3">
+							<h2
+								className="text-4xl font-black tracking-tight mb-3"
+								data-testid="proposal-detail-title"
+							>
 								{selectedProposal.title}
 							</h2>
 							<div className="flex flex-wrap items-center gap-3 text-xs font-black uppercase tracking-widest">
@@ -323,11 +326,16 @@ const DaoProposals: React.FC = () => {
 
 							<div className="space-y-3 mb-8 text-sm text-white/60">
 								<p>
-									Yes votes: {formatTokenAmount(selectedProposal.votesFor)} GOV
+									<span data-testid="vote-yes-count">
+										Yes votes: {formatTokenAmount(selectedProposal.votesFor)}{" "}
+										GOV
+									</span>
 								</p>
 								<p>
-									No votes: {formatTokenAmount(selectedProposal.votesAgainst)}{" "}
-									GOV
+									<span data-testid="vote-no-count">
+										No votes: {formatTokenAmount(selectedProposal.votesAgainst)}{" "}
+										GOV
+									</span>
 								</p>
 								<p>
 									Total voting power cast: {formatTokenAmount(totalVotes)} GOV
@@ -343,6 +351,7 @@ const DaoProposals: React.FC = () => {
 								<div className="flex gap-3">
 									<button
 										type="button"
+										data-testid="vote-yes"
 										onClick={() =>
 											void castVote({
 												proposalId: selectedProposal.id,
@@ -356,6 +365,7 @@ const DaoProposals: React.FC = () => {
 									</button>
 									<button
 										type="button"
+										data-testid="vote-no"
 										onClick={() =>
 											void castVote({
 												proposalId: selectedProposal.id,
@@ -399,7 +409,12 @@ const DaoProposals: React.FC = () => {
 					>
 						<div className="flex justify-between items-start gap-4 mb-4">
 							<div>
-								<h2 className="text-2xl font-black mb-1">{proposal.title}</h2>
+								<h2
+									className="text-2xl font-black mb-1"
+									data-testid="proposal-title"
+								>
+									{proposal.title}
+								</h2>
 								<p className="text-[10px] text-white/40 uppercase font-black tracking-widest">
 									Applicant {shortenAddress(proposal.authorAddress)}
 								</p>

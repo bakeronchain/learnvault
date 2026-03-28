@@ -305,7 +305,6 @@ impl CourseMilestone {
             .persistent()
             .get::<_, MilestoneStatus>(&state_key)
             .unwrap_or(MilestoneStatus::NotStarted);
-        Self::extend_persistent(&env, &state_key);
 
         if current_state != MilestoneStatus::NotStarted {
             panic_with_error!(&env, Error::DuplicateSubmission);

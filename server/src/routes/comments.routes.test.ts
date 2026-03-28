@@ -143,6 +143,7 @@ describe("POST /api/comments", () => {
 		// spam check returns count 0, then insert
 		mockedQuery
 			.mockResolvedValueOnce({ rows: [{ count: "0" }] })
+			.mockResolvedValueOnce({ rows: [{ count: "0" }] })
 			.mockResolvedValueOnce({ rows: [newComment] })
 
 		const res = await request(buildApp())
@@ -153,6 +154,48 @@ describe("POST /api/comments", () => {
 		expect(res.status).toBe(201)
 		expect(res.body.content).toBe("Nice idea")
 		expect(res.body.author_address).toBe(AUTHOR)
+	})
+
+	it("rejects comment content over 2,000 characters", async () => {
+		const tooLong = "a".repeat(2001)
+
+		const res = await request(buildApp())
+			.post("/api/comments")
+			.set("Authorization", makeToken(AUTHOR))
+			.send({ proposal_id: "5", content: tooLong })
+
+		expect(res.status).toBe(400)
+		expect(res.body.error).toBe("Comment must be 2,000 characters or fewer")
+		expect(mockedQuery).not.toHaveBeenCalled()
+	})
+
+	it("strips HTML tags from comment content before storage", async () => {
+		const insertedComment = {
+			id: 11,
+			proposal_id: "5",
+			author_address: AUTHOR,
+			content: "Hello alert(1) world",
+			parent_id: null,
+			is_pinned: false,
+			created_at: new Date().toISOString(),
+		}
+
+		mockedQuery
+			.mockResolvedValueOnce({ rows: [{ count: "0" }] })
+			.mockResolvedValueOnce({ rows: [{ count: "0" }] })
+			.mockResolvedValueOnce({ rows: [insertedComment] })
+
+		const res = await request(buildApp())
+			.post("/api/comments")
+			.set("Authorization", makeToken(AUTHOR))
+			.send({ proposal_id: "5", content: "Hello <script>alert(1)</script> world" })
+
+		expect(res.status).toBe(201)
+		expect(mockedQuery).toHaveBeenNthCalledWith(
+			3,
+			expect.stringContaining("INSERT INTO comments"),
+			expect.arrayContaining(["5", AUTHOR, "Hello  world", null]),
+		)
 	})
 
 	it("returns 400 when required fields are missing", async () => {
@@ -195,6 +238,16 @@ describe("POST /api/comments", () => {
 			})
 
 		expect(res.status).toBe(400)
+	})
+
+	it("returns 400 when parentId is not a positive integer", async () => {
+		const res = await request(buildApp())
+			.post("/api/comments")
+			.set("Authorization", makeToken(AUTHOR))
+			.send({ proposal_id: "5", content: "Reply", parentId: "abc" })
+
+		expect(res.status).toBe(400)
+		expect(mockedQuery).not.toHaveBeenCalled()
 	})
 })
 

@@ -93,6 +93,66 @@ describe("POST /api/comments", () => {
 		expect(res.body.content).toBe("Nice proposal")
 	})
 
+	it("rejects comments longer than 2,000 characters", async () => {
+		const res = await request(buildApp())
+			.post("/api/comments")
+			.set("Authorization", `Bearer ${makeToken()}`)
+			.send({
+				proposal_id: "proposal-1",
+				body: "a".repeat(2001),
+				author_address: "GUSER123",
+			})
+
+		expect(res.status).toBe(400)
+		expect(res.body.error).toBe("Comment must be 2,000 characters or fewer")
+		expect(querySpy).not.toHaveBeenCalled()
+	})
+
+	it("strips HTML tags before storing comments", async () => {
+		querySpy
+			.mockResolvedValueOnce({ rows: [{ count: "0" }] } as never)
+			.mockResolvedValueOnce({ rows: [{ count: "0" }] } as never)
+			.mockResolvedValueOnce({
+				rows: [
+					{
+						id: 2,
+						proposal_id: "proposal-1",
+						author_address: "GUSER123",
+						content: "Hello world",
+					},
+				],
+			} as never)
+
+		const res = await request(buildApp())
+			.post("/api/comments")
+			.set("Authorization", `Bearer ${makeToken()}`)
+			.send({
+				proposal_id: "proposal-1",
+				body: "Hello <script>alert(1)</script> world",
+				author_address: "GUSER123",
+			})
+
+		expect(res.status).toBe(201)
+		expect(querySpy).toHaveBeenCalledTimes(3)
+		const insertCallArgs = querySpy.mock.calls[2]?.[1] as unknown[]
+		expect(insertCallArgs[2]).toBe("Hello  world")
+	})
+
+	it("rejects invalid parentId values", async () => {
+		const res = await request(buildApp())
+			.post("/api/comments")
+			.set("Authorization", `Bearer ${makeToken()}`)
+			.send({
+				proposal_id: "proposal-1",
+				body: "Reply",
+				parent_id: 0,
+				author_address: "GUSER123",
+			})
+
+		expect(res.status).toBe(400)
+		expect(querySpy).not.toHaveBeenCalled()
+	})
+
 	it("enforces a global per-address daily comment limit", async () => {
 		const previousMax = process.env.MAX_COMMENTS_PER_DAY
 		process.env.MAX_COMMENTS_PER_DAY = "1"

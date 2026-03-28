@@ -1,4 +1,5 @@
 import { Router, type Response } from "express"
+import sanitizeHtml from "sanitize-html"
 import { pool } from "../db/index"
 import { createCommentBodySchema } from "../lib/zod-schemas"
 import {
@@ -11,6 +12,7 @@ import { type JwtService } from "../services/jwt.service"
 export function createCommentsRouter(jwtService: JwtService): Router {
 	const router = Router()
 	const requireAuth = createRequireAuth(jwtService)
+	const maxCommentLength = 2000
 	const maxCommentsPerDay = Number.parseInt(
 		process.env.MAX_COMMENTS_PER_DAY ?? "50",
 		10,
@@ -75,6 +77,10 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 			const parentId = body.parentId ?? body.parent_id
 			const tokenAddress = req.user?.address ?? ""
 			const authorAddress = body.author_address ?? tokenAddress
+			const safeContent = sanitizeHtml(content, {
+				allowedTags: [],
+				allowedAttributes: {},
+			})
 
 			if (body.author_address && body.author_address !== tokenAddress) {
 				return res.status(400).json({
@@ -86,6 +92,21 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 							message: "author_address must match the authenticated user",
 						},
 					],
+				})
+			}
+
+			if (content.length > maxCommentLength) {
+				return res.status(400).json({
+					error: "Comment must be 2,000 characters or fewer",
+				})
+			}
+
+			if (
+				parentId !== undefined &&
+				(parentId === null || !Number.isInteger(parentId) || parentId <= 0)
+			) {
+				return res.status(400).json({
+					error: "parentId must be a positive integer or null",
 				})
 			}
 
@@ -120,7 +141,7 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 				const result = await pool.query(
 					`INSERT INTO comments (proposal_id, author_address, content, parent_id) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
-					[proposalId, authorAddress, content, parentId || null],
+					[proposalId, authorAddress, safeContent, parentId ?? null],
 				)
 
 				res.status(201).json(result.rows[0])

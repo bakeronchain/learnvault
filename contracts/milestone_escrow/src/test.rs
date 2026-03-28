@@ -309,6 +309,22 @@ fn zero_amount_create_is_rejected() {
 }
 
 #[test]
+fn zero_tranches_create_is_rejected() {
+    let (env, contract_id, _token, _admin, _treasury, scholar) = setup();
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+
+    client.env.mock_all_auths();
+    let result = client.try_create_escrow(&22, &scholar, &100, &0);
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidTranches as u32
+        )))
+    );
+}
+
+#[test]
 fn overpayment_is_rejected() {
     let (env, contract_id, _token, _admin, _treasury, scholar) = setup();
     let client = MilestoneEscrowClient::new(&env, &contract_id);
@@ -322,6 +338,75 @@ fn overpayment_is_rejected() {
             Error::Overpayment as u32
         )))
     );
+}
+
+#[test]
+fn reclaim_inactive_when_fully_released_is_rejected() {
+    let (env, contract_id, _token, _admin, _treasury, scholar) = setup();
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+
+    create_escrow(&client, 23, &scholar, 100, 4);
+    release_tranche_authorized(&client, 23).unwrap();
+    release_tranche_authorized(&client, 23).unwrap();
+    release_tranche_authorized(&client, 23).unwrap();
+    release_tranche_authorized(&client, 23).unwrap();
+
+    set_timestamp(&env, START_TS + THIRTY_DAYS);
+    let result = reclaim_inactive_authorized(&client, 23);
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::NothingToReclaim as u32
+        )))
+    );
+}
+
+#[test]
+fn equal_split_releases_25_each_for_100_over_4_tranches() {
+    let (env, contract_id, token, _admin, _treasury, scholar) = setup();
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+
+    create_escrow(&client, 24, &scholar, 100, 4);
+
+    release_tranche_authorized(&client, 24).unwrap();
+    assert_eq!(token_client(&env, &token).balance(&scholar), 25);
+
+    release_tranche_authorized(&client, 24).unwrap();
+    assert_eq!(token_client(&env, &token).balance(&scholar), 50);
+
+    release_tranche_authorized(&client, 24).unwrap();
+    assert_eq!(token_client(&env, &token).balance(&scholar), 75);
+
+    release_tranche_authorized(&client, 24).unwrap();
+    assert_eq!(token_client(&env, &token).balance(&scholar), 100);
+
+    let escrow = client.get_escrow(&24).unwrap();
+    assert_eq!(escrow.released_amount, 100);
+    assert_eq!(escrow.tranches_released, 4);
+    assert_eq!(token_client(&env, &token).balance(&contract_id), 0);
+}
+
+#[test]
+fn last_tranche_rounding_releases_33_33_34_for_100_over_3_tranches() {
+    let (env, contract_id, token, _admin, _treasury, scholar) = setup();
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+
+    create_escrow(&client, 25, &scholar, 100, 3);
+
+    release_tranche_authorized(&client, 25).unwrap();
+    assert_eq!(token_client(&env, &token).balance(&scholar), 33);
+
+    release_tranche_authorized(&client, 25).unwrap();
+    assert_eq!(token_client(&env, &token).balance(&scholar), 66);
+
+    release_tranche_authorized(&client, 25).unwrap();
+    assert_eq!(token_client(&env, &token).balance(&scholar), 100);
+
+    let escrow = client.get_escrow(&25).unwrap();
+    assert_eq!(escrow.released_amount, 100);
+    assert_eq!(escrow.tranches_released, 3);
+    assert_eq!(token_client(&env, &token).balance(&contract_id), 0);
 }
 
 #[cfg(test)]

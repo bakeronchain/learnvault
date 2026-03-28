@@ -1,5 +1,7 @@
 import { useEffect, useId, useState, useCallback } from "react"
 import { useTranslation } from "react-i18next"
+import { useWallet } from "../hooks/useWallet"
+import { getAuthToken } from "../util/auth"
 import CommentCard from "./CommentCard"
 
 export interface Comment {
@@ -19,11 +21,9 @@ interface CommentSectionProps {
 	proposalAuthor?: string
 }
 
-function CommentSection({
-	proposalId,
-	proposalAuthor,
-}: CommentSectionProps) {
+function CommentSection({ proposalId, proposalAuthor }: CommentSectionProps) {
 	const { t } = useTranslation()
+	const { address } = useWallet()
 	const pollInterval = Number(import.meta.env.VITE_COMMENT_POLL_MS) || 15000
 	const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
 	const commentInputId = useId()
@@ -80,7 +80,12 @@ function CommentSection({
 			return
 		}
 
-		const token = localStorage.getItem("auth_token") || "mock-token"
+		const token = getAuthToken()
+		if (!token) {
+			setSubmissionError("Sign in to post a comment.")
+			setSubmissionStatus(null)
+			return
+		}
 		setSubmissionError(null)
 		setSubmissionStatus(null)
 
@@ -239,7 +244,7 @@ function CommentSection({
 							<CommentCard
 								comment={comment}
 								isAuthor={comment.author_address === proposalAuthor}
-								canPin={proposalAuthor === "CURRENT_USER_ADDRESS"}
+								canPin={proposalAuthor === address}
 								onUpdate={fetchComments}
 							/>
 							<div className="ml-12 mt-6 space-y-6 border-l border-white/5 pl-8">

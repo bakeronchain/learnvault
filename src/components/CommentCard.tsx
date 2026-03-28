@@ -1,6 +1,7 @@
 import { formatDistanceToNow } from "date-fns"
 import React, { useId, useState } from "react"
 import ReactMarkdown from "react-markdown"
+import { getAuthToken } from "../util/auth"
 
 export interface Comment {
 	id: number
@@ -44,7 +45,8 @@ const CommentCard: React.FC<CommentCardProps> = ({
 	const authorId = `comment-${comment.id}-author`
 
 	const handleVote = async (type: "upvote" | "downvote") => {
-		const token = localStorage.getItem("auth_token") || "mock-token"
+		const token = getAuthToken()
+		if (!token) return
 		try {
 			const res = await fetch(
 				`${import.meta.env.VITE_SERVER_URL}/api/comments/${comment.id}/vote`,
@@ -64,7 +66,8 @@ const CommentCard: React.FC<CommentCardProps> = ({
 	}
 
 	const handlePin = async () => {
-		const token = localStorage.getItem("auth_token") || "mock-token"
+		const token = getAuthToken()
+		if (!token) return
 		try {
 			const res = await fetch(
 				`${import.meta.env.VITE_SERVER_URL}/api/comments/${comment.id}/pin`,
@@ -87,7 +90,11 @@ const CommentCard: React.FC<CommentCardProps> = ({
 			return
 		}
 
-		const token = localStorage.getItem("auth_token") || "mock-token"
+		const token = getAuthToken()
+		if (!token) {
+			setReplyError("Sign in to reply.")
+			return
+		}
 		setReplyError(null)
 
 		try {

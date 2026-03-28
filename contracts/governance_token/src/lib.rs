@@ -14,8 +14,8 @@
 //! Implements: https://github.com/bakeronchain/learnvault/issues/11
 
 use soroban_sdk::{
-    Address, Env, String, Symbol, contract, contracterror, contractevent, contractimpl, contracttype,
-    panic_with_error, symbol_short,
+    Address, Env, String, Symbol, contract, contracterror, contractevent, contractimpl,
+    contracttype, panic_with_error, symbol_short,
 };
 
 // ---------------------------------------------------------------------------
@@ -27,8 +27,6 @@ const INSTANCE_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
 const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30; // 30 days
 const PERSISTENT_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
 const PERSISTENT_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365; // 1 year
-const TEMP_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
-const TEMP_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365; // 1 year
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -46,6 +44,10 @@ pub enum GOVError {
     NotInitialized = 3,
     /// Insufficient balance or allowance.
     InsufficientFunds = 4,
+    /// Expiration ledger is in the past.
+    InvalidExpiration = 5,
+    /// Allowance exists but is expired at current ledger.
+    AllowanceExpired = 6,
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +98,7 @@ impl GovernanceToken {
             .instance()
             .set(&SYMBOL_KEY, &String::from_str(&env, "GOV"));
         env.storage().instance().set(&DECIMALS_KEY, &7_u32);
-        
+
         Self::extend_instance(&env);
     }
 
@@ -216,13 +218,24 @@ impl GovernanceToken {
     }
 
     /// Approve `spender` to spend up to `amount` on behalf of `owner`.
-    pub fn approve(env: Env, owner: Address, spender: Address, amount: i128) {
+    pub fn approve(
+        env: Env,
+        owner: Address,
+        spender: Address,
+        amount: i128,
+        expiration_ledger: u32,
+    ) {
         owner.require_auth();
+        let current_ledger = env.ledger().sequence();
+        if expiration_ledger < current_ledger {
+            panic_with_error!(&env, GOVError::InvalidExpiration);
+        }
+
         let key = DataKey::Allowance(owner, spender);
         env.storage()
-            .temporary()
-            .set(&key, &amount);
-        env.storage().temporary().extend_ttl(&key, TEMP_BUMP_THRESHOLD, TEMP_EXTEND_TO);
+            .persistent()
+            .set(&key, &(amount, expiration_ledger));
+        Self::extend_persistent(&env, &key);
     }
 
     /// Transfer `amount` from `from` to `to` using `spender`'s allowance.
@@ -231,15 +244,30 @@ impl GovernanceToken {
         if amount <= 0 {
             panic_with_error!(&env, GOVError::ZeroAmount);
         }
+
+        let current_ledger = env.ledger().sequence();
         let allow_key = DataKey::Allowance(from.clone(), spender.clone());
-        let allowance: i128 = env.storage().temporary().get(&allow_key).unwrap_or(0);
+        let (allowance, expiration_ledger): (i128, u32) =
+            env.storage().persistent().get(&allow_key).unwrap_or((0, 0));
+
+        if allowance > 0 && expiration_ledger < current_ledger {
+            panic_with_error!(&env, GOVError::AllowanceExpired);
+        }
+
         if allowance < amount {
             panic_with_error!(&env, GOVError::InsufficientFunds);
         }
-        env.storage()
-            .temporary()
-            .set(&allow_key, &(allowance - amount));
-        env.storage().temporary().extend_ttl(&allow_key, TEMP_BUMP_THRESHOLD, TEMP_EXTEND_TO);
+
+        let remaining = allowance - amount;
+        if remaining == 0 {
+            env.storage().persistent().remove(&allow_key);
+        } else {
+            env.storage()
+                .persistent()
+                .set(&allow_key, &(remaining, expiration_ledger));
+            Self::extend_persistent(&env, &allow_key);
+        }
+
         Self::_debit(&env, &from, amount);
         Self::_credit(&env, &to, amount);
     }
@@ -329,9 +357,15 @@ impl GovernanceToken {
 
     pub fn allowance(env: Env, owner: Address, spender: Address) -> i128 {
         let key = DataKey::Allowance(owner, spender);
-        if let Some(allowance) = env.storage().temporary().get::<_, i128>(&key) {
-            env.storage().temporary().extend_ttl(&key, TEMP_BUMP_THRESHOLD, TEMP_EXTEND_TO);
-            allowance
+        if let Some((allowance, expiration_ledger)) =
+            env.storage().persistent().get::<_, (i128, u32)>(&key)
+        {
+            if expiration_ledger < env.ledger().sequence() {
+                0
+            } else {
+                Self::extend_persistent(&env, &key);
+                allowance
+            }
         } else {
             0
         }
@@ -428,7 +462,10 @@ impl GovernanceToken {
 mod test {
     extern crate std;
 
-    use soroban_sdk::{Address, Env, IntoVal, String, testutils::Address as _};
+    use soroban_sdk::{
+        Address, Env, IntoVal, String,
+        testutils::{Address as _, Ledger, LedgerInfo},
+    };
 
     use crate::{GOVError, GovernanceToken, GovernanceTokenClient};
 
@@ -439,6 +476,23 @@ mod test {
         let client = GovernanceTokenClient::new(e, &id);
         client.initialize(&admin);
         (id, admin, client)
+    }
+
+    fn set_ledger_sequence(env: &Env, sequence_number: u32) {
+        env.ledger().set(LedgerInfo {
+            timestamp: 1_700_000_000,
+            protocol_version: 23,
+            sequence_number,
+            network_id: Default::default(),
+            base_reserve: 10,
+            min_temp_entry_ttl: 16,
+            min_persistent_entry_ttl: 16,
+            max_entry_ttl: 6312000,
+        });
+    }
+
+    fn valid_expiration(env: &Env) -> u32 {
+        env.ledger().sequence() + 100
     }
 
     // --- initialization ---
@@ -566,7 +620,7 @@ mod test {
         let bob = Address::generate(&e);
         let carol = Address::generate(&e);
         client.mint(&alice, &100);
-        client.approve(&alice, &bob, &60);
+        client.approve(&alice, &bob, &60, &valid_expiration(&e));
         assert_eq!(client.allowance(&alice, &bob), 60);
         client.transfer_from(&bob, &alice, &carol, &40);
         assert_eq!(client.balance(&alice), 60);
@@ -582,7 +636,7 @@ mod test {
         let bob = Address::generate(&e);
         let carol = Address::generate(&e);
         client.mint(&alice, &100);
-        client.approve(&alice, &bob, &10);
+        client.approve(&alice, &bob, &10, &valid_expiration(&e));
         let result = client.try_transfer_from(&bob, &alice, &carol, &50);
         assert_eq!(
             result.err(),
@@ -719,7 +773,7 @@ mod test {
         let bob = Address::generate(&e);
         let carol = Address::generate(&e);
         client.mint(&alice, &100);
-        client.approve(&alice, &bob, &50);
+        client.approve(&alice, &bob, &50, &valid_expiration(&e));
         let result = client.try_transfer_from(&bob, &alice, &carol, &0);
         assert_eq!(
             result.err(),
@@ -753,10 +807,10 @@ mod test {
         let alice = Address::generate(&e);
         let bob = Address::generate(&e);
         client.mint(&alice, &100);
-        client.approve(&alice, &bob, &50);
+        client.approve(&alice, &bob, &50, &valid_expiration(&e));
         assert_eq!(client.allowance(&alice, &bob), 50);
         // Reset to zero
-        client.approve(&alice, &bob, &0);
+        client.approve(&alice, &bob, &0, &valid_expiration(&e));
         assert_eq!(client.allowance(&alice, &bob), 0);
     }
 
@@ -768,7 +822,7 @@ mod test {
         let bob = Address::generate(&e);
         let carol = Address::generate(&e);
         client.mint(&alice, &10);
-        client.approve(&alice, &bob, &100); // High allowance
+        client.approve(&alice, &bob, &100, &valid_expiration(&e)); // High allowance
         let result = client.try_transfer_from(&bob, &alice, &carol, &50);
         assert_eq!(
             result.err(),
@@ -817,11 +871,11 @@ mod test {
         let alice = Address::generate(&e);
         let bob = Address::generate(&e);
 
-        client.approve(&alice, &bob, &100);
+        client.approve(&alice, &bob, &100, &valid_expiration(&e));
         assert_eq!(client.allowance(&alice, &bob), 100);
 
         // Update allowance
-        client.approve(&alice, &bob, &200);
+        client.approve(&alice, &bob, &200, &valid_expiration(&e));
         assert_eq!(client.allowance(&alice, &bob), 200);
     }
 
@@ -848,12 +902,73 @@ mod test {
         let carol = Address::generate(&e);
 
         client.mint(&alice, &100);
-        client.approve(&alice, &bob, &100);
+        client.approve(&alice, &bob, &100, &valid_expiration(&e));
         client.transfer_from(&bob, &alice, &carol, &100);
 
         assert_eq!(client.balance(&alice), 0);
         assert_eq!(client.balance(&carol), 100);
         assert_eq!(client.allowance(&alice, &bob), 0);
+    }
+
+    #[test]
+    fn approve_rejects_past_expiration() {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        set_ledger_sequence(&e, 10);
+
+        let alice = Address::generate(&e);
+        let bob = Address::generate(&e);
+
+        let result = client.try_approve(&alice, &bob, &50, &9);
+        assert_eq!(
+            result.err(),
+            Some(Ok(soroban_sdk::Error::from_contract_error(
+                GOVError::InvalidExpiration as u32
+            )))
+        );
+    }
+
+    #[test]
+    fn transfer_from_rejects_expired_allowance() {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        set_ledger_sequence(&e, 10);
+
+        let alice = Address::generate(&e);
+        let bob = Address::generate(&e);
+        let carol = Address::generate(&e);
+
+        client.mint(&alice, &100);
+        client.approve(&alice, &bob, &80, &10);
+
+        set_ledger_sequence(&e, 11);
+        let result = client.try_transfer_from(&bob, &alice, &carol, &20);
+        assert_eq!(
+            result.err(),
+            Some(Ok(soroban_sdk::Error::from_contract_error(
+                GOVError::AllowanceExpired as u32
+            )))
+        );
+        assert_eq!(client.allowance(&alice, &bob), 0);
+    }
+
+    #[test]
+    fn transfer_from_allows_when_expiration_matches_current_ledger() {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        set_ledger_sequence(&e, 10);
+
+        let alice = Address::generate(&e);
+        let bob = Address::generate(&e);
+        let carol = Address::generate(&e);
+
+        client.mint(&alice, &100);
+        client.approve(&alice, &bob, &40, &10);
+        client.transfer_from(&bob, &alice, &carol, &25);
+
+        assert_eq!(client.balance(&alice), 75);
+        assert_eq!(client.balance(&carol), 25);
+        assert_eq!(client.allowance(&alice, &bob), 15);
     }
 
     // --- burning ---

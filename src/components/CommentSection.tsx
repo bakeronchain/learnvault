@@ -19,10 +19,7 @@ interface CommentSectionProps {
 	proposalAuthor?: string
 }
 
-function CommentSection({
-	proposalId,
-	proposalAuthor,
-}: CommentSectionProps) {
+function CommentSection({ proposalId, proposalAuthor }: CommentSectionProps) {
 	const { t } = useTranslation()
 	const pollInterval = Number(import.meta.env.VITE_COMMENT_POLL_MS) || 15000
 	const [lastUpdated, setLastUpdated] = useState<Date>(new Date())

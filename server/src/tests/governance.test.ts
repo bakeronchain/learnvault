@@ -32,7 +32,8 @@ app.use("/api", governanceRouter)
 describe("POST /api/governance/proposals", () => {
 	it("should create a valid governance proposal", async () => {
 		const response = await request(app).post("/api/governance/proposals").send({
-			author_address: "GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBFUKJQ2K5RQDDXYZ",
+			author_address:
+				"GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBFUKJQ2K5RQDDXYZ",
 			title: "Fund my Soroban course",
 			description: "I am learning Soroban and need funding for my course.",
 			requested_amount: "500",
@@ -46,7 +47,8 @@ describe("POST /api/governance/proposals", () => {
 
 	it("should reject proposal with missing required fields", async () => {
 		const response = await request(app).post("/api/governance/proposals").send({
-			author_address: "GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBFUKJQ2K5RQDDXYZ",
+			author_address:
+				"GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBFUKJQ2K5RQDDXYZ",
 			title: "Fund my course",
 		})
 
@@ -71,7 +73,8 @@ describe("POST /api/governance/proposals", () => {
 
 	it("should reject proposal with invalid evidence_url", async () => {
 		const response = await request(app).post("/api/governance/proposals").send({
-			author_address: "GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBFUKJQ2K5RQDDXYZ",
+			author_address:
+				"GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBFUKJQ2K5RQDDXYZ",
 			title: "Fund my Soroban course",
 			description: "I am learning Soroban and need funding for my course.",
 			requested_amount: "500",
@@ -85,7 +88,8 @@ describe("POST /api/governance/proposals", () => {
 
 	it("should reject proposal with invalid requested_amount", async () => {
 		const response = await request(app).post("/api/governance/proposals").send({
-			author_address: "GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBFUKJQ2K5RQDDXYZ",
+			author_address:
+				"GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBFUKJQ2K5RQDDXYZ",
 			title: "Fund my Soroban course",
 			description: "I am learning Soroban and need funding for my course.",
 			requested_amount: "not-a-number",
@@ -105,7 +109,8 @@ describe("POST /api/governance/proposals", () => {
 		).mockRejectedValueOnce(new Error("Contract call failed"))
 
 		const response = await request(app).post("/api/governance/proposals").send({
-			author_address: "GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBFUKJQ2K5RQDDXYZ",
+			author_address:
+				"GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBFUKJQ2K5RQDDXYZ",
 			title: "Fund my Soroban course",
 			description: "I am learning Soroban and need funding for my course.",
 			requested_amount: "500",
@@ -182,8 +187,12 @@ describe("POST /api/governance/vote", () => {
 			.mockResolvedValueOnce({ rows: [] }) // no existing vote
 			.mockResolvedValueOnce({ rows: [{ id: 1 }] }) // insert vote
 			.mockResolvedValueOnce({ rows: [] }) // update proposal
-			.mockResolvedValueOnce({ rows: [{ votes_for: "1250000000", votes_against: "0" }] }) // fetch updated counts
-		stellarContractService.getGovernanceTokenBalance.mockResolvedValue("1250000000")
+			.mockResolvedValueOnce({
+				rows: [{ votes_for: "1250000000", votes_against: "0" }],
+			}) // fetch updated counts
+		stellarContractService.getGovernanceTokenBalance.mockResolvedValue(
+			"1250000000",
+		)
 		stellarContractService.castVote.mockResolvedValue({
 			txHash: "mock_vote_tx",
 			simulated: false,
@@ -250,7 +259,10 @@ describe("POST /api/governance/vote", () => {
 		})
 
 		expect(response.status).toBe(400)
-		expect(response.body).toHaveProperty("error", "Voting is closed for this proposal")
+		expect(response.body).toHaveProperty(
+			"error",
+			"Voting is closed for this proposal",
+		)
 	})
 
 	it("should reject vote when voter already voted", async () => {
@@ -266,7 +278,10 @@ describe("POST /api/governance/vote", () => {
 		})
 
 		expect(response.status).toBe(409)
-		expect(response.body).toHaveProperty("error", "You have already voted on this proposal")
+		expect(response.body).toHaveProperty(
+			"error",
+			"You have already voted on this proposal",
+		)
 	})
 
 	it("should reject vote when voter has no GOV tokens", async () => {
@@ -291,7 +306,9 @@ describe("POST /api/governance/vote", () => {
 		pool.query
 			.mockResolvedValueOnce({ rows: [{ id: 1, status: "pending" }] })
 			.mockResolvedValueOnce({ rows: [] })
-		stellarContractService.castVote.mockRejectedValueOnce(new Error("Contract call failed"))
+		stellarContractService.castVote.mockRejectedValueOnce(
+			new Error("Contract call failed"),
+		)
 
 		const response = await request(app).post("/api/governance/vote").send({
 			proposal_id: 1,

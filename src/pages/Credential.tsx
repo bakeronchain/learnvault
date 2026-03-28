@@ -9,9 +9,7 @@ import { useScholarNft } from "../hooks/useScholarNft"
 // ---------------------------------------------------------------------------
 
 const SkeletonPulse: React.FC<{ className?: string }> = ({ className }) => (
-	<div
-		className={`animate-pulse rounded-xl bg-white/10 ${className ?? ""}`}
-	/>
+	<div className={`animate-pulse rounded-xl bg-white/10 ${className ?? ""}`} />
 )
 
 const CredentialSkeleton: React.FC = () => (
@@ -84,7 +82,7 @@ const Credential: React.FC = () => {
 	const { credential: nft, status, error } = useScholarNft(nftId)
 
 	const copyToClipboard = () => {
-		void navigator.clipboard.writeText(window.location.href).catch(() => { })
+		void navigator.clipboard.writeText(window.location.href).catch(() => {})
 		setCopySuccess(true)
 		setTimeout(() => setCopySuccess(false), 2000)
 	}
@@ -224,11 +222,9 @@ const Credential: React.FC = () => {
 							</h1>
 							<p className="text-white/70 text-lg font-medium leading-relaxed">
 								This on-chain certificate verifies that{" "}
-								<span className="text-white font-bold">
-									{nft.scholarName}
-								</span>{" "}
-								has successfully completed the program and earned a
-								verified ScholarNFT credential.
+								<span className="text-white font-bold">{nft.scholarName}</span>{" "}
+								has successfully completed the program and earned a verified
+								ScholarNFT credential.
 							</p>
 						</div>
 
@@ -237,9 +233,7 @@ const Credential: React.FC = () => {
 								<p className="block text-[10px] uppercase font-black text-white/70 tracking-[3px] mb-2">
 									Awarded Date
 								</p>
-								<p className="text-lg font-bold">
-									{nft.completionDate}
-								</p>
+								<p className="text-lg font-bold">{nft.completionDate}</p>
 							</div>
 							{nft.reputationPoints && (
 								<div>

@@ -106,7 +106,9 @@ const DaoProposals: React.FC = () => {
 			: 0
 
 	const userHasVoted = selectedProposal ? hasVoted(selectedProposal.id) : false
-	const voteChoice = selectedProposal ? getVoteChoice(selectedProposal.id) : null
+	const voteChoice = selectedProposal
+		? getVoteChoice(selectedProposal.id)
+		: null
 	const governanceTokens = votingPower
 	const isTokenHolder = governanceTokens > 0n
 	const isWalletConnected = Boolean(walletAddress)
@@ -243,7 +245,12 @@ const DaoProposals: React.FC = () => {
 
 							{userHasVoted ? (
 								<div className="inline-flex items-center px-4 py-2 rounded-full border border-brand-cyan/30 bg-brand-cyan/10 text-brand-cyan text-xs font-black uppercase tracking-widest">
-									You voted {voteChoice === null ? "For/Against" : voteChoice ? "For" : "Against"}
+									You voted{" "}
+									{voteChoice === null
+										? "For/Against"
+										: voteChoice
+											? "For"
+											: "Against"}
 								</div>
 							) : (
 								<div className="flex gap-3">

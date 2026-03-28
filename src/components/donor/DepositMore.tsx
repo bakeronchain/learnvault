@@ -57,7 +57,9 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 
 			showInfo("Waiting for wallet approval…")
 			// TODO: replace simulated flow with actual contract deposit call
-			showSuccess(`Deposit of $${depositAmount.toLocaleString()} USDC submitted!`)
+			showSuccess(
+				`Deposit of $${depositAmount.toLocaleString()} USDC submitted!`,
+			)
 			setAmount("")
 
 			if (onDepositSuccess) {

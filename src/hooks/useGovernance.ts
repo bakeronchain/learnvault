@@ -502,7 +502,10 @@ export function useGovernance() {
 			const sendResult = await sendTxIfNeeded(tx)
 			unwrapSendResult(sendResult)
 		},
-		onSuccess: (_: void, { proposalId, support }: { proposalId: number; support: boolean }) => {
+		onSuccess: (
+			_: void,
+			{ proposalId, support }: { proposalId: number; support: boolean },
+		) => {
 			showSuccess("Vote submitted successfully!")
 			// Invalidate queries to refresh UI
 			void queryClient.invalidateQueries({

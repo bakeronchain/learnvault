@@ -118,7 +118,10 @@ const createProposalSchema = z.object({
 })
 
 const castVoteSchema = z.object({
-	proposal_id: z.number().int().positive("proposal_id must be a positive integer"),
+	proposal_id: z
+		.number()
+		.int()
+		.positive("proposal_id must be a positive integer"),
 	voter_address: z
 		.string()
 		.min(56, "voter_address must be a valid Stellar address")

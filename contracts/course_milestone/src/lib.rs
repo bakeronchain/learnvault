@@ -253,7 +253,7 @@ impl CourseMilestone {
 
     fn assert_not_paused(env: &Env) {
         if Self::is_paused(env.clone()) {
-            panic_with_error!(env, Error::ContractPaused);
+            panic_with_error!(&env, Error::ContractPaused);
         }
     }
 
@@ -413,6 +413,122 @@ impl CourseMilestone {
 
     pub fn get_version(env: Env) -> String {
         String::from_str(&env, "1.0.0")
+    }
+
+    pub fn verify_milestone(
+        env: Env,
+        admin: Address,
+        learner: Address,
+        course_id: String,
+        milestone_id: u32,
+        tokens_amount: i128,
+    ) {
+        if Self::is_paused(env.clone()) {
+            panic_with_error!(&env, Error::ContractPaused);
+        }
+
+        Self::require_initialized(&env);
+        admin.require_auth();
+
+        // Verify admin authorization
+        let stored_admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap();
+        if admin != stored_admin {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
+
+        // Check if learner is enrolled
+        if !Self::is_enrolled(env.clone(), learner.clone(), course_id.clone()) {
+            panic_with_error!(&env, Error::NotEnrolled);
+        }
+
+        // Check current milestone state
+        let state_key = DataKey::MilestoneState(learner.clone(), course_id.clone(), milestone_id);
+        let current_state = env
+            .storage()
+            .persistent()
+            .get::<_, MilestoneStatus>(&state_key)
+            .unwrap_or(MilestoneStatus::NotStarted);
+
+        if current_state != MilestoneStatus::Pending {
+            panic_with_error!(&env, Error::InvalidState);
+        }
+
+        // Update milestone state to Approved
+        env.storage()
+            .persistent()
+            .set(&state_key, &MilestoneStatus::Approved);
+
+        // Get learn token contract address and mint tokens
+        let learn_token_address: Address = env.storage().instance().get(&LEARN_TOKEN_KEY).unwrap();
+        let learn_token_client = LearnTokenClient::new(&env, &learn_token_address);
+        learn_token_client.mint(&learner, &tokens_amount);
+
+        // Emit milestone completed event
+        env.events().publish(
+            symbol_short!("milestone_completed"),
+            MilestoneCompleted {
+                learner: learner.clone(),
+                course_id: course_id.clone().parse::<u32>().unwrap_or(0),
+                milestones_completed: milestone_id,
+                tokens_minted: tokens_amount,
+            },
+        );
+    }
+
+    pub fn reject_milestone(
+        env: Env,
+        admin: Address,
+        learner: Address,
+        course_id: String,
+        milestone_id: u32,
+    ) {
+        if Self::is_paused(env.clone()) {
+            panic_with_error!(&env, Error::ContractPaused);
+        }
+
+        Self::require_initialized(&env);
+        admin.require_auth();
+
+        // Verify admin authorization
+        let stored_admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap();
+        if admin != stored_admin {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
+
+        // Check if learner is enrolled
+        if !Self::is_enrolled(env.clone(), learner.clone(), course_id.clone()) {
+            panic_with_error!(&env, Error::NotEnrolled);
+        }
+
+        // Check current milestone state
+        let state_key = DataKey::MilestoneState(learner.clone(), course_id.clone(), milestone_id);
+        let current_state = env
+            .storage()
+            .persistent()
+            .get::<_, MilestoneStatus>(&state_key)
+            .unwrap_or(MilestoneStatus::NotStarted);
+
+        if current_state != MilestoneStatus::Pending {
+            panic_with_error!(&env, Error::InvalidState);
+        }
+
+        // Update milestone state to Rejected
+        env.storage()
+            .persistent()
+            .set(&state_key, &MilestoneStatus::Rejected);
+
+        // Remove submission data
+        let submission_key = DataKey::MilestoneSubmission(learner, course_id, milestone_id);
+        env.storage().persistent().remove(&submission_key);
+    }
+
+    pub fn get_milestone_status(
+        env: Env,
+        learner: Address,
+        course_id: String,
+        milestone_id: u32,
+    ) -> MilestoneStatus {
+        Self::get_milestone_state(env, learner, course_id, milestone_id)
     }
 
     fn require_initialized(env: &Env) {

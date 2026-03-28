@@ -10,12 +10,27 @@ jest.mock("../db/index", () => ({
 	},
 }))
 
+jest.mock("../services/stellar-contract.service", () => ({
+	stellarContractService: {
+		callVerifyMilestone: jest
+			.fn()
+			.mockResolvedValue({ txHash: "test_tx_hash", simulated: false }),
+		emitRejectionEvent: jest
+			.fn()
+			.mockResolvedValue({ txHash: "test_tx_hash", simulated: false }),
+		callMintScholarNFT: jest
+			.fn()
+			.mockResolvedValue({ txHash: "test_tx_hash", simulated: false }),
+	},
+}))
+
 import express from "express"
 import jwt from "jsonwebtoken"
 import request from "supertest"
 import { inMemoryMilestoneStore } from "../db/milestone-store"
 import { errorHandler } from "../middleware/error.middleware"
 import { adminMilestonesRouter } from "../routes/admin-milestones.routes"
+import { stellarContractService } from "../services/stellar-contract.service"
 
 const JWT_SECRET = "learnvault-secret"
 
@@ -41,6 +56,16 @@ beforeEach(() => {
 	inMemoryMilestoneStore["reportSeq"] = 1
 	// @ts-ignore
 	inMemoryMilestoneStore["auditSeq"] = 1
+
+	// Provide fake Stellar credentials so the approve/reject credential guard
+	// passes — the pool mock ensures no real SDK call is made.
+	process.env.STELLAR_SECRET_KEY = "FAKE_TEST_KEY"
+	process.env.COURSE_MILESTONE_CONTRACT_ID = "FAKE_TEST_CONTRACT"
+})
+
+afterEach(() => {
+	delete process.env.STELLAR_SECRET_KEY
+	delete process.env.COURSE_MILESTONE_CONTRACT_ID
 })
 
 describe("POST /api/milestones/submit", () => {
@@ -299,5 +324,35 @@ describe("POST /api/admin/milestones/:id/reject", () => {
 				message: "reason is required",
 			},
 		])
+	})
+})
+
+describe("error handling", () => {
+	it("returns 503 when Stellar credentials are not configured", async () => {
+		const report = await inMemoryMilestoneStore["createReport"]({
+			scholar_address: "GSCHOLAR1",
+			course_id: "stellar-basics",
+			milestone_id: 1,
+			evidence_description: "Done",
+			evidence_github: null,
+			evidence_ipfs_cid: null,
+		})
+
+		// Mock the service to throw the 'not configured' error
+		const mockedService =
+			stellarContractService.callVerifyMilestone as jest.Mock
+		mockedService.mockRejectedValueOnce(
+			new Error(
+				"STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction",
+			),
+		)
+
+		const app = buildApp()
+		const res = await request(app)
+			.post(`/api/admin/milestones/${report.id}/approve`)
+			.set("Authorization", `Bearer ${makeAdminToken()}`)
+
+		expect(res.status).toBe(503)
+		expect(res.body.error).toBe("Stellar credentials not configured")
 	})
 })

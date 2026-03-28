@@ -202,3 +202,11 @@ export const createCredentialMetadataBodySchema = z
 			.datetime({ message: "completed_at must be a valid ISO 8601 datetime" }),
 	})
 	.strict()
+
+export const enrollmentBodySchema = z
+	.object({
+		learner_address: requiredString("learner_address"),
+		course_id: requiredString("course_id"),
+		tx_hash: requiredString("tx_hash"),
+	})
+	.strict()

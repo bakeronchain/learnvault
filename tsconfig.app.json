@@ -1,4 +1,17 @@
 {
-	"extends": "@theahaco/ts-config/typescript",
+	"compilerOptions": {
+		"target": "ES2022",
+		"lib": ["ESNext", "DOM", "DOM.Iterable"],
+		"jsx": "react-jsx",
+		"moduleResolution": "bundler",
+		"allowImportingTsExtensions": true,
+		"noEmit": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"allowJs": true,
+		"isolatedModules": true,
+		"module": "ESNext",
+		"strict": true
+	},
 	"include": ["src", "e2e", "playwright.config.ts", "reset.d.ts"]
 }

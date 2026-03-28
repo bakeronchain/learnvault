@@ -1,6 +1,7 @@
 import React, { useState } from "react"
 import { Helmet } from "react-helmet"
 import { useParams } from "react-router-dom"
+import TxHashLink from "../components/TxHashLink"
 
 const Credential: React.FC = () => {
 	const { nftId } = useParams<{ nftId: string }>()
@@ -12,7 +13,7 @@ const Credential: React.FC = () => {
 		scholarName: "Alex Rivera",
 		completionDate: "October 24, 2024",
 		artworkUrl: "https://api.placeholder.com/600/600?text=ScholarNFT+Badge",
-		stellarExpertUrl: "https://stellar.expert/explorer/testnet/tx/...",
+		txHash: "3f40a5c6f2e1471fa3f31ba6b59f7f0dcefc36e35d5b12fb96f0c8d9f6a8b4e1",
 		issuer: "LearnVault DAO",
 		reputationPoints: "50 LRN",
 	}
@@ -29,17 +30,6 @@ const Credential: React.FC = () => {
 
 	return (
 		<div className="py-20 px-6 min-h-screen flex flex-col items-center gap-16 text-white relative overflow-hidden">
-			<Helmet>
-				<title>{title}</title>
-				<meta property="og:title" content={title} />
-				<meta property="og:description" content={description} />
-				<meta property="og:image" content={nft.artworkUrl} />
-				<meta property="og:url" content={`${siteUrl}/credentials/${nft.id}`} />
-				<meta name="twitter:card" content="summary_large_image" />
-			</Helmet>
-
-			{/* Background Glows */}
-
 			<div className="absolute top-1/4 left-1/4 w-[50%] h-[50%] bg-brand-cyan/10 blur-[150px] rounded-full -z-10" />
 			<div className="absolute bottom-1/4 right-1/4 w-[50%] h-[50%] bg-brand-purple/10 blur-[150px] rounded-full -z-10" />
 
@@ -110,16 +100,16 @@ const Credential: React.FC = () => {
 									</p>
 								</div>
 							</div>
+							<div className="col-span-2">
+								<label className="block text-[10px] uppercase font-black text-white/30 tracking-[3px] mb-2">
+									Transaction Hash
+								</label>
+								<TxHashLink
+									hash={nft.txHash}
+									className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#00d2ff] hover:underline"
+								/>
+							</div>
 						</div>
-
-						<a
-							href={nft.stellarExpertUrl}
-							target="_blank"
-							rel="noreferrer"
-							className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-brand-cyan hover:underline"
-						>
-							View on Stellar Expert ↗
-						</a>
 					</div>
 				</div>
 			</div>

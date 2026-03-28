@@ -20,6 +20,9 @@ const SCHOLARSHIP_TREASURY_CONTRACT = readEnv(
 )
 const GOVERNANCE_TOKEN_CONTRACT = readEnv("PUBLIC_GOVERNANCE_TOKEN_CONTRACT")
 
+// The expected contract version this client was generated against.
+const EXPECTED_CONTRACT_VERSION = "1.0.0"
+
 /**
  * Hook to manage governance interactions: reading proposals, voting power, and casting votes.
  */
@@ -164,9 +167,10 @@ export function useGovernance() {
 		(value: unknown): unknown => {
 			const resolved = unwrapResult(value)
 			if (isErrResult(resolved)) {
+				const maybeUnwrapErr = (resolved as ContractRecord).unwrapErr
 				const errorValue =
-					typeof (resolved as ContractRecord).unwrapErr === "function"
-						? (resolved as ContractRecord).unwrapErr()
+					typeof maybeUnwrapErr === "function"
+						? (maybeUnwrapErr as () => unknown)()
 						: new Error("Transaction failed")
 				throw errorValue instanceof Error
 					? errorValue
@@ -177,7 +181,10 @@ export function useGovernance() {
 				typeof resolved === "object" &&
 				typeof (resolved as ContractRecord).unwrap === "function"
 			) {
-				return (resolved as ContractRecord).unwrap()
+				const maybeUnwrap = (resolved as ContractRecord).unwrap as
+					| (() => unknown)
+					| undefined
+				return maybeUnwrap ? maybeUnwrap() : resolved
 			}
 			return resolved
 		},
@@ -191,7 +198,9 @@ export function useGovernance() {
 			if (typeof resolved === "number") return resolved !== 0
 			if (typeof resolved === "string") {
 				const normalized = resolved.trim().toLowerCase()
-				return normalized === "true" || normalized === "yes" || normalized === "for"
+				return (
+					normalized === "true" || normalized === "yes" || normalized === "for"
+				)
 			}
 			if (resolved && typeof resolved === "object") {
 				const maybe = resolved as ContractRecord
@@ -224,6 +233,69 @@ export function useGovernance() {
 			return null
 		}
 	}, [])
+
+	// Version checks — warn if deployed contract versions don't match expected
+	useQuery({
+		queryKey: ["governance", "version", "governance_token"],
+		queryFn: async (): Promise<string | null> => {
+			if (!GOVERNANCE_TOKEN_CONTRACT) return null
+			const client = await loadClient("../contracts/governance_token")
+			if (!client) return null
+			const fn = asMethod(client, "get_version")
+			if (!fn) return null
+			try {
+				const raw = await fn({})
+				const version = String(
+					(raw !== null &&
+					typeof raw === "object" &&
+					"result" in (raw as ContractRecord)
+						? (raw as ContractRecord).result
+						: raw) ?? "",
+				)
+				if (version && version !== EXPECTED_CONTRACT_VERSION) {
+					console.warn(
+						`[GovernanceToken] Version mismatch: expected ${EXPECTED_CONTRACT_VERSION}, got ${version}. ` +
+							"Client bindings may be out of date.",
+					)
+				}
+				return version
+			} catch {
+				return null
+			}
+		},
+		staleTime: Infinity,
+	})
+
+	useQuery({
+		queryKey: ["governance", "version", "scholarship_treasury"],
+		queryFn: async (): Promise<string | null> => {
+			if (!SCHOLARSHIP_TREASURY_CONTRACT) return null
+			const client = await loadClient("../contracts/scholarship_treasury")
+			if (!client) return null
+			const fn = asMethod(client, "get_version")
+			if (!fn) return null
+			try {
+				const raw = await fn({})
+				const version = String(
+					(raw !== null &&
+					typeof raw === "object" &&
+					"result" in (raw as ContractRecord)
+						? (raw as ContractRecord).result
+						: raw) ?? "",
+				)
+				if (version && version !== EXPECTED_CONTRACT_VERSION) {
+					console.warn(
+						`[ScholarshipTreasury] Version mismatch: expected ${EXPECTED_CONTRACT_VERSION}, got ${version}. ` +
+							"Client bindings may be out of date.",
+					)
+				}
+				return version
+			} catch {
+				return null
+			}
+		},
+		staleTime: Infinity,
+	})
 
 	// Fetch voting power (GOV token balance)
 	const { data: votingPower = 0n } = useQuery({

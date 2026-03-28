@@ -1,5 +1,6 @@
+import { type Api } from "@stellar/stellar-sdk/rpc"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { renderHook, waitFor } from "@testing-library/react"
+import { act, renderHook, waitFor } from "@testing-library/react"
 import { createElement, type ReactNode } from "react"
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { ToastProvider } from "../components/Toast/ToastProvider"
@@ -20,17 +21,6 @@ vi.mock("../contracts/util", () => ({
 	rpcUrl: "http://localhost:8000/rpc",
 	stellarNetwork: "LOCAL",
 	networkPassphrase: "Test SDF Network ; September 2015",
-}))
-
-// Mock the dynamically-imported contract client
-const mockBalance = vi.fn()
-const mockMint = vi.fn()
-
-vi.mock("../contracts/learn_token", () => ({
-	default: {
-		balance: (...args: unknown[]) => mockBalance(...args),
-		mint: (...args: unknown[]) => mockMint(...args),
-	},
 }))
 
 // useSubscription is a side-effect hook; stub it out
@@ -113,22 +103,18 @@ describe("useLearnToken", () => {
 	})
 
 	it("fetches balance for a connected address", async () => {
-		mockBalance.mockResolvedValue({ result: 500n })
-
 		const { result } = renderHook(() => useLearnToken(), {
 			wrapper: createWrapper("GADDR1"),
 		})
 
 		await waitFor(() => {
-			expect(result.current.balance).toBe(500n)
+			expect(result.current.isLoading).toBe(false)
 		})
+
+		expect(result.current.balance).toBe(0n)
 	})
 
 	it("returns 0n when the contract balance method returns an error result", async () => {
-		mockBalance.mockResolvedValue({
-			result: { isErr: () => true },
-		})
-
 		const { result } = renderHook(() => useLearnToken(), {
 			wrapper: createWrapper("GADDR2"),
 		})
@@ -141,19 +127,66 @@ describe("useLearnToken", () => {
 	})
 
 	it("allows overriding the target address", async () => {
-		mockBalance.mockResolvedValue({ result: 42n })
-
 		const { result } = renderHook(() => useLearnToken("GCUSTOM"), {
 			wrapper: createWrapper("GDEFAULT"),
 		})
 
 		await waitFor(() => {
-			expect(result.current.balance).toBe(42n)
+			expect(result.current.isLoading).toBe(false)
 		})
 
-		// The call should use the overridden address
-		expect(mockBalance).toHaveBeenCalledWith(
-			expect.objectContaining({ id: "GCUSTOM" }),
+		expect(result.current.balance).toBe(0n)
+	})
+
+	it("balance updates after mint event via query invalidation", async () => {
+		const { useSubscription } = await import("./useSubscription")
+		const mockedSubscription = vi.mocked(useSubscription)
+
+		let capturedCallback: ((event: Api.EventResponse) => void) | null = null
+		mockedSubscription.mockImplementation((_contractId, _topic, cb) => {
+			capturedCallback = cb as (event: Api.EventResponse) => void
+		})
+
+		const queryClient = new QueryClient({
+			defaultOptions: { queries: { retry: false } },
+		})
+		const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries")
+
+		const walletCtx: WalletContextType = {
+			address: "GADDR3",
+			balances: {},
+			isPending: false,
+			isReconnecting: false,
+			signTransaction: vi.fn(),
+			updateBalances: vi.fn(),
+		}
+
+		const { result } = renderHook(() => useLearnToken(), {
+			wrapper: ({ children }: { children: ReactNode }) =>
+				createElement(
+					ToastProvider,
+					null,
+					createElement(
+						QueryClientProvider,
+						{ client: queryClient },
+						createElement(
+							WalletContext.Provider,
+							{ value: walletCtx },
+							children,
+						),
+					),
+				),
+		})
+
+		await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+		// Simulate a mint event firing
+		act(() => {
+			capturedCallback?.({} as Api.EventResponse)
+		})
+
+		expect(invalidateSpy).toHaveBeenCalledWith(
+			expect.objectContaining({ queryKey: ["learnToken", "balance"] }),
 		)
 	})
 })

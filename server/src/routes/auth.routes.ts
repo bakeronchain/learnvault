@@ -2,6 +2,7 @@ import { Router } from "express"
 
 import { createAuthControllers } from "../controllers/auth.controller"
 import { nonceRateLimiter } from "../middleware/nonce-rate-limit.middleware"
+import { authVerifyLimiter } from "../middleware/rate-limit.middleware"
 import { type AuthService } from "../services/auth.service"
 
 export function createAuthRouter(authService: AuthService): Router {
@@ -21,7 +22,7 @@ export function createAuthRouter(authService: AuthService): Router {
 		void getNonce(req, res)
 	})
 
-	router.post("/verify", (req, res) => {
+	router.post("/verify", authVerifyLimiter, (req, res) => {
 		void postVerify(req, res)
 	})
 

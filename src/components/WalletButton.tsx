@@ -26,7 +26,7 @@ export const WalletButton = () => {
 			<Button
 				variant="secondary"
 				size="md"
-				onClick={() => void connectWallet()}
+				onClick={() => void handleConnect()}
 				disabled={isReconnecting}
 			>
 				<Icon.Wallet02 />

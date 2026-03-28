@@ -1,38 +1,26 @@
-﻿/**
+/**
  * Utility functions for USDC token operations on Stellar
  */
 
-import {
-	Asset,
-	Contract,
-	rpc as StellarRpc,
-	TransactionBuilder,
-	Operation,
-	Account,
-	TimeoutInfinite,
-} from "@stellar/stellar-sdk"
-import { rpcUrl, networkPassphrase, horizonUrl } from "../contracts/util"
+import { Contract, rpc, xdr } from "@stellar/stellar-sdk"
+import { networkPassphrase, rpcUrl } from "../contracts/util"
 
 /**
- * Get the USDC contract ID from environment variables
- * @returns The USDC contract ID
- * @throws Error if USDC contract ID is not configured
+ * Get the USDC contract ID from environment variables.
+ * Checks both PUBLIC_USDC_CONTRACT_ID and VITE_USDC_CONTRACT_ID.
+ * Returns undefined when neither is set (contract not configured).
  */
-export function getUSDCContractId(): string {
-	const contractId = import.meta.env.PUBLIC_USDC_CONTRACT_ID
+export function getUSDCContractId(): string | undefined {
+	const contractId =
+		(import.meta.env.PUBLIC_USDC_CONTRACT_ID as string | undefined) ||
+		(import.meta.env.VITE_USDC_CONTRACT_ID as string | undefined)
 
-	if (!contractId) {
-		throw new Error(
-			"USDC contract ID not configured. Please set PUBLIC_USDC_CONTRACT_ID in your .env file.",
-		)
-	}
-
-	return contractId
+	return contractId?.trim() || undefined
 }
 
 /**
- * Mint test USDC tokens to a specified address
- * This function is only for testnet/development environments
+ * Mint test USDC tokens to a specified address.
+ * This function is only for testnet/development environments.
  *
  * @param recipientAddress - The Stellar address to receive the USDC
  * @param signTransaction - Callback to sign the transaction XDR
@@ -47,106 +35,117 @@ export async function mintTestUSDC(
 ): Promise<string> {
 	try {
 		const contractId = getUSDCContractId()
-		const amountStroops = BigInt(Math.floor(amount * 10000000))
-
-		const rpcUrl =
-			import.meta.env.PUBLIC_STELLAR_RPC_URL || "http://localhost:8000/rpc"
-
+		const endpoint =
+			(import.meta.env.PUBLIC_STELLAR_RPC_URL as string | undefined) ||
+			"http://localhost:8000/rpc"
+		void signTransaction
 		throw new Error(
-			`Please use the CLI script to mint test USDC:\n\n` +
-				`./scripts/mint-test-usdc.sh ${recipientAddress} ${amount}\n\n` +
-				`The configured contract ${contractId} will be reachable via ${rpcUrl} once contract clients are generated.`,
+			`Please use the CLI script to mint test USDC:\n\n./scripts/mint-test-usdc.sh ${recipientAddress} ${amount}\n\nConfigured contract: ${contractId ?? "not set"}\nRPC endpoint: ${endpoint}`,
 		)
-		const server = new StellarRpc.Server(rpcUrl)
-
-		// 1. Fetch account sequence
-		const accountResponse = await fetch(
-			`${horizonUrl}/accounts/${recipientAddress}`,
-		)
-		if (!accountResponse.ok) {
-			throw new Error("Could not fetch account details for sequence number")
-		}
-		const accountData = await accountResponse.json()
-		const sourceAccount = new Account(recipientAddress, accountData.sequence)
-
-		// 2. Build the transaction
-		const contract = new Contract(contractId)
-		const tx = new TransactionBuilder(sourceAccount, {
-			fee: "100",
-			networkPassphrase,
-		})
-			.addOperation(
-				contract.call("mint", {
-					to: recipientAddress,
-					amount: amountStroops,
-				}),
-			)
-			.setTimeout(TimeoutInfinite)
-			.build()
-
-		// 3. Prepare transaction (simulations, footprints, etc.)
-		const preparedTx = await server.prepareTransaction(tx)
-
-		// 4. Sign transaction via wallet
-		const { signedTransaction } = await signTransaction(preparedTx.toXDR())
-
-		// 5. Submit transaction
-		const submissionRes = await server.sendTransaction(
-			TransactionBuilder.fromXDR(signedTransaction, networkPassphrase),
-		)
-
-		if (submissionRes.status !== "PENDING") {
-			throw new Error(`Transaction submission failed: ${submissionRes.status}`)
-		}
-
-		// 6. Wait for result (polling)
-		let txResult = await server.getTransaction(submissionRes.hash)
-		let retries = 0
-		const maxRetries = 30 // 30 seconds max
-		
-		while (txResult.status === "NOT_FOUND" && retries < maxRetries) {
-			await new Promise((resolve) => setTimeout(resolve, 1000))
-			txResult = await server.getTransaction(submissionRes.hash)
-			retries++
-		}
-
-		if (txResult.status === "FAILED") {
-			throw new Error(`Transaction failed: ${JSON.stringify(txResult.resultXdr)}`)
-		}
-
-		if (txResult.status !== "SUCCESS") {
-			throw new Error(`Transaction timed out or had unexpected status: ${txResult.status}`)
-		}
-
-		return submissionRes.hash
 	} catch (error) {
 		console.error("Minting error:", error)
-		if (error instanceof Error) {
-			throw error
-		}
+		if (error instanceof Error) throw error
 		throw new Error("Failed to mint test USDC")
 	}
 }
 
-/**
- * Get USDC balance for an address
- *
- * @param address - The Stellar address to check
- * @returns Promise that resolves to the USDC balance
- */
-export async function getUSDCBalance(_address: string): Promise<number> {
-	try {
-		getUSDCContractId()
-		const rpcUrl =
-			import.meta.env.PUBLIC_STELLAR_RPC_URL || "http://localhost:8000/rpc"
+// ---------------------------------------------------------------------------
+// SAC (Stellar Asset Contract) balance helper
+// ---------------------------------------------------------------------------
 
-		throw new Error(
-			`Balance checking is not yet implemented. Query the configured RPC endpoint directly: ${rpcUrl}`,
+/**
+ * Calls the SAC / SEP-41 `balance(address)` function on the USDC contract
+ * via a read-only simulation (no transaction needed).
+ *
+ * Returns 0n when:
+ *  - the contract ID is not configured
+ *  - the contract is not deployed on the current network
+ *  - the address has never interacted with the contract (balance is implicitly 0)
+ *
+ * @param address - The Stellar address whose USDC balance to query
+ * @returns The raw token balance as a bigint (7 decimal places for USDC)
+ */
+export async function getUSDCBalance(address: string): Promise<bigint> {
+	const contractId = getUSDCContractId()
+	if (!contractId) {
+		console.warn(
+			"[getUSDCBalance] USDC contract ID not configured " +
+				"(set PUBLIC_USDC_CONTRACT_ID or VITE_USDC_CONTRACT_ID).",
 		)
-	} catch (error) {
-		if (error instanceof Error) {
-			throw error
+		return 0n
+	}
+
+	try {
+		const server = new rpc.Server(rpcUrl, { allowHttp: true })
+
+		// Build the balance() invocation using the low-level Contract helper so
+		// we don't need a generated client.
+		const contract = new Contract(contractId)
+		const operation = contract.call(
+			"balance",
+			xdr.ScVal.scvAddress(
+				xdr.ScAddress.scAddressTypeAccount(
+					xdr.PublicKey.publicKeyTypeEd25519(
+						// Decode the strkey into raw bytes
+						Buffer.from(
+							// stellar-sdk exposes StrKey on the top-level import
+
+							(
+								await import("@stellar/stellar-sdk")
+							).StrKey.decodeEd25519PublicKey(address),
+						),
+					),
+				),
+			),
+		)
+
+		const account = await server.getAccount(address).catch(() => null)
+		if (!account) {
+			// Address has never been funded — balance is 0
+			return 0n
 		}
-		throw new Error("Failed to get USDC balance")
+
+		const { TransactionBuilder, BASE_FEE } =
+			await import("@stellar/stellar-sdk")
+		const tx = new TransactionBuilder(account, {
+			fee: BASE_FEE,
+			networkPassphrase,
+		})
+			.addOperation(operation)
+			.setTimeout(30)
+			.build()
+
+		const result = await server.simulateTransaction(tx)
+
+		if (rpc.Api.isSimulationError(result)) {
+			// Contract not deployed or address not found — treat as zero balance
+			console.warn("[getUSDCBalance] Simulation error:", result.error)
+			return 0n
+		}
+
+		const returnVal = (result as rpc.Api.SimulateTransactionSuccessResponse)
+			.result?.retval
+
+		if (!returnVal) return 0n
+
+		// The SAC balance() returns an i128; the SDK decodes it as a bigint.
+		const scVal = returnVal
+		if (scVal.switch().name === "scvI128") {
+			const i128 = scVal.i128()
+			const hi = BigInt(i128.hi().toString())
+			const lo = BigInt(i128.lo().toString())
+			return (hi << 64n) | lo
+		}
+
+		// Fallback: try to coerce whatever came back
+		const { scValToNative } = await import("@stellar/stellar-sdk")
+		const native = scValToNative(scVal) as unknown
+		if (typeof native === "bigint") return native
+		if (typeof native === "number") return BigInt(Math.trunc(native))
+		return 0n
+	} catch (error) {
+		// Network errors, RPC unavailable, etc. — degrade gracefully
+		console.error("[getUSDCBalance] Failed to fetch balance:", error)
+		return 0n
 	}
 }

@@ -1,9 +1,20 @@
 #![no_std]
+#![allow(clippy::too_many_arguments)]
 
 use soroban_sdk::{
     Address, Env, String, Symbol, Vec, contract, contracterror, contractevent, contractimpl,
     contracttype, panic_with_error, symbol_short,
 };
+
+// ---------------------------------------------------------------------------
+// Storage Constants (assuming ~6s ledger time)
+// ---------------------------------------------------------------------------
+
+const DAY_IN_LEDGERS: u32 = 17_280;
+const INSTANCE_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
+const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30; // 30 days
+const PERSISTENT_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
+const PERSISTENT_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365; // 1 year
 
 const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
 const GOV_KEY: Symbol = symbol_short!("GOV");
@@ -14,7 +25,10 @@ const DISBURSED_KEY: Symbol = symbol_short!("DISBURSED");
 const SCHOLARS_KEY: Symbol = symbol_short!("SCHOLARS");
 const DONORS_KEY: Symbol = symbol_short!("DONORS");
 const PAUSED_KEY: Symbol = symbol_short!("PAUSED");
+const TOTAL_GOV_KEY: Symbol = symbol_short!("TOTALGOV");
 const GOV_PER_USDC: i128 = 100;
+/// Minimum quorum in basis points (1 000 bps = 10 % of total GOV supply must vote).
+const MIN_QUORUM_BPS: i128 = 1_000;
 
 #[derive(Clone)]
 #[contracttype]
@@ -24,6 +38,7 @@ pub enum DataKey {
     ApplicantProposals(Address),
     Scholar(Address),
     VoteCast(u32, Address), // (proposal_id, voter) -> bool
+    FinalizedProposal(u32), // proposal_id -> ProposalStatus (set by finalize_proposal)
 }
 
 #[derive(Clone)]
@@ -64,6 +79,12 @@ pub enum Error {
     ProposalNotFound = 6,
     AlreadyVoted = 7,
     VotingClosed = 8,
+    /// Votes cast after the proposal's voting deadline.
+    VotingPeriodEnded = 9,
+    /// finalize_proposal called before the voting deadline has passed.
+    TooEarlyToFinalize = 10,
+    /// Proposal finalized but total votes cast did not reach MIN_QUORUM_BPS.
+    QuorumNotMet = 11,
 }
 
 #[contract]
@@ -106,7 +127,7 @@ pub struct ProposalSubmitted {
 
 #[contractevent(topics = ["vote"])]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct VoteCast {
+pub struct VoteCastEvent {
     #[topic]
     pub voter: Address,
     #[topic]
@@ -132,6 +153,8 @@ impl ScholarshipTreasury {
         env.storage().instance().set(&SCHOLARS_KEY, &0_u32);
         env.storage().instance().set(&DONORS_KEY, &0_u32);
         env.storage().instance().set(&PAUSED_KEY, &false);
+        
+        Self::extend_instance(&env);
     }
 
     pub fn pause(env: Env) {
@@ -162,7 +185,7 @@ impl ScholarshipTreasury {
         donor.require_auth();
 
         let usdc = token::client(&env);
-        usdc.transfer(&donor, &env.current_contract_address(), &amount);
+        usdc.transfer(&donor, env.current_contract_address(), &amount);
 
         let gov_contract = Self::governance_contract(&env);
         let gov_client = governance::client(&env, &gov_contract);
@@ -176,6 +199,16 @@ impl ScholarshipTreasury {
             gov_amount,
         }
         .publish(&env);
+
+        // Track total GOV issued for quorum calculations
+        let total_gov = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&TOTAL_GOV_KEY)
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&TOTAL_GOV_KEY, &(total_gov + gov_amount));
 
         let donor_key = DataKey::Donor(donor.clone());
         let current = env
@@ -198,6 +231,8 @@ impl ScholarshipTreasury {
         env.storage()
             .persistent()
             .set(&donor_key, &(current + amount));
+        
+        Self::extend_persistent(&env, &donor_key);
 
         let total = env
             .storage()
@@ -251,6 +286,7 @@ impl ScholarshipTreasury {
                 .instance()
                 .set(&SCHOLARS_KEY, &(scholars_count + 1));
             env.storage().persistent().set(&scholar_key, &true);
+            Self::extend_persistent(&env, &scholar_key);
         }
 
         DisbursementRecorded { recipient, amount }.publish(&env);
@@ -349,6 +385,8 @@ impl ScholarshipTreasury {
         env.storage()
             .persistent()
             .set(&DataKey::Proposal(proposal_id), &proposal);
+        
+        Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
 
         let applicant_key = DataKey::ApplicantProposals(applicant.clone());
         let mut proposal_ids = env
@@ -360,6 +398,8 @@ impl ScholarshipTreasury {
         env.storage()
             .persistent()
             .set(&applicant_key, &proposal_ids);
+        
+        Self::extend_persistent(&env, &applicant_key);
         env.storage()
             .instance()
             .set(&NEXT_PROPOSAL_KEY, &(proposal_id + 1));
@@ -375,9 +415,14 @@ impl ScholarshipTreasury {
     }
 
     pub fn get_proposal(env: Env, proposal_id: u32) -> Option<Proposal> {
-        env.storage()
-            .persistent()
-            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+        Self::extend_instance(&env);
+        let key = DataKey::Proposal(proposal_id);
+        if let Some(prop) = env.storage().persistent().get::<_, Proposal>(&key) {
+            Self::extend_persistent(&env, &key);
+            Some(prop)
+        } else {
+            None
+        }
     }
 
     pub fn get_proposals_by_applicant(env: Env, applicant: Address) -> Vec<u32> {
@@ -431,9 +476,9 @@ impl ScholarshipTreasury {
             .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
             .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
 
-        // 3. Panic VotingClosed if past deadline
+        // 3. Panic VotingPeriodEnded if past deadline
         if env.ledger().sequence() > proposal.deadline_ledger {
-            panic_with_error!(&env, Error::VotingClosed);
+            panic_with_error!(&env, Error::VotingPeriodEnded);
         }
 
         // 4. Panic AlreadyVoted if VoteCast(proposal_id, voter) exists
@@ -468,14 +513,91 @@ impl ScholarshipTreasury {
             .persistent()
             .set(&DataKey::Proposal(proposal_id), &proposal);
 
+        Self::extend_persistent(&env, &vote_key);
+        Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
+
         // 9. Emit event
-        VoteCast {
+        VoteCastEvent {
             voter,
             proposal_id,
             support,
             weight,
         }
         .publish(&env);
+    }
+
+    /// Finalize a proposal once its voting deadline has passed.
+    ///
+    /// Only the admin may call this. The outcome is:
+    /// - **Rejected** if total votes cast < MIN_QUORUM_BPS of total GOV supply.
+    /// - **Approved** if quorum is met and `yes_votes > no_votes`.
+    /// - **Rejected** otherwise (tie or majority against).
+    ///
+    /// The result is stored under `DataKey::FinalizedProposal(proposal_id)` so
+    /// it can be read back without re-running the tally.
+    pub fn finalize_proposal(env: Env, admin: Address, proposal_id: u32) -> ProposalStatus {
+        admin.require_auth();
+        let stored_admin = Self::admin(&env);
+        if admin != stored_admin {
+            panic_with_error!(&env, Error::NotInitialized);
+        }
+
+        let proposal = env
+            .storage()
+            .persistent()
+            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
+
+        // Must be called after the voting deadline
+        if env.ledger().sequence() <= proposal.deadline_ledger {
+            panic_with_error!(&env, Error::TooEarlyToFinalize);
+        }
+
+        // Quorum check: (yes + no) / total_gov >= MIN_QUORUM_BPS / 10_000
+        let total_gov = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&TOTAL_GOV_KEY)
+            .unwrap_or(0);
+
+        let total_votes = proposal.yes_votes + proposal.no_votes;
+        let quorum_met = total_gov > 0
+            && total_votes
+                .checked_mul(10_000)
+                .map(|tv| tv / total_gov >= MIN_QUORUM_BPS)
+                .unwrap_or(false);
+
+        let status = if !quorum_met {
+            ProposalStatus::Rejected
+        } else if proposal.yes_votes > proposal.no_votes {
+            ProposalStatus::Approved
+        } else {
+            ProposalStatus::Rejected
+        };
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::FinalizedProposal(proposal_id), &status.clone());
+        
+        Self::extend_persistent(&env, &DataKey::FinalizedProposal(proposal_id));
+
+        status
+    }
+
+    /// Returns the finalized status for a proposal if `finalize_proposal` has
+    /// been called, or `None` if it hasn't been finalized yet.
+    pub fn get_finalized_status(env: Env, proposal_id: u32) -> Option<ProposalStatus> {
+        env.storage()
+            .persistent()
+            .get::<_, ProposalStatus>(&DataKey::FinalizedProposal(proposal_id))
+    }
+
+    /// Returns the total GOV tokens issued so far (used for quorum calculation).
+    pub fn get_total_gov_issued(env: Env) -> i128 {
+        env.storage()
+            .instance()
+            .get::<_, i128>(&TOTAL_GOV_KEY)
+            .unwrap_or(0)
     }
 
     fn governance_contract(env: &Env) -> Address {
@@ -515,6 +637,22 @@ impl ScholarshipTreasury {
             .get(&ADMIN_KEY)
             .unwrap_or_else(|| panic_with_error!(env, Error::NotInitialized))
     }
+
+    pub fn get_version(env: Env) -> String {
+        String::from_str(&env, "1.0.0")
+    }
+
+    fn extend_instance(env: &Env) {
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_EXTEND_TO);
+    }
+
+    fn extend_persistent(env: &Env, key: &DataKey) {
+        env.storage()
+            .persistent()
+            .extend_ttl(key, PERSISTENT_BUMP_THRESHOLD, PERSISTENT_EXTEND_TO);
+    }
 }
 
 mod governance {
@@ -525,6 +663,7 @@ mod governance {
     }
 
     #[soroban_sdk::contractclient(name = "GovernanceTokenClient")]
+    #[allow(dead_code)]
     pub trait GovernanceTokenInterface {
         fn mint(env: Env, to: Address, amount: i128);
         fn balance(env: Env, account: Address) -> i128;

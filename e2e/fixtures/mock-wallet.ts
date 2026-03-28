@@ -25,10 +25,13 @@ export async function installMockFreighter(page: Page) {
 				signMessage: async (message: string) => `signed:${message}`,
 			}
 
-			localStorage.setItem("walletId", "freighter")
-			localStorage.setItem("walletAddress", address)
-			localStorage.setItem("walletNetwork", "TESTNET")
-			localStorage.setItem("networkPassphrase", networkPassphrase)
+			localStorage.setItem("walletId", JSON.stringify("freighter"))
+			localStorage.setItem("walletAddress", JSON.stringify(address))
+			localStorage.setItem("walletNetwork", JSON.stringify("TESTNET"))
+			localStorage.setItem(
+				"networkPassphrase",
+				JSON.stringify(networkPassphrase),
+			)
 		},
 		{ address: E2E_WALLET_ADDRESS },
 	)

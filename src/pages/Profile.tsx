@@ -3,6 +3,8 @@ import { Helmet } from "react-helmet"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import { ActivityFeed } from "../components/ActivityFeed"
+import AddressDisplay from "../components/AddressDisplay"
+import LRNHistoryChart from "../components/LRNHistoryChart"
 import { ReputationBadge } from "../components/ReputationBadge"
 import {
 	NoCredentialsEmptyState,
@@ -78,11 +80,19 @@ const Profile: React.FC = () => {
 					<h1 className="text-4xl font-black mb-3 tracking-tighter">
 						{t("pages.profile.title")}
 					</h1>
-					<code className="text-white/30 text-sm block mb-6 font-mono tracking-widest">
-						{walletAddress
-							? shortenAddress(walletAddress)
-							: t("wallet.connect")}
-					</code>
+					<div className="mb-6">
+						{walletAddress ? (
+							<AddressDisplay
+								address={walletAddress}
+								addressClassName="text-white/30 text-sm tracking-widest"
+								buttonClassName="h-6 w-6"
+							/>
+						) : (
+							<code className="text-white/30 text-sm block font-mono tracking-widest">
+								{t("wallet.connect")}
+							</code>
+						)}
+					</div>
 					<div className="flex flex-wrap justify-center md:justify-start gap-4">
 						{walletAddress ? (
 							<ReputationBadge size="md" showBalance />
@@ -149,6 +159,14 @@ const Profile: React.FC = () => {
 						))}
 					</div>
 				)}
+			</section>
+
+			<section className="mt-16">
+				<div className="flex items-center gap-4 mb-8">
+					<h2 className="text-2xl font-black tracking-tight">LRN History</h2>
+					<div className="h-px flex-1 bg-linear-to-r from-white/10 to-transparent" />
+				</div>
+				<LRNHistoryChart address={walletAddress} />
 			</section>
 
 			<ActivityFeed address={walletAddress} limit={10} />

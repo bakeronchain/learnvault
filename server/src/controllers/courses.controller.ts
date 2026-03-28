@@ -1,37 +1,429 @@
 import { type Request, type Response } from "express"
+import { pool } from "../db"
 
-const COURSES = [
-	{
-		id: "stellar-basics",
-		title: "Stellar Basics",
-		level: "beginner",
-		published: true,
-	},
-	{
-		id: "soroban-fundamentals",
-		title: "Soroban Fundamentals",
-		level: "intermediate",
-		published: true,
-	},
-] as const
-
-export const getCourses = (_req: Request, res: Response): void => {
-	res.status(200).json({
-		data: COURSES,
-	})
+type CourseRow = {
+	id: number
+	slug: string
+	title: string
+	description: string
+	cover_image_url: string | null
+	track: string
+	difficulty: "beginner" | "intermediate" | "advanced"
+	published_at: string | null
+	created_at: string
+	updated_at: string
 }
 
-export const getCourseById = (req: Request, res: Response): void => {
-	const course = COURSES.find((item) => item.id === req.params.courseId)
+type LessonRow = {
+	id: number
+	course_id: number
+	title: string
+	content_markdown: string
+	order_index: number
+	created_at: string
+	updated_at: string
+	quiz: Array<{
+		question: string
+		options: string[]
+		correctIndex: number
+	}>
+}
 
-	if (!course) {
-		res.status(404).json({
-			error: "Course not found",
+const toCourse = (row: CourseRow) => ({
+	id: row.id,
+	slug: row.slug,
+	title: row.title,
+	description: row.description,
+	coverImage: row.cover_image_url,
+	track: row.track,
+	difficulty: row.difficulty,
+	published: Boolean(row.published_at),
+	createdAt: row.created_at,
+	updatedAt: row.updated_at,
+})
+
+const toLesson = (row: LessonRow) => ({
+	id: row.id,
+	courseId: row.course_id,
+	title: row.title,
+	content: row.content_markdown,
+	order: row.order_index,
+	quiz: row.quiz ?? [],
+	createdAt: row.created_at,
+	updatedAt: row.updated_at,
+})
+
+const difficultyValues = new Set(["beginner", "intermediate", "advanced"])
+
+export const getCourses = async (
+	req: Request,
+	res: Response,
+): Promise<void> => {
+	try {
+		const track =
+			typeof req.query.track === "string" ? req.query.track.trim() : undefined
+		const difficulty =
+			typeof req.query.difficulty === "string"
+				? req.query.difficulty.trim().toLowerCase()
+				: undefined
+
+		const pageParam =
+			typeof req.query.page === "string"
+				? Number.parseInt(req.query.page, 10)
+				: 1
+
+		const limitParam =
+			typeof req.query.limit === "string"
+				? Number.parseInt(req.query.limit, 10)
+				: 12
+
+		const offsetParam =
+			typeof req.query.offset === "string"
+				? Number.parseInt(req.query.offset, 10)
+				: undefined
+
+		const limit =
+			Number.isFinite(limitParam) && limitParam > 0
+				? Math.min(limitParam, 50)
+				: 12
+
+		let offset = 0
+		let page = 1
+
+		if (
+			offsetParam !== undefined &&
+			Number.isFinite(offsetParam) &&
+			offsetParam >= 0
+		) {
+			offset = offsetParam
+			page = Math.floor(offset / limit) + 1
+		} else {
+			page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1
+			offset = (page - 1) * limit
+		}
+
+		const conditions: string[] = ["published_at IS NOT NULL"]
+		const params: unknown[] = []
+
+		if (track) {
+			params.push(track)
+			conditions.push(`LOWER(track) = LOWER($${params.length})`)
+		}
+
+		if (difficulty) {
+			if (!difficultyValues.has(difficulty)) {
+				res.status(200).json({
+					data: [],
+					page,
+					limit,
+					total: 0,
+					totalPages: 0,
+				})
+				return
+			}
+			params.push(difficulty)
+			conditions.push(`difficulty = $${params.length}`)
+		}
+
+		const whereClause = `WHERE ${conditions.join(" AND ")}`
+
+		const totalResult = (await pool.query(
+			`SELECT COUNT(*) AS count FROM courses ${whereClause}`,
+			params,
+		)) as { rows: Array<{ count: string }> }
+		const total = Number.parseInt(totalResult.rows[0]?.count ?? "0", 10)
+		const totalPages = total === 0 ? 0 : Math.ceil(total / limit)
+
+		params.push(limit)
+		params.push(offset)
+		const rowsResult = (await pool.query(
+			`SELECT id, slug, title, description, cover_image_url, track, difficulty, published_at, created_at, updated_at
+			 FROM courses
+			 ${whereClause}
+			 ORDER BY created_at DESC
+			 LIMIT $${params.length - 1} OFFSET $${params.length}`,
+			params,
+		)) as { rows: CourseRow[] }
+
+		res.status(200).json({
+			data: rowsResult.rows.map(toCourse),
+			page,
+			limit,
+			total,
+			totalPages,
 		})
-		return
+	} catch {
+		res.status(500).json({ error: "Internal server error" })
 	}
+}
 
-	res.status(200).json({
-		data: course,
-	})
+export const getCourse = async (req: Request, res: Response): Promise<void> => {
+	try {
+		const idOrSlug = req.params.idOrSlug
+		const isNumericId = /^\d+$/.test(idOrSlug)
+
+		const query = isNumericId
+			? `SELECT id, slug, title, description, cover_image_url, track, difficulty, published_at, created_at, updated_at
+			   FROM courses
+			   WHERE id = $1 AND published_at IS NOT NULL
+			   LIMIT 1`
+			: `SELECT id, slug, title, description, cover_image_url, track, difficulty, published_at, created_at, updated_at
+			   FROM courses
+			   WHERE slug = $1 AND published_at IS NOT NULL
+			   LIMIT 1`
+
+		const courseResult = (await pool.query(query, [
+			isNumericId ? Number.parseInt(idOrSlug, 10) : idOrSlug,
+		])) as { rows: CourseRow[] }
+
+		const course = courseResult.rows[0]
+		if (!course) {
+			res.status(404).json({ error: "Course not found" })
+			return
+		}
+
+		const lessonResult = (await pool.query(
+			`SELECT
+				l.id,
+				l.course_id,
+				l.title,
+				l.content_markdown,
+				l.order_index,
+				l.created_at,
+				l.updated_at,
+				COALESCE(
+					json_agg(
+						json_build_object(
+							'question', qq.question_text,
+							'options', qq.options,
+							'correctIndex', qq.correct_index
+						)
+						ORDER BY qq.id
+					) FILTER (WHERE qq.id IS NOT NULL),
+					'[]'::json
+				) AS quiz
+			 FROM lessons l
+			 LEFT JOIN quizzes q ON q.lesson_id = l.id
+			 LEFT JOIN quiz_questions qq ON qq.quiz_id = q.id
+			 WHERE l.course_id = $1
+			 GROUP BY l.id
+			 ORDER BY l.order_index ASC`,
+			[course.id],
+		)) as { rows: LessonRow[] }
+
+		res.status(200).json({
+			...toCourse(course),
+			lessons: lessonResult.rows.map(toLesson),
+		})
+	} catch {
+		res.status(500).json({ error: "Internal server error" })
+	}
+}
+
+export const getCourseLessonById = async (
+	req: Request,
+	res: Response,
+): Promise<void> => {
+	try {
+		const lessonId = Number.parseInt(req.params.id, 10)
+		if (!Number.isInteger(lessonId) || lessonId <= 0) {
+			res.status(404).json({ error: "Lesson not found" })
+			return
+		}
+
+		const idOrSlug = req.params.idOrSlug
+		const isNumericId = /^\d+$/.test(idOrSlug)
+
+		const result = (await pool.query(
+			`SELECT
+				l.id,
+				l.course_id,
+				l.title,
+				l.content_markdown,
+				l.order_index,
+				l.created_at,
+				l.updated_at,
+				COALESCE(
+					json_agg(
+						json_build_object(
+							'question', qq.question_text,
+							'options', qq.options,
+							'correctIndex', qq.correct_index
+						)
+						ORDER BY qq.id
+					) FILTER (WHERE qq.id IS NOT NULL),
+					'[]'::json
+				) AS quiz
+			 FROM lessons l
+			 INNER JOIN courses c ON c.id = l.course_id
+			 LEFT JOIN quizzes q ON q.lesson_id = l.id
+			 LEFT JOIN quiz_questions qq ON qq.quiz_id = q.id
+			 WHERE ${isNumericId ? "c.id" : "c.slug"} = $1
+			   AND c.published_at IS NOT NULL
+			   AND l.id = $2
+			 GROUP BY l.id
+			 LIMIT 1`,
+			[isNumericId ? Number.parseInt(idOrSlug, 10) : idOrSlug, lessonId],
+		)) as { rows: LessonRow[] }
+
+		const lesson = result.rows[0]
+		if (!lesson) {
+			res.status(404).json({ error: "Lesson not found" })
+			return
+		}
+
+		res.status(200).json(toLesson(lesson))
+	} catch {
+		res.status(500).json({ error: "Internal server error" })
+	}
+}
+
+export const createCourse = async (
+	req: Request,
+	res: Response,
+): Promise<void> => {
+	try {
+		const body = req.body as {
+			title?: unknown
+			slug?: unknown
+			description?: unknown
+			coverImage?: unknown
+			track?: unknown
+			difficulty?: unknown
+		}
+
+		for (const field of ["title", "slug", "track", "difficulty"] as const) {
+			const value = body[field]
+			if (typeof value !== "string" || value.trim().length === 0) {
+				res.status(400).json({ error: `${field} is required`, field })
+				return
+			}
+		}
+
+		const difficulty = String(body.difficulty).toLowerCase()
+		if (!difficultyValues.has(difficulty)) {
+			res.status(400).json({ error: "Invalid difficulty", field: "difficulty" })
+			return
+		}
+
+		const insert = (await pool.query(
+			`INSERT INTO courses (title, slug, description, cover_image_url, track, difficulty, published_at)
+			 VALUES ($1, $2, $3, $4, $5, $6, NULL)
+			 RETURNING id, slug, title, description, cover_image_url, track, difficulty, published_at, created_at, updated_at`,
+			[
+				String(body.title).trim(),
+				String(body.slug).trim(),
+				typeof body.description === "string" ? body.description : "",
+				typeof body.coverImage === "string" ? body.coverImage : null,
+				String(body.track).trim(),
+				difficulty,
+			],
+		)) as { rows: CourseRow[] }
+
+		res.status(201).json(toCourse(insert.rows[0]))
+	} catch (error) {
+		if (typeof error === "object" && error && "code" in error) {
+			const code = (error as { code?: string }).code
+			if (code === "23505") {
+				res.status(409).json({ error: "Slug already exists" })
+				return
+			}
+		}
+		res.status(500).json({ error: "Internal server error" })
+	}
+}
+
+export const updateCourse = async (
+	req: Request,
+	res: Response,
+): Promise<void> => {
+	try {
+		const id = Number.parseInt(req.params.id, 10)
+		if (!Number.isInteger(id) || id <= 0) {
+			res.status(404).json({ error: "Course not found" })
+			return
+		}
+
+		const existing = (await pool.query(
+			`SELECT id FROM courses WHERE id = $1 LIMIT 1`,
+			[id],
+		)) as { rowCount: number; rows: Array<{ id: number }> }
+		if (existing.rowCount === 0) {
+			res.status(404).json({ error: "Course not found" })
+			return
+		}
+
+		const body = req.body as Record<string, unknown>
+		const values: unknown[] = []
+		const setClauses: string[] = []
+
+		const addField = (column: string, value: unknown) => {
+			values.push(value)
+			setClauses.push(`${column} = $${values.length}`)
+		}
+
+		if ("title" in body && typeof body.title === "string") {
+			addField("title", body.title.trim())
+		}
+		if ("slug" in body && typeof body.slug === "string") {
+			addField("slug", body.slug.trim())
+		}
+		if ("description" in body && typeof body.description === "string") {
+			addField("description", body.description)
+		}
+		if ("coverImage" in body) {
+			if (typeof body.coverImage === "string") {
+				addField("cover_image_url", body.coverImage)
+			} else if (body.coverImage === null) {
+				addField("cover_image_url", null)
+			}
+		}
+		if ("track" in body && typeof body.track === "string") {
+			addField("track", body.track.trim())
+		}
+		if ("difficulty" in body && typeof body.difficulty === "string") {
+			const difficulty = body.difficulty.toLowerCase()
+			if (!difficultyValues.has(difficulty)) {
+				res
+					.status(400)
+					.json({ error: "Invalid difficulty", field: "difficulty" })
+				return
+			}
+			addField("difficulty", difficulty)
+		}
+		if ("published" in body && typeof body.published === "boolean") {
+			if (body.published) {
+				setClauses.push(
+					`published_at = COALESCE(published_at, CURRENT_TIMESTAMP)`,
+				)
+			} else {
+				setClauses.push(`published_at = NULL`)
+			}
+		}
+
+		if (setClauses.length === 0) {
+			res.status(400).json({ error: "No valid fields provided" })
+			return
+		}
+
+		values.push(id)
+		const result = (await pool.query(
+			`UPDATE courses
+			 SET ${setClauses.join(", ")}
+			 WHERE id = $${values.length}
+			 RETURNING id, slug, title, description, cover_image_url, track, difficulty, published_at, created_at, updated_at`,
+			values,
+		)) as { rows: CourseRow[] }
+
+		res.status(200).json(toCourse(result.rows[0]))
+	} catch (error) {
+		if (typeof error === "object" && error && "code" in error) {
+			const code = (error as { code?: string }).code
+			if (code === "23505") {
+				res.status(409).json({ error: "Slug already exists" })
+				return
+			}
+		}
+		res.status(500).json({ error: "Internal server error" })
+	}
 }

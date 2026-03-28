@@ -22,6 +22,11 @@ export interface MilestoneAuditEntry {
 	decided_at: string
 }
 
+export interface MilestoneReportFilters {
+	courseId?: string
+	status?: "pending" | "approved" | "rejected"
+}
+
 // In-memory fallback store (used when Postgres is unavailable)
 class InMemoryMilestoneStore {
 	private reports: MilestoneReport[] = []
@@ -35,6 +40,18 @@ class InMemoryMilestoneStore {
 
 	async getReportById(id: number): Promise<MilestoneReport | null> {
 		return this.reports.find((r) => r.id === id) ?? null
+	}
+
+	async getReportsForScholar(
+		scholarAddress: string,
+		filters: MilestoneReportFilters = {},
+	): Promise<MilestoneReport[]> {
+		const { courseId, status } = filters
+		return this.reports
+			.filter((r) => r.scholar_address === scholarAddress)
+			.filter((r) => (courseId ? r.course_id === courseId : true))
+			.filter((r) => (status ? r.status === status : true))
+			.sort((a, b) => b.submitted_at.localeCompare(a.submitted_at))
 	}
 
 	async createReport(
@@ -123,6 +140,36 @@ export const milestoneStore = {
 			[id],
 		)
 		return result.rows[0] ?? null
+	},
+
+	async getReportsForScholar(
+		scholarAddress: string,
+		filters: MilestoneReportFilters = {},
+	): Promise<MilestoneReport[]> {
+		if (!isRealPool()) {
+			return inMemoryMilestoneStore.getReportsForScholar(
+				scholarAddress,
+				filters,
+			)
+		}
+
+		const values: Array<string> = [scholarAddress]
+		let sql = `SELECT * FROM milestone_reports WHERE scholar_address = $1`
+
+		if (filters.courseId) {
+			values.push(filters.courseId)
+			sql += ` AND course_id = $${values.length}`
+		}
+
+		if (filters.status) {
+			values.push(filters.status)
+			sql += ` AND status = $${values.length}`
+		}
+
+		sql += ` ORDER BY submitted_at DESC`
+
+		const result = await pool.query(sql, values)
+		return result.rows
 	},
 
 	async createReport(

@@ -23,10 +23,23 @@ const GetTestUSDCButton: React.FC<GetTestUSDCButtonProps> = ({
 	const handleGetUSDC = () => {
 		startTransition(async () => {
 			try {
-				const txHash = await mintTestUSDC(address, signTransaction, amount)
+				const txHash = await mintTestUSDC(
+					address,
+					async (xdr) => {
+						const result = (await signTransaction(xdr)) as {
+							signedTransaction?: string
+							signedTxXdr?: string
+						}
+						return {
+							signedTransaction:
+								result.signedTransaction ?? result.signedTxXdr ?? xdr,
+						}
+					},
+					amount,
+				)
 				showSuccess(
-					t("usdc.mintSuccess", { amount, address: address.slice(0, 8) }) + 
-					` (Hash: ${txHash.slice(0, 8)}...)`,
+					t("usdc.mintSuccess", { amount, address: address.slice(0, 8) }) +
+						` (Hash: ${txHash.slice(0, 8)}...)`,
 				)
 			} catch (error) {
 				const errorMessage =

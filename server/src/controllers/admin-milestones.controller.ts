@@ -111,6 +111,11 @@ export async function approveMilestone(
 		})
 	} catch (err) {
 		console.error("[admin] approveMilestone error:", err)
+		const msg = err instanceof Error ? err.message : String(err)
+		if (msg.includes("not configured")) {
+			res.status(503).json({ error: "Stellar credentials not configured" })
+			return
+		}
 		res.status(500).json({ error: "Failed to approve milestone" })
 	}
 }
@@ -174,6 +179,11 @@ export async function rejectMilestone(
 		})
 	} catch (err) {
 		console.error("[admin] rejectMilestone error:", err)
+		const msg = err instanceof Error ? err.message : String(err)
+		if (msg.includes("not configured")) {
+			res.status(503).json({ error: "Stellar credentials not configured" })
+			return
+		}
 		res.status(500).json({ error: "Failed to reject milestone" })
 	}
 }

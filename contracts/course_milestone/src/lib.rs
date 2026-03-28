@@ -449,7 +449,9 @@ impl CourseMilestone {
 
         Self::extend_persistent(&env, &completed_key);
         Self::extend_persistent(&env, &state_key);
-        Self::extend_persistent(&env, &reward_key);
+        if env.storage().persistent().has(&reward_key) {
+            Self::extend_persistent(&env, &reward_key);
+        }
 
         env.events().publish(
             (symbol_short!("ms_done"),),

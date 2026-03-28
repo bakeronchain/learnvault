@@ -188,7 +188,10 @@ describe("POST /api/comments", () => {
 		const res = await request(buildApp())
 			.post("/api/comments")
 			.set("Authorization", makeToken(AUTHOR))
-			.send({ proposal_id: "5", content: "Hello <script>alert(1)</script> world" })
+			.send({
+				proposal_id: "5",
+				content: "Hello <script>alert(1)</script> world",
+			})
 
 		expect(res.status).toBe(201)
 		expect(mockedQuery).toHaveBeenNthCalledWith(

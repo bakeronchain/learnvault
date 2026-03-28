@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express"
 import { milestoneStore } from "../db/milestone-store"
-import { createEmailService } from "../services/email.service";
+import { createEmailService } from "../services/email.service"
 
 interface MilestoneSubmitRequestBody {
 	scholarAddress?: string
@@ -14,7 +14,7 @@ interface MilestoneSubmitRequestBody {
 	evidenceDescription?: string
 	evidence_url?: string
 }
-const emailService = createEmailService(process.env.EMAIL_API_KEY || "");
+const emailService = createEmailService(process.env.EMAIL_API_KEY || "")
 
 export async function submitMilestoneReport(
 	req: Request,
@@ -44,13 +44,14 @@ export async function submitMilestoneReport(
 			evidence_description: evidenceDescription ?? null,
 		})
 
-		emailService.sendAdminMilestoneNotification(
-			scholarAddress, // Using address as name since name wasn't in the body
-			courseId,
-			milestoneId.toString()
-		).catch(err => console.error("[EmailService] Admin alert failed:", err));
+		emailService
+			.sendAdminMilestoneNotification(
+				scholarAddress, // Using address as name since name wasn't in the body
+				courseId,
+				milestoneId.toString(),
+			)
+			.catch((err) => console.error("[EmailService] Admin alert failed:", err))
 		res.status(201).json({ data: report })
-
 	} catch (err) {
 		if (err instanceof Error && err.message === "DUPLICATE_REPORT") {
 			res.status(409).json({

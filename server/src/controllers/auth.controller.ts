@@ -30,12 +30,15 @@ export function createAuthControllers(authService: AuthService) {
 					: ""
 
 			if (!signedTransaction) {
-				res.status(400).json({ error: "Missing required field: signed_transaction" })
+				res
+					.status(400)
+					.json({ error: "Missing required field: signed_transaction" })
 				return
 			}
 
 			try {
-				const token = await authService.verifySignedTransaction(signedTransaction)
+				const token =
+					await authService.verifySignedTransaction(signedTransaction)
 				res.status(200).json({
 					token,
 					tokenType: "Bearer",

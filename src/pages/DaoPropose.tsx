@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react"
 import ReactMarkdown from "react-markdown"
 import { useNavigate } from "react-router-dom"
+import { useToast } from "../components/Toast/ToastProvider"
 import { useWallet } from "../hooks/useWallet"
 import { useScholarshipTreasury } from "../util/scholarshipTreasury"
 
@@ -27,6 +28,7 @@ interface FormData {
 const DaoPropose: React.FC = () => {
 	const { address } = useWallet()
 	const navigate = useNavigate()
+	const { showSuccess, showError, showInfo } = useToast()
 	const {
 		createProposal,
 		getGovernanceTokenBalance,
@@ -121,6 +123,7 @@ const DaoPropose: React.FC = () => {
 			}
 
 			// Submit to ScholarshipTreasury contract
+			showInfo("Waiting for wallet approval…")
 			const txHash = await createProposal(proposalData)
 
 			// Extract proposal ID from transaction hash (mock implementation)
@@ -128,12 +131,16 @@ const DaoPropose: React.FC = () => {
 				? txHash.split("_")[1]
 				: Math.floor(Math.random() * 1000) + 1
 
+			showSuccess("Proposal submitted successfully!")
 			// Redirect to proposal detail page
 			void navigate(`/dao/proposals#proposal-${proposalId}`)
 		} catch (error) {
 			console.error("Failed to submit proposal:", error)
-			// In a real implementation, you would show an error message to the user
-			alert("Failed to submit proposal. Please try again.")
+			showError(
+				error instanceof Error
+					? error.message
+					: "Failed to submit proposal. Please try again.",
+			)
 		} finally {
 			setIsSubmitting(false)
 		}

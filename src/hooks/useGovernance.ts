@@ -355,13 +355,13 @@ export function useGovernance() {
 			)
 
 			const grouped = [
-				...pending.map((proposal) =>
+				...pending.map((proposal: unknown) =>
 					mapProposal(proposal as RawContractProposal, "Active"),
 				),
-				...approved.map((proposal) =>
+				...approved.map((proposal: unknown) =>
 					mapProposal(proposal as RawContractProposal, "Passed"),
 				),
-				...rejected.map((proposal) =>
+				...rejected.map((proposal: unknown) =>
 					mapProposal(proposal as RawContractProposal, "Rejected"),
 				),
 			]
@@ -373,7 +373,7 @@ export function useGovernance() {
 				["get_proposals", "getProposals"],
 				[[]],
 			)
-			return fallback.map((proposal) =>
+			return fallback.map((proposal: unknown) =>
 				mapProposal(proposal as RawContractProposal, "Active"),
 			)
 		},
@@ -430,7 +430,7 @@ export function useGovernance() {
 
 			const results: Record<number, boolean> = {}
 			await Promise.all(
-				proposals.map(async (p) => {
+				proposals.map(async (p: Proposal) => {
 					try {
 						const voted = await hasVotedFn({
 							voter: address,
@@ -498,10 +498,11 @@ export function useGovernance() {
 				{ publicKey: address },
 			)
 
+			showInfo("Waiting for wallet approval…")
 			const sendResult = await sendTxIfNeeded(tx)
 			unwrapSendResult(sendResult)
 		},
-		onSuccess: (_, { proposalId, support }) => {
+		onSuccess: (_: void, { proposalId, support }: { proposalId: number; support: boolean }) => {
 			showSuccess("Vote submitted successfully!")
 			// Invalidate queries to refresh UI
 			void queryClient.invalidateQueries({

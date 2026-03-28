@@ -204,7 +204,7 @@ const waitForMintEvent = async (
 export function useCourse() {
 	const { address, signTransaction, updateBalances } = useWallet()
 	const { addNotification } = useNotification()
-	const { showWarning, showError, showInfo } = useToast()
+	const { showWarning, showError, showInfo, showSuccess } = useToast()
 
 	const [enrolledCourses, setEnrolledCourses] = useState<Course[]>([])
 	const [progressMap, setProgressMap] = useState<
@@ -365,6 +365,7 @@ export function useCourse() {
 			signTransaction,
 			showError,
 			showInfo,
+			showSuccess,
 		],
 	)
 
@@ -430,6 +431,7 @@ export function useCourse() {
 						{ publicKey: address },
 					],
 				)
+				showInfo("Waiting for wallet approval…")
 				await sendTxIfNeeded(
 					rawTx,
 					signTransaction as (...args: unknown[]) => unknown,
@@ -456,11 +458,10 @@ export function useCourse() {
 				})
 
 				const earned = await waitForMintEvent(address)
-				addNotification(
+				showSuccess(
 					earned != null
 						? `Milestone complete. Earned ${earned} LRN`
 						: "Milestone complete. LRN mint event confirmed",
-					"success",
 				)
 				await updateBalances()
 				await refreshCourses()
@@ -483,6 +484,7 @@ export function useCourse() {
 			updateBalances,
 			showError,
 			showInfo,
+			showSuccess,
 		],
 	)
 
@@ -549,6 +551,7 @@ export function useCourse() {
 							{ publicKey: address },
 						],
 					)
+					showInfo("Waiting for wallet approval…")
 					contractPromise = sendTxIfNeeded(
 						rawTx,
 						signTransaction as (...args: unknown[]) => unknown,
@@ -579,10 +582,7 @@ export function useCourse() {
 					[key]: "pending",
 				}))
 
-				addNotification(
-					"Milestone submitted — awaiting admin review",
-					"success",
-				)
+				showSuccess("Milestone submitted — awaiting admin review")
 				await updateBalances()
 				await refreshCourses()
 			} catch (err) {

@@ -37,7 +37,7 @@ export function requireAdmin(
 	let decoded: { address?: string; sub?: string }
 
 	try {
-		decoded = jwt.verify(token, JWT_SECRET) as {
+		decoded = jwt.verify(token, JWT_SECRET!) as {
 			address?: string
 			sub?: string
 		}

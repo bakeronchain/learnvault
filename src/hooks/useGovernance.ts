@@ -4,21 +4,12 @@ import { useToast } from "../components/Toast/ToastProvider"
 import { ErrorCode, createAppError } from "../types/errors"
 import { type Proposal, type RawContractProposal } from "../types/governance"
 import { isUserRejection, parseError } from "../utils/errors"
+import { useContractIds } from "./useContractIds"
 import { useWallet } from "./useWallet"
 
 export type { Proposal }
 
 type ContractRecord = Record<string, unknown>
-
-const readEnv = (key: string): string | undefined => {
-	const value = (import.meta.env as Record<string, unknown>)[key]
-	return typeof value === "string" && value.length ? value : undefined
-}
-
-const SCHOLARSHIP_TREASURY_CONTRACT = readEnv(
-	"PUBLIC_SCHOLARSHIP_TREASURY_CONTRACT",
-)
-const GOVERNANCE_TOKEN_CONTRACT = readEnv("PUBLIC_GOVERNANCE_TOKEN_CONTRACT")
 
 // The expected contract version this client was generated against.
 const EXPECTED_CONTRACT_VERSION = "1.0.0"
@@ -28,6 +19,7 @@ const EXPECTED_CONTRACT_VERSION = "1.0.0"
  */
 export function useGovernance() {
 	const { address, signTransaction } = useWallet()
+	const { scholarshipTreasury, governanceToken } = useContractIds()
 	const queryClient = useQueryClient()
 	const { showSuccess, showError, showInfo } = useToast()
 
@@ -238,7 +230,7 @@ export function useGovernance() {
 	useQuery({
 		queryKey: ["governance", "version", "governance_token"],
 		queryFn: async (): Promise<string | null> => {
-			if (!GOVERNANCE_TOKEN_CONTRACT) return null
+			if (!governanceToken) return null
 			const client = await loadClient("../contracts/governance_token")
 			if (!client) return null
 			const fn = asMethod(client, "get_version")
@@ -269,7 +261,7 @@ export function useGovernance() {
 	useQuery({
 		queryKey: ["governance", "version", "scholarship_treasury"],
 		queryFn: async (): Promise<string | null> => {
-			if (!SCHOLARSHIP_TREASURY_CONTRACT) return null
+			if (!scholarshipTreasury) return null
 			const client = await loadClient("../contracts/scholarship_treasury")
 			if (!client) return null
 			const fn = asMethod(client, "get_version")
@@ -301,7 +293,7 @@ export function useGovernance() {
 	const { data: votingPower = 0n } = useQuery({
 		queryKey: ["governance", "votingPower", address],
 		queryFn: async () => {
-			if (!address || !GOVERNANCE_TOKEN_CONTRACT) return 0n
+			if (!address || !governanceToken) return 0n
 			const client = await loadClient("../contracts/governance_token")
 			if (!client) return 0n
 
@@ -334,7 +326,7 @@ export function useGovernance() {
 	>({
 		queryKey: ["governance", "proposals"],
 		queryFn: async () => {
-			if (!SCHOLARSHIP_TREASURY_CONTRACT) return []
+			if (!scholarshipTreasury) return []
 			const client = await loadClient("../contracts/scholarship_treasury")
 			if (!client) return []
 
@@ -413,7 +405,7 @@ export function useGovernance() {
 	useQuery({
 		queryKey: ["governance", "voted", address],
 		queryFn: async () => {
-			if (!address || !SCHOLARSHIP_TREASURY_CONTRACT || proposals.length === 0)
+			if (!address || !scholarshipTreasury || proposals.length === 0)
 				return {}
 			const client = await loadClient("../contracts/scholarship_treasury")
 			if (!client) return {}
@@ -480,7 +472,7 @@ export function useGovernance() {
 			support: boolean
 		}) => {
 			if (!address) throw new Error("Wallet not connected")
-			if (!SCHOLARSHIP_TREASURY_CONTRACT)
+			if (!scholarshipTreasury)
 				throw new Error("Contract not configured")
 
 			const client = await loadClient("../contracts/scholarship_treasury")

@@ -25,7 +25,10 @@ export async function installMockFreighter(page: Page) {
 				signMessage: async (message: string) => `signed:${message}`,
 			}
 
-			localStorage.setItem("walletId", JSON.stringify("freighter"))
+			// Use a non-freighter stored wallet id so WalletProvider rehydrates
+			// from storage without attempting a real extension handshake.
+			localStorage.setItem("walletId", JSON.stringify("hot-wallet"))
+			localStorage.setItem("walletType", JSON.stringify("hot-wallet"))
 			localStorage.setItem("walletAddress", JSON.stringify(address))
 			localStorage.setItem("walletNetwork", JSON.stringify("TESTNET"))
 			localStorage.setItem(

@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react"
+import React, { useMemo, useState } from "react"
 import ReactMarkdown from "react-markdown"
 import { useNavigate } from "react-router-dom"
 import { useToast } from "../components/Toast/ToastProvider"
+import { useProposals } from "../hooks/useProposals"
 import { useWallet } from "../hooks/useWallet"
-import { useScholarshipTreasury } from "../util/scholarshipTreasury"
 
 type ProposalType = "scholarship" | "parameter_change" | "new_course"
 
@@ -11,138 +11,146 @@ interface FormData {
 	title: string
 	description: string
 	type: ProposalType
-	// Scholarship specific fields
-	applicationUrl?: string
-	fundingAmount?: string
-	// Parameter change specific fields
-	parameterName?: string
-	parameterValue?: string
-	parameterReason?: string
-	// New course specific fields
-	courseTitle?: string
-	courseDescription?: string
-	courseDuration?: string
-	courseDifficulty?: string
+	applicationUrl: string
+	fundingAmount: string
+	parameterName: string
+	parameterValue: string
+	parameterReason: string
+	courseTitle: string
+	courseDescription: string
+	courseDuration: string
+	courseDifficulty: string
+}
+
+const MINIMUM_PROPOSAL_TOKENS = 10n
+
+const initialFormData: FormData = {
+	title: "",
+	description: "",
+	type: "scholarship",
+	applicationUrl: "",
+	fundingAmount: "",
+	parameterName: "",
+	parameterValue: "",
+	parameterReason: "",
+	courseTitle: "",
+	courseDescription: "",
+	courseDuration: "",
+	courseDifficulty: "",
 }
 
 const DaoPropose: React.FC = () => {
 	const { address } = useWallet()
 	const navigate = useNavigate()
-	const { showSuccess, showError, showInfo } = useToast()
-	const {
-		createProposal,
-		getGovernanceTokenBalance,
-		getMinimumProposalTokens,
-		isConnected,
-	} = useScholarshipTreasury()
+	const { createProposal, isSubmittingProposal, votingPower } = useProposals()
+	const { showError } = useToast()
 	const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit")
-	const [isSubmitting, setIsSubmitting] = useState(false)
-	const [governanceTokenBalance, setGovernanceTokenBalance] = useState(0)
-	const [minimumTokens, setMinimumTokens] = useState(10)
-	const [hasMinimumBalance, setHasMinimumBalance] = useState(false)
-	const [isLoading, setIsLoading] = useState(true)
-	const [formData, setFormData] = useState<FormData>({
-		title: "",
-		description: "",
-		type: "scholarship",
-	})
+	const [submissionError, setSubmissionError] = useState<string | null>(null)
+	const [submissionSuccess, setSubmissionSuccess] = useState<string | null>(
+		null,
+	)
+	const [formData, setFormData] = useState<FormData>(initialFormData)
 
-	// Check governance token balance and minimum requirements
-	useEffect(() => {
-		const checkBalance = async () => {
-			if (!address || !isConnected) return
+	const hasMinimumBalance = votingPower >= MINIMUM_PROPOSAL_TOKENS
 
-			setIsLoading(true)
-			try {
-				const [balance, minimum] = await Promise.all([
-					getGovernanceTokenBalance(address),
-					getMinimumProposalTokens(),
-				])
+	const requestedAmount = useMemo(() => {
+		if (formData.type === "scholarship" && formData.fundingAmount.trim()) {
+			return formData.fundingAmount.trim()
+		}
+		return "0"
+	}, [formData.fundingAmount, formData.type])
 
-				setGovernanceTokenBalance(balance)
-				setMinimumTokens(minimum)
-				setHasMinimumBalance(balance >= minimum)
-			} catch (error) {
-				console.error("Failed to check governance token balance:", error)
-				// Set default values on error
-				setGovernanceTokenBalance(0)
-				setMinimumTokens(10)
-				setHasMinimumBalance(false)
-			} finally {
-				setIsLoading(false)
-			}
+	const evidenceUrl = useMemo(() => {
+		const candidate = formData.applicationUrl.trim()
+		if (candidate.length > 0) return candidate
+		if (typeof window !== "undefined") {
+			return `${window.location.origin}/dao/proposals`
+		}
+		return "https://learnvault.app/dao/proposals"
+	}, [formData.applicationUrl])
+
+	const composedDescription = useMemo(() => {
+		const sections = [formData.description.trim()]
+
+		if (formData.type === "parameter_change") {
+			sections.push(
+				[
+					"## Parameter Change Details",
+					`- Parameter: ${formData.parameterName || "Not specified"}`,
+					`- New value: ${formData.parameterValue || "Not specified"}`,
+					`- Reason: ${formData.parameterReason || "Not specified"}`,
+				].join("\n"),
+			)
 		}
 
-		void checkBalance()
-	}, [
-		address,
-		isConnected,
-		getGovernanceTokenBalance,
-		getMinimumProposalTokens,
-	])
+		if (formData.type === "new_course") {
+			sections.push(
+				[
+					"## Course Proposal Details",
+					`- Course title: ${formData.courseTitle || "Not specified"}`,
+					`- Course description: ${formData.courseDescription || "Not specified"}`,
+					`- Duration (hours): ${formData.courseDuration || "Not specified"}`,
+					`- Difficulty: ${formData.courseDifficulty || "Not specified"}`,
+				].join("\n"),
+			)
+		}
+
+		if (formData.type === "scholarship") {
+			sections.push(
+				[
+					"## Scholarship Request Details",
+					`- Application URL: ${evidenceUrl}`,
+					`- Requested funding: ${requestedAmount} USDC`,
+				].join("\n"),
+			)
+		}
+
+		return sections.filter(Boolean).join("\n\n")
+	}, [evidenceUrl, formData, requestedAmount])
 
 	const handleInputChange = (
-		e: React.ChangeEvent<
+		event: React.ChangeEvent<
 			HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
 		>,
 	) => {
-		const { name, value } = e.target
-		setFormData((prev) => ({
-			...prev,
+		const { name, value } = event.target
+		setFormData((current) => ({
+			...current,
 			[name]: value,
 		}))
+		if (submissionError) setSubmissionError(null)
+		if (submissionSuccess) setSubmissionSuccess(null)
 	}
 
-	const handleSubmit = async (e: React.FormEvent) => {
-		e.preventDefault()
-		if (!hasMinimumBalance || !address) return
+	const handleSubmit = async (event: React.FormEvent) => {
+		event.preventDefault()
+		if (!address || !hasMinimumBalance) return
 
-		setIsSubmitting(true)
+		setSubmissionError(null)
+		setSubmissionSuccess(null)
 
 		try {
-			// Prepare proposal data for contract submission
-			const proposalData = {
-				title: formData.title,
-				description: formData.description,
-				proposalType: formData.type,
-				typeSpecificData: {
-					applicationUrl: formData.applicationUrl,
-					fundingAmount: formData.fundingAmount
-						? parseFloat(formData.fundingAmount)
-						: undefined,
-					parameterName: formData.parameterName,
-					parameterValue: formData.parameterValue,
-					parameterReason: formData.parameterReason,
-					courseTitle: formData.courseTitle,
-					courseDescription: formData.courseDescription,
-					courseDuration: formData.courseDuration
-						? parseInt(formData.courseDuration)
-						: undefined,
-					courseDifficulty: formData.courseDifficulty,
-				},
-			}
+			const created = await createProposal({
+				author_address: address,
+				title: formData.title.trim(),
+				description: composedDescription,
+				requested_amount: requestedAmount,
+				evidence_url: evidenceUrl,
+			})
 
-			// Submit to ScholarshipTreasury contract
-			showInfo("Waiting for wallet approval…")
-			const txHash = await createProposal(proposalData)
-
-			// Extract proposal ID from transaction hash (mock implementation)
-			const proposalId = txHash.includes("PROPOSAL_")
-				? txHash.split("_")[1]
-				: Math.floor(Math.random() * 1000) + 1
-
-			showSuccess("Proposal submitted successfully!")
-			// Redirect to proposal detail page
-			void navigate(`/dao/proposals#proposal-${proposalId}`)
+			setSubmissionSuccess("Proposal submitted successfully. Redirecting...")
+			setFormData(initialFormData)
+			window.setTimeout(() => {
+				void navigate(`/dao/proposals?proposal=${created.proposal_id}`)
+			}, 700)
 		} catch (error) {
-			console.error("Failed to submit proposal:", error)
-			showError(
+			const message =
 				error instanceof Error
 					? error.message
-					: "Failed to submit proposal. Please try again.",
-			)
-		} finally {
-			setIsSubmitting(false)
+					: "Failed to submit proposal. Please try again."
+			setSubmissionError(message)
+			console.error("Failed to submit proposal:", error)
+			showError(message)
 		}
 	}
 
@@ -158,7 +166,7 @@ const DaoPropose: React.FC = () => {
 							<input
 								type="url"
 								name="applicationUrl"
-								value={formData.applicationUrl || ""}
+								value={formData.applicationUrl}
 								onChange={handleInputChange}
 								className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:border-brand-cyan/40 focus:outline-none transition-colors"
 								placeholder="https://example.com/scholarship-application"
@@ -171,11 +179,11 @@ const DaoPropose: React.FC = () => {
 							<input
 								type="number"
 								name="fundingAmount"
-								value={formData.fundingAmount || ""}
+								value={formData.fundingAmount}
 								onChange={handleInputChange}
 								className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:border-brand-cyan/40 focus:outline-none transition-colors"
 								placeholder="500"
-								min="1"
+								min="0"
 							/>
 						</div>
 					</div>
@@ -189,7 +197,7 @@ const DaoPropose: React.FC = () => {
 							</label>
 							<select
 								name="parameterName"
-								value={formData.parameterName || ""}
+								value={formData.parameterName}
 								onChange={handleInputChange}
 								className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:border-brand-cyan/40 focus:outline-none transition-colors"
 							>
@@ -206,7 +214,7 @@ const DaoPropose: React.FC = () => {
 							<input
 								type="text"
 								name="parameterValue"
-								value={formData.parameterValue || ""}
+								value={formData.parameterValue}
 								onChange={handleInputChange}
 								className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:border-brand-cyan/40 focus:outline-none transition-colors"
 								placeholder="Enter new value"
@@ -218,7 +226,7 @@ const DaoPropose: React.FC = () => {
 							</label>
 							<textarea
 								name="parameterReason"
-								value={formData.parameterReason || ""}
+								value={formData.parameterReason}
 								onChange={handleInputChange}
 								rows={3}
 								className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:border-brand-cyan/40 focus:outline-none transition-colors resize-none"
@@ -237,7 +245,7 @@ const DaoPropose: React.FC = () => {
 							<input
 								type="text"
 								name="courseTitle"
-								value={formData.courseTitle || ""}
+								value={formData.courseTitle}
 								onChange={handleInputChange}
 								className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:border-brand-cyan/40 focus:outline-none transition-colors"
 								placeholder="Introduction to Smart Contracts"
@@ -249,7 +257,7 @@ const DaoPropose: React.FC = () => {
 							</label>
 							<textarea
 								name="courseDescription"
-								value={formData.courseDescription || ""}
+								value={formData.courseDescription}
 								onChange={handleInputChange}
 								rows={3}
 								className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:border-brand-cyan/40 focus:outline-none transition-colors resize-none"
@@ -264,7 +272,7 @@ const DaoPropose: React.FC = () => {
 								<input
 									type="number"
 									name="courseDuration"
-									value={formData.courseDuration || ""}
+									value={formData.courseDuration}
 									onChange={handleInputChange}
 									className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:border-brand-cyan/40 focus:outline-none transition-colors"
 									placeholder="40"
@@ -277,7 +285,7 @@ const DaoPropose: React.FC = () => {
 								</label>
 								<select
 									name="courseDifficulty"
-									value={formData.courseDifficulty || ""}
+									value={formData.courseDifficulty}
 									onChange={handleInputChange}
 									className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:border-brand-cyan/40 focus:outline-none transition-colors"
 								>
@@ -290,101 +298,16 @@ const DaoPropose: React.FC = () => {
 						</div>
 					</div>
 				)
-			default:
-				return null
 		}
 	}
 
-	const renderMarkdownPreview = () => {
-		return (
-			<div className="prose prose-invert max-w-none">
-				{formData.title && (
-					<h1 className="text-3xl font-bold text-white mb-4">
-						{formData.title}
-					</h1>
-				)}
-				<div className="text-white/80">
-					<ReactMarkdown
-						components={{
-							h1: ({ children }) => (
-								<h1 className="text-2xl font-bold text-white mb-4">
-									{children}
-								</h1>
-							),
-							h2: ({ children }) => (
-								<h2 className="text-xl font-bold text-white mb-3">
-									{children}
-								</h2>
-							),
-							h3: ({ children }) => (
-								<h3 className="text-lg font-bold text-white mb-2">
-									{children}
-								</h3>
-							),
-							p: ({ children }) => (
-								<p className="text-white/80 leading-relaxed mb-4">{children}</p>
-							),
-							ul: ({ children }) => (
-								<ul className="list-disc list-inside text-white/80 mb-4">
-									{children}
-								</ul>
-							),
-							ol: ({ children }) => (
-								<ol className="list-decimal list-inside text-white/80 mb-4">
-									{children}
-								</ol>
-							),
-							li: ({ children }) => (
-								<li className="text-white/80 mb-2">{children}</li>
-							),
-							strong: ({ children }) => (
-								<strong className="text-white font-bold">{children}</strong>
-							),
-							em: ({ children }) => (
-								<em className="text-white italic">{children}</em>
-							),
-							code: ({ children }) => (
-								<code className="bg-white/10 text-brand-cyan px-2 py-1 rounded text-sm">
-									{children}
-								</code>
-							),
-							pre: ({ children }) => (
-								<pre className="bg-white/10 text-white p-4 rounded-lg overflow-x-auto mb-4">
-									{children}
-								</pre>
-							),
-							blockquote: ({ children }) => (
-								<blockquote className="border-l-4 border-brand-cyan pl-4 text-white/60 italic mb-4">
-									{children}
-								</blockquote>
-							),
-							a: ({ children, href }) => (
-								<a
-									href={href}
-									className="text-brand-cyan hover:text-brand-cyan/80 underline"
-								>
-									{children}
-								</a>
-							),
-						}}
-					>
-						{formData.description || "*Start typing to see a preview...*"}
-					</ReactMarkdown>
-				</div>
-			</div>
-		)
-	}
-
-	if (isLoading) {
-		return (
-			<div className="min-h-screen flex items-center justify-center text-white">
-				<div className="text-center">
-					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-cyan mx-auto mb-4"></div>
-					<p className="text-white/60">Checking governance token balance...</p>
-				</div>
-			</div>
-		)
-	}
+	const renderMarkdownPreview = () => (
+		<div className="prose prose-invert max-w-none">
+			<ReactMarkdown>
+				{composedDescription || "*Start typing to see a preview...*"}
+			</ReactMarkdown>
+		</div>
+	)
 
 	if (!address) {
 		return (
@@ -392,7 +315,7 @@ const DaoPropose: React.FC = () => {
 				<div className="text-center">
 					<h1 className="text-4xl font-black mb-4">Connect Your Wallet</h1>
 					<p className="text-white/60 mb-8">
-						You need to connect your wallet to create a proposal
+						You need to connect your wallet to create a proposal.
 					</p>
 				</div>
 			</div>
@@ -407,15 +330,12 @@ const DaoPropose: React.FC = () => {
 						Insufficient Governance Tokens
 					</h1>
 					<p className="text-white/60 mb-6">
-						You need at least {minimumTokens} governance tokens to create a
-						proposal.
+						You need at least {MINIMUM_PROPOSAL_TOKENS.toString()} governance
+						tokens to create a proposal.
 					</p>
 					<div className="text-brand-cyan text-2xl font-bold mb-8">
-						Current Balance: {governanceTokenBalance} tokens
+						Current Balance: {votingPower.toString()} GOV
 					</div>
-					<button className="iridescent-border px-8 py-3 rounded-xl font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all">
-						Get Governance Tokens
-					</button>
 				</div>
 			</div>
 		)
@@ -429,12 +349,12 @@ const DaoPropose: React.FC = () => {
 						Create Proposal
 					</h1>
 					<p className="text-white/40 text-lg font-medium max-w-2xl">
-						Submit a governance proposal for community review and voting.
+						Submit a governance proposal to the backend API for community review
+						and voting.
 					</p>
 				</header>
 
 				<form onSubmit={handleSubmit} className="space-y-8">
-					{/* Basic Fields */}
 					<div className="glass-card p-8 rounded-[2.5rem] border border-white/5">
 						<div className="space-y-6">
 							<div>
@@ -514,7 +434,7 @@ const DaoPropose: React.FC = () => {
 											required
 											rows={8}
 											className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:border-brand-cyan/40 focus:outline-none transition-colors resize-none"
-											placeholder="Enter detailed proposal description using Markdown formatting"
+											placeholder="Enter the proposal details using Markdown formatting"
 										/>
 										<div className="text-right mt-1">
 											<span className="text-xs text-white/40">
@@ -531,7 +451,6 @@ const DaoPropose: React.FC = () => {
 						</div>
 					</div>
 
-					{/* Type-specific Fields */}
 					<div className="glass-card p-8 rounded-[2.5rem] border border-white/5">
 						<h2 className="text-2xl font-black mb-6 tracking-tight">
 							{formData.type === "scholarship" && "Scholarship Details"}
@@ -542,12 +461,27 @@ const DaoPropose: React.FC = () => {
 						{renderTypeSpecificFields()}
 					</div>
 
-					{/* Submit Section */}
+					<div className="glass-card p-6 rounded-[2rem] border border-white/5 space-y-3">
+						<p className="text-sm text-white/50">
+							Submitting as <span className="text-white">{address}</span>
+						</p>
+						<p className="text-sm text-white/50">
+							Requested amount:{" "}
+							<span className="text-brand-cyan">{requestedAmount} USDC</span>
+						</p>
+						{submissionSuccess && (
+							<p className="text-sm text-brand-emerald">{submissionSuccess}</p>
+						)}
+						{submissionError && (
+							<p className="text-sm text-red-400">{submissionError}</p>
+						)}
+					</div>
+
 					<div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
 						<div className="text-sm text-white/40">
 							Your governance token balance:{" "}
 							<span className="text-brand-cyan font-bold">
-								{governanceTokenBalance} tokens
+								{votingPower.toString()} GOV
 							</span>
 						</div>
 						<div className="flex gap-4">
@@ -560,15 +494,16 @@ const DaoPropose: React.FC = () => {
 							</button>
 							<button
 								type="submit"
+								data-testid="submit-proposal"
 								disabled={
-									isSubmitting ||
-									!formData.title ||
-									!formData.description ||
+									isSubmittingProposal ||
+									!formData.title.trim() ||
+									!formData.description.trim() ||
 									!hasMinimumBalance
 								}
 								className="px-8 py-3 bg-brand-cyan/10 border border-brand-cyan/30 text-brand-cyan font-black uppercase tracking-widest rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 transition-all"
 							>
-								{isSubmitting ? "Submitting..." : "Submit Proposal"}
+								{isSubmittingProposal ? "Submitting..." : "Submit Proposal"}
 							</button>
 						</div>
 					</div>

@@ -182,6 +182,71 @@ describe("GET /api/governance/voting-power/:address", () => {
 	})
 })
 
+describe("GET /api/proposals", () => {
+	it("returns proposals from the alias endpoint", async () => {
+		const db = require("../db/index")
+		db.pool.query
+			.mockResolvedValueOnce({ rows: [{ total: 1 }] })
+			.mockResolvedValueOnce({
+				rows: [
+					{
+						id: 7,
+						author_address:
+							"GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBFUKJQ2K5RQDDXYZ",
+						title: "Fund cohort",
+						description: "Detailed proposal",
+						amount: "500",
+						votes_for: "10",
+						votes_against: "2",
+						status: "pending",
+						deadline: "2026-04-10T12:00:00.000Z",
+						created_at: "2026-03-28T12:00:00.000Z",
+						user_vote_support: true,
+					},
+				],
+			})
+
+		const response = await request(app).get(
+			`/api/proposals?viewer_address=${TEST_VOTER}`,
+		)
+
+		expect(response.status).toBe(200)
+		expect(response.body.total).toBe(1)
+		expect(response.body.proposals[0]).toHaveProperty("id", 7)
+		expect(response.body.proposals[0]).toHaveProperty("user_vote_support", true)
+	})
+})
+
+describe("GET /api/proposals/:id", () => {
+	it("returns proposal detail from the alias endpoint", async () => {
+		const db = require("../db/index")
+		db.pool.query.mockResolvedValueOnce({
+			rows: [
+				{
+					id: 9,
+					author_address:
+						"GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBFUKJQ2K5RQDDXYZ",
+					title: "Fund educators",
+					description: "Long-form detail",
+					amount: "750",
+					votes_for: "11",
+					votes_against: "4",
+					status: "pending",
+					deadline: "2026-04-15T12:00:00.000Z",
+					created_at: "2026-03-28T12:00:00.000Z",
+					user_vote_support: null,
+				},
+			],
+		})
+
+		const response = await request(app).get("/api/proposals/9")
+
+		expect(response.status).toBe(200)
+		expect(response.body).toHaveProperty("id", 9)
+		expect(response.body).toHaveProperty("title", "Fund educators")
+	})
+})
+
 // Valid 56-char Stellar test address
 const TEST_VOTER = "GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBFUKJQ2K5RQDDXYZ"
 
@@ -198,7 +263,14 @@ describe("POST /api/governance/vote", () => {
 		// Default happy path mocks
 		pool.query
 			.mockResolvedValueOnce({
-				rows: [{ id: 1, status: "pending", cancelled: false }],
+				rows: [
+					{
+						id: 1,
+						status: "pending",
+						deadline: "2099-01-01T00:00:00.000Z",
+						cancelled: false,
+					},
+				],
 			}) // proposal check
 			.mockResolvedValueOnce({ rows: [] }) // no existing vote
 			.mockResolvedValueOnce({ rows: [{ id: 1 }] }) // insert vote
@@ -266,7 +338,9 @@ describe("POST /api/governance/vote", () => {
 
 	it("should reject vote when proposal is not pending", async () => {
 		pool.query.mockReset()
-		pool.query.mockResolvedValueOnce({ rows: [{ id: 1, status: "approved" }] })
+		pool.query.mockResolvedValueOnce({
+			rows: [{ id: 1, status: "approved", deadline: null }],
+		})
 
 		const response = await request(app).post("/api/governance/vote").send({
 			proposal_id: 1,
@@ -285,7 +359,14 @@ describe("POST /api/governance/vote", () => {
 		pool.query.mockReset()
 		pool.query
 			.mockResolvedValueOnce({
-				rows: [{ id: 1, status: "pending", cancelled: false }],
+				rows: [
+					{
+						id: 1,
+						status: "pending",
+						deadline: "2099-01-01T00:00:00.000Z",
+						cancelled: false,
+					},
+				],
 			})
 			.mockResolvedValueOnce({ rows: [{ id: 1 }] })
 
@@ -306,7 +387,14 @@ describe("POST /api/governance/vote", () => {
 		pool.query.mockReset()
 		pool.query
 			.mockResolvedValueOnce({
-				rows: [{ id: 1, status: "pending", cancelled: false }],
+				rows: [
+					{
+						id: 1,
+						status: "pending",
+						deadline: "2099-01-01T00:00:00.000Z",
+						cancelled: false,
+					},
+				],
 			})
 			.mockResolvedValueOnce({ rows: [] })
 		stellarContractService.getGovernanceTokenBalance.mockResolvedValueOnce("0")
@@ -325,7 +413,14 @@ describe("POST /api/governance/vote", () => {
 		pool.query.mockReset()
 		pool.query
 			.mockResolvedValueOnce({
-				rows: [{ id: 1, status: "pending", cancelled: false }],
+				rows: [
+					{
+						id: 1,
+						status: "pending",
+						deadline: "2099-01-01T00:00:00.000Z",
+						cancelled: false,
+					},
+				],
 			})
 			.mockResolvedValueOnce({ rows: [] })
 		stellarContractService.castVote.mockRejectedValueOnce(
@@ -340,6 +435,27 @@ describe("POST /api/governance/vote", () => {
 
 		expect(response.status).toBe(500)
 		expect(response.body).toHaveProperty("error", "Failed to cast vote")
+	})
+
+	it("should reject vote when deadline has passed", async () => {
+		pool.query.mockReset()
+		pool.query.mockResolvedValueOnce({
+			rows: [
+				{ id: 1, status: "pending", deadline: "2020-01-01T00:00:00.000Z" },
+			],
+		})
+
+		const response = await request(app).post("/api/governance/vote").send({
+			proposal_id: 1,
+			voter_address: TEST_VOTER,
+			support: true,
+		})
+
+		expect(response.status).toBe(400)
+		expect(response.body).toHaveProperty(
+			"error",
+			"Voting is closed for this proposal",
+		)
 	})
 })
 

@@ -1,84 +1,11 @@
-import { Button, Card, Input, Text } from "@stellar/design-system"
-import { useMemo, useState } from "react"
-
+import { Button, Card, Text } from "@stellar/design-system"
+import { Link } from "react-router-dom"
+import { useProposals } from "../hooks/useProposals"
 import { useWallet } from "../hooks/useWallet"
 
 export default function Dao() {
 	const { address } = useWallet()
-
-	type Proposal = {
-		id: string
-		title: string
-		amountUsdc: string
-		createdAtIso: string
-		votesYes: number
-	}
-
-	const proposalsKey = useMemo(
-		() => (address ? `dao:proposals:${address}` : "dao:proposals:anon"),
-		[address],
-	)
-	const governanceKey = useMemo(
-		() => (address ? `dao:gov:${address}` : "dao:gov:anon"),
-		[address],
-	)
-
-	const [title, setTitle] = useState("Scholarship for Stellar Basics")
-	const [amountUsdc, setAmountUsdc] = useState("100")
-	const [isGovHolder, setIsGovHolder] = useState(() => {
-		return localStorage.getItem(governanceKey) === "1"
-	})
-	const [govTokens, setGovTokens] = useState(() => {
-		const raw = localStorage.getItem(`${governanceKey}:tokens`)
-		return raw ? Number(raw) || 0 : 0
-	})
-
-	const [proposals, setProposals] = useState<Proposal[]>(() => {
-		try {
-			const raw = localStorage.getItem(proposalsKey)
-			return raw ? (JSON.parse(raw) as Proposal[]) : []
-		} catch {
-			return []
-		}
-	})
-
-	const persistProposals = (next: Proposal[]) => {
-		setProposals(next)
-		localStorage.setItem(proposalsKey, JSON.stringify(next))
-	}
-
-	const submitProposal = () => {
-		if (!address) return
-		const id = String(Date.now())
-		const next: Proposal[] = [
-			{
-				id,
-				title,
-				amountUsdc,
-				createdAtIso: new Date().toISOString(),
-				votesYes: 0,
-			},
-			...proposals,
-		]
-		persistProposals(next)
-	}
-
-	const voteYes = (id: string) => {
-		if (!isGovHolder) return
-		const next = proposals.map((p) =>
-			p.id === id ? { ...p, votesYes: p.votesYes + 1 } : p,
-		)
-		persistProposals(next)
-	}
-
-	const depositUsdc = () => {
-		if (!address) return
-		const next = govTokens + 10
-		setGovTokens(next)
-		localStorage.setItem(`${governanceKey}:tokens`, String(next))
-		setIsGovHolder(true)
-		localStorage.setItem(governanceKey, "1")
-	}
+	const { proposals, votingPower, isLoading } = useProposals()
 
 	return (
 		<div>
@@ -88,91 +15,70 @@ export default function Dao() {
 
 			<Card>
 				<Text as="h2" size="md">
-					Submit scholarship proposal
-				</Text>
-				{!address ? (
-					<Text as="p" size="sm">
-						Connect wallet to submit.
-					</Text>
-				) : (
-					<div style={{ display: "grid", gap: "0.75rem", maxWidth: 520 }}>
-						<Input
-							id="proposal-title"
-							label="Title"
-							fieldSize="md"
-							value={title}
-							onChange={(e) => setTitle(e.target.value)}
-						/>
-						<Input
-							id="proposal-amount"
-							label="Amount (USDC)"
-							fieldSize="md"
-							value={amountUsdc}
-							onChange={(e) => setAmountUsdc(e.target.value)}
-						/>
-						<Button
-							variant="primary"
-							size="md"
-							data-testid="submit-proposal"
-							onClick={submitProposal}
-						>
-							Submit Proposal
-						</Button>
-					</div>
-				)}
-			</Card>
-
-			<Card>
-				<Text as="h2" size="md">
-					Treasury (Donor)
+					Governance hub
 				</Text>
 				<Text as="p" size="sm">
-					Deposit USDC → receive governance tokens.
+					Browse live proposals from the backend API and create new ones without
+					local proposal storage.
 				</Text>
-				<Button
-					variant="secondary"
-					size="md"
-					data-testid="deposit-usdc"
-					disabled={!address}
-					onClick={depositUsdc}
-				>
-					Deposit USDC
-				</Button>
+				<div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem" }}>
+					<Link to="/dao/proposals">
+						<Button variant="primary" size="md" data-testid="view-proposals">
+							View Proposals
+						</Button>
+					</Link>
+					<Link to="/dao/propose">
+						<Button
+							variant="secondary"
+							size="md"
+							disabled={!address}
+							data-testid="create-proposal"
+						>
+							Create Proposal
+						</Button>
+					</Link>
+				</div>
+			</Card>
+
+			<Card>
+				<Text as="h2" size="md">
+					Voting power
+				</Text>
 				<Text as="div" size="sm" data-testid="gov-token-balance">
-					Governance Tokens: {govTokens}
+					Governance Tokens: {votingPower.toString()}
+				</Text>
+				<Text as="p" size="sm">
+					{address
+						? "Connect your proposal and voting flow through the live DAO endpoints."
+						: "Connect wallet to create proposals and vote."}
 				</Text>
 			</Card>
 
 			<Card>
 				<Text as="h2" size="md">
-					Active proposals
+					Recent proposals
 				</Text>
-				{proposals.length === 0 ? (
+				{isLoading ? (
 					<Text as="p" size="sm">
-						No proposals yet.
+						Loading proposals...
+					</Text>
+				) : proposals.length === 0 ? (
+					<Text as="p" size="sm">
+						No proposals available yet.
 					</Text>
 				) : (
 					<div style={{ display: "grid", gap: "0.75rem" }}>
-						{proposals.map((p) => (
-							<Card key={p.id}>
+						{proposals.slice(0, 3).map((proposal) => (
+							<Card key={proposal.id}>
 								<Text as="div" size="sm" data-testid="proposal-title">
-									{p.title}
+									{proposal.title}
 								</Text>
 								<Text as="div" size="sm">
-									Requested: {p.amountUsdc} USDC
+									Status: {proposal.displayStatus}
 								</Text>
 								<Text as="div" size="sm" data-testid="vote-count">
-									Votes YES: {p.votesYes}
+									Yes votes: {proposal.votesFor.toString()}
 								</Text>
-								<Button
-									variant="primary"
-									size="sm"
-									data-testid="vote-yes"
-									disabled={!isGovHolder}
-									onClick={() => voteYes(p.id)}
-								>
-									Vote YES
-								</Button>
 							</Card>
 						))}
 					</div>

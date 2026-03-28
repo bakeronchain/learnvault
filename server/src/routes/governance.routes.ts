@@ -5,6 +5,7 @@ import {
 	castVote,
 	createGovernanceProposal,
 	getProposalStatus,
+	getGovernanceProposalById,
 	getGovernanceProposals,
 	getVotingPower,
 } from "../controllers/governance.controller"
@@ -64,6 +65,10 @@ governanceRouter.get("/governance/proposals", (req, res) => {
 	void getGovernanceProposals(req, res)
 })
 
+governanceRouter.get("/proposals", (req, res) => {
+	void getGovernanceProposals(req, res)
+})
+
 /**
  * @openapi
  * /api/governance/proposals:
@@ -99,6 +104,18 @@ governanceRouter.get("/governance/proposals", (req, res) => {
  */
 governanceRouter.post("/governance/proposals", (req, res) => {
 	void createGovernanceProposal(req, res)
+})
+
+governanceRouter.post("/proposals", (req, res) => {
+	void createGovernanceProposal(req, res)
+})
+
+governanceRouter.get("/governance/proposals/:id", (req, res) => {
+	void getGovernanceProposalById(req, res)
+})
+
+governanceRouter.get("/proposals/:id", (req, res) => {
+	void getGovernanceProposalById(req, res)
 })
 
 /**

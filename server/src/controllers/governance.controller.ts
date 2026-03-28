@@ -7,6 +7,8 @@ import { stellarContractService } from "../services/stellar-contract.service"
 type ProposalStatus = "pending" | "approved" | "rejected"
 type ProposalPublicState = "open" | "closed" | "cancelled" | "executed"
 
+const stellarAddressSchema = z.string().min(56).max(56).startsWith("G")
+
 function parseStatus(value: unknown): ProposalStatus | undefined {
 	if (typeof value !== "string") return undefined
 	const normalized = value.trim().toLowerCase()
@@ -53,11 +55,44 @@ function deriveProposalState(proposal: {
 	return "open"
 }
 
+function parseViewerAddress(value: unknown): string | null {
+	if (typeof value !== "string") return null
+	const trimmed = value.trim()
+	const validation = stellarAddressSchema.safeParse(trimmed)
+	return validation.success ? validation.data : null
+}
+
+function buildProposalSelect(viewerParamIndex?: number) {
+	const viewerVoteSelect = viewerParamIndex
+		? `,
+			(
+				SELECT v.support
+				FROM votes v
+				WHERE v.proposal_id = p.id AND v.voter_address = $${viewerParamIndex}
+				LIMIT 1
+			) AS user_vote_support`
+		: ", NULL::boolean AS user_vote_support"
+
+	return `SELECT
+			p.id,
+			p.author_address,
+			p.title,
+			p.description,
+			p.amount,
+			p.votes_for,
+			p.votes_against,
+			p.status,
+			p.deadline,
+			p.created_at${viewerVoteSelect}
+		FROM proposals p`
+}
+
 export async function getGovernanceProposals(
 	req: Request,
 	res: Response,
 ): Promise<void> {
 	const status = parseStatus(req.query.status)
+	const viewerAddress = parseViewerAddress(req.query.viewer_address)
 	const page = parsePositiveInt(req.query.page, 1)
 	const limit = Math.min(parsePositiveInt(req.query.limit, 20), 100)
 	const offset = (page - 1) * limit
@@ -66,7 +101,7 @@ export async function getGovernanceProposals(
 	const values: unknown[] = []
 
 	if (status) {
-		conditions.push(`status = $${values.length + 1}`)
+		conditions.push(`p.status = $${values.length + 1}`)
 		values.push(status)
 	}
 
@@ -76,18 +111,19 @@ export async function getGovernanceProposals(
 
 	try {
 		const totalResult = await pool.query(
-			`SELECT COUNT(*)::int AS total FROM proposals ${whereClause}`,
+			`SELECT COUNT(*)::int AS total FROM proposals p ${whereClause}`,
 			values,
 		)
 
 		const total = Number(totalResult.rows[0]?.total ?? 0)
 
-		const proposalValues = [...values, limit, offset]
+		const proposalValues = viewerAddress
+			? [...values, limit, offset, viewerAddress]
+			: [...values, limit, offset]
 		const proposalsResult = await pool.query(
-			`SELECT id, author_address, title, description, amount, votes_for, votes_against, status, deadline, cancelled
-			 FROM proposals
+			`${buildProposalSelect(viewerAddress ? values.length + 3 : undefined)}
 			 ${whereClause}
-			 ORDER BY created_at DESC
+			 ORDER BY p.created_at DESC
 			 LIMIT $${values.length + 1}
 			 OFFSET $${values.length + 2}`,
 			proposalValues,
@@ -100,6 +136,40 @@ export async function getGovernanceProposals(
 		})
 	} catch {
 		res.status(500).json({ error: "Failed to fetch governance proposals" })
+	}
+}
+
+export async function getGovernanceProposalById(
+	req: Request,
+	res: Response,
+): Promise<void> {
+	const proposalId = Number.parseInt(req.params.id, 10)
+	const viewerAddress = parseViewerAddress(req.query.viewer_address)
+	const values: unknown[] = viewerAddress
+		? [proposalId, viewerAddress]
+		: [proposalId]
+
+	if (Number.isNaN(proposalId) || proposalId < 1) {
+		res.status(400).json({ error: "Invalid proposal id" })
+		return
+	}
+
+	try {
+		const result = await pool.query(
+			`${buildProposalSelect(viewerAddress ? 2 : undefined)}
+			 WHERE p.id = $1
+			 LIMIT 1`,
+			values,
+		)
+
+		if (result.rows.length === 0) {
+			res.status(404).json({ error: "Proposal not found" })
+			return
+		}
+
+		res.status(200).json(result.rows[0])
+	} catch {
+		res.status(500).json({ error: "Failed to fetch governance proposal" })
 	}
 }
 
@@ -141,7 +211,7 @@ const createProposalSchema = z.object({
 	title: z.string().min(5).max(200),
 	description: z.string().min(10),
 	requested_amount: z.string().regex(/^\d+(\.\d+)?$/, "Must be a valid number"),
-	evidence_url: z.string().url(),
+	evidence_url: z.string().url().optional(),
 })
 
 const castVoteSchema = z.object({
@@ -173,6 +243,7 @@ export async function createGovernanceProposal(
 
 	const { author_address, title, description, requested_amount, evidence_url } =
 		validation.data
+	const programUrl = evidence_url ?? "https://learnvault.app/dao/proposals"
 
 	try {
 		// Parse the requested amount
@@ -199,7 +270,7 @@ export async function createGovernanceProposal(
 			applicant: author_address,
 			amount: atomicAmount,
 			programName: title,
-			programUrl: evidence_url,
+			programUrl,
 			programDescription: description,
 			startDate: startDate.toISOString().split("T")[0],
 			milestoneTitles: [
@@ -226,8 +297,9 @@ export async function createGovernanceProposal(
 				description,
 				amount,
 				status,
+				deadline,
 				created_at
-			) VALUES ($1, $2, $3, $4, 'pending', NOW())
+			) VALUES ($1, $2, $3, $4, 'pending', NOW() + INTERVAL '7 days', NOW())
 			RETURNING id`,
 			[author_address, title, description, amount],
 		)
@@ -262,7 +334,7 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 	try {
 		// 1. Check if proposal exists
 		const proposalResult = await pool.query(
-			"SELECT id, status, cancelled FROM proposals WHERE id = $1",
+			"SELECT id, status, deadline, cancelled FROM proposals WHERE id = $1",
 			[proposal_id],
 		)
 
@@ -280,6 +352,16 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 
 		// 2. Check if proposal is still pending
 		if (proposalResult.rows[0].status !== "pending") {
+			res.status(400).json({
+				error: "Voting is closed for this proposal",
+			})
+			return
+		}
+
+		if (
+			proposalResult.rows[0].deadline &&
+			new Date(proposalResult.rows[0].deadline).getTime() <= Date.now()
+		) {
 			res.status(400).json({
 				error: "Voting is closed for this proposal",
 			})

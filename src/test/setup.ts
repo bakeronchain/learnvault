@@ -8,6 +8,20 @@ import { afterEach, vi } from "vitest"
 import { mockContracts } from "./mocks/contracts"
 import { mockStellarWalletsKit, mockWalletUtils } from "./mocks/wallet"
 
+vi.mock("react", async () => {
+	const actual = await vi.importActual<typeof import("react")>("react")
+	const dom = await vi.importActual<typeof import("react-dom/test-utils")>(
+		"react-dom/test-utils",
+	)
+	return {
+		...actual,
+		act:
+			typeof actual.act === "function"
+				? actual.act
+				: (dom.act as typeof actual.act),
+	}
+})
+
 // ---------------------------------------------------------------------------
 // Global Mocks
 // ---------------------------------------------------------------------------

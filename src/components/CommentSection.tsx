@@ -1,6 +1,10 @@
 import { useEffect, useId, useState, useCallback } from "react"
 import { useTranslation } from "react-i18next"
+import { useWallet } from "../hooks/useWallet"
+import { getAuthToken } from "../util/auth"
 import CommentCard from "./CommentCard"
+
+const API_BASE = import.meta.env.VITE_SERVER_URL ?? "http://localhost:4000"
 
 export interface Comment {
 	id: number
@@ -21,6 +25,7 @@ interface CommentSectionProps {
 
 function CommentSection({ proposalId, proposalAuthor }: CommentSectionProps) {
 	const { t } = useTranslation()
+	const { address } = useWallet()
 	const pollInterval = Number(import.meta.env.VITE_COMMENT_POLL_MS) || 15000
 	const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
 	const commentInputId = useId()
@@ -39,7 +44,7 @@ function CommentSection({ proposalId, proposalAuthor }: CommentSectionProps) {
 			if (!isSilent) setLoading(true)
 			try {
 				const res = await fetch(
-					`${import.meta.env.VITE_SERVER_URL}/api/proposals/${proposalId}/comments`,
+					`${API_BASE}/api/proposals/${proposalId}/comments`,
 				)
 				if (!res.ok) throw new Error("Failed to fetch comments")
 				const data = await res.json()
@@ -77,26 +82,28 @@ function CommentSection({ proposalId, proposalAuthor }: CommentSectionProps) {
 			return
 		}
 
-		const token = localStorage.getItem("auth_token") || "mock-token"
+		const token = getAuthToken()
+		if (!token) {
+			setSubmissionError("Sign in to post a comment.")
+			setSubmissionStatus(null)
+			return
+		}
 		setSubmissionError(null)
 		setSubmissionStatus(null)
 
 		try {
-			const res = await fetch(
-				`${import.meta.env.VITE_SERVER_URL}/api/comments`,
-				{
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${token}`,
-					},
-					body: JSON.stringify({
-						proposalId,
-						content: newComment,
-						parentId,
-					}),
+			const res = await fetch(`${API_BASE}/api/comments`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
 				},
-			)
+				body: JSON.stringify({
+					proposalId,
+					content: newComment,
+					parentId,
+				}),
+			})
 
 			if (res.ok) {
 				setNewComment("")
@@ -236,7 +243,7 @@ function CommentSection({ proposalId, proposalAuthor }: CommentSectionProps) {
 							<CommentCard
 								comment={comment}
 								isAuthor={comment.author_address === proposalAuthor}
-								canPin={proposalAuthor === "CURRENT_USER_ADDRESS"}
+								canPin={proposalAuthor === address}
 								onUpdate={fetchComments}
 							/>
 							<div className="ml-12 mt-6 space-y-6 border-l border-white/5 pl-8">

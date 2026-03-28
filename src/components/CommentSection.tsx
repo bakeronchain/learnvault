@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useState } from "react"
+import { useEffect, useId, useState, useCallback } from "react"
 import { useTranslation } from "react-i18next"
 import CommentCard from "./CommentCard"
 
@@ -19,11 +19,14 @@ interface CommentSectionProps {
 	proposalAuthor?: string
 }
 
-const CommentSection: React.FC<CommentSectionProps> = ({
+function CommentSection({
 	proposalId,
 	proposalAuthor,
-}) => {
+}: CommentSectionProps) {
 	const { t } = useTranslation()
+	const pollInterval = Number(import.meta.env.VITE_COMMENT_POLL_MS) || 15000
+	const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+
 	const commentInputId = useId()
 	const commentHintId = `${commentInputId}-hint`
 	const commentErrorId = `${commentInputId}-error`
@@ -35,24 +38,41 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 	const [submissionError, setSubmissionError] = useState<string | null>(null)
 	const [submissionStatus, setSubmissionStatus] = useState<string | null>(null)
 
-	const fetchComments = async () => {
-		setLoading(true)
-		try {
-			const res = await fetch(
-				`${import.meta.env.VITE_SERVER_URL}/api/proposals/${proposalId}/comments`,
-			)
-			const data = await res.json()
-			setComments(data)
-		} catch (err) {
-			console.error("Failed to fetch comments", err)
-		} finally {
-			setLoading(false)
-		}
-	}
+	const fetchComments = useCallback(
+		async (isSilent = false) => {
+			if (!isSilent) setLoading(true)
+			try {
+				const res = await fetch(
+					`${import.meta.env.VITE_SERVER_URL}/api/proposals/${proposalId}/comments`,
+				)
+				if (!res.ok) throw new Error("Failed to fetch comments")
+				const data = await res.json()
+				setComments(data)
+				setLastUpdated(new Date())
+			} catch (err) {
+				console.error("Failed to fetch comments", err)
+			} finally {
+				if (!isSilent) setLoading(false)
+			}
+		},
+		[proposalId],
+	)
 
 	useEffect(() => {
-		void fetchComments()
-	}, [proposalId])
+		let isMounted = true
+		const safeFetch = async (silent: boolean) => {
+			if (!isMounted) return
+			await fetchComments(silent)
+		}
+
+		void safeFetch(false)
+
+		const interval = setInterval(() => void safeFetch(true), pollInterval)
+		return () => {
+			isMounted = false
+			clearInterval(interval)
+		}
+	}, [fetchComments, pollInterval])
 
 	const handlePostComment = async (parentId: number | null = null) => {
 		if (!newComment.trim()) {
@@ -237,6 +257,14 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 					))}
 				</div>
 			)}
+
+			<div className="mt-8 text-center">
+				<p className="text-[10px] text-white/20 uppercase font-bold tracking-[2px] italic">
+					{t("pages.dao.lastUpdated", {
+						time: lastUpdated.toLocaleTimeString(),
+					})}
+				</p>
+			</div>
 		</div>
 	)
 }

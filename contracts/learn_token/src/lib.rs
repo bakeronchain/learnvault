@@ -73,20 +73,29 @@ pub struct LearnToken;
 impl LearnToken {
     /// Initialise the contract. Can only be called once.
     ///
-    /// Sets name = "LearnVault Learn Token", symbol = "LRN", decimals = 7.
+    /// Sets name = "LearnToken", symbol = "LRN", decimals = 7, total supply = 0.
     pub fn initialize(env: Env, admin: Address) {
         if env.storage().instance().has(&ADMIN_KEY) {
-            panic_with_error!(&env, LRNError::Unauthorized);
+            panic_with_error!(&env, LRNError::NotInitialized);
         }
+        admin.require_auth();
         env.storage().instance().set(&ADMIN_KEY, &admin);
         env.storage()
             .instance()
-            .set(&NAME_KEY, &String::from_str(&env, "LearnVault Learn Token"));
+            .set(&NAME_KEY, &String::from_str(&env, "LearnToken"));
         env.storage()
             .instance()
             .set(&SYMBOL_KEY, &String::from_str(&env, "LRN"));
         env.storage().instance().set(&DECIMALS_KEY, &7_u32);
-        
+        env.storage()
+            .persistent()
+            .set(&DataKey::TotalSupply, &0_i128);
+        env.storage().persistent().extend_ttl(
+            &DataKey::TotalSupply,
+            PERSISTENT_BUMP_THRESHOLD,
+            PERSISTENT_EXTEND_TO,
+        );
+
         Self::extend_instance(&env);
     }
 
@@ -126,8 +135,16 @@ impl LearnToken {
             .set(&DataKey::TotalSupply, &(supply + amount));
 
         // Extend persistent storage for balance entries
-        env.storage().persistent().extend_ttl(&bal_key, PERSISTENT_BUMP_THRESHOLD, PERSISTENT_EXTEND_TO);
-        env.storage().persistent().extend_ttl(&DataKey::TotalSupply, PERSISTENT_BUMP_THRESHOLD, PERSISTENT_EXTEND_TO);
+        env.storage().persistent().extend_ttl(
+            &bal_key,
+            PERSISTENT_BUMP_THRESHOLD,
+            PERSISTENT_EXTEND_TO,
+        );
+        env.storage().persistent().extend_ttl(
+            &DataKey::TotalSupply,
+            PERSISTENT_BUMP_THRESHOLD,
+            PERSISTENT_EXTEND_TO,
+        );
 
         // 5. Emit event
         env.events()
@@ -182,7 +199,11 @@ impl LearnToken {
         Self::extend_instance(&env);
         let key = DataKey::Balance(account);
         if let Some(bal) = env.storage().persistent().get::<_, i128>(&key) {
-            env.storage().persistent().extend_ttl(&key, PERSISTENT_BUMP_THRESHOLD, PERSISTENT_EXTEND_TO);
+            env.storage().persistent().extend_ttl(
+                &key,
+                PERSISTENT_BUMP_THRESHOLD,
+                PERSISTENT_EXTEND_TO,
+            );
             bal
         } else {
             0
@@ -193,7 +214,11 @@ impl LearnToken {
         Self::extend_instance(&env);
         let key = DataKey::TotalSupply;
         if let Some(supply) = env.storage().persistent().get::<_, i128>(&key) {
-            env.storage().persistent().extend_ttl(&key, PERSISTENT_BUMP_THRESHOLD, PERSISTENT_EXTEND_TO);
+            env.storage().persistent().extend_ttl(
+                &key,
+                PERSISTENT_BUMP_THRESHOLD,
+                PERSISTENT_EXTEND_TO,
+            );
             supply
         } else {
             0

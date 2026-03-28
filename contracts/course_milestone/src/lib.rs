@@ -2,9 +2,13 @@
 #![allow(deprecated)]
 
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, panic_with_error,
-    symbol_short, Address, Env, String, Symbol, Vec,
+    Address, Env, String, Symbol, Vec, contract, contracterror, contractevent, contractimpl,
+    contracttype, panic_with_error, symbol_short,
 };
+
+mod learn_token_client;
+
+use learn_token_client::LearnTokenClient;
 
 const DAY_IN_LEDGERS: u32 = 17_280;
 const INSTANCE_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
@@ -80,14 +84,7 @@ pub enum Error {
     DuplicateSubmission = 10,
     ContractPaused = 11,
     AlreadyEnrolled = 12,
-}
-
-#[contractevent]
-pub struct MilestoneCompleted {
-    pub learner: Address,
-    pub course_id: u32,
-    pub milestones_completed: u32,
-    pub tokens_minted: i128,
+    InvalidState = 13,
 }
 
 #[contractevent]
@@ -298,7 +295,6 @@ impl CourseMilestone {
             .persistent()
             .get::<_, MilestoneStatus>(&state_key)
             .unwrap_or(MilestoneStatus::NotStarted);
-        Self::extend_persistent(&env, &state_key);
 
         if current_state != MilestoneStatus::NotStarted {
             panic_with_error!(&env, Error::DuplicateSubmission);
@@ -434,15 +430,15 @@ impl CourseMilestone {
         let learn_token_client = LearnTokenClient::new(&env, &learn_token_address);
         learn_token_client.mint(&learner, &tokens_amount);
 
-        // Emit milestone completed event
+        // Emit milestone completed event (learner, course_id, milestone_id, tokens_minted)
         env.events().publish(
-            symbol_short!("milestone_completed"),
-            MilestoneCompleted {
-                learner: learner.clone(),
-                course_id: course_id.clone().parse::<u32>().unwrap_or(0),
-                milestones_completed: milestone_id,
-                tokens_minted: tokens_amount,
-            },
+            (symbol_short!("ms_compl"),),
+            (
+                learner.clone(),
+                course_id.clone(),
+                milestone_id,
+                tokens_amount,
+            ),
         );
     }
 
@@ -491,15 +487,6 @@ impl CourseMilestone {
         // Remove submission data
         let submission_key = DataKey::MilestoneSubmission(learner, course_id, milestone_id);
         env.storage().persistent().remove(&submission_key);
-    }
-
-    pub fn get_milestone_status(
-        env: Env,
-        learner: Address,
-        course_id: String,
-        milestone_id: u32,
-    ) -> MilestoneStatus {
-        Self::get_milestone_state(env, learner, course_id, milestone_id)
     }
 
     fn require_initialized(env: &Env) {

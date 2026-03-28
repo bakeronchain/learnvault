@@ -1,11 +1,9 @@
 #![cfg(test)]
 
-use crate::{
-    InitializedEventData, MintEventData, ScholarNFT, ScholarNFTClient,
-};
+use crate::{InitializedEventData, MintEventData, ScholarNFT, ScholarNFTClient};
 use soroban_sdk::{
-    testutils::{Address as _, Events as _, MockAuth, MockAuthInvoke},
     Address, Env, IntoVal, String, symbol_short,
+    testutils::{Address as _, Events as _, MockAuth, MockAuthInvoke},
 };
 
 fn setup(env: &Env) -> (Address, Address, ScholarNFTClient) {
@@ -64,7 +62,7 @@ fn non_admin_mint_panics() {
     let (_, _admin, client) = setup(&env);
     let hacker = Address::generate(&env);
     let scholar = Address::generate(&env);
-    
+
     // hacker tries to mint - this will fail admin.require_auth()
     env.mock_auths(&[MockAuth {
         address: &hacker,
@@ -131,7 +129,7 @@ fn test_unauthorized_revoke_fails() {
 
     env.mock_all_auths();
     let token_id = client.mint(&scholar, &cid(&env, "ipfs://test"));
-    
+
     // hacker tries to revoke - mock_auths to mimic hacker's call
     env.mock_auths(&[MockAuth {
         address: &hacker,
@@ -182,11 +180,12 @@ fn initialize_emits_event() {
 
     let events = env.events().all();
     let found = events.iter().any(|(_, topics, data)| {
-        topics.contains(&symbol_short!("init").into_val(&env))
-            && {
-                let d: InitializedEventData = data.clone().into_val(&env);
-                d == InitializedEventData { admin: admin.clone() }
+        topics.contains(&symbol_short!("init").into_val(&env)) && {
+            let d: InitializedEventData = data.clone().into_val(&env);
+            d == InitializedEventData {
+                admin: admin.clone(),
             }
+        }
     });
     assert!(found, "initialized event not found");
 }
@@ -207,7 +206,10 @@ fn mint_emits_event() {
             && topics.contains(&token_id.into_val(&env))
             && {
                 let d: MintEventData = data.clone().into_val(&env);
-                d == MintEventData { owner: scholar.clone(), metadata_uri: uri.clone() }
+                d == MintEventData {
+                    owner: scholar.clone(),
+                    metadata_uri: uri.clone(),
+                }
             }
     });
     assert!(found, "mint event not found");
@@ -260,7 +262,7 @@ fn transfer_attempt_reverts_soulbound() {
     // Use try_transfer to verify the specific Soulbound error (#7)
     let res = client.try_transfer(&from, &to, &token_id);
     assert!(res.is_err());
-    
-    // Note: event emission on panic cannot be verified via env.events().all() 
+
+    // Note: event emission on panic cannot be verified via env.events().all()
     // as Soroban rolls back events on contract failure.
 }

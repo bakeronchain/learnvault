@@ -1,8 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, panic_with_error,
-    Address, Env, Vec,
+    Address, Env, Vec, contract, contracterror, contractimpl, contracttype, panic_with_error,
 };
 
 #[contracterror]
@@ -32,7 +31,9 @@ impl FungibleAllowlist {
         }
         env.storage().instance().set(&DataKey::Admin, &admin);
         let empty_list: Vec<Address> = Vec::new(&env);
-        env.storage().instance().set(&DataKey::Allowlist, &empty_list);
+        env.storage()
+            .instance()
+            .set(&DataKey::Allowlist, &empty_list);
     }
 
     pub fn add_to_allowlist(env: Env, admin: Address, account: Address) {
@@ -50,8 +51,7 @@ impl FungibleAllowlist {
             env.storage()
                 .persistent()
                 .set(&DataKey::IsAllowed(account.clone()), &true);
-            let mut list: Vec<Address> =
-                env.storage().instance().get(&DataKey::Allowlist).unwrap();
+            let mut list: Vec<Address> = env.storage().instance().get(&DataKey::Allowlist).unwrap();
             list.push_back(account);
             env.storage().instance().set(&DataKey::Allowlist, &list);
         }
@@ -72,8 +72,7 @@ impl FungibleAllowlist {
             env.storage()
                 .persistent()
                 .set(&DataKey::IsAllowed(account.clone()), &false);
-            let list: Vec<Address> =
-                env.storage().instance().get(&DataKey::Allowlist).unwrap();
+            let list: Vec<Address> = env.storage().instance().get(&DataKey::Allowlist).unwrap();
             let mut new_list: Vec<Address> = Vec::new(&env);
             for x in list.iter() {
                 if x != account {
@@ -115,7 +114,7 @@ impl FungibleAllowlist {
 #[cfg(test)]
 mod test {
     use super::*;
-    use soroban_sdk::{testutils::Address as _, Env};
+    use soroban_sdk::{Env, testutils::Address as _};
 
     #[test]
     fn test_allowlist_flow() {

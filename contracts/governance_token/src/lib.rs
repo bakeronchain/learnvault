@@ -14,8 +14,8 @@
 //! Implements: https://github.com/bakeronchain/learnvault/issues/11
 
 use soroban_sdk::{
-    Address, Env, String, Symbol, contract, contracterror, contractevent, contractimpl, contracttype,
-    panic_with_error, symbol_short,
+    Address, Env, String, Symbol, contract, contracterror, contractevent, contractimpl,
+    contracttype, panic_with_error, symbol_short,
 };
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ impl GovernanceToken {
             .instance()
             .set(&SYMBOL_KEY, &symbol_short!("GOV"));
         env.storage().instance().set(&DECIMALS_KEY, &7_u32);
-        
+
         Self::extend_instance(&env);
     }
 
@@ -219,10 +219,10 @@ impl GovernanceToken {
     pub fn approve(env: Env, owner: Address, spender: Address, amount: i128) {
         owner.require_auth();
         let key = DataKey::Allowance(owner, spender);
+        env.storage().temporary().set(&key, &amount);
         env.storage()
             .temporary()
-            .set(&key, &amount);
-        env.storage().temporary().extend_ttl(&key, TEMP_BUMP_THRESHOLD, TEMP_EXTEND_TO);
+            .extend_ttl(&key, TEMP_BUMP_THRESHOLD, TEMP_EXTEND_TO);
     }
 
     /// Transfer `amount` from `from` to `to` using `spender`'s allowance.
@@ -239,7 +239,9 @@ impl GovernanceToken {
         env.storage()
             .temporary()
             .set(&allow_key, &(allowance - amount));
-        env.storage().temporary().extend_ttl(&allow_key, TEMP_BUMP_THRESHOLD, TEMP_EXTEND_TO);
+        env.storage()
+            .temporary()
+            .extend_ttl(&allow_key, TEMP_BUMP_THRESHOLD, TEMP_EXTEND_TO);
         Self::_debit(&env, &from, amount);
         Self::_credit(&env, &to, amount);
     }
@@ -330,7 +332,9 @@ impl GovernanceToken {
     pub fn allowance(env: Env, owner: Address, spender: Address) -> i128 {
         let key = DataKey::Allowance(owner, spender);
         if let Some(allowance) = env.storage().temporary().get::<_, i128>(&key) {
-            env.storage().temporary().extend_ttl(&key, TEMP_BUMP_THRESHOLD, TEMP_EXTEND_TO);
+            env.storage()
+                .temporary()
+                .extend_ttl(&key, TEMP_BUMP_THRESHOLD, TEMP_EXTEND_TO);
             allowance
         } else {
             0

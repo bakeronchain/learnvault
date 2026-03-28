@@ -1,8 +1,8 @@
 extern crate std;
 
 use soroban_sdk::{
-    Address, Env, IntoVal, Val, Vec, Symbol, symbol_short,
-    testutils::{Address as _, Ledger, LedgerInfo, MockAuth, MockAuthInvoke, Events},
+    Address, Env, IntoVal, Symbol, Val, Vec, symbol_short,
+    testutils::{Address as _, Events, Ledger, LedgerInfo, MockAuth, MockAuthInvoke},
     token::{StellarAssetClient, TokenClient},
 };
 
@@ -249,6 +249,9 @@ fn reclaim_inactive_uses_configured_window_size() {
     set_timestamp(&env, START_TS + 1);
     reclaim_inactive_authorized(&client, 12).unwrap();
     assert_eq!(token_client(&env, &token).balance(&treasury), 975);
+}
+
+#[test]
 fn reclaim_inactive_emits_event() {
     let (env, contract_id, _token, _admin, treasury, scholar) = setup();
     let client = MilestoneEscrowClient::new(&env, &contract_id);

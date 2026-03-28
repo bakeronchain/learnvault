@@ -229,10 +229,7 @@ fn initialize_sets_name_symbol_decimals() {
     let (_, _, client) = setup(&e);
 
     use soroban_sdk::String;
-    assert_eq!(
-        client.name(),
-        String::from_str(&e, "LearnVault Learn Token")
-    );
+    assert_eq!(client.name(), String::from_str(&e, "LearnToken"));
     assert_eq!(client.symbol(), String::from_str(&e, "LRN"));
     assert_eq!(client.decimals(), 7);
 }
@@ -254,7 +251,7 @@ fn double_initialize_rejected() {
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
-            LRNError::Unauthorized as u32
+            LRNError::NotInitialized as u32
         )))
     );
 }
@@ -634,10 +631,7 @@ fn initialized_contract_has_all_metadata() {
     use soroban_sdk::String;
 
     // All metadata should be set
-    assert_eq!(
-        client.name(),
-        String::from_str(&e, "LearnVault Learn Token")
-    );
+    assert_eq!(client.name(), String::from_str(&e, "LearnToken"));
     assert_eq!(client.symbol(), String::from_str(&e, "LRN"));
     assert_eq!(client.decimals(), 7);
     assert_eq!(client.get_version(), String::from_str(&e, "1.0.0"));

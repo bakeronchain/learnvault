@@ -7,8 +7,8 @@ use soroban_sdk::{
 };
 
 use crate::{
-    CourseConfig, CourseMilestone, CourseMilestoneClient, DataKey, Error, MilestoneCompleted,
-    MilestoneStatus,
+    CourseCompleted, CourseConfig, CourseMilestone, CourseMilestoneClient, DataKey, Error,
+    MilestoneCompleted, MilestoneStatus,
 };
 
 #[contracttype]
@@ -275,6 +275,83 @@ fn verify_milestone_mints_lrn_and_marks_completion() {
     );
     assert!(client.is_completed(&learner, &course_id, &1));
     assert_eq!(token_client.balance(&learner), 125);
+}
+
+#[test]
+fn verify_milestone_emits_course_completed_event_on_final_milestone() {
+    let (env, contract_id, admin, _token_id, client, _token_client) = setup();
+    let learner = Address::generate(&env);
+    let course_id = sid(&env, "rust-101");
+    let evidence_1 = sid(&env, "ipfs://proof-1");
+    let evidence_2 = sid(&env, "ipfs://proof-2");
+
+    add_course(&env, &contract_id, &admin, &client, &course_id, 2);
+    enroll(&env, &contract_id, &learner, &client, &course_id);
+
+    submit_milestone(
+        &env,
+        &contract_id,
+        &learner,
+        &client,
+        &course_id,
+        1,
+        &evidence_1,
+    );
+    authorize(
+        &env,
+        &admin,
+        &contract_id,
+        "verify_milestone",
+        (
+            admin.clone(),
+            learner.clone(),
+            course_id.clone(),
+            1_u32,
+            10_i128,
+        ),
+    );
+    client.verify_milestone(&admin, &learner, &course_id, &1, &10);
+
+    submit_milestone(
+        &env,
+        &contract_id,
+        &learner,
+        &client,
+        &course_id,
+        2,
+        &evidence_2,
+    );
+    authorize(
+        &env,
+        &admin,
+        &contract_id,
+        "verify_milestone",
+        (
+            admin.clone(),
+            learner.clone(),
+            course_id.clone(),
+            2_u32,
+            20_i128,
+        ),
+    );
+    client.verify_milestone(&admin, &learner, &course_id, &2, &20);
+
+    let events = env.events().all();
+    let completion_events = events
+        .iter()
+        .filter(|(_, topics, data)| {
+            topics.contains(&symbol_short!("course_done").into_val(&env)) && {
+                let payload: CourseCompleted = data.clone().into_val(&env);
+                payload
+                    == CourseCompleted {
+                        learner: learner.clone(),
+                        course_id: course_id.clone(),
+                    }
+            }
+        })
+        .count();
+
+    assert_eq!(completion_events, 1);
 }
 
 #[test]

@@ -466,6 +466,8 @@ impl CourseMilestone {
                 lrn_reward,
             },
         );
+
+        Self::emit_course_completed_if_ready(&env, &learner, &course_id);
     }
 
     pub fn is_completed(env: Env, learner: Address, course_id: String, milestone_id: u32) -> bool {
@@ -542,6 +544,8 @@ impl CourseMilestone {
                 lrn_reward: tokens_amount,
             },
         );
+
+        Self::emit_course_completed_if_ready(&env, &learner, &course_id);
     }
 
     pub fn reject_milestone(
@@ -626,6 +630,42 @@ impl CourseMilestone {
             }
             None => false,
         }
+    }
+
+    fn emit_course_completed_if_ready(env: &Env, learner: &Address, course_id: &String) {
+        let course_key = DataKey::Course(course_id.clone());
+        let config: CourseConfig = match env.storage().persistent().get(&course_key) {
+            Some(cfg) => cfg,
+            None => return,
+        };
+        Self::extend_persistent(env, &course_key);
+
+        let mut milestone_id = 1_u32;
+        while milestone_id <= config.milestone_count {
+            let state_key = DataKey::MilestoneState(
+                learner.clone(),
+                course_id.clone(),
+                milestone_id,
+            );
+            let state = env
+                .storage()
+                .persistent()
+                .get::<_, MilestoneStatus>(&state_key)
+                .unwrap_or(MilestoneStatus::NotStarted);
+            if state != MilestoneStatus::Approved {
+                return;
+            }
+            Self::extend_persistent(env, &state_key);
+            milestone_id += 1;
+        }
+
+        env.events().publish(
+            (symbol_short!("course_done"),),
+            CourseCompleted {
+                learner: learner.clone(),
+                course_id: course_id.clone(),
+            },
+        );
     }
 
     fn extend_instance(env: &Env) {

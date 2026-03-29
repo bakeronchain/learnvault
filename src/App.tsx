@@ -64,15 +64,12 @@ function App() {
 					<Route path="/treasury" element={renderRoute(<Treasury />)} />
 					<Route path="/donor" element={renderRoute(<Donor />)} />
 					<Route
-						path="/credentials/:nftId"
+						path="/credentials/:id"
 						element={renderRoute(<Credential />)}
 					/>
 					<Route path="/dashboard" element={renderRoute(<Dashboard />)} />
 					<Route path="/debug" element={renderRoute(<Debug />)} />
-					<Route
-						path="/debug/:contractName"
-						element={renderRoute(<Debug />)}
-					/>
+					<Route path="/debug/:contractName" element={renderRoute(<Debug />)} />
 					<Route path="*" element={renderRoute(<NotFound />)} />
 				</Route>
 			</Routes>

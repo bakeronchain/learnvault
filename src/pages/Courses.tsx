@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import { CourseFilter } from "../components/CourseFilter"
 import Pagination from "../components/Pagination"
-import { courses } from "../data/courses"
 import { CourseCardSkeleton } from "../components/skeletons/CourseCardSkeleton"
+import { useCourses } from "../hooks/useCourses"
+import { type CourseSummary } from "../types/courses"
 
-const levelStyles: Record<(typeof courses)[number]["level"], string> = {
+const levelStyles: Record<CourseSummary["level"], string> = {
 	Beginner: "bg-brand-emerald/20 text-brand-emerald border-brand-emerald/20",
 	Intermediate: "bg-brand-purple/20 text-brand-purple border-brand-purple/20",
 	Advanced: "bg-red-500/20 text-red-400 border-red-500/20",
@@ -20,7 +21,7 @@ function trackSlug(track: string): string {
 
 const Courses: React.FC = () => {
 	const [searchParams, setSearchParams] = useSearchParams()
-	const [isLoading, setIsLoading] = useState(true)
+	const { courses, isLoading, error } = useCourses()
 
 	// Local state for the search input so filtering is instant; URL is synced after debounce
 	const [searchInput, setSearchInput] = useState(
@@ -30,14 +31,7 @@ const Courses: React.FC = () => {
 	const difficulty = searchParams.get("difficulty") ?? ""
 	const track = searchParams.get("track") ?? ""
 	const parsedPage = parseInt(searchParams.get("page") || "1", 10)
-	const currentPage =
-		isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
-
-	// Simulate loading state
-	useEffect(() => {
-		const timer = setTimeout(() => setIsLoading(false), 1200)
-		return () => clearTimeout(timer)
-	}, [])
+	const currentPage = isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
 
 	// Debounce search input → URL param (300 ms)
 	useEffect(() => {
@@ -114,17 +108,35 @@ const Courses: React.FC = () => {
 				!q ||
 				course.title.toLowerCase().includes(q) ||
 				course.description.toLowerCase().includes(q)
-			const matchesDifficulty =
-				!difficulty || course.level.toLowerCase() === difficulty
+			const matchesDifficulty = !difficulty || course.difficulty === difficulty
 			const matchesTrack = !track || trackSlug(course.track) === track
 			return matchesSearch && matchesDifficulty && matchesTrack
 		})
-	}, [searchInput, difficulty, track])
+	}, [courses, searchInput, difficulty, track])
+
+	const trackOptions = useMemo(() => {
+		const seen = new Set<string>()
+		const dynamicOptions = courses
+			.filter((course) => {
+				if (seen.has(course.trackKey)) return false
+				seen.add(course.trackKey)
+				return Boolean(course.trackKey)
+			})
+			.map((course) => ({
+				label: course.track,
+				value: trackSlug(course.track),
+			}))
+
+		return [{ label: "All Tracks", value: "" }, ...dynamicOptions]
+	}, [courses])
 
 	const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE))
 	const safePage = Math.min(currentPage, totalPages)
 	const startIndex = (safePage - 1) * ITEMS_PER_PAGE
-	const paginatedCourses = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+	const paginatedCourses = filtered.slice(
+		startIndex,
+		startIndex + ITEMS_PER_PAGE,
+	)
 
 	return (
 		<div className="container mx-auto px-4 py-12">
@@ -147,6 +159,7 @@ const Courses: React.FC = () => {
 				difficulty={difficulty}
 				onDifficultyChange={handleDifficultyChange}
 				track={track}
+				trackOptions={trackOptions}
 				onTrackChange={handleTrackChange}
 				onClear={handleClear}
 				hasActiveFilters={hasActiveFilters}
@@ -157,6 +170,13 @@ const Courses: React.FC = () => {
 					{[1, 2, 3, 4].map((i) => (
 						<CourseCardSkeleton key={i} />
 					))}
+				</div>
+			) : error ? (
+				<div className="glass-card rounded-[2.5rem] border border-red-500/20 bg-red-500/10 p-12 text-center">
+					<h2 className="text-2xl font-black tracking-tight mb-3">
+						Couldn&apos;t load courses
+					</h2>
+					<p className="text-red-100/80 max-w-xl mx-auto">{error}</p>
 				</div>
 			) : filtered.length === 0 ? (
 				<div className="glass-card rounded-[2.5rem] border border-white/5 p-16 text-center">
@@ -206,33 +226,13 @@ const Courses: React.FC = () => {
 										{course.description}
 									</p>
 
-									<div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4 mb-5">
-										<p className="text-xs uppercase tracking-[0.25em] text-white/40">
-											First lesson
-										</p>
-										<p className="mt-2 text-sm font-medium text-white/75">
-											{course.firstLesson}
-										</p>
-									</div>
-
-									<ul className="space-y-2 text-sm text-white/60 mb-6">
-										{course.outcomes.map((outcome) => (
-											<li
-												key={outcome}
-												className="rounded-xl bg-white/[0.03] px-3 py-2"
-											>
-												{outcome}
-											</li>
-										))}
-									</ul>
-
 									<div className="mt-auto flex items-center justify-between gap-4 text-sm text-gray-400">
-										<span>{course.duration}</span>
+										<span>{course.track}</span>
 										<Link
-											to={`/learn?course=${course.id}`}
+											to={`/courses/${course.slug}/lessons/1`}
 											className="iridescent-border px-4 py-2 rounded-xl font-semibold text-white hover:scale-105 transition-transform"
 										>
-											Preview track
+											Open course
 										</Link>
 									</div>
 								</div>

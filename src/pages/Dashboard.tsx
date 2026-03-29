@@ -4,8 +4,8 @@ import ActivityFeed from "../components/ActivityFeed"
 import CourseCard from "../components/CourseCard"
 import LRNBalanceWidget from "../components/LRNBalanceWidget"
 import { useCourse } from "../hooks/useCourse"
-import { useLearnToken } from "../hooks/useLearnToken"
 import { useLearnerProfile } from "../hooks/useLearnerProfile"
+import { useLearnToken } from "../hooks/useLearnToken"
 import { WalletContext } from "../providers/WalletProvider"
 
 const shortenAddress = (addr: string) => {
@@ -22,12 +22,12 @@ const Dashboard: React.FC = () => {
 	const { profile, isLoading: isLoadingProfile } = useLearnerProfile()
 
 	// Fetch LRN balance from contract
-	const { balance: lrnBalance, isLoading: isLoadingBalance } = useLearnToken(
-		address,
-	)
+	const { balance: lrnBalance, isLoading: isLoadingBalance } =
+		useLearnToken(address)
 
 	// Fetch enrolled courses and milestone progress from contract
-	const { enrolledCourses, progressMap, isCompletingMilestone } = useCourse()
+	const { enrolledCourses, getCourseProgress, isCompletingMilestone } =
+		useCourse()
 
 	useEffect(() => {
 		if (address) {
@@ -47,12 +47,12 @@ const Dashboard: React.FC = () => {
 		}
 	}, [address, navigate])
 
-	// Calculate milestone count from progress map
+	// Calculate milestone count from enrolled courses' progress
 	const milestonesCompleted = useMemo(() => {
-		return Object.values(progressMap).reduce((total, progress) => {
-			return total + progress.completedMilestoneIds.length
+		return enrolledCourses.reduce((total, course) => {
+			return total + getCourseProgress(course.id).completedMilestoneIds.length
 		}, 0)
-	}, [progressMap])
+	}, [enrolledCourses, getCourseProgress])
 
 	// Check if data is still loading
 	const isLoading =
@@ -83,9 +83,7 @@ const Dashboard: React.FC = () => {
 						to="/"
 						className="inline-block iridescent-border px-8 py-3 rounded-xl font-bold transition-all hover:scale-105 active:scale-95"
 					>
-						<span className="relative z-10">
-							Connect Wallet &rarr;
-						</span>
+						<span className="relative z-10">Connect Wallet &rarr;</span>
 					</Link>
 				</div>
 			</div>
@@ -103,7 +101,10 @@ const Dashboard: React.FC = () => {
 						})
 					: "0",
 		},
-		{ label: "Courses Enrolled", value: isLoading ? "—" : enrolledCourses.length },
+		{
+			label: "Courses Enrolled",
+			value: isLoading ? "—" : enrolledCourses.length,
+		},
 		{ label: "Milestones", value: isLoading ? "—" : milestonesCompleted },
 		{ label: "Gov Tokens", value: "0" },
 	]

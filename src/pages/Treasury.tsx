@@ -1,19 +1,16 @@
-import React, { Suspense, useEffect, useState } from "react"
+import React, { useMemo } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { Helmet } from "react-helmet"
-import {
-	Area,
-	AreaChart,
-	CartesianGrid,
-	ResponsiveContainer,
-	Tooltip,
-	XAxis,
-	YAxis,
-} from "recharts"
 import TxHashLink from "../components/TxHashLink"
+import TreasuryHealthChart, {
+	type TreasuryPoint,
+} from "../components/treasury/TreasuryHealthChart"
 import { useContractIds } from "../hooks/useContractIds"
 import { useUSDC } from "../hooks/useUSDC"
 
 const API_BASE = import.meta.env.VITE_SERVER_URL || "http://localhost:4000"
+const CHART_WINDOW_DAYS = 7
+const STROOPS_PER_USDC = 10000000
 
 interface TreasuryStats {
 	total_deposited_usdc: string
@@ -32,54 +29,115 @@ interface TreasuryEvent {
 	created_at: string
 }
 
+interface TreasuryActivityResponse {
+	events?: TreasuryEvent[]
+	error?: string
+}
+
+const fetchJson = async <T,>(url: string): Promise<T> => {
+	const response = await fetch(url)
+	const data = (await response.json().catch(() => ({}))) as T & {
+		error?: string
+	}
+
+	if (!response.ok) {
+		throw new Error(data.error || `Request failed for ${url}`)
+	}
+
+	return data as T
+}
+
+const startOfDay = (value: Date) =>
+	new Date(value.getFullYear(), value.getMonth(), value.getDate())
+
+const formatDayLabel = (value: Date) =>
+	value.toLocaleDateString("en-US", { weekday: "short" })
+
+const parseAmount = (amount?: string) => {
+	const parsed = Number(amount ?? "0")
+	if (!Number.isFinite(parsed)) return 0
+	return parsed / STROOPS_PER_USDC
+}
+
+const buildTreasuryChartData = (events: TreasuryEvent[]): TreasuryPoint[] => {
+	const today = startOfDay(new Date())
+	const buckets = new Map<
+		string,
+		{ name: string; inflows: number; outflows: number }
+	>()
+
+	for (let offset = CHART_WINDOW_DAYS - 1; offset >= 0; offset -= 1) {
+		const day = new Date(today)
+		day.setDate(today.getDate() - offset)
+		const key = day.toISOString().slice(0, 10)
+		buckets.set(key, {
+			name: formatDayLabel(day),
+			inflows: 0,
+			outflows: 0,
+		})
+	}
+
+	for (const event of events) {
+		const timestamp = new Date(event.created_at)
+		if (Number.isNaN(timestamp.getTime())) continue
+
+		const day = startOfDay(timestamp).toISOString().slice(0, 10)
+		const bucket = buckets.get(day)
+		if (!bucket) continue
+
+		const amount = parseAmount(event.amount)
+		if (event.type === "deposit") {
+			bucket.inflows += amount
+		} else if (event.type === "disburse") {
+			bucket.outflows += amount
+		}
+	}
+
+	return Array.from(buckets.values())
+}
+
 const Treasury: React.FC = () => {
 	const { scholarshipTreasury } = useContractIds()
 	const { balance: treasuryUSDC, isLoading: treasuryLoading } =
 		useUSDC(scholarshipTreasury)
 
-	const [stats, setStats] = useState<TreasuryStats | null>(null)
-	const [activity, setActivity] = useState<TreasuryEvent[]>([])
-	const [loading, setLoading] = useState(true)
+	const {
+		data: stats,
+		isLoading: statsLoading,
+		error: statsError,
+	} = useQuery<TreasuryStats>({
+		queryKey: ["treasury", "stats"],
+		queryFn: () => fetchJson<TreasuryStats>(`${API_BASE}/api/treasury/stats`),
+		staleTime: 60 * 1000,
+	})
 
-	useEffect(() => {
-		const fetchTreasuryData = async () => {
-			try {
-				const [statsRes, activityRes] = await Promise.all([
-					fetch(`${API_BASE}/api/treasury/stats`),
-					fetch(`${API_BASE}/api/treasury/activity?limit=20`),
-				])
+	const {
+		data: activityResponse,
+		isLoading: activityLoading,
+		error: activityError,
+		refetch: refetchActivity,
+	} = useQuery<TreasuryActivityResponse>({
+		queryKey: ["treasury", "activity", 200],
+		queryFn: () =>
+			fetchJson<TreasuryActivityResponse>(
+				`${API_BASE}/api/treasury/activity?limit=200`,
+			),
+		staleTime: 60 * 1000,
+	})
 
-				if (statsRes.ok) {
-					const statsData = await statsRes.json()
-					setStats(statsData)
-				}
+	const activity = activityResponse?.events ?? []
 
-				if (activityRes.ok) {
-					const activityData = await activityRes.json()
-					setActivity(activityData.events || [])
-				}
-			} catch (err) {
-				console.error("Failed to fetch treasury data:", err)
-			} finally {
-				setLoading(false)
-			}
-		}
+	const chartData = useMemo(
+		() => buildTreasuryChartData(activity),
+		[activity],
+	)
 
-		void fetchTreasuryData()
-	}, [])
-
-	const data = [
-		{ name: "Mon", inflows: 4000, outflows: 2400 },
-		{ name: "Tue", inflows: 3000, outflows: 1398 },
-		{ name: "Wed", inflows: 2000, outflows: 9800 },
-		{ name: "Thu", inflows: 2780, outflows: 3908 },
-		{ name: "Fri", inflows: 1890, outflows: 4800 },
-		{ name: "Sat", inflows: 2390, outflows: 3800 },
-		{ name: "Sun", inflows: 3490, outflows: 4300 },
-	]
+	const hasChartData = chartData.some(
+		(point) => point.inflows > 0 || point.outflows > 0,
+	)
 
 	const formatUSDC = (stroops: string) => {
-		const usdc = Number(stroops) / 10000000
+		const usdc = Number(stroops) / STROOPS_PER_USDC
 		return usdc.toLocaleString("en-US", {
 			minimumFractionDigits: 0,
 			maximumFractionDigits: 2,
@@ -87,8 +145,7 @@ const Treasury: React.FC = () => {
 	}
 
 	const formatAmount = (stroops: string) => {
-		const usdc = Number(stroops) / 10000000
-		return usdc.toLocaleString("en-US", {
+		return parseAmount(stroops).toLocaleString("en-US", {
 			minimumFractionDigits: 0,
 			maximumFractionDigits: 2,
 		})
@@ -101,22 +158,23 @@ const Treasury: React.FC = () => {
 
 	const formatTime = (timestamp: string) => {
 		const date = new Date(timestamp)
+		if (Number.isNaN(date.getTime())) return "Unknown time"
+
 		const now = new Date()
 		const diffMs = now.getTime() - date.getTime()
 		const diffMins = Math.floor(diffMs / 60000)
 		const diffHours = Math.floor(diffMins / 60)
 		const diffDays = Math.floor(diffHours / 24)
 
-		if (diffMins < 60) return `${diffMins}m ago`
+		if (diffMins < 60) return `${Math.max(diffMins, 0)}m ago`
 		if (diffHours < 24) return `${diffHours}h ago`
 		return `${diffDays}d ago`
 	}
 
 	const displayStats = stats
 		? {
-				// Use contract balance if available, otherwise use API data
 				totalTreasury: treasuryLoading
-					? "Loading…"
+					? "Loading..."
 					: treasuryUSDC !== undefined
 						? `${treasuryUSDC.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC`
 						: `${formatUSDC(stats.total_deposited_usdc)} USDC`,
@@ -126,19 +184,21 @@ const Treasury: React.FC = () => {
 			}
 		: {
 				totalTreasury: treasuryLoading
-					? "Loading…"
+					? "Loading..."
 					: treasuryUSDC !== undefined
 						? `${treasuryUSDC.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC`
-						: "Loading...",
-				totalDisbursed: "Loading...",
-				scholarsFunded: "...",
-				donorsCount: "...",
+						: statsError
+							? "Unavailable"
+							: "Loading...",
+				totalDisbursed: statsLoading ? "Loading..." : "Unavailable",
+				scholarsFunded: statsLoading ? "..." : "—",
+				donorsCount: statsLoading ? "..." : "—",
 			}
 
-	const deposits = activity.filter((e) => e.type === "deposit").slice(0, 2)
+	const deposits = activity.filter((event) => event.type === "deposit").slice(0, 5)
 	const disbursements = activity
-		.filter((e) => e.type === "disburse")
-		.slice(0, 2)
+		.filter((event) => event.type === "disburse")
+		.slice(0, 5)
 
 	const siteUrl = "https://learnvault.app"
 	const title = `Treasury - ${displayStats.totalTreasury} - ${displayStats.scholarsFunded} Scholars Funded - LearnVault`
@@ -199,7 +259,8 @@ const Treasury: React.FC = () => {
 						<div>
 							<h3 className="text-3xl font-black mb-2">Treasury Health</h3>
 							<p className="text-white/40 text-sm">
-								Comparison of community inflows vs scholarship outflows.
+								Actual treasury inflows and outflows from recent on-chain
+								activity.
 							</p>
 						</div>
 						<div className="flex gap-6">
@@ -208,13 +269,27 @@ const Treasury: React.FC = () => {
 						</div>
 					</div>
 					<div className="w-full h-[400px]">
-						<Suspense
-							fallback={
-								<div className="h-full animate-pulse rounded-[2rem] border border-white/5 bg-white/5" />
-							}
-						>
-							<TreasuryHealthChart data={data} />
-						</Suspense>
+						{activityLoading ? (
+							<ChartSkeleton />
+						) : activityError ? (
+							<ChartState
+								title="Unable to load treasury history"
+								description={
+									activityError instanceof Error
+										? activityError.message
+										: "Please try again in a moment."
+								}
+								actionLabel="Retry"
+								onAction={() => void refetchActivity()}
+							/>
+						) : !hasChartData ? (
+							<ChartState
+								title="No treasury history yet"
+								description="Deposits and disbursements will appear here once on-chain treasury activity is available."
+							/>
+						) : (
+							<TreasuryHealthChart data={chartData} />
+						)}
 					</div>
 				</div>
 			</div>
@@ -229,7 +304,11 @@ const Treasury: React.FC = () => {
 						type: "deposit" as const,
 						txHash: event.tx_hash,
 					}))}
-					loading={loading}
+					loading={activityLoading}
+					error={
+						activityError instanceof Error ? activityError.message : undefined
+					}
+					emptyMessage="No deposit activity is available yet"
 				/>
 				<ActivityFeed
 					title="Latest Disbursements"
@@ -240,7 +319,11 @@ const Treasury: React.FC = () => {
 						type: "disburse" as const,
 						txHash: event.tx_hash,
 					}))}
-					loading={loading}
+					loading={activityLoading}
+					error={
+						activityError instanceof Error ? activityError.message : undefined
+					}
+					emptyMessage="No disbursements have been recorded yet"
 				/>
 			</div>
 
@@ -283,39 +366,38 @@ const LegendItem: React.FC<{ color: string; label: string }> = ({
 	</div>
 )
 
-const TreasuryHealthChart: React.FC<{
-	data: { name: string; inflows: number; outflows: number }[]
-}> = ({ data }) => (
-	<ResponsiveContainer width="100%" height="100%">
-		<AreaChart data={data}>
-			<defs>
-				<linearGradient id="inflowGradient" x1="0" y1="0" x2="0" y2="1">
-					<stop offset="5%" stopColor="#00d2ff" stopOpacity={0.4} />
-					<stop offset="95%" stopColor="#00d2ff" stopOpacity={0} />
-				</linearGradient>
-				<linearGradient id="outflowGradient" x1="0" y1="0" x2="0" y2="1">
-					<stop offset="5%" stopColor="#8e2de2" stopOpacity={0.4} />
-					<stop offset="95%" stopColor="#8e2de2" stopOpacity={0} />
-				</linearGradient>
-			</defs>
-			<CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-			<XAxis dataKey="name" stroke="rgba(255,255,255,0.5)" />
-			<YAxis stroke="rgba(255,255,255,0.5)" />
-			<Tooltip />
-			<Area
-				type="monotone"
-				dataKey="inflows"
-				stroke="#00d2ff"
-				fill="url(#inflowGradient)"
-			/>
-			<Area
-				type="monotone"
-				dataKey="outflows"
-				stroke="#8e2de2"
-				fill="url(#outflowGradient)"
-			/>
-		</AreaChart>
-	</ResponsiveContainer>
+const ChartSkeleton = () => (
+	<div className="h-full rounded-[2rem] border border-white/5 bg-white/5 p-8 animate-pulse">
+		<div className="flex h-full items-end gap-4">
+			<div className="h-24 w-full rounded-full bg-white/5" />
+			<div className="h-36 w-full rounded-full bg-white/5" />
+			<div className="h-20 w-full rounded-full bg-white/5" />
+			<div className="h-48 w-full rounded-full bg-white/5" />
+			<div className="h-28 w-full rounded-full bg-white/5" />
+			<div className="h-40 w-full rounded-full bg-white/5" />
+			<div className="h-32 w-full rounded-full bg-white/5" />
+		</div>
+	</div>
+)
+
+const ChartState: React.FC<{
+	title: string
+	description: string
+	actionLabel?: string
+	onAction?: () => void
+}> = ({ title, description, actionLabel, onAction }) => (
+	<div className="flex h-full flex-col items-center justify-center rounded-[2rem] border border-dashed border-white/10 bg-white/[0.03] px-8 text-center">
+		<h4 className="text-xl font-black text-white">{title}</h4>
+		<p className="mt-3 max-w-xl text-sm text-white/50">{description}</p>
+		{actionLabel && onAction ? (
+			<button
+				onClick={onAction}
+				className="mt-6 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-brand-cyan transition-colors hover:bg-white/10"
+			>
+				{actionLabel}
+			</button>
+		) : null}
+	</div>
 )
 
 const ActivityFeed: React.FC<{
@@ -328,20 +410,41 @@ const ActivityFeed: React.FC<{
 		txHash: string
 	}[]
 	loading?: boolean
-}> = ({ title, items, loading = false }) => (
+	error?: string
+	emptyMessage?: string
+}> = ({
+	title,
+	items,
+	loading = false,
+	error,
+	emptyMessage = "No activity yet",
+}) => (
 	<div className="glass p-8 rounded-[2.5rem] border border-white/5">
 		<h3 className="text-xl font-black mb-8 border-l-4 border-brand-cyan pl-4">
 			{title}
 		</h3>
 		<div className="flex flex-col gap-4">
 			{loading ? (
-				<div className="text-center text-white/40 py-8">Loading...</div>
+				<div className="space-y-4 py-2">
+					{Array.from({ length: 3 }).map((_, index) => (
+						<div
+							key={index}
+							className="rounded-2xl border border-white/5 bg-white/5 p-5 animate-pulse"
+						>
+							<div className="h-4 w-24 rounded-full bg-white/10" />
+							<div className="mt-3 h-3 w-16 rounded-full bg-white/5" />
+							<div className="mt-4 h-4 w-28 rounded-full bg-white/10" />
+						</div>
+					))}
+				</div>
+			) : error ? (
+				<div className="text-center text-white/40 py-8">{error}</div>
 			) : items.length === 0 ? (
-				<div className="text-center text-white/40 py-8">No activity yet</div>
+				<div className="text-center text-white/40 py-8">{emptyMessage}</div>
 			) : (
 				items.map((item, i) => (
 					<div
-						key={i}
+						key={`${item.txHash}-${i}`}
 						className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-colors group"
 					>
 						<div className="flex items-center gap-4">

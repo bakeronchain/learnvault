@@ -45,12 +45,8 @@ jobs:
         run: npm ci
 
       - name: Run migrations
-        run: |
-          psql $DATABASE_URL \
-            -f server/src/db/migrations/001_milestone_reports.sql \
-            -f server/src/db/migrations/002_ipfs_cids.sql \
-            -f server/src/db/migrations/003_course_content_schema.sql \
-            -f server/src/db/migrations/004_events.sql
+        working-directory: server
+        run: npm run migrate
 
       - name: Run tests
         working-directory: server

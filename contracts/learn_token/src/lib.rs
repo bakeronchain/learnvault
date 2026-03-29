@@ -20,6 +20,16 @@ use soroban_sdk::{
 };
 
 // ---------------------------------------------------------------------------
+// Storage Constants (assuming ~6s ledger time)
+// ---------------------------------------------------------------------------
+
+const DAY_IN_LEDGERS: u32 = 17_280;
+const INSTANCE_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
+const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30; // 30 days
+const PERSISTENT_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
+const PERSISTENT_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365; // 1 year
+
+// ---------------------------------------------------------------------------
 // Errors
 // ---------------------------------------------------------------------------
 
@@ -76,6 +86,8 @@ impl LearnToken {
             .instance()
             .set(&SYMBOL_KEY, &String::from_str(&env, "LRN"));
         env.storage().instance().set(&DECIMALS_KEY, &7_u32);
+
+        Self::extend_instance(&env);
     }
 
     // -----------------------------------------------------------------------
@@ -84,6 +96,7 @@ impl LearnToken {
 
     /// Mint `amount` LRN to `to`. Admin only.
     pub fn mint(env: Env, to: Address, amount: i128) {
+        Self::extend_instance(&env);
         // 1. Load admin from storage, call admin.require_auth()
         let admin: Address = env
             .storage()
@@ -112,6 +125,18 @@ impl LearnToken {
             .persistent()
             .set(&DataKey::TotalSupply, &(supply + amount));
 
+        // Extend persistent storage for balance entries
+        env.storage().persistent().extend_ttl(
+            &bal_key,
+            PERSISTENT_BUMP_THRESHOLD,
+            PERSISTENT_EXTEND_TO,
+        );
+        env.storage().persistent().extend_ttl(
+            &DataKey::TotalSupply,
+            PERSISTENT_BUMP_THRESHOLD,
+            PERSISTENT_EXTEND_TO,
+        );
+
         // 5. Emit event
         env.events()
             .publish((symbol_short!("lrn_mint"), to.clone()), amount);
@@ -119,6 +144,7 @@ impl LearnToken {
 
     /// Transfer the admin role to a new address. Admin only.
     pub fn set_admin(env: Env, new_admin: Address) {
+        Self::extend_instance(&env);
         let admin: Address = env
             .storage()
             .instance()
@@ -136,7 +162,13 @@ impl LearnToken {
     }
 
     /// Transfer from is not allowed — LRN is soulbound.
-    pub fn transfer_from(_env: Env, _spender: Address, _from: Address, _to: Address, _amount: i128) {
+    pub fn transfer_from(
+        _env: Env,
+        _spender: Address,
+        _from: Address,
+        _to: Address,
+        _amount: i128,
+    ) {
         panic_with_error!(&_env, LRNError::Soulbound);
     }
 
@@ -155,17 +187,33 @@ impl LearnToken {
     // -----------------------------------------------------------------------
 
     pub fn balance(env: Env, account: Address) -> i128 {
-        env.storage()
-            .persistent()
-            .get(&DataKey::Balance(account))
-            .unwrap_or(0)
+        Self::extend_instance(&env);
+        let key = DataKey::Balance(account);
+        if let Some(bal) = env.storage().persistent().get::<_, i128>(&key) {
+            env.storage().persistent().extend_ttl(
+                &key,
+                PERSISTENT_BUMP_THRESHOLD,
+                PERSISTENT_EXTEND_TO,
+            );
+            bal
+        } else {
+            0
+        }
     }
 
     pub fn total_supply(env: Env) -> i128 {
-        env.storage()
-            .persistent()
-            .get(&DataKey::TotalSupply)
-            .unwrap_or(0)
+        Self::extend_instance(&env);
+        let key = DataKey::TotalSupply;
+        if let Some(supply) = env.storage().persistent().get::<_, i128>(&key) {
+            env.storage().persistent().extend_ttl(
+                &key,
+                PERSISTENT_BUMP_THRESHOLD,
+                PERSISTENT_EXTEND_TO,
+            );
+            supply
+        } else {
+            0
+        }
     }
 
     pub fn decimals(env: Env) -> u32 {
@@ -195,6 +243,16 @@ impl LearnToken {
     pub fn reputation_score(env: Env, account: Address) -> i128 {
         let balance = Self::balance(env, account);
         balance / 100
+    }
+
+    // -----------------------------------------------------------------------
+    // Internal helpers
+    // -----------------------------------------------------------------------
+
+    fn extend_instance(env: &Env) {
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_EXTEND_TO);
     }
 }
 

@@ -14,6 +14,10 @@ export type { Proposal, RawContractProposal } from "./governance"
 // Milestone types (on-chain CourseMilestone)
 // ---------------------------------------------------------------------------
 export type { MilestoneReportFormValues, SubmittedMilestoneReport } from "./milestone"
+export type {
+	MilestoneReportFormValues,
+	SubmittedMilestoneReport,
+} from "./milestone"
 
 // ---------------------------------------------------------------------------
 // Donor & contribution types (derived from contract events)

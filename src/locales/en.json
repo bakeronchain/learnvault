@@ -105,7 +105,8 @@
 		},
 		"dao": {
 			"title": "DAO",
-			"desc": "This is the DAO page."
+			"desc": "This is the DAO page.",
+			"lastUpdated": "Last updated: {{time}}"
 		},
 		"leaderboard": {
 			"title": "Leaderboard",

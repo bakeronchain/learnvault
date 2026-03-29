@@ -44,9 +44,14 @@ export async function getScholarMilestones(
 	const address = req.params.address
 	const courseId =
 		typeof req.query.course_id === "string" ? req.query.course_id : undefined
-	const internalStatus = mapQueryStatus(
-		typeof req.query.status === "string" ? req.query.status : undefined,
-	)
+	const rawStatus =
+		typeof req.query.status === "string" ? req.query.status : undefined
+	const internalStatus = mapQueryStatus(rawStatus)
+
+	if (rawStatus && !internalStatus) {
+		res.status(400).json({ error: "Validation failed" })
+		return
+	}
 
 	try {
 		const reports = await milestoneStore.getReportsForScholar(address, {
@@ -222,7 +227,8 @@ export async function getScholarCredentials(
 	}
 
 	try {
-		const credentials = await stellarContractService.getScholarCredentials(address)
+		const credentials =
+			await stellarContractService.getScholarCredentials(address)
 		res.status(200).json({ credentials })
 	} catch (error) {
 		console.error("[scholars] Error fetching scholar credentials:", error)

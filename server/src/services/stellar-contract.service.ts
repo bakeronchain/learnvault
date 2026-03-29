@@ -34,6 +34,16 @@ export interface ScholarshipProposalParams {
 	milestoneDates: string[]
 }
 
+export interface CastVoteParams {
+	voter: string
+	proposalId: number
+	support: boolean
+}
+
+export interface CancelProposalParams {
+	proposalId: number
+}
+
 // --- Admin Validation Cache ---
 let cachedAdminAddress: string | null = null
 let lastAdminCheckTime: number = 0
@@ -311,7 +321,7 @@ async function callMintScholarNFT(
 				contract.call(
 					"mint",
 					new Address(scholarAddress).toScVal(),
-					xdr.ScVal.scvU64(tokenId),
+					xdr.ScVal.scvU64(new xdr.Uint64(tokenId)),
 				),
 			)
 			.setTimeout(30)
@@ -378,11 +388,7 @@ async function isEnrolled(
 				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
 		})
 			.addOperation(
-				contract.call(
-					"is_enrolled",
-					learnerScVal,
-					xdr.ScVal.scvU32(courseId),
-				),
+				contract.call("is_enrolled", learnerScVal, xdr.ScVal.scvU32(courseId)),
 			)
 			.setTimeout(30)
 			.build()
@@ -472,6 +478,134 @@ async function submitScholarshipProposal(
 		console.error("[stellar] Scholarship proposal submission failed:", err)
 		throw new Error(
 			"Scholarship proposal submission failed: " +
+				(err instanceof Error ? err.message : String(err)),
+		)
+	}
+}
+
+async function castVote(params: CastVoteParams): Promise<ContractCallResult> {
+	if (!STELLAR_SECRET_KEY) {
+		throw new Error(
+			"STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction",
+		)
+	}
+	if (!SCHOLARSHIP_TREASURY_CONTRACT_ID) {
+		throw new Error(
+			"SCHOLARSHIP_TREASURY_CONTRACT_ID not configured — cannot submit on-chain transaction",
+		)
+	}
+
+	try {
+		const {
+			Keypair,
+			Contract,
+			TransactionBuilder,
+			Networks,
+			BASE_FEE,
+			rpc,
+			nativeToScVal,
+			Address,
+		} = await import("@stellar/stellar-sdk")
+
+		const server = new rpc.Server(
+			STELLAR_NETWORK === "mainnet"
+				? "https://soroban-rpc.stellar.org"
+				: "https://soroban-testnet.stellar.org",
+		)
+
+		const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
+		const account = await server.getAccount(keypair.publicKey())
+		const contract = new Contract(SCHOLARSHIP_TREASURY_CONTRACT_ID)
+
+		const tx = new TransactionBuilder(account, {
+			fee: BASE_FEE,
+			networkPassphrase:
+				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+		})
+			.addOperation(
+				contract.call(
+					"vote",
+					nativeToScVal(params.voter, { type: "address" }),
+					nativeToScVal(params.proposalId, { type: "u32" }),
+					nativeToScVal(params.support, { type: "bool" }),
+				),
+			)
+			.setTimeout(30)
+			.build()
+
+		const prepared = await server.prepareTransaction(tx)
+		prepared.sign(keypair)
+
+		const result = await server.sendTransaction(prepared)
+
+		return { txHash: result.hash, simulated: false }
+	} catch (err) {
+		console.error("[stellar] Cast vote failed:", err)
+		throw new Error(
+			"Cast vote failed: " + (err instanceof Error ? err.message : String(err)),
+		)
+	}
+}
+
+async function cancelProposal(
+	params: CancelProposalParams,
+): Promise<ContractCallResult> {
+	if (!STELLAR_SECRET_KEY) {
+		throw new Error(
+			"STELLAR_SECRET_KEY not configured â€” cannot submit on-chain transaction",
+		)
+	}
+	if (!SCHOLARSHIP_TREASURY_CONTRACT_ID) {
+		throw new Error(
+			"SCHOLARSHIP_TREASURY_CONTRACT_ID not configured â€” cannot submit on-chain transaction",
+		)
+	}
+
+	try {
+		const {
+			Keypair,
+			Contract,
+			TransactionBuilder,
+			Networks,
+			BASE_FEE,
+			rpc,
+			nativeToScVal,
+		} = await import("@stellar/stellar-sdk")
+
+		const server = new rpc.Server(
+			STELLAR_NETWORK === "mainnet"
+				? "https://soroban-rpc.stellar.org"
+				: "https://soroban-testnet.stellar.org",
+		)
+
+		const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
+		const account = await server.getAccount(keypair.publicKey())
+		const contract = new Contract(SCHOLARSHIP_TREASURY_CONTRACT_ID)
+
+		const tx = new TransactionBuilder(account, {
+			fee: BASE_FEE,
+			networkPassphrase:
+				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+		})
+			.addOperation(
+				contract.call(
+					"cancel_proposal",
+					nativeToScVal(params.proposalId, { type: "u32" }),
+				),
+			)
+			.setTimeout(30)
+			.build()
+
+		const prepared = await server.prepareTransaction(tx)
+		prepared.sign(keypair)
+
+		const result = await server.sendTransaction(prepared)
+
+		return { txHash: result.hash, simulated: false }
+	} catch (err) {
+		console.error("[stellar] Cancel proposal failed:", err)
+		throw new Error(
+			"Cancel proposal failed: " +
 				(err instanceof Error ? err.message : String(err)),
 		)
 	}
@@ -598,7 +732,15 @@ async function getScholarCredentials(address: string): Promise<any[]> {
 			[address],
 		)
 
-		return result.rows.map(row => ({
+		type NftRow = {
+			token_id: string | number
+			course_id: string
+			course_title: string | null
+			metadata_uri: string | null
+			issued_at: Date
+			revoked: boolean
+		}
+		return result.rows.map((row: NftRow) => ({
 			token_id: Number(row.token_id),
 			course_id: row.course_id,
 			course_title: row.course_title || "Unknown Course",
@@ -618,6 +760,8 @@ export const stellarContractService = {
 	callMintScholarNFT,
 	isEnrolled,
 	submitScholarshipProposal,
+	castVote,
+	cancelProposal,
 	getLearnTokenBalance,
 	getGovernanceTokenBalance,
 	getEnrolledCourses,

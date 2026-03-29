@@ -44,6 +44,10 @@ export function createUploadRouter(jwtService: JwtService): Router {
 	 *                   type: string
 	 *                 gatewayUrl:
 	 *                   type: string
+	 *                   example: bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+	 *                 gatewayUrl:
+	 *                   type: string
+	 *                   example: https://gateway.pinata.cloud/ipfs/bafybei...
 	 *       400:
 	 *         $ref: '#/components/responses/BadRequestError'
 	 *       401:
@@ -53,6 +57,20 @@ export function createUploadRouter(jwtService: JwtService): Router {
 
 	/**
 	 * Pin NFT metadata (JSON) to IPFS
+	 * @openapi
+	 * /api/upload/nft-metadata:
+	 *   post:
+	 *     tags: [Upload]
+	 *     summary: Pin NFT metadata to IPFS
+	 *     security:
+	 *       - bearerAuth: []
+	 *     responses:
+	 *       201:
+	 *         description: Metadata pinned successfully
+	 *       400:
+	 *         $ref: '#/components/responses/BadRequestError'
+	 *       401:
+	 *         $ref: '#/components/responses/UnauthorizedError'
 	 */
 	router.post("/upload/nft-metadata", requireAuth, pinNftMetadata)
 

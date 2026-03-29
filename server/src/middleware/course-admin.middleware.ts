@@ -2,6 +2,7 @@ import { type NextFunction, type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
 
 const JWT_PUBLIC_KEY = process.env.JWT_PUBLIC_KEY?.replace(/\\n/g, "\n").trim()
+const JWT_SECRET = process.env.JWT_SECRET
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY
 const ADMIN_ADDRESSES = (process.env.ADMIN_ADDRESSES ?? "")
 	.split(",")
@@ -38,16 +39,20 @@ export function requireCourseAdmin(
 		return
 	}
 
-	if (!JWT_PUBLIC_KEY) {
+	if (!JWT_PUBLIC_KEY && !JWT_SECRET) {
 		res.status(500).json({ error: "JWT verification not configured" })
 		return
 	}
 
 	let decoded: TokenPayload
 	try {
-		decoded = jwt.verify(token, JWT_PUBLIC_KEY, {
-			algorithms: ["RS256"],
-		}) as TokenPayload
+		if (JWT_PUBLIC_KEY) {
+			decoded = jwt.verify(token, JWT_PUBLIC_KEY, {
+				algorithms: ["RS256"],
+			}) as TokenPayload
+		} else {
+			decoded = jwt.verify(token, JWT_SECRET!) as TokenPayload
+		}
 	} catch {
 		res.status(401).json({ error: "Unauthorized" })
 		return

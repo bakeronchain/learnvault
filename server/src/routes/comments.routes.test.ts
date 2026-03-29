@@ -1,6 +1,6 @@
 import express, { type Express } from "express"
-import request from "supertest"
 import jwt from "jsonwebtoken"
+import request from "supertest"
 
 // ── Mocks must be declared before any imports that use these modules ─────────
 
@@ -17,7 +17,7 @@ jest.mock("../db/index", () => ({
 }))
 
 import { pool } from "../db/index"
-import { commentsRouter } from "./comments.routes"
+import { createCommentsRouter } from "./comments.routes"
 
 const mockedQuery = pool.query as jest.Mock
 const mockedConnect = pool.connect as jest.Mock
@@ -33,10 +33,23 @@ const PROPOSAL_AUTHOR = "GPROP_AUTHOR_ADDRESS0"
 const makeToken = (address: string) =>
 	`Bearer ${jwt.sign({ sub: address }, TEST_SECRET)}`
 
+const testJwtService = {
+	signWalletToken: (address: string) => jwt.sign({ sub: address }, TEST_SECRET),
+	verifyWalletToken: (token: string) => {
+		const decoded = jwt.verify(token, TEST_SECRET) as {
+			sub?: string
+			address?: string
+		}
+		const sub = decoded.sub ?? decoded.address ?? ""
+		if (!sub) throw new Error("Invalid token")
+		return { sub }
+	},
+}
+
 const buildApp = (): Express => {
 	const app = express()
 	app.use(express.json())
-	app.use("/api", commentsRouter)
+	app.use("/api", createCommentsRouter(testJwtService))
 	return app
 }
 
@@ -97,18 +110,17 @@ describe("GET /api/proposals/:proposalId/comments", () => {
 		)
 
 		expect(res.status).toBe(200)
-		expect(mockedQuery).toHaveBeenCalledWith(
-			expect.stringContaining("LIMIT"),
-			["1", 5, 10],
-		)
+		expect(mockedQuery).toHaveBeenCalledWith(expect.stringContaining("LIMIT"), [
+			"1",
+			5,
+			10,
+		])
 	})
 
 	it("caps limit at 100 even if a larger value is sent", async () => {
 		mockedQuery.mockResolvedValueOnce({ rows: [] })
 
-		await request(buildApp()).get(
-			"/api/proposals/1/comments?limit=500",
-		)
+		await request(buildApp()).get("/api/proposals/1/comments?limit=500")
 
 		const [, params] = mockedQuery.mock.calls[0]
 		expect(params[1]).toBe(100)
@@ -131,6 +143,7 @@ describe("POST /api/comments", () => {
 		// spam check returns count 0, then insert
 		mockedQuery
 			.mockResolvedValueOnce({ rows: [{ count: "0" }] })
+			.mockResolvedValueOnce({ rows: [{ count: "0" }] })
 			.mockResolvedValueOnce({ rows: [newComment] })
 
 		const res = await request(buildApp())
@@ -141,6 +154,51 @@ describe("POST /api/comments", () => {
 		expect(res.status).toBe(201)
 		expect(res.body.content).toBe("Nice idea")
 		expect(res.body.author_address).toBe(AUTHOR)
+	})
+
+	it("rejects comment content over 2,000 characters", async () => {
+		const tooLong = "a".repeat(2001)
+
+		const res = await request(buildApp())
+			.post("/api/comments")
+			.set("Authorization", makeToken(AUTHOR))
+			.send({ proposal_id: "5", content: tooLong })
+
+		expect(res.status).toBe(400)
+		expect(res.body.error).toBe("Comment must be 2,000 characters or fewer")
+		expect(mockedQuery).not.toHaveBeenCalled()
+	})
+
+	it("strips HTML tags from comment content before storage", async () => {
+		const insertedComment = {
+			id: 11,
+			proposal_id: "5",
+			author_address: AUTHOR,
+			content: "Hello alert(1) world",
+			parent_id: null,
+			is_pinned: false,
+			created_at: new Date().toISOString(),
+		}
+
+		mockedQuery
+			.mockResolvedValueOnce({ rows: [{ count: "0" }] })
+			.mockResolvedValueOnce({ rows: [{ count: "0" }] })
+			.mockResolvedValueOnce({ rows: [insertedComment] })
+
+		const res = await request(buildApp())
+			.post("/api/comments")
+			.set("Authorization", makeToken(AUTHOR))
+			.send({
+				proposal_id: "5",
+				content: "Hello <script>alert(1)</script> world",
+			})
+
+		expect(res.status).toBe(201)
+		expect(mockedQuery).toHaveBeenNthCalledWith(
+			3,
+			expect.stringContaining("INSERT INTO comments"),
+			expect.arrayContaining(["5", AUTHOR, "Hello  world", null]),
+		)
 	})
 
 	it("returns 400 when required fields are missing", async () => {
@@ -176,9 +234,23 @@ describe("POST /api/comments", () => {
 		const res = await request(buildApp())
 			.post("/api/comments")
 			.set("Authorization", makeToken(AUTHOR))
-			.send({ proposal_id: "5", content: "Impersonation", author_address: OTHER })
+			.send({
+				proposal_id: "5",
+				content: "Impersonation",
+				author_address: OTHER,
+			})
 
 		expect(res.status).toBe(400)
+	})
+
+	it("returns 400 when parentId is not a positive integer", async () => {
+		const res = await request(buildApp())
+			.post("/api/comments")
+			.set("Authorization", makeToken(AUTHOR))
+			.send({ proposal_id: "5", content: "Reply", parentId: "abc" })
+
+		expect(res.status).toBe(400)
+		expect(mockedQuery).not.toHaveBeenCalled()
 	})
 })
 

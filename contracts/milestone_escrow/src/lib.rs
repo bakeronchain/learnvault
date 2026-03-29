@@ -5,9 +5,9 @@ use soroban_sdk::{
     contracttype, panic_with_error, symbol_short,
 };
 
-const INACTIVITY_WINDOW_SECONDS: u64 = 30 * 24 * 60 * 60;
 const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
 const TREASURY_KEY: Symbol = symbol_short!("TREAS");
+const INACTIVITY_WINDOW_KEY: Symbol = symbol_short!("INACT_W");
 
 #[derive(Clone)]
 #[contracttype]
@@ -76,14 +76,18 @@ pub struct EscrowReclaimed {
 
 #[contractimpl]
 impl MilestoneEscrow {
-    pub fn initialize(env: Env, admin: Address, treasury: Address) {
+    pub fn initialize(env: Env, admin: Address, treasury: Address, inactivity_window_seconds: u64) {
         if env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(&env, Error::AlreadyInitialized);
         }
         admin.require_auth();
 
+        // Keep 30 days (30 * 24 * 60 * 60) as the recommended default at deployment.
         env.storage().instance().set(&ADMIN_KEY, &admin);
         env.storage().instance().set(&TREASURY_KEY, &treasury);
+        env.storage()
+            .instance()
+            .set(&INACTIVITY_WINDOW_KEY, &inactivity_window_seconds);
     }
 
     pub fn create_escrow(
@@ -131,11 +135,10 @@ impl MilestoneEscrow {
     }
 
     pub fn release_tranche(env: Env, proposal_id: u32) {
-        let admin = Self::admin(&env);
-        admin.require_auth();
-
         let key = DataKey::Escrow(proposal_id);
         let mut record = Self::get_or_panic(&env, &key);
+
+        record.admin.require_auth();
 
         if record.tranches_released >= record.total_tranches {
             panic_with_error!(&env, Error::AllTranchesReleased);
@@ -158,15 +161,15 @@ impl MilestoneEscrow {
     }
 
     pub fn reclaim_inactive(env: Env, proposal_id: u32) {
-        let admin = Self::admin(&env);
-        admin.require_auth();
-
         let key = DataKey::Escrow(proposal_id);
         let mut record = Self::get_or_panic(&env, &key);
 
+        record.admin.require_auth();
+
         let now = env.ledger().timestamp();
         let inactive_for = now.saturating_sub(record.last_activity);
-        if inactive_for < INACTIVITY_WINDOW_SECONDS {
+        let inactivity_window = Self::inactivity_window(&env);
+        if inactive_for < inactivity_window {
             panic_with_error!(&env, Error::InactivityNotReached);
         }
 
@@ -232,6 +235,18 @@ impl MilestoneEscrow {
     fn treasury(env: &Env) -> Address {
         if let Some(treasury) = env.storage().instance().get::<_, Address>(&TREASURY_KEY) {
             treasury
+        } else {
+            panic_with_error!(env, Error::NotInitialized);
+        }
+    }
+
+    fn inactivity_window(env: &Env) -> u64 {
+        if let Some(window) = env
+            .storage()
+            .instance()
+            .get::<_, u64>(&INACTIVITY_WINDOW_KEY)
+        {
+            window
         } else {
             panic_with_error!(env, Error::NotInitialized);
         }

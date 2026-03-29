@@ -1,0 +1,9 @@
+DROP INDEX IF EXISTS idx_platform_events_created_at;
+DROP INDEX IF EXISTS idx_platform_events_type_created_at;
+DROP TABLE IF EXISTS platform_events;
+DROP INDEX IF EXISTS idx_enrollments_course_id;
+DROP INDEX IF EXISTS idx_enrollments_learner_address;
+DROP TABLE IF EXISTS enrollments;
+DROP INDEX IF EXISTS idx_votes_voter_address;
+DROP INDEX IF EXISTS idx_votes_proposal_id;
+DROP TABLE IF EXISTS votes;

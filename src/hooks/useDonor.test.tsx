@@ -62,7 +62,7 @@ describe("useDonor", () => {
 			...baseContracts,
 			scholarshipTreasury: undefined,
 			governanceToken: undefined,
-			isDeployed: () => false,
+			isDeployed: (_id: string | undefined): _id is string => false,
 		} as ReturnType<typeof useContractIds>)
 
 		const { result } = renderHook(() => useDonor())

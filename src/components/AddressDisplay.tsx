@@ -59,7 +59,9 @@ const AddressDisplay: React.FC<AddressDisplayProps> = ({
 	suffixLength = 4,
 	showCopyButton = true,
 }) => {
-	const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle")
+	const [copyState, setCopyState] = useState<"idle" | "copied" | "error">(
+		"idle",
+	)
 	const tooltipId = useId()
 
 	useEffect(() => {

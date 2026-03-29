@@ -2,7 +2,7 @@ import { Button } from "@stellar/design-system"
 import React from "react"
 import ReactMarkdown from "react-markdown"
 import { Link } from "react-router-dom"
-import { type Lesson } from "../data/lessons"
+import { type CourseLesson as Lesson } from "../types/courses"
 
 // A simple mock skeleton to match what's needed for content loading state
 export const LessonContentSkeleton = () => (

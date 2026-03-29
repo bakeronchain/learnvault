@@ -4,6 +4,12 @@ import { type AdminRequest } from "../middleware/admin.middleware"
 import { credentialService } from "../services/credential.service"
 import { stellarContractService } from "../services/stellar-contract.service"
 
+function hasStellarMilestoneCredentials(): boolean {
+	return Boolean(
+		process.env.STELLAR_SECRET_KEY && process.env.COURSE_MILESTONE_CONTRACT_ID,
+	)
+}
+
 // ── GET /api/admin/milestones/pending ────────────────────────────────────────
 
 export async function getPendingMilestones(
@@ -63,6 +69,10 @@ export async function approveMilestone(
 		}
 		if (report.status !== "pending") {
 			res.status(409).json({ error: `Report already ${report.status}` })
+			return
+		}
+		if (!hasStellarMilestoneCredentials()) {
+			res.status(503).json({ error: "Stellar credentials not configured" })
 			return
 		}
 
@@ -141,6 +151,10 @@ export async function rejectMilestone(
 		}
 		if (report.status !== "pending") {
 			res.status(409).json({ error: `Report already ${report.status}` })
+			return
+		}
+		if (!hasStellarMilestoneCredentials()) {
+			res.status(503).json({ error: "Stellar credentials not configured" })
 			return
 		}
 

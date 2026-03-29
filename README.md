@@ -158,6 +158,55 @@ Mints a **soulbound ERC721 credential** to scholars who complete their funded
 programs. Non-transferable, tamper-proof, and permanently verifiable on-chain.
 Shareable with employers, DAOs, and the broader ecosystem.
 
+## Contract Interaction Flow
+
+```mermaid
+sequenceDiagram
+    participant Learner
+    participant Frontend
+    participant CourseMilestone
+    participant LearnToken
+    participant Donor
+    participant ScholarshipTreasury
+    participant GovernanceToken
+    participant GOV_Holder
+    participant MilestoneEscrow
+    participant Scholar
+    participant ScholarNFT
+    participant Treasury
+
+    Note over Learner, ScholarNFT: Learning & Reputation Building
+    Learner->>Frontend: Complete milestone
+    Frontend->>CourseMilestone: complete_milestone()
+    CourseMilestone->>LearnToken: mint(learner, lrn)
+    LearnToken-->>Learner: LearnTokens earned
+
+    Note over Donor, GovernanceToken: Treasury Funding
+    Donor->>Frontend: Deposit USDC
+    Frontend->>ScholarshipTreasury: deposit(usdc)
+    ScholarshipTreasury->>GovernanceToken: mint(donor, gov)
+    GovernanceToken-->>Donor: GovernanceTokens earned
+
+    Note over Learner, MilestoneEscrow: Scholarship Process
+    Learner->>Frontend: Submit scholarship proposal
+    Frontend->>ScholarshipTreasury: submit_proposal()
+
+    GOV_Holder->>Frontend: Vote on proposal
+    Frontend->>ScholarshipTreasury: vote()
+
+    ScholarshipTreasury->>MilestoneEscrow: create() [on approval]
+
+    Note over MilestoneEscrow, Treasury: Milestone Completion
+    MilestoneEscrow->>Scholar: transfer(usdc) [on milestone release]
+
+    Note over MilestoneEscrow, Treasury: Timeout Handling
+    MilestoneEscrow->>Treasury: transfer(usdc) [on timeout]
+
+    Note over Scholar, ScholarNFT: Program Completion
+    Scholar->>ScholarNFT: mint() [on program completion]
+    ScholarNFT-->>Scholar: ScholarNFT credential earned
+```
+
 ---
 
 ## User Roles

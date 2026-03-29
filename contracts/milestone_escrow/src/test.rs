@@ -3,6 +3,8 @@ extern crate std;
 use soroban_sdk::{
     Address, Env, IntoVal, Val, Vec,
     testutils::{Address as _, Ledger, LedgerInfo, MockAuth, MockAuthInvoke, Events as _},
+    Address, Env, IntoVal, Symbol, Val, Vec, symbol_short,
+    testutils::{Address as _, Events, Ledger, LedgerInfo, MockAuth, MockAuthInvoke},
     token::{StellarAssetClient, TokenClient},
 };
 
@@ -37,6 +39,12 @@ fn stellar_asset_client<'a>(env: &Env, token: &Address) -> StellarAssetClient<'a
 }
 
 fn setup() -> (Env, Address, Address, Address, Address, Address) {
+    setup_with_inactivity_window(THIRTY_DAYS)
+}
+
+fn setup_with_inactivity_window(
+    inactivity_window_seconds: u64,
+) -> (Env, Address, Address, Address, Address, Address) {
     let env = Env::default();
     set_timestamp(&env, START_TS);
 
@@ -51,7 +59,7 @@ fn setup() -> (Env, Address, Address, Address, Address, Address) {
     stellar_asset_client(&env, &token).mint(&treasury, &1_000);
 
     let client = MilestoneEscrowClient::new(&env, &contract_id);
-    client.initialize(&admin, &treasury);
+    client.initialize(&admin, &treasury, &inactivity_window_seconds);
 
     (env, contract_id, token, admin, treasury, scholar)
 }
@@ -88,7 +96,9 @@ fn release_tranche_authorized(
     client: &MilestoneEscrowClient<'_>,
     proposal_id: u32,
 ) -> Result<(), Result<soroban_sdk::Error, soroban_sdk::InvokeError>> {
-    client.env.mock_all_auths();
+    if let Some(escrow) = client.get_escrow(&proposal_id) {
+        set_caller(client, "release_tranche", &escrow.admin, (proposal_id,));
+    }
     client.try_release_tranche(&proposal_id).map(|_| ())
 }
 
@@ -96,7 +106,9 @@ fn reclaim_inactive_authorized(
     client: &MilestoneEscrowClient<'_>,
     proposal_id: u32,
 ) -> Result<(), Result<soroban_sdk::Error, soroban_sdk::InvokeError>> {
-    client.env.mock_all_auths();
+    if let Some(escrow) = client.get_escrow(&proposal_id) {
+        set_caller(client, "reclaim_inactive", &escrow.admin, (proposal_id,));
+    }
     client.try_reclaim_inactive(&proposal_id).map(|_| ())
 }
 
@@ -117,6 +129,20 @@ fn initialize_sets_admin_and_treasury_on_created_escrow() {
     assert_eq!(escrow.total_amount, 120);
     assert_eq!(escrow.released_amount, 0);
     assert_eq!(token_client(&env, &token).balance(&contract_id), 120);
+}
+
+#[test]
+fn create_escrow_emits_event() {
+    let (env, contract_id, _token, _admin, _treasury, scholar) = setup();
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+
+    create_escrow(&client, 123, &scholar, 200, 4);
+
+    let events = env.events().all();
+    let found = events.iter().any(|(cid, topics, _)| {
+        cid == contract_id && topics.contains(&Symbol::new(&env, "escrow_created").into_val(&env))
+    });
+    assert!(found, "escrow_created event not found");
 }
 
 #[test]
@@ -222,6 +248,47 @@ fn reclaim_inactive_requires_admin_and_deadline() {
 }
 
 #[test]
+fn reclaim_inactive_uses_configured_window_size() {
+    let (env, contract_id, token, _admin, treasury, scholar) = setup_with_inactivity_window(1);
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+
+    create_escrow(&client, 12, &scholar, 100, 4);
+    release_tranche_authorized(&client, 12).unwrap();
+
+    set_timestamp(&env, START_TS);
+    let early = reclaim_inactive_authorized(&client, 12);
+    assert_eq!(
+        early.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InactivityNotReached as u32
+        )))
+    );
+
+    set_timestamp(&env, START_TS + 1);
+    reclaim_inactive_authorized(&client, 12).unwrap();
+    assert_eq!(token_client(&env, &token).balance(&treasury), 975);
+}
+
+#[test]
+fn reclaim_inactive_emits_event() {
+    let (env, contract_id, _token, _admin, _treasury, scholar) = setup();
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+
+    create_escrow(&client, 77, &scholar, 120, 4);
+    // Make it active so last_activity is set from a release
+    release_tranche_authorized(&client, 77).unwrap();
+
+    set_timestamp(&env, START_TS + THIRTY_DAYS);
+    reclaim_inactive_authorized(&client, 77).unwrap();
+
+    let events = env.events().all();
+    let found = events.iter().any(|(cid, topics, _)| {
+        cid == contract_id && topics.contains(&Symbol::new(&env, "escrow_reclaimed").into_val(&env))
+    });
+    assert!(found, "escrow_reclaimed event not found");
+}
+
+#[test]
 fn get_escrow_reflects_each_stage_of_the_full_flow() {
     let (env, contract_id, _token, _admin, _treasury, scholar) = setup();
     let client = MilestoneEscrowClient::new(&env, &contract_id);
@@ -260,6 +327,22 @@ fn zero_amount_create_is_rejected() {
 }
 
 #[test]
+fn zero_tranches_create_is_rejected() {
+    let (env, contract_id, _token, _admin, _treasury, scholar) = setup();
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+
+    client.env.mock_all_auths();
+    let result = client.try_create_escrow(&22, &scholar, &100, &0);
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidTranches as u32
+        )))
+    );
+}
+
+#[test]
 fn overpayment_is_rejected() {
     let (env, contract_id, _token, _admin, _treasury, scholar) = setup();
     let client = MilestoneEscrowClient::new(&env, &contract_id);
@@ -273,6 +356,75 @@ fn overpayment_is_rejected() {
             Error::Overpayment as u32
         )))
     );
+}
+
+#[test]
+fn reclaim_inactive_when_fully_released_is_rejected() {
+    let (env, contract_id, _token, _admin, _treasury, scholar) = setup();
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+
+    create_escrow(&client, 23, &scholar, 100, 4);
+    release_tranche_authorized(&client, 23).unwrap();
+    release_tranche_authorized(&client, 23).unwrap();
+    release_tranche_authorized(&client, 23).unwrap();
+    release_tranche_authorized(&client, 23).unwrap();
+
+    set_timestamp(&env, START_TS + THIRTY_DAYS);
+    let result = reclaim_inactive_authorized(&client, 23);
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::NothingToReclaim as u32
+        )))
+    );
+}
+
+#[test]
+fn equal_split_releases_25_each_for_100_over_4_tranches() {
+    let (env, contract_id, token, _admin, _treasury, scholar) = setup();
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+
+    create_escrow(&client, 24, &scholar, 100, 4);
+
+    release_tranche_authorized(&client, 24).unwrap();
+    assert_eq!(token_client(&env, &token).balance(&scholar), 25);
+
+    release_tranche_authorized(&client, 24).unwrap();
+    assert_eq!(token_client(&env, &token).balance(&scholar), 50);
+
+    release_tranche_authorized(&client, 24).unwrap();
+    assert_eq!(token_client(&env, &token).balance(&scholar), 75);
+
+    release_tranche_authorized(&client, 24).unwrap();
+    assert_eq!(token_client(&env, &token).balance(&scholar), 100);
+
+    let escrow = client.get_escrow(&24).unwrap();
+    assert_eq!(escrow.released_amount, 100);
+    assert_eq!(escrow.tranches_released, 4);
+    assert_eq!(token_client(&env, &token).balance(&contract_id), 0);
+}
+
+#[test]
+fn last_tranche_rounding_releases_33_33_34_for_100_over_3_tranches() {
+    let (env, contract_id, token, _admin, _treasury, scholar) = setup();
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+
+    create_escrow(&client, 25, &scholar, 100, 3);
+
+    release_tranche_authorized(&client, 25).unwrap();
+    assert_eq!(token_client(&env, &token).balance(&scholar), 33);
+
+    release_tranche_authorized(&client, 25).unwrap();
+    assert_eq!(token_client(&env, &token).balance(&scholar), 66);
+
+    release_tranche_authorized(&client, 25).unwrap();
+    assert_eq!(token_client(&env, &token).balance(&scholar), 100);
+
+    let escrow = client.get_escrow(&25).unwrap();
+    assert_eq!(escrow.released_amount, 100);
+    assert_eq!(escrow.tranches_released, 3);
+    assert_eq!(token_client(&env, &token).balance(&contract_id), 0);
 }
 
 #[cfg(test)]
@@ -314,13 +466,18 @@ mod fuzz_tests {
         #[test]
         #[ignore]
         fn fuzz_tranche_disbursement_amounts(amount in 1..1_000_000_000_i128, tranches in 1..1000_u32) {
-            let (env, contract_id, _token, _admin, _treasury, scholar) = setup();
+            let (env, contract_id, token, _admin, treasury, scholar) = setup();
             let client = MilestoneEscrowClient::new(&env, &contract_id);
 
             // Overpayment check constraint: amounts must be enough for tranches
             if amount < tranches as i128 {
                 return Ok(());
             }
+
+            // Ensure the treasury has enough balance for the randomized escrow amount.
+            // setup() only mints 1_000 tokens by default.
+            env.mock_all_auths();
+            stellar_asset_client(&env, &token).mint(&treasury, &amount);
 
             create_escrow(&client, 100, &scholar, amount, tranches);
 

@@ -1,6 +1,6 @@
 import React from "react"
 import { Link } from "react-router-dom"
-import { type Lesson } from "../data/lessons"
+import { type CourseLesson as Lesson } from "../types/courses"
 
 interface LessonSidebarProps {
 	courseId: string

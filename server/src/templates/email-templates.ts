@@ -150,6 +150,52 @@ export const templates: Record<string, (vars: EmailVariables) => string> = {
   `,
 			vars,
 		),
+	"milestone-approved-admin": (vars) =>
+		baseLayout(
+			`
+    <p>Hi ${vars.name},</p>
+    <p><strong>Yayy! Your milestone has been approved!</strong></p>
+    <p>Your milestone <strong>${vars.milestoneTitle}</strong> for the course <strong>${vars.courseTitle}</strong> has been approved by the admin.</p>
+    
+    <ul>
+        <li><strong>Milestone:</strong> ${vars.milestoneNumber}</li>
+        <li><strong>Reward Earned:</strong> ${vars.reward} LRN</li>
+    </ul>
+
+    <p>Keep up the great progress 🚀</p>
+
+    <p><a href="${vars.dashboardUrl}" class="button success">View Dashboard</a></p>
+
+    <p>Best,<br>The LearnVault Team</p>
+  `,
+			vars,
+		),
+
+	"milestone-rejected-admin": (vars) =>
+		baseLayout(
+			`
+    <p>Hi ${vars.name},</p>
+    <p><strong>Your milestone was not approved</strong></p>
+    <p>Your submission for <strong>${vars.milestoneTitle}</strong> in the course <strong>${vars.courseTitle}</strong> was reviewed by the admin and requires changes.</p>
+
+    <ul>
+        <li><strong>Milestone:</strong> ${vars.milestoneNumber}</li>
+    </ul>
+
+    ${
+			vars.rejectionReason
+				? `<p><strong>Reason:</strong> ${vars.rejectionReason}</p>`
+				: ""
+		}
+
+    <p>Please review the feedback and resubmit.</p>
+
+    <p><a href="${vars.milestoneUrl}" class="button warning">Update Milestone</a></p>
+
+    <p>Best,<br>The LearnVault Team</p>
+  `,
+			vars,
+		),
 }
 
 /**

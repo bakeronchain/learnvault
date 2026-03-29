@@ -11,9 +11,11 @@ export interface EmailOptions {
 	subject: string
 	data: EmailVariables
 }
-
 export class EmailService {
+	private readonly apiKey: string
+
 	constructor(apiKey: string) {
+		this.apiKey = apiKey
 		if (apiKey) {
 			sgMail.setApiKey(apiKey)
 		}

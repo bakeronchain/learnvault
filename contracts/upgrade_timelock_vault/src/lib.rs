@@ -31,8 +31,8 @@
 //! 5. Admin can `cancel_upgrade()` during timelock period
 
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, panic_with_error,
-    symbol_short, Address, BytesN, Env, Symbol,
+    Address, BytesN, Env, Symbol, contract, contracterror, contractevent, contractimpl,
+    contracttype, panic_with_error, symbol_short,
 };
 
 // ---------------------------------------------------------------------------
@@ -279,7 +279,7 @@ impl UpgradeTimelockVault {
 mod test {
     use super::*;
     use soroban_sdk::testutils::{Address as _, Ledger};
-    use soroban_sdk::{contractclient, Address, BytesN, Env, IntoVal};
+    use soroban_sdk::{Address, BytesN, Env, IntoVal, contractclient};
 
     #[contractclient(name = "UpgradeTimelockVaultClient")]
     pub trait UpgradeTimelockVaultInterface {
@@ -314,7 +314,10 @@ mod test {
     fn test_initialize() {
         let env = create_env();
         let admin = create_admin(&env);
-        let contract = UpgradeTimelockVaultClient::new(&env, &env.register_contract(None, UpgradeTimelockVault {}));
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
 
         contract.initialize(&admin);
 
@@ -327,7 +330,10 @@ mod test {
     fn test_initialize_twice_fails() {
         let env = create_env();
         let admin = create_admin(&env);
-        let contract = UpgradeTimelockVaultClient::new(&env, &env.register_contract(None, UpgradeTimelockVault {}));
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
 
         contract.initialize(&admin);
         contract.initialize(&admin);
@@ -337,7 +343,10 @@ mod test {
     fn test_set_timelock_duration() {
         let env = create_env();
         let admin = create_admin(&env);
-        let contract = UpgradeTimelockVaultClient::new(&env, &env.register_contract(None, UpgradeTimelockVault {}));
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
 
         contract.initialize(&admin);
 
@@ -362,7 +371,10 @@ mod test {
         let env = create_env();
         let admin = create_admin(&env);
         let unauthorized = create_admin(&env);
-        let contract = UpgradeTimelockVaultClient::new(&env, &env.register_contract(None, UpgradeTimelockVault {}));
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
 
         contract.initialize(&admin);
 
@@ -384,7 +396,10 @@ mod test {
         let admin = create_admin(&env);
         let contract_addr = create_contract(&env);
         let wasm_hash = create_wasm_hash(&env);
-        let contract = UpgradeTimelockVaultClient::new(&env, &env.register_contract(None, UpgradeTimelockVault {}));
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
 
         contract.initialize(&admin);
         env.ledger().set_timestamp(1);
@@ -414,7 +429,10 @@ mod test {
         let admin = create_admin(&env);
         let contract_addr = create_contract(&env);
         let wasm_hash = create_wasm_hash(&env);
-        let contract = UpgradeTimelockVaultClient::new(&env, &env.register_contract(None, UpgradeTimelockVault {}));
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
 
         contract.initialize(&admin);
 
@@ -447,7 +465,10 @@ mod test {
         let admin = create_admin(&env);
         let contract_addr = create_contract(&env);
         let wasm_hash = create_wasm_hash(&env);
-        let contract = UpgradeTimelockVaultClient::new(&env, &env.register_contract(None, UpgradeTimelockVault {}));
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
 
         contract.initialize(&admin);
 
@@ -464,7 +485,8 @@ mod test {
         contract.queue_upgrade(&contract_addr, &wasm_hash);
 
         // Fast forward time past timelock
-        env.ledger().set_timestamp(env.ledger().timestamp() + DEFAULT_TIMELOCK_DURATION + 1);
+        env.ledger()
+            .set_timestamp(env.ledger().timestamp() + DEFAULT_TIMELOCK_DURATION + 1);
 
         // Execute upgrade
         let returned_hash = contract.execute_upgrade(&contract_addr);
@@ -481,7 +503,10 @@ mod test {
         let admin = create_admin(&env);
         let contract_addr = create_contract(&env);
         let wasm_hash = create_wasm_hash(&env);
-        let contract = UpgradeTimelockVaultClient::new(&env, &env.register_contract(None, UpgradeTimelockVault {}));
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
 
         contract.initialize(&admin);
 
@@ -507,7 +532,10 @@ mod test {
         let admin = create_admin(&env);
         let contract_addr = create_contract(&env);
         let wasm_hash = create_wasm_hash(&env);
-        let contract = UpgradeTimelockVaultClient::new(&env, &env.register_contract(None, UpgradeTimelockVault {}));
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
 
         contract.initialize(&admin);
 
@@ -545,7 +573,10 @@ mod test {
         let admin = create_admin(&env);
         let contract_addr = create_contract(&env);
         let wasm_hash = create_wasm_hash(&env);
-        let contract = UpgradeTimelockVaultClient::new(&env, &env.register_contract(None, UpgradeTimelockVault {}));
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
 
         contract.initialize(&admin);
 
@@ -568,7 +599,8 @@ mod test {
         assert!(!contract.is_upgrade_ready(&contract_addr));
 
         // Fast forward time
-        env.ledger().set_timestamp(env.ledger().timestamp() + DEFAULT_TIMELOCK_DURATION + 1);
+        env.ledger()
+            .set_timestamp(env.ledger().timestamp() + DEFAULT_TIMELOCK_DURATION + 1);
 
         // Now ready
         assert!(contract.is_upgrade_ready(&contract_addr));

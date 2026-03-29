@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import DeferredSection from "../components/DeferredSection"
 import { WalletAddressPill } from "../components/WalletAddressPill"
+import { useEnrolledCourses } from "../hooks/useCourses"
 
 const GuessTheNumber = lazy(() =>
 	import("../components/GuessTheNumber").then((module) => ({
@@ -19,12 +20,7 @@ const MilestoneTracker = lazy(() =>
 
 const Home: React.FC = () => {
 	const { t } = useTranslation()
-
-	const mockMilestones = [
-		{ id: 1, label: t("home.milestones.1"), lrnReward: 10 },
-		{ id: 2, label: t("home.milestones.2"), lrnReward: 20 },
-		{ id: 3, label: t("home.milestones.3"), lrnReward: 50 },
-	]
+	const { enrolledCourses, isLoading: isLoadingCourses } = useEnrolledCourses()
 
 	const siteUrl = "https://learnvault.app"
 	const title = "LearnVault - Learn Stellar & Soroban Development"
@@ -94,18 +90,59 @@ const Home: React.FC = () => {
 									</p>
 								</div>
 								<div className="md:w-2/3 w-full">
-									<DeferredSection
-										fallback={<SectionSkeleton className="min-h-40" />}
-									>
-										<Suspense
-											fallback={<SectionSkeleton className="min-h-40" />}
-										>
-											<MilestoneTracker
-												courseId="stellar-basics"
-												milestones={mockMilestones}
-											/>
-										</Suspense>
-									</DeferredSection>
+									{isLoadingCourses ? (
+										<SectionSkeleton className="min-h-40" />
+									) : enrolledCourses.length === 0 ? (
+										<div className="glass-card rounded-2xl p-8 text-center border border-white/5">
+											<p className="text-white/40 mb-4">
+												{t("home.courseProgress.empty")}
+											</p>
+											<Link
+												to="/courses"
+												className="text-brand-cyan hover:underline font-semibold"
+											>
+												{t("nav.courses")}
+											</Link>
+										</div>
+									) : (
+										<div className="flex flex-col gap-8">
+											{enrolledCourses.map((course) => (
+												<div key={course.courseId}>
+													<div className="flex items-center justify-between mb-2">
+														<span className="font-semibold text-white/80">
+															{course.title}
+														</span>
+														<span className="text-sm text-white/40">
+															{course.completedCount}/{course.totalCount}{" "}
+															{t("home.courseProgress.milestones")}
+														</span>
+													</div>
+													<div className="w-full h-2 bg-white/10 rounded-full mb-4">
+														<div
+															className="h-2 bg-brand-cyan rounded-full transition-all"
+															style={{ width: `${course.progressPercent}%` }}
+														/>
+													</div>
+													<DeferredSection
+														fallback={
+															<SectionSkeleton className="min-h-40" />
+														}
+													>
+														<Suspense
+															fallback={
+																<SectionSkeleton className="min-h-40" />
+															}
+														>
+															<MilestoneTracker
+																courseId={course.courseId}
+																milestones={course.milestones}
+															/>
+														</Suspense>
+													</DeferredSection>
+												</div>
+											))}
+										</div>
+									)}
 								</div>
 							</div>
 						</div>

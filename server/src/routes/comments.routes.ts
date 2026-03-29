@@ -9,6 +9,11 @@ import {
 import { validate } from "../middleware/validate.middleware"
 import { type JwtService } from "../services/jwt.service"
 
+const VOTE_COLUMN: Record<string, string> = {
+	upvote: "upvotes",
+	downvote: "downvotes",
+}
+
 export function createCommentsRouter(jwtService: JwtService): Router {
 	const router = Router()
 	const requireAuth = createRequireAuth(jwtService)
@@ -112,12 +117,9 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 
 			try {
 				const globalSpamCheck = await pool.query(
-					`SELECT COUNT(*) FROM comments
-       WHERE author_address = $1
-       AND created_at > NOW() - INTERVAL '1 day'`,
+					`SELECT COUNT(*) FROM comments WHERE author_address = $1 AND created_at > NOW() - INTERVAL '1 day'`,
 					[authorAddress],
 				)
-
 				if (parseInt(globalSpamCheck.rows[0].count) >= maxCommentsPerDay) {
 					return res
 						.status(429)
@@ -126,12 +128,9 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 
 				// Spam protection: max 5 comments per address per proposal per day
 				const spamCheck = await pool.query(
-					`SELECT COUNT(*) FROM comments 
-       WHERE author_address = $1 AND proposal_id = $2 
-       AND created_at > NOW() - INTERVAL '1 day'`,
+					`SELECT COUNT(*) FROM comments WHERE author_address = $1 AND proposal_id = $2 AND created_at > NOW() - INTERVAL '1 day'`,
 					[authorAddress, proposalId],
 				)
-
 				if (parseInt(spamCheck.rows[0].count) >= 5) {
 					return res
 						.status(429)
@@ -139,11 +138,9 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 				}
 
 				const result = await pool.query(
-					`INSERT INTO comments (proposal_id, author_address, content, parent_id) 
-       VALUES ($1, $2, $3, $4) RETURNING *`,
+					`INSERT INTO comments (proposal_id, author_address, content, parent_id) VALUES ($1, $2, $3, $4) RETURNING *`,
 					[proposalId, authorAddress, safeContent, parentId ?? null],
 				)
-
 				res.status(201).json(result.rows[0])
 			} catch (err) {
 				res.status(500).json({ error: "Failed to post comment" })
@@ -165,14 +162,12 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 		async (req: AuthRequest, res: Response) => {
 			const { id } = req.params
 			const authorAddress = req.user?.address
-
 			try {
 				// Check if comment exists and belongs to user (and not already deleted)
 				const checkResult = await pool.query(
 					`SELECT * FROM comments WHERE id = $1 AND author_address = $2 AND deleted_at IS NULL`,
 					[id, authorAddress],
 				)
-
 				if (checkResult.rows.length === 0) {
 					return res
 						.status(404)
@@ -184,7 +179,6 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 					`UPDATE comments SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1`,
 					[id],
 				)
-
 				res.json({ success: true })
 			} catch (err) {
 				res.status(500).json({ error: "Failed to delete comment" })
@@ -208,10 +202,11 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 			const { type } = req.body // 'upvote' or 'downvote'
 			const voterAddress = req.user?.address
 
-			if (!["upvote", "downvote"].includes(type)) {
+			if (!VOTE_COLUMN[type]) {
 				return res.status(400).json({ error: "Invalid vote type" })
 			}
 
+			const col = VOTE_COLUMN[type]
 			const client = await pool.connect()
 			try {
 				await client.query("BEGIN")
@@ -230,18 +225,19 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 							[id, voterAddress],
 						)
 						await client.query(
-							`UPDATE comments SET ${type}s = ${type}s - 1 WHERE id = $1`,
+							`UPDATE comments SET ${col} = ${col} - 1 WHERE id = $1`,
 							[id],
 						)
 					} else {
 						// Change vote type
 						const oldType = existingVote.rows[0].vote_type
+						const oldCol = VOTE_COLUMN[oldType]
 						await client.query(
 							`UPDATE comment_votes SET vote_type = $1 WHERE comment_id = $2 AND voter_address = $3`,
 							[type, id, voterAddress],
 						)
 						await client.query(
-							`UPDATE comments SET ${type}s = ${type}s + 1, ${oldType}s = ${oldType}s - 1 WHERE id = $1`,
+							`UPDATE comments SET ${col} = ${col} + 1, ${oldCol} = ${oldCol} - 1 WHERE id = $1`,
 							[id],
 						)
 					}
@@ -252,7 +248,7 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 						[id, voterAddress, type],
 					)
 					await client.query(
-						`UPDATE comments SET ${type}s = ${type}s + 1 WHERE id = $1`,
+						`UPDATE comments SET ${col} = ${col} + 1 WHERE id = $1`,
 						[id],
 					)
 				}
@@ -286,16 +282,13 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 		async (req: AuthRequest, res: Response) => {
 			const { id } = req.params
 			const authorAddress = req.user?.address
-
 			try {
 				// Check if the user is the author of the proposal associated with this comment
 				// For now, we'll assume a "proposal_authors" mapping or check a proposals table
 				// In a real app, you'd fetch the proposal by comment.proposal_id and check its author
-
 				// MOCK: Allow anyone to pin for now if they are the "author" of the proposal (which we'll just check against a param or something)
 				// Actually, the user says "Proposal author can pin one comment".
 				// I'll need a way to verify this.
-
 				const commentRes = await pool.query(
 					`SELECT proposal_id FROM comments WHERE id = $1 AND deleted_at IS NULL`,
 					[id],
@@ -327,7 +320,6 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 				await pool.query(`UPDATE comments SET is_pinned = TRUE WHERE id = $1`, [
 					id,
 				])
-
 				res.json({ message: "Comment pinned" })
 			} catch (err) {
 				res.status(500).json({ error: "Failed to pin comment" })

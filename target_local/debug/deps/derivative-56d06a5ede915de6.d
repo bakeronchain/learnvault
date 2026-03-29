@@ -1,0 +1,16 @@
+/Users/macbook/dev/drips-wave3/learnvault/./target_local/debug/deps/derivative-56d06a5ede915de6.d: /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/lib.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/ast.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/attr.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/bound.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/clone.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/cmp.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/debug.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/default.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/hash.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/matcher.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/paths.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/utils.rs
+
+/Users/macbook/dev/drips-wave3/learnvault/./target_local/debug/deps/libderivative-56d06a5ede915de6.dylib: /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/lib.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/ast.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/attr.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/bound.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/clone.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/cmp.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/debug.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/default.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/hash.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/matcher.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/paths.rs /tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/utils.rs
+
+/tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/lib.rs:
+/tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/ast.rs:
+/tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/attr.rs:
+/tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/bound.rs:
+/tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/clone.rs:
+/tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/cmp.rs:
+/tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/debug.rs:
+/tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/default.rs:
+/tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/hash.rs:
+/tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/matcher.rs:
+/tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/paths.rs:
+/tmp/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derivative-2.2.0/src/utils.rs:

@@ -29,7 +29,7 @@
     "packages/*"
   ],
   "dependencies": {
-    "@creit.tech/stellar-wallets-kit": "^1.9.5",
+    "@creit.tech/stellar-wallets-kit": "^2.0.1",
     "@stellar/design-system": "^3.2.7",
     "@stellar/stellar-sdk": "^14.4.3",
     "@stellar/stellar-xdr-json": "^23.0.0",
@@ -51,6 +51,7 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.13.2",
     "recharts": "^2.15.1",
+    "resend": "^6.9.4",
     "sonner": "^2.0.7",
     "tailwindcss": "^4.2.2",
     "utf-8-validate": "^5.0.10",
@@ -68,7 +69,7 @@
     "@types/react-helmet": "^6.1.11",
     "@types/react-router-dom": "^5.3.3",
     "@types/recharts": "^1.8.29",
-    "@vitejs/plugin-react": "^5.1.2",
+    "@vitejs/plugin-react": "^6.0.1",
     "@vitest/coverage-v8": "^4.1.1",
     "concurrently": "^9.2.1",
     "dotenv": "^17.2.3",

@@ -15,12 +15,18 @@ export const TRACK_OPTIONS = [
 	{ label: "Stellar", value: "stellar" },
 ] as const
 
+export interface CourseTrackOption {
+	label: string
+	value: string
+}
+
 interface CourseFilterProps {
 	search: string
 	onSearchChange: (value: string) => void
 	difficulty: string
 	onDifficultyChange: (value: string) => void
 	track: string
+	trackOptions?: readonly CourseTrackOption[]
 	onTrackChange: (value: string) => void
 	onClear: () => void
 	hasActiveFilters: boolean
@@ -32,6 +38,7 @@ export const CourseFilter: React.FC<CourseFilterProps> = ({
 	difficulty,
 	onDifficultyChange,
 	track,
+	trackOptions = TRACK_OPTIONS,
 	onTrackChange,
 	onClear,
 	hasActiveFilters,
@@ -101,7 +108,7 @@ export const CourseFilter: React.FC<CourseFilterProps> = ({
 					role="group"
 					aria-label="Filter by track"
 				>
-					{TRACK_OPTIONS.map((opt) => (
+					{trackOptions.map((opt) => (
 						<button
 							key={opt.value || "all-tracks"}
 							type="button"

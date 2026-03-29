@@ -22,7 +22,7 @@ jest.mock("../services/pinata.service", () => ({
 }))
 
 import { errorHandler } from "../middleware/error.middleware"
-import { uploadRouter } from "../routes/upload.routes"
+import { createUploadRouter } from "../routes/upload.routes"
 import * as pinataService from "../services/pinata.service"
 
 // ---------------------------------------------------------------------------
@@ -31,6 +31,19 @@ import * as pinataService from "../services/pinata.service"
 
 const JWT_SECRET = "learnvault-secret"
 
+const testJwtService = {
+	signWalletToken: (addr: string) => jwt.sign({ sub: addr }, JWT_SECRET),
+	verifyWalletToken: (token: string) => {
+		const d = jwt.verify(token, JWT_SECRET) as {
+			sub?: string
+			address?: string
+		}
+		const sub = d.sub ?? d.address ?? ""
+		if (!sub) throw new Error("Invalid token")
+		return { sub }
+	},
+}
+
 function makeToken(address = "GUSER123") {
 	return jwt.sign({ address }, JWT_SECRET, { expiresIn: "1h" })
 }
@@ -38,7 +51,7 @@ function makeToken(address = "GUSER123") {
 function buildApp() {
 	const app = express()
 	app.use(express.json())
-	app.use("/api", uploadRouter)
+	app.use("/api", createUploadRouter(testJwtService))
 	app.use(errorHandler)
 	return app
 }

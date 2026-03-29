@@ -388,6 +388,22 @@ pub fn reclaim_inactive(env: Env, proposal_id: u32) {
 }
 ```
 
+### 4.4 Access Control for reclaim_inactive
+
+#### ✅ Access control enforced
+
+The `reclaim_inactive` entrypoint now requires the contract admin to authorize the call. This prevents arbitrary actors from triggering a reclaim when the inactivity window is reached. Evidence in the contract:
+
+```rust
+pub fn reclaim_inactive(env: Env, proposal_id: u32) {
+    let admin = Self::admin(&env);
+    admin.require_auth(); // ✅ Only admin may call
+    // ... rest of function
+}
+```
+
+This change ensures only the configured admin (or a future extension to allow the stored treasury address) can perform reclamation.
+
 #### ✅ No Stuck State Possible
 
 - All funds either released to scholar or returned to treasury

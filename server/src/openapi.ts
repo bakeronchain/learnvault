@@ -126,6 +126,7 @@ export const buildOpenApiSpec = () => {
 								type: "string",
 								enum: ["pending", "approved", "rejected"],
 							},
+							cancelled: { type: "boolean" },
 							deadline: { type: "string", format: "date-time" },
 						},
 						required: ["id", "author_address", "title", "status"],

@@ -1,3 +1,5 @@
+process.env.JWT_SECRET = "learnvault-secret"
+
 jest.mock("../db/index", () => ({
 	pool: {
 		query: jest.fn(),

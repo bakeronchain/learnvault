@@ -8,12 +8,12 @@
 // ---------------------------------------------------------------------------
 // Governance types (on-chain ScholarshipTreasury)
 // ---------------------------------------------------------------------------
-export { Proposal, RawContractProposal } from "./governance"
+export type { Proposal, RawContractProposal } from "./governance"
 
 // ---------------------------------------------------------------------------
 // Milestone types (on-chain CourseMilestone)
 // ---------------------------------------------------------------------------
-export {
+export type {
 	MilestoneReportFormValues,
 	SubmittedMilestoneReport,
 } from "./milestone"

@@ -8,6 +8,20 @@ import { afterEach, vi } from "vitest"
 import { mockContracts } from "./mocks/contracts"
 import { mockStellarWalletsKit, mockWalletUtils } from "./mocks/wallet"
 
+vi.mock("react", async () => {
+	const actual = await vi.importActual<typeof import("react")>("react")
+	const dom = await vi.importActual<typeof import("react-dom/test-utils")>(
+		"react-dom/test-utils",
+	)
+	return {
+		...actual,
+		act:
+			typeof actual.act === "function"
+				? actual.act
+				: (dom.act as typeof actual.act),
+	}
+})
+
 // ---------------------------------------------------------------------------
 // Global Mocks
 // ---------------------------------------------------------------------------
@@ -34,23 +48,6 @@ vi.mock("../contracts/scholarship_treasury", () => ({
 vi.mock("../contracts/guess_the_number", () => ({
 	default: mockContracts.guessTheNumber,
 }))
-// Mock contract client dynamic imports
-vi.mock(
-	"../contracts/learn_token",
-	() => mockContractImports["../contracts/learn_token"],
-)
-vi.mock(
-	"../contracts/governance_token",
-	() => mockContractImports["../contracts/governance_token"],
-)
-vi.mock(
-	"../contracts/scholarship_treasury",
-	() => mockContractImports["../contracts/scholarship_treasury"],
-)
-vi.mock(
-	"../contracts/guess_the_number",
-	() => mockContractImports["../contracts/guess_the_number"],
-)
 
 // Mock @stellar/design-system to avoid CSS import issues
 vi.mock("@stellar/design-system", () => ({
@@ -137,12 +134,25 @@ vi.mock("../hooks/useContractIds", () => ({
 	}),
 }))
 
-// Mock localStorage
+// Mock localStorage with in-memory behavior so storage helpers can be tested.
+const localStorageData = new Map<string, string>()
 const localStorageMock = {
-	getItem: vi.fn(),
-	setItem: vi.fn(),
-	removeItem: vi.fn(),
-	clear: vi.fn(),
+	get length() {
+		return localStorageData.size
+	},
+	clear: vi.fn(() => {
+		localStorageData.clear()
+	}),
+	getItem: vi.fn((key: string) => localStorageData.get(key) ?? null),
+	key: vi.fn(
+		(index: number) => Array.from(localStorageData.keys())[index] ?? null,
+	),
+	removeItem: vi.fn((key: string) => {
+		localStorageData.delete(key)
+	}),
+	setItem: vi.fn((key: string, value: string) => {
+		localStorageData.set(key, value)
+	}),
 }
 Object.defineProperty(window, "localStorage", {
 	value: localStorageMock,
@@ -250,7 +260,9 @@ afterEach(() => {
 	vi.clearAllMocks()
 
 	// Reset localStorage mock
+	localStorageData.clear()
 	localStorageMock.getItem.mockClear()
+	localStorageMock.key.mockClear()
 	localStorageMock.setItem.mockClear()
 	localStorageMock.removeItem.mockClear()
 	localStorageMock.clear.mockClear()

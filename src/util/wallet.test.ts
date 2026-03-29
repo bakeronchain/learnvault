@@ -38,6 +38,8 @@ vi.mock("@stellar/stellar-sdk", () => ({
 	},
 }))
 
+vi.unmock("./wallet")
+
 import storage from "./storage"
 import { fetchBalances, connectWallet, disconnectWallet } from "./wallet"
 

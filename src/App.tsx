@@ -69,10 +69,7 @@ function App() {
 					/>
 					<Route path="/dashboard" element={renderRoute(<Dashboard />)} />
 					<Route path="/debug" element={renderRoute(<Debug />)} />
-					<Route
-						path="/debug/:contractName"
-						element={renderRoute(<Debug />)}
-					/>
+					<Route path="/debug/:contractName" element={renderRoute(<Debug />)} />
 					<Route path="*" element={renderRoute(<NotFound />)} />
 				</Route>
 			</Routes>

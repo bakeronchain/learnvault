@@ -4,6 +4,7 @@ import { rpcUrl } from "../contracts/util"
 import {
 	type DonorData,
 	type DonorContribution,
+	type DonorStats,
 	type Vote,
 	type RpcEvent,
 } from "../types/contracts"

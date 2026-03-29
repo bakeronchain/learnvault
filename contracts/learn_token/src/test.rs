@@ -42,10 +42,7 @@ proptest! {
 
 extern crate std;
 
-use soroban_sdk::{
-    IntoVal,
-    testutils::Events as _,
-};
+use soroban_sdk::{IntoVal, testutils::Events as _};
 
 use crate::{LRNError, LearnToken, LearnTokenClient};
 
@@ -219,7 +216,7 @@ fn initialize_sets_admin_correctly() {
     e.mock_all_auths();
     let client = LearnTokenClient::new(&e, &id);
     client.initialize(&admin);
-    
+
     // Verify admin can mint (only admin can mint)
     let learner = Address::generate(&e);
     client.mint(&learner, &100);
@@ -230,9 +227,12 @@ fn initialize_sets_admin_correctly() {
 fn initialize_sets_name_symbol_decimals() {
     let e = Env::default();
     let (_, _, client) = setup(&e);
-    
+
     use soroban_sdk::String;
-    assert_eq!(client.name(), String::from_str(&e, "LearnVault Learn Token"));
+    assert_eq!(
+        client.name(),
+        String::from_str(&e, "LearnVault Learn Token")
+    );
     assert_eq!(client.symbol(), String::from_str(&e, "LRN"));
     assert_eq!(client.decimals(), 7);
 }
@@ -244,13 +244,13 @@ fn double_initialize_rejected() {
     let id = e.register(LearnToken, ());
     e.mock_all_auths();
     let client = LearnTokenClient::new(&e, &id);
-    
+
     client.initialize(&admin);
-    
+
     // Try to initialize again
     let new_admin = Address::generate(&e);
     let result = client.try_initialize(&new_admin);
-    
+
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
@@ -267,18 +267,18 @@ fn transfer_panics_with_soulbound_error() {
     let (_, _, client) = setup(&e);
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
-    
+
     client.mint(&alice, &100);
-    
+
     let result = client.try_transfer(&alice, &bob, &50);
-    
+
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
             LRNError::Soulbound as u32
         )))
     );
-    
+
     // Verify balance unchanged
     assert_eq!(client.balance(&alice), 100);
     assert_eq!(client.balance(&bob), 0);
@@ -290,9 +290,9 @@ fn transfer_always_panics_even_with_zero_amount() {
     let (_, _, client) = setup(&e);
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
-    
+
     let result = client.try_transfer(&alice, &bob, &0);
-    
+
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
@@ -308,22 +308,22 @@ fn reputation_score_increases_with_balance() {
     let e = Env::default();
     let (_, _, client) = setup(&e);
     let learner = Address::generate(&e);
-    
+
     // No balance = 0 reputation
     assert_eq!(client.reputation_score(&learner), 0);
-    
+
     // 100 LRN = 1 reputation
     client.mint(&learner, &100);
     assert_eq!(client.reputation_score(&learner), 1);
-    
+
     // 500 LRN = 5 reputation
     client.mint(&learner, &400);
     assert_eq!(client.reputation_score(&learner), 5);
-    
+
     // 999 LRN = 9 reputation (integer division)
     client.mint(&learner, &499);
     assert_eq!(client.reputation_score(&learner), 9);
-    
+
     // 1000 LRN = 10 reputation
     client.mint(&learner, &1);
     assert_eq!(client.reputation_score(&learner), 10);
@@ -334,7 +334,7 @@ fn reputation_score_proportional_to_balance() {
     let e = Env::default();
     let (_, _, client) = setup(&e);
     let learner = Address::generate(&e);
-    
+
     client.mint(&learner, &12345);
     assert_eq!(client.reputation_score(&learner), 123);
 }
@@ -344,7 +344,7 @@ fn reputation_score_zero_for_unknown_address() {
     let e = Env::default();
     let (_, _, client) = setup(&e);
     let unknown = Address::generate(&e);
-    
+
     assert_eq!(client.reputation_score(&unknown), 0);
 }
 
@@ -357,13 +357,13 @@ fn set_admin_transfers_admin_rights() {
     let new_admin = Address::generate(&e);
     let id = e.register(LearnToken, ());
     e.mock_all_auths();
-    
+
     let client = LearnTokenClient::new(&e, &id);
     client.initialize(&old_admin);
-    
+
     // Transfer admin
     client.set_admin(&new_admin);
-    
+
     // New admin can mint
     let learner = Address::generate(&e);
     client.mint(&learner, &100);
@@ -376,7 +376,7 @@ fn set_admin_only_callable_by_current_admin() {
     let admin = Address::generate(&e);
     let attacker = Address::generate(&e);
     let id = e.register(LearnToken, ());
-    
+
     // Only mock auth for initialize
     e.mock_auths(&[soroban_sdk::testutils::MockAuth {
         address: &admin,
@@ -387,10 +387,10 @@ fn set_admin_only_callable_by_current_admin() {
             sub_invokes: &[],
         },
     }]);
-    
+
     let client = LearnTokenClient::new(&e, &id);
     client.initialize(&admin);
-    
+
     // Attacker tries to set themselves as admin
     let result = client.try_set_admin(&attacker);
     assert!(result.is_err());
@@ -401,14 +401,13 @@ fn set_admin_emits_event() {
     let e = Env::default();
     let (contract_id, _, client) = setup(&e);
     let new_admin = Address::generate(&e);
-    
+
     client.set_admin(&new_admin);
-    
+
     let events = e.events().all();
     use soroban_sdk::{symbol_short, vec};
     let found = events.iter().any(|(cid, topics, _data)| {
-        cid == contract_id
-            && topics == vec![&e, symbol_short!("set_admin").into_val(&e)]
+        cid == contract_id && topics == vec![&e, symbol_short!("set_admin").into_val(&e)]
     });
     assert!(found, "set_admin event not found");
 }
@@ -421,10 +420,10 @@ fn mint_before_initialize_panics() {
     let id = e.register(LearnToken, ());
     e.mock_all_auths();
     let client = LearnTokenClient::new(&e, &id);
-    
+
     let learner = Address::generate(&e);
     let result = client.try_mint(&learner, &100);
-    
+
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
@@ -441,19 +440,19 @@ fn transfer_from_panics_with_soulbound_error() {
     let (_, _, client) = setup(&e);
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
-    
+
     client.mint(&alice, &100);
-    
+
     // Even with proper authorization, transfer_from should fail
     let result = client.try_transfer_from(&alice, &alice, &bob, &50);
-    
+
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
             LRNError::Soulbound as u32
         )))
     );
-    
+
     // Verify balance unchanged
     assert_eq!(client.balance(&alice), 100);
     assert_eq!(client.balance(&bob), 0);
@@ -465,9 +464,9 @@ fn transfer_from_always_panics_even_with_zero_amount() {
     let (_, _, client) = setup(&e);
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
-    
+
     let result = client.try_transfer_from(&alice, &alice, &bob, &0);
-    
+
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
@@ -483,12 +482,12 @@ fn transfer_from_panics_regardless_of_spender() {
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
     let charlie = Address::generate(&e);
-    
+
     client.mint(&alice, &100);
-    
+
     // charlie (spender) tries to transfer from alice to bob
     let result = client.try_transfer_from(&charlie, &alice, &bob, &50);
-    
+
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
@@ -505,11 +504,11 @@ fn approve_panics_with_soulbound_error() {
     let (_, _, client) = setup(&e);
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
-    
+
     client.mint(&alice, &100);
-    
+
     let result = client.try_approve(&alice, &bob, &50);
-    
+
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
@@ -524,9 +523,9 @@ fn approve_always_panics_even_with_zero_amount() {
     let (_, _, client) = setup(&e);
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
-    
+
     let result = client.try_approve(&alice, &bob, &0);
-    
+
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
@@ -541,10 +540,10 @@ fn approve_panics_even_for_non_existent_balance() {
     let (_, _, client) = setup(&e);
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
-    
+
     // alice has no LRN balance
     let result = client.try_approve(&alice, &bob, &50);
-    
+
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
@@ -561,7 +560,7 @@ fn allowance_returns_zero() {
     let (_, _, client) = setup(&e);
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
-    
+
     let allowance = client.allowance(&alice, &bob);
     assert_eq!(allowance, 0);
 }
@@ -573,10 +572,10 @@ fn allowance_always_returns_zero_regardless_of_accounts() {
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
     let charlie = Address::generate(&e);
-    
+
     // Mint some tokens to alice
     client.mint(&alice, &1000);
-    
+
     // Allowance should still be 0 for any pair
     assert_eq!(client.allowance(&alice, &bob), 0);
     assert_eq!(client.allowance(&alice, &charlie), 0);
@@ -589,9 +588,9 @@ fn allowance_returns_zero_for_same_address() {
     let e = Env::default();
     let (_, _, client) = setup(&e);
     let alice = Address::generate(&e);
-    
+
     client.mint(&alice, &500);
-    
+
     // Even allowance from alice to herself should be 0
     assert_eq!(client.allowance(&alice, &alice), 0);
 }
@@ -606,25 +605,24 @@ fn admin_transfers_always_succeed() {
     let admin3 = Address::generate(&e);
     let id = e.register(LearnToken, ());
     e.mock_all_auths();
-    
+
     let client = LearnTokenClient::new(&e, &id);
     client.initialize(&admin1);
-    
+
     // First transfer
     client.set_admin(&admin2);
-    
+
     // Second transfer (new admin can transfer admin)
     client.set_admin(&admin3);
-    
+
     // Verify final admin is admin3
     assert_eq!(client.total_supply(), 0);
-    
+
     // admin3 should be able to mint (verifies admin transfer worked)
     let learner = Address::generate(&e);
     client.mint(&learner, &100);
     assert_eq!(client.balance(&learner), 100);
 }
-
 
 // --- initialization completeness tests ---
 
@@ -632,11 +630,14 @@ fn admin_transfers_always_succeed() {
 fn initialized_contract_has_all_metadata() {
     let e = Env::default();
     let (_, _, client) = setup(&e);
-    
+
     use soroban_sdk::String;
-    
+
     // All metadata should be set
-    assert_eq!(client.name(), String::from_str(&e, "LearnVault Learn Token"));
+    assert_eq!(
+        client.name(),
+        String::from_str(&e, "LearnVault Learn Token")
+    );
     assert_eq!(client.symbol(), String::from_str(&e, "LRN"));
     assert_eq!(client.decimals(), 7);
     assert_eq!(client.get_version(), String::from_str(&e, "1.0.0"));
@@ -650,11 +651,11 @@ fn large_mint_amounts_tracked_correctly() {
     let e = Env::default();
     let (_, _, client) = setup(&e);
     let learner = Address::generate(&e);
-    
+
     // Test with large amounts
     let large_amount: i128 = 1_000_000_000;
     client.mint(&learner, &large_amount);
-    
+
     assert_eq!(client.balance(&learner), large_amount);
     assert_eq!(client.total_supply(), large_amount);
 }
@@ -665,15 +666,15 @@ fn multiple_small_mints_vs_single_large_mint() {
     let (_, _, client) = setup(&e);
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
-    
+
     // Alice receives 10 mints of 100 each
     for _ in 0..10 {
         client.mint(&alice, &100);
     }
-    
+
     // Bob receives a single mint of 1000
     client.mint(&bob, &1000);
-    
+
     assert_eq!(client.balance(&alice), 1000);
     assert_eq!(client.balance(&bob), 1000);
     assert_eq!(client.total_supply(), 2000);
@@ -686,12 +687,12 @@ fn reputation_score_matches_balance_division() {
     let e = Env::default();
     let (_, _, client) = setup(&e);
     let learner = Address::generate(&e);
-    
+
     for _amount in [1, 10, 99, 100, 101, 999, 1000, 9999, 10000] {
         client.mint(&learner, &1); // Increment balance one at a time
         let balance = client.balance(&learner);
         let reputation = client.reputation_score(&learner);
-        
+
         assert_eq!(
             reputation,
             balance / 100,
@@ -700,4 +701,3 @@ fn reputation_score_matches_balance_division() {
         );
     }
 }
-

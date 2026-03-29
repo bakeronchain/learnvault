@@ -27,6 +27,7 @@ export function createRequireAuth(jwtService: JwtService) {
 		try {
 			const { sub } = jwtService.verifyWalletToken(token)
 			req.walletAddress = sub
+			;(req as AuthRequest).user = { address: sub }
 			next()
 		} catch {
 			res.status(401).json({ error: "Invalid or expired token" })

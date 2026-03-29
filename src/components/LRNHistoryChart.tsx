@@ -119,8 +119,10 @@ const LRNHistoryChart: React.FC<LRNHistoryChartProps> = ({ address }) => {
 							color: "#fff",
 							fontSize: 12,
 						}}
-						formatter={(value: number) => [
-							value.toLocaleString(),
+						formatter={(value) => [
+							typeof value === "number"
+								? value.toLocaleString()
+								: String(value),
 							"Cumulative LRN",
 						]}
 					/>

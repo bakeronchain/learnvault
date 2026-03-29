@@ -26,7 +26,8 @@ const Dashboard: React.FC = () => {
 		useLearnToken(address)
 
 	// Fetch enrolled courses and milestone progress from contract
-	const { enrolledCourses, progressMap, isCompletingMilestone } = useCourse()
+	const { enrolledCourses, getCourseProgress, isCompletingMilestone } =
+		useCourse()
 
 	useEffect(() => {
 		if (address) {
@@ -46,12 +47,12 @@ const Dashboard: React.FC = () => {
 		}
 	}, [address, navigate])
 
-	// Calculate milestone count from progress map
+	// Calculate milestone count from enrolled courses' progress
 	const milestonesCompleted = useMemo(() => {
-		return Object.values(progressMap).reduce((total, progress) => {
-			return total + progress.completedMilestoneIds.length
+		return enrolledCourses.reduce((total, course) => {
+			return total + getCourseProgress(course.id).completedMilestoneIds.length
 		}, 0)
-	}, [progressMap])
+	}, [enrolledCourses, getCourseProgress])
 
 	// Check if data is still loading
 	const isLoading =

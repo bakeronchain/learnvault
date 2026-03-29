@@ -22,6 +22,12 @@ interface CommentCardProps {
 	onUpdate?: () => void
 }
 
+const API_URL = (
+	(import.meta.env.VITE_API_URL as string | undefined) ??
+	(import.meta.env.VITE_SERVER_URL as string | undefined) ??
+	""
+).replace(/\/$/, "")
+
 const shortenAddress = (address: string) => {
 	if (!address) return ""
 	return `${address.slice(0, 6)}...${address.slice(-4)}`
@@ -47,7 +53,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 		const token = localStorage.getItem("auth_token") || "mock-token"
 		try {
 			const res = await fetch(
-				`${import.meta.env.VITE_SERVER_URL}/api/comments/${comment.id}/vote`,
+				`${API_URL}/api/comments/${comment.id}/vote`,
 				{
 					method: "PUT",
 					headers: {
@@ -67,7 +73,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 		const token = localStorage.getItem("auth_token") || "mock-token"
 		try {
 			const res = await fetch(
-				`${import.meta.env.VITE_SERVER_URL}/api/comments/${comment.id}/pin`,
+				`${API_URL}/api/comments/${comment.id}/pin`,
 				{
 					method: "PUT",
 					headers: {
@@ -92,7 +98,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 
 		try {
 			const res = await fetch(
-				`${import.meta.env.VITE_SERVER_URL}/api/comments`,
+				`${API_URL}/api/comments`,
 				{
 					method: "POST",
 					headers: {

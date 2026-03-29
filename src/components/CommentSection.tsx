@@ -19,6 +19,12 @@ interface CommentSectionProps {
 	proposalAuthor?: string
 }
 
+const API_URL = (
+	(import.meta.env.VITE_API_URL as string | undefined) ??
+	(import.meta.env.VITE_SERVER_URL as string | undefined) ??
+	""
+).replace(/\/$/, "")
+
 const CommentSection: React.FC<CommentSectionProps> = ({
 	proposalId,
 	proposalAuthor,
@@ -39,7 +45,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 		setLoading(true)
 		try {
 			const res = await fetch(
-				`${import.meta.env.VITE_SERVER_URL}/api/proposals/${proposalId}/comments`,
+				`${API_URL}/api/proposals/${proposalId}/comments`,
 			)
 			const data = await res.json()
 			setComments(data)
@@ -67,7 +73,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 
 		try {
 			const res = await fetch(
-				`${import.meta.env.VITE_SERVER_URL}/api/comments`,
+				`${API_URL}/api/comments`,
 				{
 					method: "POST",
 					headers: {

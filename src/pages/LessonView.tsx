@@ -37,12 +37,17 @@ const LessonView: React.FC = () => {
 	} = useCourseDetail(courseId)
 
 	const [isLoadingContent, setIsLoadingContent] = useState(true)
+	const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
 	useEffect(() => {
 		// Simulate a short content load delay
 		setIsLoadingContent(true)
 		const timer = setTimeout(() => setIsLoadingContent(false), 500)
 		return () => clearTimeout(timer)
+	}, [lessonId])
+
+	useEffect(() => {
+		setIsSidebarOpen(false)
 	}, [lessonId])
 
 	const lesson = useMemo(
@@ -172,8 +177,60 @@ const LessonView: React.FC = () => {
 				</h1>
 			</header>
 
+			<div className="lg:hidden mb-6">
+				<button
+					type="button"
+					onClick={() => setIsSidebarOpen(true)}
+					className="w-full px-4 py-3 rounded-2xl border border-white/10 glass text-sm font-black uppercase tracking-widest text-white/70 hover:text-white hover:border-white/20 transition-colors"
+				>
+					Open Track Outline
+				</button>
+			</div>
+
+			<div
+				className={`lg:hidden ${isSidebarOpen ? "pointer-events-auto" : "pointer-events-none"}`}
+			>
+				<button
+					type="button"
+					aria-label="Close lesson sidebar backdrop"
+					onClick={() => setIsSidebarOpen(false)}
+					className={`fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${
+						isSidebarOpen ? "opacity-100" : "opacity-0"
+					}`}
+				/>
+				<aside
+					className={`fixed left-0 top-0 z-50 h-full w-[min(22rem,90vw)] border-r border-white/10 bg-[#070910] p-4 transition-transform duration-300 ${
+						isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+					}`}
+				>
+					<div className="mb-4 flex items-center justify-between">
+						<span className="text-xs font-black uppercase tracking-[0.25em] text-white/40">
+							Lessons
+						</span>
+						<button
+							type="button"
+							onClick={() => setIsSidebarOpen(false)}
+							className="w-9 h-9 rounded-xl border border-white/10 text-white/70 hover:text-white hover:border-white/20"
+							aria-label="Close lesson sidebar"
+						>
+							×
+						</button>
+					</div>
+					{isLoadingCourse || isLoadingContent ? (
+						<LessonListSkeleton />
+					) : (
+						<LessonSidebar
+							courseId={course.slug}
+							lessons={allLessons}
+							completedMilestones={completedMilestones}
+							currentLessonId={lessonId}
+						/>
+					)}
+				</aside>
+			</div>
+
 			<div className="grid grid-cols-1 lg:grid-cols-[1fr_2.5fr] gap-8">
-				<div className="lg:sticky lg:top-28 h-fit">
+				<div className="hidden lg:block lg:sticky lg:top-28 h-fit">
 					{isLoadingCourse || isLoadingContent ? (
 						<LessonListSkeleton />
 					) : (

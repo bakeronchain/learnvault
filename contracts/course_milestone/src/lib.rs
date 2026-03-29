@@ -2,8 +2,8 @@
 #![allow(deprecated)]
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, panic_with_error,
-    symbol_short, Address, Env, String, Symbol, Vec,
+    Address, Env, String, Symbol, Vec, contract, contracterror, contractimpl, contracttype,
+    panic_with_error, symbol_short,
 };
 
 mod interface;
@@ -404,7 +404,7 @@ impl CourseMilestone {
             .persistent()
             .get(&key)
             .unwrap_or_else(|| Vec::new(&env));
-        if courses.len() > 0 {
+        if !courses.is_empty() {
             Self::extend_persistent(&env, &key);
         }
         courses
@@ -440,7 +440,11 @@ impl CourseMilestone {
         }
 
         let reward_key = DataKey::MilestoneLrn(course_id.clone(), milestone_id);
-        let lrn_reward = env.storage().persistent().get(&reward_key).unwrap_or(0_i128);
+        let lrn_reward = env
+            .storage()
+            .persistent()
+            .get(&reward_key)
+            .unwrap_or(0_i128);
 
         env.storage().persistent().set(&completed_key, &true);
         env.storage()
@@ -464,12 +468,7 @@ impl CourseMilestone {
         );
     }
 
-    pub fn is_completed(
-        env: Env,
-        learner: Address,
-        course_id: String,
-        milestone_id: u32,
-    ) -> bool {
+    pub fn is_completed(env: Env, learner: Address, course_id: String, milestone_id: u32) -> bool {
         let completed_key = DataKey::Completed(learner, course_id, milestone_id);
         let completed = env
             .storage()

@@ -1,8 +1,9 @@
 extern crate std;
 
 use soroban_sdk::{
-    Address, Env, IntoVal, String, Val, Vec, contract, contractimpl, contracttype, symbol_short, vec,
+    Address, Env, IntoVal, String, Val, Vec, contract, contractimpl, contracttype, symbol_short,
     testutils::{Address as _, Events as _, MockAuth, MockAuthInvoke},
+    vec,
 };
 
 use crate::{
@@ -78,7 +79,14 @@ fn setup() -> (
     );
     client.initialize(&admin, &learn_token_id);
 
-    (env, contract_id, admin, learn_token_id, client, token_client)
+    (
+        env,
+        contract_id,
+        admin,
+        learn_token_id,
+        client,
+        token_client,
+    )
 }
 
 fn add_course(
@@ -130,7 +138,12 @@ fn submit_milestone(
         learner,
         contract_id,
         "submit_milestone",
-        (learner.clone(), course_id.clone(), milestone_id, evidence_uri.clone()),
+        (
+            learner.clone(),
+            course_id.clone(),
+            milestone_id,
+            evidence_uri.clone(),
+        ),
     );
     client.submit_milestone(learner, course_id, &milestone_id, evidence_uri);
 }
@@ -246,7 +259,13 @@ fn verify_milestone_mints_lrn_and_marks_completion() {
         &admin,
         &contract_id,
         "verify_milestone",
-        (admin.clone(), learner.clone(), course_id.clone(), 1_u32, 125_i128),
+        (
+            admin.clone(),
+            learner.clone(),
+            course_id.clone(),
+            1_u32,
+            125_i128,
+        ),
     );
     client.verify_milestone(&admin, &learner, &course_id, &1, &125);
 
@@ -283,7 +302,13 @@ fn verify_milestone_fails_for_non_admin() {
         &attacker,
         &contract_id,
         "verify_milestone",
-        (attacker.clone(), learner.clone(), course_id.clone(), 1_u32, 125_i128),
+        (
+            attacker.clone(),
+            learner.clone(),
+            course_id.clone(),
+            1_u32,
+            125_i128,
+        ),
     );
     let result = client.try_verify_milestone(&attacker, &learner, &course_id, &1, &125);
 
@@ -327,7 +352,11 @@ fn reject_milestone_marks_rejected_and_clears_submission() {
         client.get_milestone_status(&learner, &course_id, &1),
         MilestoneStatus::Rejected
     );
-    assert!(client.get_milestone_submission(&learner, &course_id, &1).is_none());
+    assert!(
+        client
+            .get_milestone_submission(&learner, &course_id, &1)
+            .is_none()
+    );
 }
 
 #[test]
@@ -385,16 +414,15 @@ fn complete_milestone_marks_completion_and_emits_reward_event() {
 
     let events = env.events().all();
     let found = events.iter().any(|(_, topics, data)| {
-        topics.contains(&symbol_short!("ms_done").into_val(&env))
-            && {
-                let d: MilestoneCompleted = data.clone().into_val(&env);
-                d == MilestoneCompleted {
-                    learner: learner.clone(),
-                    course_id: course_id.clone(),
-                    milestone_id: 2,
-                    lrn_reward: 75,
-                }
+        topics.contains(&symbol_short!("ms_done").into_val(&env)) && {
+            let d: MilestoneCompleted = data.clone().into_val(&env);
+            d == MilestoneCompleted {
+                learner: learner.clone(),
+                course_id: course_id.clone(),
+                milestone_id: 2,
+                lrn_reward: 75,
             }
+        }
     });
     assert!(found, "completion event with reward was not emitted");
 

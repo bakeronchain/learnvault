@@ -10,6 +10,7 @@ const scholarshipTreasuryLoader =
 	generatedContractModules["../contracts/scholarship_treasury.ts"]
 
 const STROOPS_PER_USDC = 10000000
+import { logger } from "../utils/logger"
 
 export interface ScholarshipTreasuryContract {
 	createProposal: (
@@ -165,6 +166,16 @@ export class ScholarshipTreasury implements ScholarshipTreasuryContract {
 			void params
 			void _address
 			return `PROPOSAL_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
+			const mockTxHash = `PROPOSAL_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
+
+			logger.debug("Creating proposal with params:", params)
+			logger.debug("Contract ID:", this.contractId)
+			logger.debug("Submitting from address:", this.address)
+
+			// Simulate contract call delay
+			await new Promise((resolve) => setTimeout(resolve, 1500))
+
+			return mockTxHash
 		} catch (error) {
 			console.error("Failed to create proposal:", error)
 			throw new Error("Failed to submit proposal to contract")

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useToast } from "../components/Toast/ToastProvider"
 import { rpcUrl } from "../contracts/util"
 import { ErrorCode, createAppError } from "../types/errors"
+import { logger } from "../utils/logger"
 import { parseError, isUserRejection } from "../utils/errors"
 import { useNotification } from "./useNotification"
 import { useWallet } from "./useWallet"
@@ -83,7 +84,7 @@ const loadCourseClient = async (): Promise<AnyRecord | null> => {
 		const mod = (await import(/* @vite-ignore */ path)) as AnyRecord
 		return (mod.default as AnyRecord) ?? mod
 	} catch (err) {
-		console.warn(
+		logger.warn(
 			createAppError(
 				ErrorCode.CONTRACT_NOT_DEPLOYED,
 				"CourseMilestone contract not available",
@@ -106,7 +107,7 @@ const callFirst = async (
 		try {
 			return await Promise.resolve(fn(...args))
 		} catch (err) {
-			console.debug(`Method ${name} failed, trying next method:`, err)
+			logger.debug(`Method ${name} failed, trying next method:`, err)
 			continue
 		}
 	}
@@ -194,7 +195,7 @@ const waitForMintEvent = async (
 				}
 			}
 		} catch (err) {
-			console.debug("Polling for mint event failed, continuing:", err)
+			logger.debug("Polling for mint event failed, continuing:", err)
 		}
 		await new Promise((resolve) => setTimeout(resolve, 1000))
 	}

@@ -4,6 +4,7 @@
 
 import { Contract, rpc, xdr } from "@stellar/stellar-sdk"
 import { networkPassphrase, rpcUrl } from "../contracts/util"
+import { logger } from "../utils/logger"
 
 /**
  * Get the USDC contract ID from environment variables.
@@ -68,7 +69,7 @@ export async function mintTestUSDC(
 export async function getUSDCBalance(address: string): Promise<bigint> {
 	const contractId = getUSDCContractId()
 	if (!contractId) {
-		console.warn(
+		logger.warn(
 			"[getUSDCBalance] USDC contract ID not configured " +
 				"(set PUBLIC_USDC_CONTRACT_ID or VITE_USDC_CONTRACT_ID).",
 		)
@@ -119,7 +120,7 @@ export async function getUSDCBalance(address: string): Promise<bigint> {
 
 		if (rpc.Api.isSimulationError(result)) {
 			// Contract not deployed or address not found — treat as zero balance
-			console.warn("[getUSDCBalance] Simulation error:", result.error)
+			logger.warn("[getUSDCBalance] Simulation error:", result.error)
 			return 0n
 		}
 

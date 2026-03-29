@@ -74,6 +74,29 @@ pub struct GOVBurned {
     pub amount: i128,
 }
 
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GOVMinted {
+    pub to: Address,
+    pub amount: i128,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GOVTransferred {
+    pub from: Address,
+    pub to: Address,
+    pub amount: i128,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GOVApproved {
+    pub owner: Address,
+    pub spender: Address,
+    pub amount: i128,
+}
+
 // ---------------------------------------------------------------------------
 // Contract
 // ---------------------------------------------------------------------------
@@ -142,6 +165,8 @@ impl GovernanceToken {
         env.storage()
             .instance()
             .set(&DataKey::TotalSupply, &(supply + amount));
+
+        GOVMinted { to, amount }.publish(&env);
     }
 
     /// Burn `amount` from the caller's own balance.
@@ -215,6 +240,8 @@ impl GovernanceToken {
         }
         Self::_debit(&env, &from, amount);
         Self::_credit(&env, &to, amount);
+
+        GOVTransferred { from, to, amount }.publish(&env);
     }
 
     /// Approve `spender` to spend up to `amount` on behalf of `owner`.
@@ -231,11 +258,18 @@ impl GovernanceToken {
             panic_with_error!(&env, GOVError::InvalidExpiration);
         }
 
-        let key = DataKey::Allowance(owner, spender);
+        let key = DataKey::Allowance(owner.clone(), spender.clone());
         env.storage()
             .persistent()
             .set(&key, &(amount, expiration_ledger));
         Self::extend_persistent(&env, &key);
+
+        GOVApproved {
+            owner,
+            spender,
+            amount,
+        }
+        .publish(&env);
     }
 
     /// Transfer `amount` from `from` to `to` using `spender`'s allowance.
@@ -270,6 +304,8 @@ impl GovernanceToken {
 
         Self::_debit(&env, &from, amount);
         Self::_credit(&env, &to, amount);
+
+        GOVTransferred { from, to, amount }.publish(&env);
     }
 
     // -----------------------------------------------------------------------

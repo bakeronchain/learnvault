@@ -452,13 +452,18 @@ mod fuzz_tests {
         #[test]
         #[ignore]
         fn fuzz_tranche_disbursement_amounts(amount in 1..1_000_000_000_i128, tranches in 1..1000_u32) {
-            let (env, contract_id, _token, _admin, _treasury, scholar) = setup();
+            let (env, contract_id, token, _admin, treasury, scholar) = setup();
             let client = MilestoneEscrowClient::new(&env, &contract_id);
 
             // Overpayment check constraint: amounts must be enough for tranches
             if amount < tranches as i128 {
                 return Ok(());
             }
+
+            // Ensure the treasury has enough balance for the randomized escrow amount.
+            // setup() only mints 1_000 tokens by default.
+            env.mock_all_auths();
+            stellar_asset_client(&env, &token).mint(&treasury, &amount);
 
             create_escrow(&client, 100, &scholar, amount, tranches);
 

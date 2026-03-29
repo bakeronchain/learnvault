@@ -1,165 +1,156 @@
 @import "tailwindcss";
 
 @theme {
-	--color-brand-cyan: #00d2ff;
-	--color-brand-blue: #3a7bd5;
-	--color-brand-emerald: #00ff80;
-	--color-brand-purple: #8e2de2;
+    --color-brand-cyan: #00d2ff;
+    --color-brand-blue: #3a7bd5;
+    --color-brand-emerald: #00ff80;
+    --color-brand-purple: #8e2de2;
 
-	--bg-mesh-gradient:
-		radial-gradient(at 0% 0%, rgba(0, 210, 255, 0.15) 0px, transparent 50%),
-		radial-gradient(at 50% 0%, rgba(58, 123, 213, 0.15) 0px, transparent 50%),
-		radial-gradient(at 100% 0%, rgba(0, 255, 128, 0.15) 0px, transparent 50%),
-		radial-gradient(at 0% 100%, rgba(142, 45, 226, 0.15) 0px, transparent 50%),
-		radial-gradient(at 100% 100%, rgba(0, 210, 255, 0.15) 0px, transparent 50%);
+    --color-app-bg: #ffffff;
+    --color-app-text: #0f172a;
+    --color-glass-bg: rgba(255, 255, 255, 0.8);
+    --color-glass-border: rgba(0, 0, 0, 0.08);
 
-	--animate-mesh: mesh 20s ease infinite;
+    --bg-mesh-gradient:
+        radial-gradient(at 0% 0%, rgba(0, 210, 255, 0.15) 0px, transparent 50%),
+        radial-gradient(at 50% 0%, rgba(58, 123, 213, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(0, 255, 128, 0.15) 0px, transparent 50%),
+        radial-gradient(at 0% 100%, rgba(142, 45, 226, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(0, 210, 255, 0.15) 0px, transparent 50%);
 
-	@keyframes mesh {
-		0%,
-		100% {
-			background-position: 0% 50%;
-		}
+    --animate-mesh: mesh 20s ease infinite;
 
-		50% {
-			background-position: 100% 50%;
-		}
-	}
-
-	@keyframes shimmer {
-		0% {
-			transform: translateX(-100%);
-		}
-
-		100% {
-			transform: translateX(100%);
-		}
-	}
+    @keyframes mesh {
+        0%, 100% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+    }
 }
 
 :root {
-	color-scheme: dark;
+    --color-app-bg: #ffffff;
+    --color-app-text: #0f172a;
+    --color-glass-bg: rgba(255, 255, 255, 0.9);
+    --color-glass-border: rgba(0, 0, 0, 0.1);
+    color-scheme: light dark;
 }
 
-html {
-	scroll-behavior: smooth;
+/* Issue #61 — Dark mode: supports both SDS class and Tailwind dark: variant */
+.sds-theme-dark,
+.dark {
+    --color-app-bg: #05070a;
+    --color-app-text: #ffffff;
+    --color-glass-bg: rgba(15, 20, 28, 0.9);
+    --color-glass-border: rgba(255, 255, 255, 0.1);
 }
 
-html,
 body {
-	margin: 0;
-	padding: 0;
-	width: 100%;
+    background-color: var(--color-app-bg);
+    background-image: var(--bg-mesh-gradient);
+    background-size: 200% 200%;
+    animation: var(--animate-mesh);
+    color: var(--color-app-text);
+    transition: background-color 0.3s ease, color 0.3s ease;
+    font-family: "Inter", sans-serif;
 }
 
-body {
-	background-color: #05070a;
-	background-image: var(--bg-mesh-gradient);
-	background-size: 200% 200%;
-	animation: var(--animate-mesh);
-	color: white;
-	font-family:
-		"Inter",
-		system-ui,
-		-apple-system,
-		sans-serif;
-	-webkit-font-smoothing: antialiased;
+/* Fix for the COURSES/LEARN buttons text visibility */
+.glass, .glass-card {
+    background: var(--color-glass-bg) !important;
+    border: 1px solid var(--color-glass-border) !important;
+    color: var(--color-app-text) !important;
 }
 
-a:focus-visible,
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-[tabindex]:not([tabindex="-1"]):focus-visible {
-	outline: 3px solid rgba(0, 210, 255, 0.9);
-	outline-offset: 3px;
-	box-shadow: 0 0 0 6px rgba(0, 210, 255, 0.18);
+/* Ensure buttons in the middle of the screen (like COURSES) are always readable */
+button.glass, a.glass {
+    color: var(--color-app-text) !important;
+    font-weight: 900;
 }
 
-.glass {
-	background: rgba(255, 255, 255, 0.03);
-	backdrop-filter: blur(20px);
-	-webkit-backdrop-filter: blur(20px);
-	border: 1px solid rgba(255, 255, 255, 0.05);
+/* Footer Visibility Fix */
+footer, .footer-content, footer p, footer span {
+    color: var(--color-app-text) !important;
 }
 
-.glass-card {
-	background: linear-gradient(
-		135deg,
-		rgba(255, 255, 255, 0.05) 0%,
-		rgba(255, 255, 255, 0.01) 100%
-	);
-	backdrop-filter: blur(24px);
-	border: 1px solid rgba(255, 255, 255, 0.08);
-	box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+footer a {
+    color: var(--color-app-text) !important;
+    opacity: 0.8;
 }
 
-.iridescent-border {
-	position: relative;
-	background: #11141a;
-	background-clip: padding-box;
-	border: 1px solid transparent;
-}
-
-.iridescent-border::before {
-	content: "";
-	position: absolute;
-	top: 0;
-	right: 0;
-	bottom: 0;
-	left: 0;
-	z-index: -1;
-	margin: -1px;
-	border-radius: inherit;
-	background: linear-gradient(to right, #00d2ff, #3a7bd5, #00ff80, #8e2de2);
+footer a:hover {
+    opacity: 1;
+    color: var(--color-brand-cyan) !important;
 }
 
 .text-gradient {
-	background: linear-gradient(to right, #00d2ff, #3a7bd5, #00ff80);
-	-webkit-background-clip: text;
-	-webkit-text-fill-color: transparent;
-	background-clip: text;
+    background: linear-gradient(to right, #00d2ff, #3a7bd5, #00ff80);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 .animate-shimmer {
-	display: block;
-	position: relative;
-	overflow: hidden;
+    display: block;
+    position: relative;
+    overflow: hidden;
 }
 
 .animate-shimmer::after {
-	content: "";
-	position: absolute;
-	top: 0;
-	right: 0;
-	bottom: 0;
-	left: 0;
-	background: linear-gradient(
-		90deg,
-		transparent,
-		rgba(255, 255, 255, 0.05),
-		transparent
-	);
-	animation: shimmer 2s infinite;
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.05),
+        transparent
+    );
+    animation: shimmer 2s infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-	html {
-		scroll-behavior: auto;
-	}
+    html {
+        scroll-behavior: auto;
+    }
 
-	*,
-	*::before,
-	*::after {
-		animation-duration: 0.01ms !important;
-		animation-iteration-count: 1 !important;
-		transition-duration: 0.01ms !important;
-		scroll-behavior: auto !important;
-	}
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 
-	body {
-		animation: none;
-		background-size: auto;
-	}
+    body {
+        animation: none;
+        background-size: auto;
+    }
+}
+/* Issue #61 — Fix body background in dark mode */
+.sds-theme-dark body,
+.dark body {
+    background-image:
+        radial-gradient(at 0% 0%, rgba(0, 210, 255, 0.08) 0px, transparent 50%),
+        radial-gradient(at 50% 0%, rgba(58, 123, 213, 0.08) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(0, 255, 128, 0.08) 0px, transparent 50%),
+        radial-gradient(at 0% 100%, rgba(142, 45, 226, 0.08) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(0, 210, 255, 0.08) 0px, transparent 50%);
+}
+
+/* Issue #61 — Fix COURSES button visibility in dark mode */
+.sds-theme-dark .glass button,
+.dark .glass button,
+.sds-theme-dark button.glass,
+.dark button.glass {
+    color: #ffffff !important;
+}
+/* Issue #61 — Connect Wallet button text fix in dark mode */
+.sds-theme-dark button[variant="secondary"],
+.dark button[variant="secondary"],
+.sds-theme-dark .sc-bdVTJa,
+.dark .sc-bdVTJa {
+    color: #000000 !important;
 }

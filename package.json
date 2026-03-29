@@ -47,6 +47,7 @@
     "react-dom": "^19.2.4",
     "react-helmet": "^6.1.0",
     "react-i18next": "^16.6.2",
+    "react-is": "^19.2.4",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.13.2",
     "recharts": "^2.15.1",
@@ -56,6 +57,7 @@
     "zod": "^4.3.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
@@ -76,7 +78,6 @@
     "husky": "^9.1.7",
     "jsdom": "^29.0.1",
     "lint-staged": "^16.2.7",
-    "@playwright/test": "^1.55.0",
     "prettier": "^3.8.0",
     "recharts": "^3.8.0",
     "typescript": "~5.9.3",

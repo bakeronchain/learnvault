@@ -17,6 +17,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"))
 const Debug = lazy(() => import("./pages/Debug"))
 const Donor = lazy(() => import("./pages/Donor"))
 const Home = lazy(() => import("./pages/Home"))
+const History = lazy(() => import("./pages/History"))
 const Leaderboard = lazy(() => import("./pages/Leaderboard"))
 const Learn = lazy(() => import("./pages/Learn"))
 const LessonView = lazy(() => import("./pages/LessonView"))
@@ -51,6 +52,7 @@ function App() {
 					/>
 					<Route path="/dao/propose" element={renderRoute(<DaoPropose />)} />
 					<Route path="/leaderboard" element={renderRoute(<Leaderboard />)} />
+					<Route path="/history" element={renderRoute(<History />)} />
 					<Route path="/profile" element={renderRoute(<Profile />)} />
 					<Route
 						path="/profile/:walletAddress"

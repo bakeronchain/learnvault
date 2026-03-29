@@ -1,6 +1,6 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Helmet } from "react-helmet"
-import { useParams } from "react-router-dom"
+import { useParams, Link } from "react-router-dom"
 import TxHashLink from "../components/TxHashLink"
 import { useScholarNft } from "../hooks/useScholarNft"
 
@@ -76,9 +76,102 @@ const ErrorState: React.FC<ErrorStateProps> = ({ title, message, icon }) => (
 // ---------------------------------------------------------------------------
 
 const Credential: React.FC = () => {
-	const { nftId } = useParams<{ nftId: string }>()
+	const { id } = useParams<{ id: string }>()
 	const [copySuccess, setCopySuccess] = useState(false)
+	const [isLoading, setIsLoading] = useState(true)
+	const [error, setError] = useState<string | null>(null)
 
+	// Simulate API call to fetch credential data
+	useEffect(() => {
+		const fetchCredential = async () => {
+			setIsLoading(true)
+			setError(null)
+			
+			try {
+				// Simulate API delay
+				await new Promise(resolve => setTimeout(resolve, 1000))
+				
+				// Validate ID format (basic check)
+				if (!id || isNaN(Number(id))) {
+					throw new Error("Invalid credential ID")
+				}
+				
+				// For demo purposes, we'll use mock data
+				// In a real implementation, this would fetch from /api/credentials/:id
+				if (id === "999") {
+					throw new Error("Credential not found or revoked")
+				}
+			} catch (err) {
+				setError(err instanceof Error ? err.message : "Failed to load credential")
+			} finally {
+				setIsLoading(false)
+			}
+		}
+		
+		if (id) {
+			fetchCredential()
+		} else {
+			setError("No credential ID provided")
+			setIsLoading(false)
+		}
+	}, [id])
+
+	// Mock credential data - in production this would come from API
+	const nft = {
+		id: id || "1",
+		programName: "Soroban Smart Contract Masterclass",
+		scholarName: "Alex Rivera",
+		completionDate: "October 24, 2024",
+		artworkUrl: "https://api.placeholder.com/600/600?text=ScholarNFT+Badge",
+		txHash: "3f40a5c6f2e1471fa3f31ba6b59f7f0dcefc36e35d5b12fb96f0c8d9f6a8b4e1",
+		issuer: "LearnVault DAO",
+		reputationPoints: "50 LRN",
+		learnerAddress: "GD5V5B3X4K3X2Y7Z8W9Q1R2T3Y4U5I6O7P8Q9R0S1T",
+		metadataUri: "ipfs://QmXyZ123..."
+	}
+
+	const siteUrl = "https://learnvault.app"
+	const title = error ? "Credential Not Found — LearnVault" : `${nft.scholarName} earned "${nft.programName}" — LearnVault`
+	const description = error ? "The requested credential could not be found or has been revoked." : `${nft.scholarName} completed "${nft.programName}" on ${nft.completionDate} and earned a verified ScholarNFT credential on LearnVault.`
+
+	// Loading state
+	if (isLoading) {
+		return (
+			<div className="py-20 px-6 min-h-screen flex flex-col items-center justify-center text-white">
+				<div className="glass-card rounded-[2.5rem] p-12 animate-pulse">
+					<div className="w-32 h-32 bg-white/10 rounded-full mb-8" />
+					<div className="h-8 w-64 bg-white/10 rounded-full mb-4" />
+					<div className="h-4 w-48 bg-white/10 rounded-full" />
+				</div>
+			</div>
+		)
+	}
+
+	// Error state
+	if (error) {
+		return (
+			<div className="py-20 px-6 min-h-screen flex flex-col items-center justify-center text-white">
+				<Helmet>
+					<title>{title}</title>
+					<meta property="og:title" content={title} />
+					<meta property="og:description" content={description} />
+				</Helmet>
+				<div className="glass-card rounded-[2.5rem] p-12 max-w-2xl text-center">
+					<div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+						<span className="text-2xl">⚠️</span>
+					</div>
+					<h1 className="text-3xl font-black mb-4">Credential Not Found</h1>
+					<p className="text-white/70 mb-8">{error}</p>
+					<Link
+						to="/profile"
+						className="inline-flex items-center gap-2 px-8 py-3 bg-brand-cyan text-black rounded-xl font-black text-sm uppercase tracking-widest hover:scale-105 transition-all"
+					>
+						← Back to Profile
+					</Link>
+				</div>
+			</div>
+		)
+	}
 	const { credential: nft, status, error } = useScholarNft(nftId)
 
 	const copyToClipboard = () => {
@@ -258,6 +351,28 @@ const Credential: React.FC = () => {
 							</div>
 							<div className="col-span-2">
 								<p className="block text-[10px] uppercase font-black text-white/70 tracking-[3px] mb-2">
+									Learner Address
+								</p>
+								<code className="text-xs font-mono bg-black/50 px-3 py-2 rounded-lg text-brand-emerald">
+									{nft.learnerAddress}
+								</code>
+							</div>
+							<div className="col-span-2">
+								<p className="block text-[10px] uppercase font-black text-white/70 tracking-[3px] mb-2">
+									Metadata URI
+								</p>
+								<code className="text-xs font-mono bg-black/50 px-3 py-2 rounded-lg text-white/70 break-all">
+									{nft.metadataUri}
+								</code>
+							</div>
+							<div className="col-span-2">
+								<label className="block text-[10px] uppercase font-black text-white/30 tracking-[3px] mb-2">
+									Transaction Hash
+								</label>
+								<TxHashLink
+									hash={nft.txHash}
+									className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#00d2ff] hover:underline"
+								/>
 									Owner
 								</p>
 								<code className="text-xs font-mono text-brand-cyan bg-black/30 px-3 py-1.5 rounded-lg break-all">
@@ -282,6 +397,16 @@ const Credential: React.FC = () => {
 
 			<div className="flex flex-wrap justify-center gap-6 animate-in slide-in-from-bottom-8 duration-1000 delay-300">
 				<a
+					href={`https://stellar.expert/explorer/public/tx/${nft.txHash}`}
+					target="_blank"
+					rel="noopener noreferrer"
+					className="px-10 py-4 bg-gradient-to-r from-brand-cyan to-brand-blue text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-brand-cyan/20"
+					aria-label={`Verify ${nft.programName} credential on Stellar Explorer`}
+				>
+					Verify on-chain →
+				</a>
+				<a
+					href={`https://twitter.com/intent/tweet?text=I've just earned my ${nft.programName} credential on @LearnVault!`}
 					href={`https://twitter.com/intent/tweet?text=I've just earned my ${encodeURIComponent(nft.programName)} credential on @LearnVault!`}
 					className="px-10 py-4 bg-[#1d9bf0] text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-[#1d9bf0]/20"
 					aria-label={`Share ${nft.programName} credential on Twitter`}

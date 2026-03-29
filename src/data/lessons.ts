@@ -176,7 +176,7 @@ Automated Market Makers are the pricing engines behind many liquidity pools. Ins
 
 ## Main Content
 ### The constant product idea
-One of the most common AMM models uses the rule `x * y = k`, where `x` and `y` are the pool balances and `k` stays constant after accounting for fees. If a trader removes one asset, they must add enough of the other asset so the formula still holds. That balance shift changes the effective price.
+One of the most common AMM models uses the rule x * y = k, where x and y are the pool balances and k stays constant after accounting for fees. If a trader removes one asset, they must add enough of the other asset so the formula still holds. That balance shift changes the effective price.
 
 ### Why prices move during a trade
 AMMs quote prices from the current ratio of assets in the pool. A large trade pushes that ratio further than a small trade, which is why slippage increases with trade size relative to pool depth.

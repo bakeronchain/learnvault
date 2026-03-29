@@ -185,8 +185,10 @@ impl ScholarshipTreasury {
         env.storage().instance().set(&DONORS_KEY, &0_u32);
         env.storage().instance().set(&PAUSED_KEY, &false);
         env.storage().instance().set(&QUORUM_KEY, &quorum_threshold);
-        env.storage().instance().set(&APPROVAL_BPS_KEY, &approval_bps);
-        
+        env.storage()
+            .instance()
+            .set(&APPROVAL_BPS_KEY, &approval_bps);
+
         Self::extend_instance(&env);
     }
 
@@ -298,7 +300,7 @@ impl ScholarshipTreasury {
         env.storage()
             .persistent()
             .set(&donor_key, &(current + amount));
-        
+
         Self::extend_persistent(&env, &donor_key);
 
         let total = env
@@ -538,7 +540,7 @@ impl ScholarshipTreasury {
         env.storage()
             .persistent()
             .set(&DataKey::Proposal(proposal_id), &proposal);
-        
+
         Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
 
         let applicant_key = DataKey::ApplicantProposals(applicant.clone());
@@ -551,7 +553,7 @@ impl ScholarshipTreasury {
         env.storage()
             .persistent()
             .set(&applicant_key, &proposal_ids);
-        
+
         Self::extend_persistent(&env, &applicant_key);
         env.storage()
             .instance()
@@ -735,7 +737,7 @@ impl ScholarshipTreasury {
         env.storage()
             .persistent()
             .set(&DataKey::FinalizedProposal(proposal_id), &status.clone());
-        
+
         Self::extend_persistent(&env, &DataKey::FinalizedProposal(proposal_id));
 
         status

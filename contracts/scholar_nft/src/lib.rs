@@ -2,8 +2,8 @@
 #![allow(deprecated)]
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, panic_with_error,
-    symbol_short, Address, Env, String, Symbol,
+    Address, Env, String, Symbol, contract, contracterror, contractimpl, contracttype,
+    panic_with_error, symbol_short,
 };
 
 const DAY_IN_LEDGERS: u32 = 17_280;
@@ -98,10 +98,8 @@ impl ScholarNFT {
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::Counter, &0_u64);
 
-        env.events().publish(
-            (symbol_short!("init"),),
-            InitializedEventData { admin },
-        );
+        env.events()
+            .publish((symbol_short!("init"),), InitializedEventData { admin });
 
         Self::extend_instance(&env);
     }
@@ -303,9 +301,7 @@ impl ScholarNFT {
     }
 
     fn extend_persistent(env: &Env, key: &DataKey) {
-        env.storage()
-            .persistent()
-            .extend_ttl(key, TTL_MIN, TTL_MAX);
+        env.storage().persistent().extend_ttl(key, TTL_MIN, TTL_MAX);
     }
 }
 

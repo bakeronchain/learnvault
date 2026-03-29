@@ -1723,7 +1723,8 @@ fn execute_proposal_passed_disburses_and_emits_event() {
     client.vote(&donor, &proposal_id, &true);
 
     let proposal = client.get_proposal(&proposal_id).unwrap();
-    env.ledger().set_sequence_number(proposal.deadline_ledger + 1);
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1);
 
     let before = token_client(&env, &token_id).balance(&applicant);
     client.execute_proposal(&proposal_id);
@@ -1751,7 +1752,8 @@ fn execute_proposal_rejected_emits_event_and_no_disbursement() {
     client.vote(&donor, &proposal_id, &true);
 
     let proposal = client.get_proposal(&proposal_id).unwrap();
-    env.ledger().set_sequence_number(proposal.deadline_ledger + 1);
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1);
 
     let before = token_client(&env, &token_id).balance(&applicant);
     client.execute_proposal(&proposal_id);
@@ -1777,7 +1779,8 @@ fn execute_proposal_double_execute_panics() {
     gov_client.mint(&donor, &100);
     client.vote(&donor, &proposal_id, &true);
     let proposal = client.get_proposal(&proposal_id).unwrap();
-    env.ledger().set_sequence_number(proposal.deadline_ledger + 1);
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1);
 
     client.execute_proposal(&proposal_id);
     let result = client.try_execute_proposal(&proposal_id);

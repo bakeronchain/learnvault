@@ -133,6 +133,7 @@ export async function getGovernanceProposals(
 			proposals: proposalsResult.rows,
 			total,
 			page,
+			totalPages: Math.ceil(total / limit),
 		})
 	} catch {
 		res.status(500).json({ error: "Failed to fetch governance proposals" })

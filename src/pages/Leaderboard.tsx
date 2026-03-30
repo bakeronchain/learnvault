@@ -8,7 +8,7 @@ import { useWallet } from "../hooks/useWallet"
 import { API_URL } from "../lib/api"
 import { type LeaderboardEntry } from "../util/mockLeaderboardData"
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000"
+const API_URL = import.meta.env.VITE_API_URL || ""
 
 type LeaderboardApiEntry = {
 	rank: number

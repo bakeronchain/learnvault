@@ -465,6 +465,12 @@ const DaoProposals: React.FC = () => {
 				</div>
 			)}
 
+			{filteredProposals.length > 0 && (
+				<p className="text-center text-xs text-white/40 font-black uppercase tracking-widest mt-8 mb-2">
+					Page {safePage} of {totalPages}
+				</p>
+			)}
+
 			<Pagination
 				page={safePage}
 				totalPages={totalPages}

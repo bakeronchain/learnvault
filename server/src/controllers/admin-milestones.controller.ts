@@ -10,6 +10,8 @@ const emailService = createEmailService(
 	process.env.RESEND_API_KEY || process.env.EMAIL_API_KEY || "",
 )
 
+type MilestoneStatusFilter = "pending" | "approved" | "rejected"
+
 function hasStellarMilestoneCredentials(): boolean {
 	return Boolean(
 		process.env.STELLAR_SECRET_KEY && process.env.COURSE_MILESTONE_CONTRACT_ID,
@@ -17,6 +19,60 @@ function hasStellarMilestoneCredentials(): boolean {
 }
 
 // ── GET /api/admin/milestones/pending ────────────────────────────────────────
+
+export async function listMilestones(
+	req: Request,
+	res: Response,
+): Promise<void> {
+	const page =
+		typeof req.query.page === "string"
+			? Number.parseInt(req.query.page, 10)
+			: 1
+	const pageSize =
+		typeof req.query.pageSize === "string"
+			? Number.parseInt(req.query.pageSize, 10)
+			: 10
+	const courseId =
+		typeof req.query.course === "string" ? req.query.course : undefined
+	const status =
+		typeof req.query.status === "string"
+			? (req.query.status as MilestoneStatusFilter)
+			: undefined
+
+	if (
+		status &&
+		status !== "pending" &&
+		status !== "approved" &&
+		status !== "rejected"
+	) {
+		res.status(400).json({ error: "Invalid milestone status filter" })
+		return
+	}
+
+	try {
+		const safePage = Number.isFinite(page) && page > 0 ? page : 1
+		const safePageSize =
+			Number.isFinite(pageSize) && pageSize > 0 ? Math.min(pageSize, 100) : 10
+		const result = await milestoneStore.listReports(
+			{
+				courseId,
+				status,
+			},
+			safePage,
+			safePageSize,
+		)
+
+		res.status(200).json({
+			data: result.data,
+			total: result.total,
+			page: safePage,
+			pageSize: safePageSize,
+		})
+	} catch (err) {
+		console.error("[admin] listMilestones error:", err)
+		res.status(500).json({ error: "Failed to fetch milestones" })
+	}
+}
 
 export async function getPendingMilestones(
 	_req: Request,

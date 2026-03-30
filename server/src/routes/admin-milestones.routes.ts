@@ -1,5 +1,6 @@
 import { Router } from "express"
 import {
+	listMilestones,
 	getPendingMilestones,
 	getMilestoneById,
 	approveMilestone,
@@ -18,6 +19,8 @@ import { milestoneSubmissionLimiter } from "../middleware/rate-limit.middleware"
 import { validate } from "../middleware/validate.middleware"
 
 export const adminMilestonesRouter = Router()
+
+adminMilestonesRouter.get("/admin/milestones", requireAdmin, listMilestones)
 
 /**
  * @openapi

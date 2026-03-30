@@ -7,7 +7,10 @@ import {
 	getCourses,
 	updateCourse,
 } from "../controllers/courses.controller"
-import { requireCourseAdmin } from "../middleware/course-admin.middleware"
+import {
+	requireCourseAdmin,
+	requireCourseAdminIfRequested,
+} from "../middleware/course-admin.middleware"
 
 export const coursesRouter = Router()
 
@@ -68,7 +71,7 @@ export const coursesRouter = Router()
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-coursesRouter.get("/courses", getCourses)
+coursesRouter.get("/courses", requireCourseAdminIfRequested, getCourses)
 /**
  * @openapi
  * /api/courses/{idOrSlug}:

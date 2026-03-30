@@ -33,6 +33,11 @@ export interface MilestoneReportFilters {
 	status?: "pending" | "approved" | "rejected"
 }
 
+export interface PaginatedMilestoneReports {
+	data: MilestoneReport[]
+	total: number
+}
+
 // In-memory fallback store (used when Postgres is unavailable)
 class InMemoryMilestoneStore {
 	private reports: MilestoneReport[] = []
@@ -42,6 +47,24 @@ class InMemoryMilestoneStore {
 
 	async getPendingReports(): Promise<MilestoneReport[]> {
 		return this.reports.filter((r) => r.status === "pending")
+	}
+
+	async listReports(
+		filters: MilestoneReportFilters = {},
+		page: number = 1,
+		pageSize: number = 10,
+	): Promise<PaginatedMilestoneReports> {
+		const { courseId, status } = filters
+		const filtered = this.reports
+			.filter((report) => (courseId ? report.course_id === courseId : true))
+			.filter((report) => (status ? report.status === status : true))
+			.sort((a, b) => b.submitted_at.localeCompare(a.submitted_at))
+
+		const offset = (page - 1) * pageSize
+		return {
+			data: filtered.slice(offset, offset + pageSize),
+			total: filtered.length,
+		}
 	}
 
 	async getReportById(id: number): Promise<MilestoneReport | null> {
@@ -137,6 +160,53 @@ export const milestoneStore = {
 			`SELECT * FROM milestone_reports WHERE status = 'pending' ORDER BY submitted_at ASC`,
 		)
 		return result.rows
+	},
+
+	async listReports(
+		filters: MilestoneReportFilters = {},
+		page: number = 1,
+		pageSize: number = 10,
+	): Promise<PaginatedMilestoneReports> {
+		if (!isRealPool()) {
+			return inMemoryMilestoneStore.listReports(filters, page, pageSize)
+		}
+
+		const values: Array<string | number> = []
+		const conditions: string[] = []
+
+		if (filters.courseId) {
+			values.push(filters.courseId)
+			conditions.push(`course_id = $${values.length}`)
+		}
+
+		if (filters.status) {
+			values.push(filters.status)
+			conditions.push(`status = $${values.length}`)
+		}
+
+		const whereClause =
+			conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
+		const totalResult = await pool.query(
+			`SELECT COUNT(*) AS total FROM milestone_reports ${whereClause}`,
+			values,
+		)
+		const total = Number(totalResult.rows[0]?.total ?? 0)
+		const offset = (page - 1) * pageSize
+		const rowValues = [...values, pageSize, offset]
+		const dataResult = await pool.query(
+			`SELECT *
+			 FROM milestone_reports
+			 ${whereClause}
+			 ORDER BY submitted_at DESC
+			 LIMIT $${rowValues.length - 1}
+			 OFFSET $${rowValues.length}`,
+			rowValues,
+		)
+
+		return {
+			data: dataResult.rows,
+			total,
+		}
 	},
 
 	async getReportById(id: number): Promise<MilestoneReport | null> {

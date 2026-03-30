@@ -93,6 +93,9 @@ if (!jwtPrivateKey || !jwtPublicKey) {
 	jwtPublicKey = ephemeral.publicKeyPem
 }
 
+process.env.JWT_PRIVATE_KEY = jwtPrivateKey
+process.env.JWT_PUBLIC_KEY = jwtPublicKey
+
 const nonceStore = createNonceStore(env.REDIS_URL)
 const jwtService = createJwtService(jwtPrivateKey, jwtPublicKey)
 const authService = createAuthService(nonceStore, jwtService)

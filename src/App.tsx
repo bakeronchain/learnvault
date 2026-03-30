@@ -97,7 +97,8 @@ const RouteFallback = () => (
 )
 
 const AppLayout = () => (
-	<div className="min-h-screen flex flex-col pt-24 overflow-x-hidden w-full max-w-full">
+	// Issue #61 — Theme-aware background using CSS variables + Tailwind dark: variant
+	<div className="min-h-screen flex flex-col pt-24 overflow-x-hidden w-full max-w-full bg-[var(--color-app-bg)] text-[var(--color-app-text)] transition-colors duration-300">
 		<NetworkPreconnect />
 		<NavBar />
 		<main className="flex-1 relative z-10">
@@ -106,5 +107,4 @@ const AppLayout = () => (
 		<Footer />
 	</div>
 )
-
 export default App

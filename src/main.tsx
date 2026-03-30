@@ -1,8 +1,8 @@
 import {
-	QueryClient,
-	QueryClientProvider,
-	QueryCache,
-	MutationCache,
+    QueryClient,
+    QueryClientProvider,
+    QueryCache,
+    MutationCache,
 } from "@tanstack/react-query"
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
@@ -15,35 +15,59 @@ import { WalletProvider } from "./providers/WalletProvider.tsx"
 import "./i18n"
 import { parseError } from "./util/error"
 
+// Issue #61 — FOUC prevention: apply theme before first render
+;(function () {
+    try {
+        const saved = localStorage.getItem("learnvault:theme")
+        const theme = saved
+            ? JSON.parse(saved)
+            : window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light"
+        const themeClass = theme === "dark" ? "sds-theme-dark" : "sds-theme-light"
+        const html = document.documentElement
+        const body = document.body
+        // Apply SDS theme class + Tailwind dark class + data attributes
+        ;[html, body].forEach((el) => {
+            el.classList.remove("sds-theme-dark", "sds-theme-light", "dark", "light")
+            el.classList.add(themeClass)
+            if (theme === "dark") el.classList.add("dark")
+            el.setAttribute("data-theme", theme)
+            el.setAttribute("data-sds-theme", themeClass)
+        })
+        html.style.colorScheme = theme
+    } catch (e) {}
+})()
+
 const queryClient = new QueryClient({
-	queryCache: new QueryCache({
-		onError: (error) => {
-			console.error("Query Error:", parseError(error))
-		},
-	}),
-	mutationCache: new MutationCache({
-		onError: (error) => {
-			console.error("Mutation Error:", parseError(error))
-		},
-	}),
-	defaultOptions: {
-		queries: {
-			refetchOnWindowFocus: false,
-			retry: false,
-		},
-	},
+    queryCache: new QueryCache({
+        onError: (error) => {
+            console.error("Query Error:", parseError(error))
+        },
+    }),
+    mutationCache: new MutationCache({
+        onError: (error) => {
+            console.error("Mutation Error:", parseError(error))
+        },
+    }),
+    defaultOptions: {
+        queries: {
+            refetchOnWindowFocus: false,
+            retry: false,
+        },
+    },
 })
 
 createRoot(document.getElementById("root") as HTMLElement).render(
-	<StrictMode>
-		<NotificationProvider>
-			<QueryClientProvider client={queryClient}>
-				<WalletProvider>
-					<BrowserRouter>
-						<App />
-					</BrowserRouter>
-				</WalletProvider>
-			</QueryClientProvider>
-		</NotificationProvider>
-	</StrictMode>,
+    <StrictMode>
+        <NotificationProvider>
+            <QueryClientProvider client={queryClient}>
+                <WalletProvider>
+                    <BrowserRouter>
+                        <App />
+                    </BrowserRouter>
+                </WalletProvider>
+            </QueryClientProvider>
+        </NotificationProvider>
+    </StrictMode>,
 )

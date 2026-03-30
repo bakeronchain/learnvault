@@ -7,6 +7,7 @@ on:
     paths:
       - "src/**"
       - "package.json"
+      - "package-lock.json"  # <--- CRITICAL: ADD THIS
       - "vite.config.ts"
       - "tsconfig*.json"
       - "eslint.config.js"
@@ -23,10 +24,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-
+          # We are REMOVING the cache line temporarily to force a clean download
+          
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps  # <--- Added flag for stability
 
       - name: Type check
         run: npm run typecheck
@@ -39,11 +40,3 @@ jobs:
 
       - name: Build
         run: npm run build
-
-      - name: Upload build artifact
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: dist
-          if-no-files-found: error

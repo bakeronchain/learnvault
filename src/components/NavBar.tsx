@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next"
 import { NavLink } from "react-router-dom"
 import { ReputationBadge } from "./ReputationBadge"
 import { WalletButton } from "./WalletButton"
+import { ThemeToggle } from "./ThemeToggle"
 
 export default function NavBar() {
 	const [menuOpen, setMenuOpen] = useState(false)
@@ -54,7 +55,7 @@ export default function NavBar() {
 								`px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
 									isActive
 										? "text-brand-cyan bg-brand-cyan/5 shadow-[0_0_20px_rgba(0,210,255,0.1)]"
-										: "text-white/70 hover:text-white hover:bg-white/5"
+										: "text-slate-700 dark:text-white/70 hover:text-brand-blue dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
 								}`
 							}
 						>
@@ -64,18 +65,20 @@ export default function NavBar() {
 				</nav>
 
 				<div className="flex items-center gap-3 md:gap-4">
+					<ThemeToggle />
+					
 					<ReputationBadge
 						className="hidden lg:inline-flex shrink-0"
 						size="sm"
 						showBalance
 					/>
-					<div className="hidden md:block scale-90">
+					<div className="hidden md:block scale-90 [&_button]:dark:text-black [&_button]:dark:bg-white">
 						<WalletButton />
 					</div>
 					<button
 						type="button"
 						onClick={() => setMenuOpen((current) => !current)}
-						className="md:hidden w-10 h-10 glass flex items-center justify-center rounded-xl text-white/70 hover:text-white transition-colors border border-white/10"
+						className="md:hidden w-10 h-10 glass flex items-center justify-center rounded-xl text-slate-700 dark:text-white/70 hover:text-black dark:hover:text-white transition-colors border border-white/10"
 						aria-controls={mobileMenuId}
 						aria-expanded={menuOpen}
 						aria-label={
@@ -117,13 +120,13 @@ export default function NavBar() {
 					}`}
 				>
 					<div className="flex items-center justify-between">
-						<span className="text-xs font-black uppercase tracking-[0.25em] text-white/40">
+						<span className="text-xs font-black uppercase tracking-[0.25em] text-slate-500 dark:text-white/40">
 							Menu
 						</span>
 						<button
 							type="button"
 							onClick={closeMenu}
-							className="w-9 h-9 rounded-xl border border-white/10 text-white/70 hover:text-white hover:border-white/20"
+							className="w-9 h-9 rounded-xl border border-white/10 text-slate-700 dark:text-white/70 hover:text-black dark:hover:text-white hover:border-white/20"
 							aria-label="Close mobile navigation menu"
 						>
 							×
@@ -131,11 +134,11 @@ export default function NavBar() {
 					</div>
 
 					<ReputationBadge className="w-full" size="sm" showBalance />
-					<div className="w-full">
+					<div className="w-full [&_button]:dark:text-black [&_button]:dark:bg-white">
 						<WalletButton />
 					</div>
 
-					<div className="h-px bg-white/10 my-1" />
+					<div className="h-px bg-slate-200 dark:bg-white/10 my-1" />
 
 					{navLinks.map(({ to, label }) => (
 						<NavLink
@@ -146,7 +149,7 @@ export default function NavBar() {
 								`block w-full px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
 									isActive
 										? "text-brand-cyan bg-brand-cyan/5 border border-brand-cyan/20"
-										: "text-white/70 border border-white/10 hover:text-white hover:border-white/20"
+										: "text-slate-700 dark:text-white/70 border border-slate-200 dark:border-white/10 hover:text-black dark:hover:text-white"
 								}`
 							}
 						>

@@ -1,6 +1,8 @@
 extern crate std;
 
 use soroban_sdk::{
+    Address, Env, IntoVal, Val, Vec,
+    testutils::{Address as _, Ledger, LedgerInfo, MockAuth, MockAuthInvoke, Events as _},
     Address, Env, IntoVal, Symbol, Val, Vec, symbol_short,
     testutils::{Address as _, Events, Ledger, LedgerInfo, MockAuth, MockAuthInvoke},
     token::{StellarAssetClient, TokenClient},
@@ -115,7 +117,11 @@ fn initialize_sets_admin_and_treasury_on_created_escrow() {
     let (env, contract_id, token, admin, treasury, scholar) = setup();
     let client = MilestoneEscrowClient::new(&env, &contract_id);
 
+    let before_events = env.events().all().len();
     create_escrow(&client, 1, &scholar, 120, 3);
+    let after_events = env.events().all().len();
+    // token transfer + EscrowCreated
+    assert_eq!(after_events, before_events + 2);
 
     let escrow = client.get_escrow(&1).unwrap();
     assert_eq!(escrow.admin, admin);
@@ -144,7 +150,11 @@ fn create_escrow_locks_funds_and_rejects_duplicates() {
     let (env, contract_id, token, _admin, treasury, scholar) = setup();
     let client = MilestoneEscrowClient::new(&env, &contract_id);
 
+    let before = env.events().all().len();
     create_escrow(&client, 7, &scholar, 100, 4);
+    let after = env.events().all().len();
+    // token transfer + EscrowCreated
+    assert_eq!(after, before + 2);
 
     let escrow = client.get_escrow(&7).unwrap();
     assert_eq!(escrow.scholar, scholar);
@@ -225,7 +235,11 @@ fn reclaim_inactive_requires_admin_and_deadline() {
     );
 
     set_timestamp(&env, START_TS + THIRTY_DAYS);
+    let before_reclaim = env.events().all().len();
     reclaim_inactive_authorized(&client, 11).unwrap();
+    let after_reclaim = env.events().all().len();
+    // token transfer back to treasury + EscrowReclaimed
+    assert_eq!(after_reclaim, before_reclaim + 2);
 
     let escrow = client.get_escrow(&11).unwrap();
     assert_eq!(escrow.released_amount, 120);
@@ -452,13 +466,18 @@ mod fuzz_tests {
         #[test]
         #[ignore]
         fn fuzz_tranche_disbursement_amounts(amount in 1..1_000_000_000_i128, tranches in 1..1000_u32) {
-            let (env, contract_id, _token, _admin, _treasury, scholar) = setup();
+            let (env, contract_id, token, _admin, treasury, scholar) = setup();
             let client = MilestoneEscrowClient::new(&env, &contract_id);
 
             // Overpayment check constraint: amounts must be enough for tranches
             if amount < tranches as i128 {
                 return Ok(());
             }
+
+            // Ensure the treasury has enough balance for the randomized escrow amount.
+            // setup() only mints 1_000 tokens by default.
+            env.mock_all_auths();
+            stellar_asset_client(&env, &token).mint(&treasury, &amount);
 
             create_escrow(&client, 100, &scholar, amount, tranches);
 

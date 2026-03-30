@@ -1,12 +1,12 @@
 #![cfg(test)]
 
 use crate::{
-    AdminChangedEventData, DataKey, InitializedEventData, MintEventData, ScholarNFT, ScholarNFTClient,
-    ScholarNFTError,
+    AdminChangedEventData, DataKey, InitializedEventData, MintEventData, ScholarNFT,
+    ScholarNFTClient, ScholarNFTError,
 };
 use soroban_sdk::{
-    testutils::{storage::Persistent, Address as _, Events as _, MockAuth, MockAuthInvoke},
     Address, Env, IntoVal, String, symbol_short,
+    testutils::{Address as _, Events as _, MockAuth, MockAuthInvoke, storage::Persistent},
 };
 
 fn setup(env: &Env) -> (Address, Address, ScholarNFTClient) {
@@ -44,6 +44,34 @@ fn owner_of_returns_minted_owner() {
     let token_id = client.mint(&scholar, &cid(&env, "ipfs://owner-check"));
 
     assert_eq!(client.owner_of(&token_id), scholar);
+}
+
+#[test]
+fn get_all_scholars_is_empty_before_mint() {
+    let env = Env::default();
+    let (_, _admin, client) = setup(&env);
+
+    assert_eq!(client.get_all_scholars().len(), 0);
+}
+
+#[test]
+fn get_all_scholars_returns_all_minted_scholars_in_order() {
+    let env = Env::default();
+    let (_, _admin, client) = setup(&env);
+    let scholar_a = Address::generate(&env);
+    let scholar_b = Address::generate(&env);
+    let scholar_c = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.mint(&scholar_a, &cid(&env, "ipfs://scholar-a"));
+    client.mint(&scholar_b, &cid(&env, "ipfs://scholar-b"));
+    client.mint(&scholar_c, &cid(&env, "ipfs://scholar-c"));
+
+    let scholars = client.get_all_scholars();
+    assert_eq!(scholars.len(), 3);
+    assert_eq!(scholars.get(0).unwrap(), scholar_a);
+    assert_eq!(scholars.get(1).unwrap(), scholar_b);
+    assert_eq!(scholars.get(2).unwrap(), scholar_c);
 }
 
 #[test]
@@ -161,6 +189,19 @@ fn token_uri_returns_metadata_uri() {
     let token_id = client.mint(&scholar, &metadata_uri);
 
     assert_eq!(client.token_uri(&token_id), metadata_uri);
+}
+
+#[test]
+fn get_metadata_uri_round_trip() {
+    let env = Env::default();
+    let (_, _admin, client) = setup(&env);
+    let scholar = Address::generate(&env);
+    let uri = cid(&env, "ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi");
+
+    env.mock_all_auths();
+    let token_id = client.mint(&scholar, &uri);
+
+    assert_eq!(client.get_metadata_uri(&token_id), uri);
 }
 
 #[test]
@@ -288,11 +329,12 @@ fn initialize_emits_event() {
 
     let events = env.events().all();
     let found = events.iter().any(|(_, topics, data)| {
-        topics.contains(&symbol_short!("init").into_val(&env))
-            && {
-                let d: InitializedEventData = data.clone().into_val(&env);
-                d == InitializedEventData { admin: admin.clone() }
+        topics.contains(&symbol_short!("init").into_val(&env)) && {
+            let d: InitializedEventData = data.clone().into_val(&env);
+            d == InitializedEventData {
+                admin: admin.clone(),
             }
+        }
     });
     assert!(found, "initialized event not found");
 }
@@ -313,7 +355,10 @@ fn mint_emits_event() {
             && topics.contains(&token_id.into_val(&env))
             && {
                 let d: MintEventData = data.clone().into_val(&env);
-                d == MintEventData { token_id, owner: scholar.clone() }
+                d == MintEventData {
+                    token_id,
+                    owner: scholar.clone(),
+                }
             }
     });
     assert!(found, "mint event not found");
@@ -330,14 +375,13 @@ fn transfer_admin_emits_event() {
 
     let events = env.events().all();
     let found = events.iter().any(|(_, topics, data)| {
-        topics.contains(&symbol_short!("adm_chng").into_val(&env))
-            && {
-                let d: AdminChangedEventData = data.clone().into_val(&env);
-                d == AdminChangedEventData {
-                    old_admin: old_admin.clone(),
-                    new_admin: new_admin.clone(),
-                }
+        topics.contains(&symbol_short!("adm_chng").into_val(&env)) && {
+            let d: AdminChangedEventData = data.clone().into_val(&env);
+            d == AdminChangedEventData {
+                old_admin: old_admin.clone(),
+                new_admin: new_admin.clone(),
             }
+        }
     });
     assert!(found, "admin_changed event not found");
 }
@@ -384,8 +428,23 @@ fn test_mint_extends_ttl() {
     let token_id = client.mint(&scholar, &cid(&env, "ipfs://ttl-test"));
 
     env.as_contract(&contract_id, || {
-        assert!(env.storage().persistent().get_ttl(&DataKey::Owner(token_id)) >= 6_307_200);
-        assert!(env.storage().persistent().get_ttl(&DataKey::TokenUri(token_id)) >= 6_307_200);
-        assert!(env.storage().persistent().get_ttl(&DataKey::Metadata(token_id)) >= 6_307_200);
+        assert!(
+            env.storage()
+                .persistent()
+                .get_ttl(&DataKey::Owner(token_id))
+                >= 6_307_200
+        );
+        assert!(
+            env.storage()
+                .persistent()
+                .get_ttl(&DataKey::TokenUri(token_id))
+                >= 6_307_200
+        );
+        assert!(
+            env.storage()
+                .persistent()
+                .get_ttl(&DataKey::Metadata(token_id))
+                >= 6_307_200
+        );
     });
 }

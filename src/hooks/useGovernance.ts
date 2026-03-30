@@ -2,11 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCallback } from "react"
 import { useToast } from "../components/Toast/ToastProvider"
 import { ErrorCode, createAppError } from "../types/errors"
+import type { RawContractProposal } from "../types/governance"
+import type { Proposal } from "../types/contracts"
 import { type Proposal, type RawContractProposal } from "../types/governance"
 import { logger } from "../utils/logger"
 import { isUserRejection, parseError } from "../utils/errors"
 import { useWallet } from "./useWallet"
 
+// expose the canonical Proposal type for consumers of this module
 export type { Proposal }
 
 type ContractRecord = Record<string, unknown>
@@ -83,50 +86,38 @@ export function useGovernance() {
 
 	const toProposalStatus = useCallback(
 		(status: unknown): Proposal["status"] => {
-			const normalized = String(status ?? "Pending").toLowerCase()
-			if (normalized === "approved" || normalized === "passed") return "Passed"
-			if (normalized === "rejected") return "Rejected"
-			return "Active"
-		},
+				const normalized = String(status ?? "pending").toLowerCase()
+				if (normalized === "approved" || normalized === "passed") return "approved"
+				if (normalized === "rejected") return "rejected"
+				return "pending"
+			},
 		[],
 	)
 
 	const mapProposal = useCallback(
 		(
-			rawProposal: RawContractProposal,
-			fallbackStatus: Proposal["status"],
-		): Proposal => ({
-			id: Number(rawProposal.id ?? 0),
-			title: String(rawProposal.program_name ?? rawProposal.title ?? ""),
-			description: String(
-				rawProposal.program_description ?? rawProposal.description ?? "",
-			),
-			author: String(
-				rawProposal.applicant ??
-					rawProposal.author ??
-					rawProposal.author_address ??
-					"",
-			),
-			status: toProposalStatus(rawProposal.status ?? fallbackStatus),
-			votesFor: toBigIntSafe(
-				rawProposal.yes_votes ??
-					rawProposal.votes_for ??
-					rawProposal.votesFor ??
-					0,
-			),
-			votesAgainst: toBigIntSafe(
-				rawProposal.no_votes ??
-					rawProposal.votes_against ??
-					rawProposal.votesAgainst ??
-					0,
-			),
-			endDate: Number(
-				rawProposal.deadline_ledger ??
-					rawProposal.end_date ??
-					rawProposal.endDate ??
-					0,
-			),
-		}),
+				rawProposal: RawContractProposal,
+				fallbackStatus: Proposal["status"],
+			): Proposal => ({
+				id: Number(rawProposal.id ?? 0),
+				proposer: String(
+					rawProposal.applicant ??
+						rawProposal.author ??
+						rawProposal.author_address ??
+						"",
+				),
+				amount: toBigIntSafe(rawProposal.amount ?? 0),
+				description: String(
+					rawProposal.program_description ?? rawProposal.description ?? "",
+				),
+				votes_for: toBigIntSafe(
+					rawProposal.yes_votes ?? rawProposal.votes_for ?? rawProposal.votesFor ?? 0,
+				),
+				votes_against: toBigIntSafe(
+					rawProposal.no_votes ?? rawProposal.votes_against ?? rawProposal.votesAgainst ?? 0,
+				),
+				status: toProposalStatus(rawProposal.status ?? fallbackStatus),
+			}),
 		[toBigIntSafe, toProposalStatus],
 	)
 

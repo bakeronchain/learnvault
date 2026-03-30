@@ -166,7 +166,7 @@ const Courses: React.FC = () => {
 			/>
 
 			{isLoading ? (
-				<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8">
+				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
 					{[1, 2, 3, 4].map((i) => (
 						<CourseCardSkeleton key={i} />
 					))}
@@ -191,14 +191,14 @@ const Courses: React.FC = () => {
 					<button
 						type="button"
 						onClick={handleClear}
-						className="px-6 py-2.5 rounded-full text-sm font-bold uppercase tracking-widest border border-brand-cyan/30 text-brand-cyan hover:bg-brand-cyan/10 transition-all"
+						className="w-full sm:w-auto px-6 py-2.5 rounded-full text-sm font-bold uppercase tracking-widest border border-brand-cyan/30 text-brand-cyan hover:bg-brand-cyan/10 transition-all"
 					>
 						Clear all filters
 					</button>
 				</div>
 			) : (
 				<>
-					<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8">
+					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
 						{paginatedCourses.map((course) => (
 							<article
 								key={course.id}
@@ -226,11 +226,11 @@ const Courses: React.FC = () => {
 										{course.description}
 									</p>
 
-									<div className="mt-auto flex items-center justify-between gap-4 text-sm text-gray-400">
+									<div className="mt-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 text-sm text-gray-400">
 										<span>{course.track}</span>
 										<Link
 											to={`/courses/${course.slug}/lessons/1`}
-											className="iridescent-border px-4 py-2 rounded-xl font-semibold text-white hover:scale-105 transition-transform"
+											className="iridescent-border w-full sm:w-auto text-center px-4 py-2 rounded-xl font-semibold text-white hover:scale-105 transition-transform"
 										>
 											Open course
 										</Link>

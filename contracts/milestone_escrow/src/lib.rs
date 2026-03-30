@@ -76,12 +76,7 @@ pub struct EscrowReclaimed {
 
 #[contractimpl]
 impl MilestoneEscrow {
-    pub fn initialize(
-        env: Env,
-        admin: Address,
-        treasury: Address,
-        inactivity_window_seconds: u64,
-    ) {
+    pub fn initialize(env: Env, admin: Address, treasury: Address, inactivity_window_seconds: u64) {
         if env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(&env, Error::AlreadyInitialized);
         }
@@ -192,6 +187,7 @@ impl MilestoneEscrow {
         record.released_amount = record.total_amount;
         record.last_activity = now;
         env.storage().persistent().set(&key, &record);
+
         EscrowReclaimed {
             proposal_id,
             scholar: record.scholar.clone(),

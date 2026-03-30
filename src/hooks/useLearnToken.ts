@@ -1,4 +1,5 @@
 import { type Api } from "@stellar/stellar-sdk/rpc"
+import type { LearnTokenInfo } from "../types/contracts"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCallback } from "react"
 import { useToast } from "../components/Toast/ToastProvider"

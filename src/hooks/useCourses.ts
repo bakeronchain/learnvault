@@ -160,6 +160,75 @@ export function useCourses() {
 	}
 }
 
+type EnrolledApiCourse = {
+	id: number | string
+	slug?: string
+	title?: string
+	completedMilestones?: number
+	completed_milestones?: number
+	totalMilestones?: number
+	total_milestones?: number
+	milestones?: Array<{
+		id: number
+		label?: string
+		title?: string
+		lrnReward?: number
+		lrn_reward?: number
+	}>
+}
+
+export type EnrolledCourse = {
+	courseId: string
+	title: string
+	completedCount: number
+	totalCount: number
+	progressPercent: number
+	milestones: Array<{ id: number; label: string; lrnReward: number }>
+}
+
+const normalizeEnrolledCourse = (c: EnrolledApiCourse): EnrolledCourse => {
+	const courseId = c.slug ?? String(c.id)
+	const completedCount = c.completedMilestones ?? c.completed_milestones ?? 0
+	const totalCount = c.totalMilestones ?? c.total_milestones ?? 0
+	const progressPercent =
+		totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+	const milestones = (c.milestones ?? []).map((m) => ({
+		id: m.id,
+		label: m.label ?? m.title ?? `Milestone ${m.id}`,
+		lrnReward: m.lrnReward ?? m.lrn_reward ?? 0,
+	}))
+	return {
+		courseId,
+		title: c.title ?? "Untitled Course",
+		completedCount,
+		totalCount,
+		progressPercent,
+		milestones,
+	}
+}
+
+export function useEnrolledCourses() {
+	const query = useQuery({
+		queryKey: ["courses", "enrolled"],
+		queryFn: async (): Promise<EnrolledCourse[]> => {
+			const response = await fetchJson<EnrolledApiCourse[]>(
+				"/api/courses/enrolled",
+			)
+			return (Array.isArray(response) ? response : []).map(
+				normalizeEnrolledCourse,
+			)
+		},
+		staleTime: 2 * 60 * 1000,
+	})
+
+	return {
+		enrolledCourses: query.data ?? [],
+		isLoading: query.isLoading,
+		error: query.error instanceof Error ? query.error.message : null,
+		refetch: query.refetch,
+	}
+}
+
 export function useCourseDetail(idOrSlug: string | undefined) {
 	const query = useQuery({
 		queryKey: ["course", idOrSlug],

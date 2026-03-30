@@ -42,6 +42,8 @@ export function createUploadRouter(jwtService: JwtService): Router {
 	 *               properties:
 	 *                 cid:
 	 *                   type: string
+	 *                 gatewayUrl:
+	 *                   type: string
 	 *                   example: bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
 	 *                 gatewayUrl:
 	 *                   type: string
@@ -54,6 +56,7 @@ export function createUploadRouter(jwtService: JwtService): Router {
 	router.post("/upload", requireAuth, upload.single("file"), uploadFile)
 
 	/**
+	 * Pin NFT metadata (JSON) to IPFS
 	 * @openapi
 	 * /api/upload/nft-metadata:
 	 *   post:

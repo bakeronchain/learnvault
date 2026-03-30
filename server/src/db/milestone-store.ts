@@ -10,6 +10,12 @@ export interface MilestoneReport {
 	evidence_description?: string | null
 	status: "pending" | "approved" | "rejected"
 	submitted_at: string
+	scholar_email?: string
+	scholar_name?: string
+	course_title?: string
+	milestone_title?: string
+	milestone_number?: number
+	lrn_reward?: number
 }
 
 export interface MilestoneAuditEntry {

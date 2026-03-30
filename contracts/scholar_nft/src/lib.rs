@@ -2,8 +2,8 @@
 #![allow(deprecated)]
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, panic_with_error,
-    symbol_short, Address, Env, String, Symbol,
+    Address, Env, String, Symbol, Vec, contract, contracterror, contractimpl, contracttype,
+    panic_with_error, symbol_short,
 };
 
 const DAY_IN_LEDGERS: u32 = 17_280;
@@ -28,6 +28,7 @@ pub struct ScholarMetadata {
 pub enum DataKey {
     Admin,
     Counter,
+    Scholars,
     Owner(u64),
     TokenUri(u64),
     Revoked(u64),
@@ -97,11 +98,12 @@ impl ScholarNFT {
         env.storage().instance().set(&TOKEN_COUNTER_KEY, &0_u64);
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::Counter, &0_u64);
+        let scholars: Vec<Address> = Vec::new(&env);
+        env.storage().persistent().set(&DataKey::Scholars, &scholars);
+        Self::extend_persistent(&env, &DataKey::Scholars);
 
-        env.events().publish(
-            (symbol_short!("init"),),
-            InitializedEventData { admin },
-        );
+        env.events()
+            .publish((symbol_short!("init"),), InitializedEventData { admin });
 
         Self::extend_instance(&env);
     }
@@ -133,6 +135,15 @@ impl ScholarNFT {
             .persistent()
             .set(&DataKey::Metadata(token_id), &metadata);
         Self::extend_persistent(&env, &DataKey::Metadata(token_id));
+
+        let mut scholars: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Scholars)
+            .unwrap_or_else(|| Vec::new(&env));
+        scholars.push_back(to.clone());
+        env.storage().persistent().set(&DataKey::Scholars, &scholars);
+        Self::extend_persistent(&env, &DataKey::Scholars);
 
         env.events().publish(
             (symbol_short!("minted"), token_id),
@@ -197,6 +208,17 @@ impl ScholarNFT {
         }
     }
 
+    pub fn get_metadata_uri(env: Env, token_id: u64) -> String {
+        Self::extend_instance(&env);
+        let key = DataKey::TokenUri(token_id);
+        if let Some(uri) = env.storage().persistent().get::<_, String>(&key) {
+            Self::extend_persistent(&env, &key);
+            uri
+        } else {
+            panic_with_error!(&env, ScholarNFTError::TokenNotFound);
+        }
+    }
+
     pub fn get_metadata(env: Env, token_id: u64) -> ScholarMetadata {
         Self::extend_instance(&env);
         let key = DataKey::Metadata(token_id);
@@ -214,6 +236,20 @@ impl ScholarNFT {
             .instance()
             .get(&TOKEN_COUNTER_KEY)
             .unwrap_or(0_u64)
+    }
+
+    pub fn get_all_scholars(env: Env) -> Vec<Address> {
+        Self::extend_instance(&env);
+        let key = DataKey::Scholars;
+        let scholars: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or_else(|| Vec::new(&env));
+        if env.storage().persistent().has(&key) {
+            Self::extend_persistent(&env, &key);
+        }
+        scholars
     }
 
     pub fn transfer(env: Env, from: Address, to: Address, token_id: u64) {
@@ -303,9 +339,7 @@ impl ScholarNFT {
     }
 
     fn extend_persistent(env: &Env, key: &DataKey) {
-        env.storage()
-            .persistent()
-            .extend_ttl(key, TTL_MIN, TTL_MAX);
+        env.storage().persistent().extend_ttl(key, TTL_MIN, TTL_MAX);
     }
 }
 

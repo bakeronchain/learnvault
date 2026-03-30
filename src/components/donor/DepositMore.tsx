@@ -1,5 +1,14 @@
 import React, { useState } from "react"
+import { useContractIds } from "../../hooks/useContractIds"
 import { useWallet } from "../../hooks/useWallet"
+import {
+	explorerTransactionUrl,
+	formatUsdcAmount,
+} from "../../util/scholarshipApplications"
+import {
+	SCHOLARSHIP_TREASURY_CONTRACT_ID,
+	createScholarshipTreasuryContract,
+} from "../../util/scholarshipTreasury"
 import { useToast } from "../Toast/ToastProvider"
 
 interface DepositMoreProps {
@@ -11,7 +20,8 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 }) => {
 	const [amount, setAmount] = useState("")
 	const [isLoading, setIsLoading] = useState(false)
-	const { address, signTransaction } = useWallet()
+	const [lastTxHash, setLastTxHash] = useState<string | null>(null)
+	const { address, signTransaction, updateBalances } = useWallet()
 	const { showSuccess, showError, showInfo } = useToast()
 
 	const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -38,35 +48,66 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 			return
 		}
 
+		if (!scholarshipTreasury) {
+			showError("Scholarship treasury is not available on this network")
+			return
+		}
+
+		if (!signTransaction) {
+			showError("Wallet does not support signing")
+			return
+		}
+
 		setIsLoading(true)
+		setLastTxHash(null)
 		try {
-			// In a real implementation, this would:
-			// 1. Create a transaction to approve USDC transfer
-			// 2. Create a transaction to call treasury deposit
-			// 3. Sign both transactions
-			// 4. Submit to the network
-
-			// For now, simulate the transaction flow
+			showInfo("Waiting for wallet approval...")
+			const scholarshipTreasury = createScholarshipTreasuryContract(
+				SCHOLARSHIP_TREASURY_CONTRACT_ID,
+				address,
+			)
+			const txHash = await scholarshipTreasury.deposit(amount, signTransaction)
+			setLastTxHash(txHash)
+			await updateBalances()
+			showSuccess(
+				`Deposit of ${formatUsdcAmount(amount)} submitted. Tx: ${txHash.slice(0, 8)}...`,
 			const depositAmount = parseFloat(amount)
+			const contract = createScholarshipTreasuryContract(
+				scholarshipTreasury,
+				address,
+			)
 
-			if (!signTransaction) {
-				showError("Wallet does not support signing")
-				setIsLoading(false)
-				return
-			}
+			showInfo("Waiting for wallet approval...")
+			const txHash = await contract.deposit(
+				address,
+				depositAmount,
+				signTransaction,
+			)
 
-			showInfo("Waiting for wallet approval…")
-			// TODO: replace simulated flow with actual contract deposit call
 			showSuccess(
 				`Deposit of $${depositAmount.toLocaleString()} USDC submitted!`,
+				txHash || undefined,
 			)
 			setAmount("")
-
-			if (onDepositSuccess) {
-				onDepositSuccess()
+			onDepositSuccess?.()
+		} catch (error) {
+			if (isUserRejection(error)) {
+				showInfo("Deposit cancelled")
+				return
 			}
-		} catch (_error) {
-			showError("Failed to process deposit. Please try again.")
+		} catch (error) {
+			const message =
+				error instanceof Error
+					? error.message
+					: "Failed to process deposit. Please try again."
+			showError(message)
+
+			const appError = parseError(error)
+			showError(
+				appError.message && appError.message !== "An unexpected error occurred"
+					? appError.message
+					: "Failed to process deposit. Please try again.",
+			)
 		} finally {
 			setIsLoading(false)
 		}
@@ -157,11 +198,35 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 								: "Connect Wallet to Deposit"}
 					</button>
 
-					<p className="text-[10px] text-white/30 text-center mt-6">
-						✓ Deposits are secured on the Stellar blockchain
+					{lastTxHash ? (
+						<div className="mt-6 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-100">
+							<p className="text-[11px] font-black uppercase tracking-widest text-emerald-300">
+								Deposit Submitted
+							</p>
+							<p className="mt-2 break-all font-mono text-xs text-emerald-50">
+								Transaction: {lastTxHash}
+							</p>
+							<a
+								href={explorerTransactionUrl(lastTxHash)}
+								target="_blank"
+								rel="noreferrer"
+								className="mt-3 inline-flex text-xs font-black uppercase tracking-widest text-emerald-300 hover:text-emerald-200"
+							>
+								View on Stellar Explorer
+							</a>
+						</div>
+					) : null}
+
+					<p className="mt-6 text-center text-[10px] text-white/30">
+						Deposits are secured on the Stellar blockchain
 						<br />
-						✓ You'll receive governance tokens immediately
-						<br />✓ Your funds support eligible scholar proposals
+						You&apos;ll receive governance tokens immediately
+					<p className="text-[10px] text-white/30 text-center mt-6">
+						Deposits are secured on the Stellar blockchain
+						<br />
+						You will receive governance tokens immediately
+						<br />
+						Your funds support eligible scholar proposals
 					</p>
 				</div>
 			</form>

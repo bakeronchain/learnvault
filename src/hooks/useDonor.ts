@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react"
 import { useToast } from "../components/Toast/ToastProvider"
 import { rpcUrl } from "../contracts/util"
+import type {
+	DonorData,
+	DonorContribution,
+	Vote,
+	RpcEvent,
+	DonorStats,
 import {
 	type DonorData,
 	type DonorContribution,
@@ -20,11 +26,9 @@ export type {
 } from "../types/contracts"
 
 const emptyStats: DonorStats = {
-	totalContributed: 0,
-	governanceBalance: 0,
-	governancePercentage: 0,
-	proposalsVoted: 0,
-	scholarsFunded: 0,
+	total_contributed: 0n,
+	votes_cast: 0,
+	scholars_funded: 0,
 }
 
 const makeEmptyData = (): DonorData => ({
@@ -152,11 +156,9 @@ export const useDonor = (): DonorData => {
 
 				const next: DonorData = {
 					stats: {
-						totalContributed,
-						governanceBalance: totalContributed,
-						governancePercentage: 0,
-						proposalsVoted: votes.length,
-						scholarsFunded,
+						total_contributed: BigInt(totalContributed),
+						votes_cast: votes.length,
+						scholars_funded: scholarsFunded,
 					},
 					contributions,
 					votes,

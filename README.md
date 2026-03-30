@@ -110,7 +110,7 @@ stablecoins — real, stable value delivered directly to their wallets.
 │   │ Courses  │    │ LRN      │    │ Scholarship│    │
 │   │ Quizzes  │    │ Tokens   │    │ Proposals │     │
 │   │ Projects │    │ (Soulbound│   │ DAO Vote  │     │
-│   │          │    │ ERC20)   │    │ Escrow    │     │
+│   │          │    │ SEP-41)  │    │ Escrow    │     │
 │   └──────────┘    └──────────┘    └──────────┘     │
 │                                                     │
 │   ┌─────────────────────────────────────────┐       │
@@ -126,41 +126,42 @@ stablecoins — real, stable value delivered directly to their wallets.
 
 LearnVault is powered by six core smart contracts:
 
-### `LearnToken.sol`
+### `learn_token`
 
-A **soulbound ERC20** token that is minted to learners upon verified milestone
-completion. Non-transferable by design — it represents real effort, not
-speculation. Your LearnToken balance is your on-chain academic reputation score.
+A **soulbound SEP-41 fungible token** that is minted to learners upon verified
+milestone completion. Non-transferable by design — it represents real effort,
+not speculation. Your LearnToken balance is your on-chain academic reputation
+score.
 
-### `GovernanceToken.sol`
+### `governance_token`
 
-A **transferable ERC20** distributed to donors upon treasury contribution and
-earned by top learners at milestone thresholds. Used exclusively for DAO voting
-on scholarship proposals.
+A **transferable SEP-41 fungible token** distributed to donors upon treasury
+contribution and earned by top learners at milestone thresholds. Used
+exclusively for DAO voting on scholarship proposals.
 
-### `CourseMilestone.sol`
+### `course_milestone`
 
 Tracks learner progress per course. Each course has defined checkpoints verified
 by a trusted multi-sig validator (transitioning to oracle-based verification in
 V2). On successful verification, this contract triggers LearnToken minting.
 
-### `ScholarshipTreasury.sol`
+### `scholarship_treasury`
 
 Holds all donor funds in stablecoins (USDC). Funds can only be released upon
 successful proposal execution through the governance system. Tracks total
 contributions per donor. Transparent and auditable by anyone.
 
-### `MilestoneEscrow.sol`
+### `milestone_escrow`
 
 Manages approved scholarship disbursements in tranches. Funds are released as
 scholars hit agreed milestones. If a scholar is inactive for 30 days, unspent
 funds automatically return to the treasury.
 
-### `ScholarNFT.sol`
+### `scholar_nft`
 
-Mints a **soulbound ERC721 credential** to scholars who complete their funded
-programs. Non-transferable, tamper-proof, and permanently verifiable on-chain.
-Shareable with employers, DAOs, and the broader ecosystem.
+Mints a **soulbound SEP-41 NFT credential** to scholars who complete their
+funded programs. Non-transferable, tamper-proof, and permanently verifiable
+on-chain. Shareable with employers, DAOs, and the broader ecosystem.
 
 ## Contract Interaction Flow
 
@@ -308,7 +309,7 @@ resubmitted after 30 days.
 
 ### Disbursement
 
-Approved funds are locked in `MilestoneEscrow.sol` and released in tranches as
+Approved funds are locked in `milestone_escrow` and released in tranches as
 the scholar completes agreed milestones. Progress is reported by the scholar and
 confirmed by a community-elected validator committee (transitioning to oracle
 verification in V2).
@@ -341,10 +342,10 @@ transfers to token holders.
 
 | Layer              | Technology                                     |
 | ------------------ | ---------------------------------------------- |
-| Blockchain         | Stellar (primary), EVM-compatible L2 (planned) |
-| Smart Contracts    | Solidity / Stellar Soroban                     |
-| Frontend           | Next.js, TypeScript, TailwindCSS               |
-| Wallet Integration | Freighter (Stellar), MetaMask                  |
+| Blockchain         | Stellar                                        |
+| Smart Contracts    | Rust (Stellar Soroban)                         |
+| Frontend           | React 19, TypeScript, Stellar Design System    |
+| Wallet Integration | Freighter (Stellar)                            |
 | Storage            | IPFS (course content + proposal docs)          |
 | Stablecoin         | USDC                                           |
 | Backend            | Node.js, PostgreSQL                            |

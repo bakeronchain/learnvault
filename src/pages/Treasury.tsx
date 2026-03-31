@@ -1,18 +1,21 @@
+import React, { Suspense } from "react"
 import React, { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Helmet } from "react-helmet"
 import {
-	Area,
-	AreaChart,
-	CartesianGrid,
-	ResponsiveContainer,
-	Tooltip,
-	XAxis,
-	YAxis,
+Area,
+AreaChart,
+CartesianGrid,
+ResponsiveContainer,
+Tooltip,
+XAxis,
+YAxis,
 } from "recharts"
 import { EmptyState } from "../components/states/emptyState"
 import { ErrorState } from "../components/states/errorState"
 import TxHashLink from "../components/TxHashLink"
+import { useTreasury } from "../hooks/useTreasury"
+import { DashboardStatsSkeleton, EmptyState } from "../components/SkeletonLoader"
 import TreasuryHealthChart, {
 	type TreasuryPoint,
 } from "../components/treasury/TreasuryHealthChart"
@@ -24,20 +27,20 @@ const CHART_WINDOW_DAYS = 7
 const STROOPS_PER_USDC = 10000000
 
 interface TreasuryStats {
-	total_deposited_usdc: string
-	total_disbursed_usdc: string
-	scholars_funded: number
-	active_proposals: number
-	donors_count: number
+total_deposited_usdc: string
+total_disbursed_usdc: string
+scholars_funded: number
+active_proposals: number
+donors_count: number
 }
 
 interface TreasuryEvent {
-	type: "deposit" | "disburse"
-	amount?: string
-	address?: string
-	scholar?: string
-	tx_hash: string
-	created_at: string
+type: "deposit" | "disburse"
+amount?: string
+address?: string
+scholar?: string
+tx_hash: string
+created_at: string
 }
 
 interface TreasuryActivityResponse {
@@ -108,6 +111,28 @@ const buildTreasuryChartData = (events: TreasuryEvent[]): TreasuryPoint[] => {
 }
 
 const Treasury: React.FC = () => {
+const { stats, activity, isLoading, isError } = useTreasury()
+
+const formatUSDC = (stroops: string) => {
+const usdc = Number(stroops) / 10000000
+return usdc.toLocaleString("en-US", {
+minimumFractionDigits: 0,
+maximumFractionDigits: 2,
+})
+}
+
+const formatAmount = (stroops: string) => {
+const usdc = Number(stroops) / 10000000
+return usdc.toLocaleString("en-US", {
+minimumFractionDigits: 0,
+maximumFractionDigits: 2,
+})
+}
+
+const formatAddress = (address: string) => {
+if (address.length <= 8) return address
+return `${address.slice(0, 4)}...${address.slice(-4)}`
+}
 	const { scholarshipTreasury } = useContractIds()
 	const { balance: treasuryUSDC, isLoading: treasuryLoading } =
 		useUSDC(scholarshipTreasury)
@@ -188,11 +213,64 @@ const Treasury: React.FC = () => {
 		})
 	}
 
-	const formatAddress = (address: string) => {
-		if (address.length <= 8) return address
-		return `${address.slice(0, 4)}...${address.slice(-4)}`
-	}
+const formatTime = (timestamp: string) => {
+const date = new Date(timestamp)
+const now = new Date()
+const diffMs = now.getTime() - date.getTime()
+const diffMins = Math.floor(diffMs / 60000)
+const diffHours = Math.floor(diffMins / 60)
+const diffDays = Math.floor(diffHours / 24)
 
+if (diffMins < 60) return `${diffMins}m ago`
+if (diffHours < 24) return `${diffHours}h ago`
+return `${diffDays}d ago`
+}
+
+const displayStats = stats
+? {
+totalTreasury: `${formatUSDC(stats.total_deposited_usdc)} USDC`,
+totalDisbursed: `${formatUSDC(stats.total_disbursed_usdc)} USDC`,
+scholarsFunded: stats.scholars_funded.toString(),
+donorsCount: stats.donors_count.toString(),
+}
+: {
+totalTreasury: isLoading ? "Loading…" : "0 USDC",
+totalDisbursed: isLoading ? "Loading…" : "0 USDC",
+scholarsFunded: isLoading ? "..." : "0",
+donorsCount: isLoading ? "..." : "0",
+}
+
+const deposits = (activity ?? [])
+.filter((e) => e.type === "deposit")
+.slice(0, 2)
+const disbursements = (activity ?? [])
+.filter((e) => e.type === "disburse")
+.slice(0, 2)
+
+const siteUrl = "https://learnvault.app"
+const title = `Treasury - ${displayStats.totalTreasury} - ${displayStats.scholarsFunded} Scholars Funded - LearnVault`
+const description = `LearnVault's decentralized scholarship treasury holds ${displayStats.totalTreasury} and has funded ${displayStats.scholarsFunded} scholars. View real-time inflows and disbursements.`
+
+const chartData = [
+{ name: "Mon", inflows: 4000, outflows: 2400 },
+{ name: "Tue", inflows: 3000, outflows: 1398 },
+{ name: "Wed", inflows: 2000, outflows: 9800 },
+{ name: "Thu", inflows: 2780, outflows: 3908 },
+{ name: "Fri", inflows: 1890, outflows: 4800 },
+{ name: "Sat", inflows: 2390, outflows: 3800 },
+{ name: "Sun", inflows: 3490, outflows: 4300 },
+]
+
+return (
+<div className="p-12 max-w-7xl mx-auto min-h-screen text-white animate-in fade-in duration-1000">
+<Helmet>
+<title>{title}</title>
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:image" content={`${siteUrl}/og-image.png`} />
+<meta property="og:url" content={`${siteUrl}/treasury`} />
+<meta name="twitter:card" content="summary_large_image" />
+</Helmet>
 	const formatTime = (timestamp: string) => {
 		const date = new Date(timestamp)
 		if (Number.isNaN(date.getTime())) return "Unknown time"
@@ -274,43 +352,51 @@ const Treasury: React.FC = () => {
 				<meta name="twitter:card" content="summary_large_image" />
 			</Helmet>
 
-			<header className="text-center mb-20 relative">
-				<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-brand-cyan/20 blur-[100px] rounded-full -z-10" />
-				<h1 className="text-7xl font-black mb-4 tracking-tighter text-gradient">
-					Treasury Dashboard
-				</h1>
-				<p className="text-white/40 text-lg max-w-2xl mx-auto font-medium">
-					Real-time transparency into the LearnVault decentralized scholarship
-					fund.
-				</p>
-			</header>
+<header className="text-center mb-20 relative">
+<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-brand-cyan/20 blur-[100px] rounded-full -z-10" />
+<h1 className="text-7xl font-black mb-4 tracking-tighter text-gradient">
+Treasury Dashboard
+</h1>
+<p className="text-white/40 text-lg max-w-2xl mx-auto font-medium">
+Real-time transparency into the LearnVault decentralized scholarship
+fund.
+</p>
+</header>
 
-			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-20">
-				<StatCard
-					label="Total in Treasury"
-					value={displayStats.totalTreasury}
-					icon={"\u{1F4B0}"}
-					color="text-brand-cyan"
-				/>
-				<StatCard
-					label="Total Disbursed"
-					value={displayStats.totalDisbursed}
-					icon={"\u{1F4B8}"}
-					color="text-brand-purple"
-				/>
-				<StatCard
-					label="Scholars Funded"
-					value={displayStats.scholarsFunded}
-					icon={"\u{1F393}"}
-					color="text-brand-emerald"
-				/>
-				<StatCard
-					label="Global Donors"
-					value={displayStats.donorsCount}
-					icon={"\u{1F30D}"}
-					color="text-brand-blue"
-				/>
-			</div>
+{isLoading ? (
+<DashboardStatsSkeleton />
+) : isError ? (
+<div className="glass-card p-8 rounded-[3rem] border border-white/5 text-center text-red-400">
+Failed to load treasury stats.
+</div>
+) : (
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-20">
+<StatCard
+label="Total in Treasury"
+value={displayStats.totalTreasury}
+icon={"\u{1F4B0}"}
+color="text-brand-cyan"
+/>
+<StatCard
+label="Total Disbursed"
+value={displayStats.totalDisbursed}
+icon={"\u{1F4B8}"}
+color="text-brand-purple"
+/>
+<StatCard
+label="Scholars Funded"
+value={displayStats.scholarsFunded}
+icon={"\u{1F393}"}
+color="text-brand-emerald"
+/>
+<StatCard
+label="Global Donors"
+value={displayStats.donorsCount}
+icon={"\u{1F30D}"}
+color="text-brand-blue"
+/>
+</div>
+)}
 
 			<div className="mb-20">
 				<div className="glass-card p-10 rounded-[3rem] relative overflow-hidden">
@@ -392,43 +478,43 @@ const Treasury: React.FC = () => {
 				)}
 			</div>
 
-			<div className="mt-20 text-center">
-				<button className="iridescent-border px-12 py-5 rounded-2xl font-black text-lg uppercase tracking-widest hover:scale-105 active:scale-95 transition-all group overflow-hidden shadow-2xl shadow-brand-cyan/20">
-					<span className="relative z-10">Donate to Treasury</span>
-				</button>
-			</div>
-		</div>
-	)
+<div className="mt-20 text-center">
+<button className="iridescent-border px-12 py-5 rounded-2xl font-black text-lg uppercase tracking-widest hover:scale-105 active:scale-95 transition-all group overflow-hidden shadow-2xl shadow-brand-cyan/20">
+<span className="relative z-10">Donate to Treasury</span>
+</button>
+</div>
+</div>
+)
 }
 
 const StatCard: React.FC<{
-	label: string
-	value: string
-	icon: string
-	color: string
+label: string
+value: string
+icon: string
+color: string
 }> = ({ label, value, icon, color }) => (
-	<div className="glass-card p-8 rounded-4xl hover:border-white/20 transition-all hover:-translate-y-2 group">
-		<div className="text-3xl mb-4 group-hover:scale-125 transition-transform duration-500">
-			{icon}
-		</div>
-		<p className="text-[10px] uppercase font-black text-white/30 tracking-[2px] mb-1">
-			{label}
-		</p>
-		<p className={`text-2xl font-black ${color} tracking-tight`}>{value}</p>
-	</div>
+<div className="glass-card p-8 rounded-4xl hover:border-white/20 transition-all hover:-translate-y-2 group">
+<div className="text-3xl mb-4 group-hover:scale-125 transition-transform duration-500">
+{icon}
+</div>
+<p className="text-[10px] uppercase font-black text-white/30 tracking-[2px] mb-1">
+{label}
+</p>
+<p className={`text-2xl font-black ${color} tracking-tight`}>{value}</p>
+</div>
 )
 
 const LegendItem: React.FC<{ color: string; label: string }> = ({
-	color,
-	label,
+color,
+label,
 }) => (
-	<div className="flex items-center gap-2">
-		<div
-			className="w-3 h-3 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.5)]"
-			style={{ backgroundColor: color }}
-		/>
-		<span className="text-xs font-bold text-white/60">{label}</span>
-	</div>
+<div className="flex items-center gap-2">
+<div
+className="w-3 h-3 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.5)]"
+style={{ backgroundColor: color }}
+/>
+<span className="text-xs font-bold text-white/60">{label}</span>
+</div>
 )
 
 const ChartSkeleton = () => (

@@ -59,8 +59,7 @@ describe("GET /api/courses", () => {
 
 		const res = await request(buildApp()).get("/api/courses")
 		expect(res.status).toBe(200)
-		expect(res.body.total).toBe(1)
-		expect(res.body.totalPages).toBe(1)
+		expect(res.body.pagination.total).toBe(1)
 		expect(res.body.data).toHaveLength(1)
 		expect(res.body.data[0].published).toBe(true)
 	})
@@ -77,7 +76,7 @@ describe("GET /api/courses", () => {
 		)
 		expect(res.status).toBe(200)
 		expect(res.body.data).toEqual([])
-		expect(res.body.total).toBe(0)
+		expect(res.body.pagination.total).toBe(0)
 	})
 
 	it("applies search across course title and description", async () => {
@@ -125,9 +124,8 @@ describe("GET /api/courses", () => {
 
 		const res = await request(buildApp()).get("/api/courses?page=2&limit=999")
 		expect(res.status).toBe(200)
-		expect(res.body.limit).toBe(50)
-		expect(res.body.page).toBe(2)
-		expect(res.body.totalPages).toBe(3)
+		expect(res.body.pagination.limit).toBe(50)
+		expect(res.body.pagination.page).toBe(2)
 	})
 
 	it("supports offset parameter", async () => {
@@ -139,8 +137,8 @@ describe("GET /api/courses", () => {
 
 		const res = await request(buildApp()).get("/api/courses?offset=10&limit=10")
 		expect(res.status).toBe(200)
-		expect(res.body.page).toBe(2)
-		expect(res.body.limit).toBe(10)
+		expect(res.body.pagination.page).toBe(2)
+		expect(res.body.pagination.limit).toBe(10)
 	})
 
 	it("returns empty results for invalid difficulty", async () => {
@@ -148,10 +146,7 @@ describe("GET /api/courses", () => {
 		expect(res.status).toBe(200)
 		expect(res.body).toEqual({
 			data: [],
-			page: 1,
-			limit: 12,
-			total: 0,
-			totalPages: 0,
+			pagination: { page: 1, limit: 12, total: 0 },
 		})
 	})
 })

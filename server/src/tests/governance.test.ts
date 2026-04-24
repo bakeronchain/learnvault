@@ -247,9 +247,9 @@ describe("GET /api/proposals", () => {
 		)
 
 		expect(response.status).toBe(200)
-		expect(response.body.total).toBe(1)
-		expect(response.body.proposals[0]).toHaveProperty("id", 7)
-		expect(response.body.proposals[0]).toHaveProperty("user_vote_support", true)
+		expect(response.body.pagination.total).toBe(1)
+		expect(response.body.data[0]).toHaveProperty("id", 7)
+		expect(response.body.data[0]).toHaveProperty("user_vote_support", true)
 	})
 })
 

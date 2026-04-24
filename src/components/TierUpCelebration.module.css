@@ -1,0 +1,114 @@
+.overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.7);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 1000;
+	backdrop-filter: blur(4px);
+}
+
+.celebrationCard {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 2.5rem 3rem;
+	background: linear-gradient(135deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.98));
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	border-radius: 1.5rem;
+	box-shadow: 0 25px 80px rgba(124, 58, 237, 0.3);
+	text-align: center;
+	max-width: 400px;
+	margin: 1rem;
+}
+
+.tierUpIcon {
+	font-size: 4rem;
+	margin-bottom: 1rem;
+	animation: bounce 0.6s ease-in-out;
+}
+
+@keyframes bounce {
+	0%, 100% { transform: translateY(0); }
+	25% { transform: translateY(-20px); }
+	50% { transform: translateY(0); }
+	75% { transform: translateY(-10px); }
+}
+
+.tierUpTitle {
+	font-size: 2rem;
+	font-weight: 900;
+	background: linear-gradient(135deg, #7c3aed, #ec4899);
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	background-clip: text;
+	margin-bottom: 1.5rem;
+	text-transform: uppercase;
+	letter-spacing: 0.1em;
+}
+
+.tierTransition {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	margin-bottom: 1.5rem;
+	font-size: 1.25rem;
+	font-weight: 700;
+}
+
+.oldTier {
+	color: #6b7280;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.arrow {
+	color: #9ca3af;
+}
+
+.newTier {
+	color: #7c3aed;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	text-shadow: 0 0 20px rgba(124, 58, 237, 0.5);
+}
+
+.congratsMessage {
+	font-size: 0.875rem;
+	color: #9ca3af;
+	line-height: 1.5;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+	.tierUpIcon {
+		animation: none;
+	}
+
+	.celebrationCard {
+		animation: none;
+	}
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+	.celebrationCard {
+		padding: 2rem 1.5rem;
+	}
+
+	.tierUpIcon {
+		font-size: 3rem;
+	}
+
+	.tierUpTitle {
+		font-size: 1.5rem;
+	}
+
+	.tierTransition {
+		font-size: 1rem;
+		flex-wrap: wrap;
+		justify-content: center;
+	}
+}

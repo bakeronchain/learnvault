@@ -1,11 +1,15 @@
 import React, { useContext, useEffect, useMemo } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import ActivityFeed from "../components/ActivityFeed"
+import BadgeWall from "../components/BadgeWall"
 import CourseCard from "../components/CourseCard"
 import LRNBalanceWidget from "../components/LRNBalanceWidget"
+import TierProgressBar from "../components/TierProgressBar"
+import TierUpCelebration from "../components/TierUpCelebration"
 import { useCourse } from "../hooks/useCourse"
 import { useLearnerProfile } from "../hooks/useLearnerProfile"
 import { useLearnToken } from "../hooks/useLearnToken"
+import { useTierProgress } from "../hooks/useTierProgress"
 import { WalletContext } from "../providers/WalletProvider"
 
 import AddressDisplay from "../components/AddressDisplay"
@@ -21,6 +25,27 @@ const Dashboard: React.FC = () => {
 	// Fetch LRN balance from contract
 	const { balance: lrnBalance, isLoading: isLoadingBalance } =
 		useLearnToken(address)
+
+	// Tier progression hook
+	const {
+		currentLrn,
+		currentTier,
+		nextTier,
+		progressPercent,
+		lrnToNext,
+		isMaxTier,
+		updateLrn,
+		tierUpEvent,
+		dismissTierUp,
+	} = useTierProgress(0)
+
+	// Update LRN when balance changes
+	useEffect(() => {
+		if (lrnBalance !== undefined) {
+			const numericLrn = Number(lrnBalance) / 1e7
+			updateLrn(numericLrn)
+		}
+	}, [lrnBalance, updateLrn])
 
 	// Fetch enrolled courses and milestone progress from contract
 	const { enrolledCourses, getCourseProgress, isCompletingMilestone } =
@@ -139,27 +164,31 @@ const Dashboard: React.FC = () => {
 							<LRNBalanceWidget address={address} size="lg" />
 						</div>
 
-						{/* Stat cards grid */}
-						{isLoading ? (
-							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 flex-1 w-full">
-								{[1, 2, 3, 4].map((i) => (
-									<div
-										key={i}
-										className="glass-card p-4 sm:p-6 rounded-2xl border border-white/10 bg-white/5 animate-pulse min-h-20"
-									/>
-								))}
-							</div>
-						) : (
-							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 flex-1 w-full">
-								{stats.map((stat) => (
-									<StatCard
-										key={stat.label}
-										label={stat.label}
-										value={stat.value}
-									/>
-								))}
-							</div>
-						)}
+						{/* Tier progress bar + Stat cards grid */}
+						<div className="flex-1 w-full space-y-4">
+							<TierProgressBar currentLrn={currentLrn} />
+
+							{isLoading ? (
+								<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+									{[1, 2, 3, 4].map((i) => (
+										<div
+											key={i}
+											className="glass-card p-4 sm:p-6 rounded-2xl border border-white/10 bg-white/5 animate-pulse min-h-20"
+										/>
+									))}
+								</div>
+							) : (
+								<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+									{stats.map((stat) => (
+										<StatCard
+											key={stat.label}
+											label={stat.label}
+											value={stat.value}
+										/>
+									))}
+								</div>
+							)}
+						</div>
 					</div>
 				</section>
 
@@ -221,7 +250,27 @@ const Dashboard: React.FC = () => {
 						<ActivityFeed address={address} limit={5} />
 					</section>
 				</div>
+
+				{/* ── Achievements / Badge Wall ── */}
+				<section aria-label="Achievements">
+					<BadgeWall
+						earnedBadges={[]}
+						stats={{
+							milestonesCompleted: milestonesCompleted,
+							leaderboardRank: null,
+							votesCast: 0,
+						}}
+					/>
+				</section>
 			</div>
+
+			{/* Tier Up Celebration Modal */}
+			<TierUpCelebration
+				isOpen={tierUpEvent !== null}
+				previousTier={tierUpEvent?.previousTier.name ?? ""}
+				newTier={tierUpEvent?.newTier.name ?? ""}
+				onComplete={dismissTierUp}
+			/>
 		</div>
 	)
 }

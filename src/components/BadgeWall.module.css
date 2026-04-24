@@ -1,0 +1,135 @@
+.badgeWall {
+	width: 100%;
+}
+
+.badgeWallTitle {
+	font-size: 1.25rem;
+	font-weight: 700;
+	color: #f9fafb;
+	margin-bottom: 0.25rem;
+}
+
+.badgeWallSubtitle {
+	font-size: 0.875rem;
+	color: #9ca3af;
+	margin-bottom: 1.5rem;
+}
+
+.badgeGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+	gap: 1rem;
+}
+
+.badgeItem {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	cursor: default;
+}
+
+.badgeIcon {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 64px;
+	height: 64px;
+	border-radius: 16px;
+	border: 2px solid;
+	background: rgba(255, 255, 255, 0.05);
+	transition: all 0.3s ease;
+	overflow: hidden;
+}
+
+.badgeIconLocked {
+	opacity: 0.4;
+	filter: grayscale(100%);
+}
+
+.badgeEmoji {
+	font-size: 1.75rem;
+	z-index: 2;
+}
+
+.badgeGlow {
+	position: absolute;
+	inset: 0;
+	opacity: 0.3;
+	filter: blur(12px);
+	z-index: 1;
+}
+
+.badgeTooltip {
+	position: absolute;
+	bottom: 100%;
+	left: 50%;
+	transform: translateX(-50%);
+	margin-bottom: 0.5rem;
+	padding: 0.75rem;
+	background: rgba(17, 24, 39, 0.98);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	border-radius: 0.75rem;
+	box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+	min-width: 160px;
+	max-width: 220px;
+	z-index: 50;
+	backdrop-filter: blur(8px);
+}
+
+.tooltipHint {
+	font-size: 0.75rem;
+	color: #fbbf24;
+	font-weight: 600;
+	margin-bottom: 0.25rem;
+}
+
+.tooltipName {
+	font-size: 0.875rem;
+	color: #f9fafb;
+	font-weight: 700;
+	margin-bottom: 0.25rem;
+}
+
+.tooltipDesc {
+	font-size: 0.75rem;
+	color: #9ca3af;
+	margin-bottom: 0.5rem;
+}
+
+.tooltipDate {
+	font-size: 0.625rem;
+	color: #6b7280;
+	margin-bottom: 0.5rem;
+}
+
+.rarityBadge {
+	display: inline-block;
+	font-size: 0.625rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: #000;
+	padding: 0.125rem 0.5rem;
+	border-radius: 9999px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+	.badgeGrid {
+		grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+		gap: 0.75rem;
+	}
+
+	.badgeIcon {
+		width: 52px;
+		height: 52px;
+		border-radius: 12px;
+	}
+
+	.badgeEmoji {
+		font-size: 1.5rem;
+	}
+}

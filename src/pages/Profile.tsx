@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import { ActivityFeed } from "../components/ActivityFeed"
 import AddressDisplay from "../components/AddressDisplay"
+import BadgeWall from "../components/BadgeWall"
 import LRNHistoryChart from "../components/LRNHistoryChart"
 import { ReputationBadge } from "../components/ReputationBadge"
 import {
@@ -15,6 +16,7 @@ import { useScholarCredentials } from "../hooks/useScholarCredentials"
 import { WalletContext } from "../providers/WalletProvider"
 import { formatDuration, getLearningTimeSummary } from "../util/learningTime"
 import { shortenAddress } from "../util/scholarshipApplications"
+import type { UserBadge } from "../types/gamification"
 
 type UserNft = {
 	id: string
@@ -237,6 +239,21 @@ const Profile: React.FC = () => {
 					<div className="h-px flex-1 bg-linear-to-r from-white/10 to-transparent" />
 				</div>
 				<LRNHistoryChart address={walletAddress} />
+			</section>
+
+			<section className="mt-16">
+				<div className="flex items-center gap-4 mb-8">
+					<h2 className="text-2xl font-black tracking-tight">Achievements</h2>
+					<div className="h-px flex-1 bg-linear-to-r from-white/10 to-transparent" />
+				</div>
+				<BadgeWall
+					earnedBadges={[]}
+					stats={{
+						milestonesCompleted: 0,
+						leaderboardRank: null,
+						votesCast: 0,
+					}}
+				/>
 			</section>
 
 			<ActivityFeed address={walletAddress} limit={10} />

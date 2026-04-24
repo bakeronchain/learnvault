@@ -189,7 +189,7 @@ export async function getVotingPower(
 
 	try {
 		const rawBalance =
-			await stellarContractService.getGovernanceTokenBalance(address)
+			await stellarContractService.getGovernanceVotingPower(address)
 		const balanceBigInt = BigInt(rawBalance)
 		const whole = balanceBigInt / GOV_DIVISOR
 		const frac = balanceBigInt % GOV_DIVISOR
@@ -380,9 +380,9 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 			return
 		}
 
-		// 4. Check voter's GOV token balance (voting power)
+		// 4. Check voter's effective voting power (own balance + any delegated-to-them)
 		const rawBalance =
-			await stellarContractService.getGovernanceTokenBalance(voter_address)
+			await stellarContractService.getGovernanceVotingPower(voter_address)
 		const balanceBigInt = BigInt(rawBalance)
 
 		if (balanceBigInt <= 0n) {
@@ -522,5 +522,40 @@ export async function cancelProposal(
 			error: "Failed to cancel proposal",
 			message: err instanceof Error ? err.message : String(err),
 		})
+	}
+}
+
+export async function getDelegation(
+	req: Request,
+	res: Response,
+): Promise<void> {
+	const { address } = req.params
+	if (!address || address.length < 50) {
+		res.status(400).json({ error: "Invalid Stellar address" })
+		return
+	}
+
+	try {
+		const [rawVotingPower, rawOwnBalance, delegatee] = await Promise.all([
+			stellarContractService.getGovernanceVotingPower(address),
+			stellarContractService.getGovernanceTokenBalance(address),
+			stellarContractService.getGovernanceDelegation(address),
+		])
+
+		const ownBalance = BigInt(rawOwnBalance)
+		const votingPower = BigInt(rawVotingPower)
+		const delegatedToMe = delegatee ? 0n : votingPower - ownBalance
+
+		res.status(200).json({
+			address,
+			delegatee,
+			is_delegating: delegatee !== null,
+			own_balance: rawOwnBalance,
+			delegated_to_me: delegatedToMe > 0n ? delegatedToMe.toString() : "0",
+			voting_power: rawVotingPower,
+		})
+	} catch (err) {
+		console.error("[governance] getDelegation error:", err)
+		res.status(500).json({ error: "Failed to fetch delegation state" })
 	}
 }

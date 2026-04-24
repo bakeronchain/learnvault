@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { createAuthHeaders } from "../lib/api"
 import { useWallet } from "./useWallet"
 
 export interface Bookmark {
@@ -10,14 +11,15 @@ export interface Bookmark {
 
 const BOOKMARKS_QUERY_KEY = ["bookmarks"] as const
 
-function authHeaders(): Record<string, string> {
-	const token = localStorage.getItem("authToken")
-	const headers: Record<string, string> = {
-		"Content-Type": "application/json",
-	}
-	if (token) {
-		headers.Authorization = `Bearer ${token}`
-	}
+/**
+ * Build headers for authenticated bookmark requests. Delegates to the shared
+ * `createAuthHeaders` / `getAuthToken` pair so we stay in sync with the
+ * codebase's "authToken" + "auth_token" storage-key fallback, and never send
+ * `Authorization: Bearer ` when no token is present.
+ */
+function authHeaders(): Headers {
+	const headers = createAuthHeaders()
+	headers.set("Content-Type", "application/json")
 	return headers
 }
 

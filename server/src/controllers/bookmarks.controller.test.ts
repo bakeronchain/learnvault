@@ -138,7 +138,8 @@ describe("POST /api/me/bookmarks", () => {
 
 	it("is idempotent — returns 200 when bookmark already existed", async () => {
 		const now = new Date().toISOString()
-		// Upsert: ON CONFLICT DO UPDATE returns the existing row, is_new = false
+		// CTE: INSERT ... ON CONFLICT DO NOTHING returns no row; the UNION ALL
+		// fallback SELECT returns the pre-existing row with is_new = false.
 		mockedQuery.mockResolvedValueOnce({
 			rows: [{ id: 7, course_id: COURSE_A, created_at: now, is_new: false }],
 		})

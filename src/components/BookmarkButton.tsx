@@ -16,16 +16,18 @@ const BookmarkButton: React.FC<BookmarkButtonProps> = ({
 	courseId,
 	className = "",
 }) => {
-	const { address, isBookmarked, toggleBookmark } = useBookmarks()
+	const { address, isBookmarked, toggleBookmark, isToggling } = useBookmarks()
 
 	if (!address) return null
 
 	const active = isBookmarked(courseId)
 
-	// Deliberately NOT `disabled` while a toggle is in flight — the mutation is
-	// shared across every BookmarkButton on the page, so disabling here would
-	// freeze every other heart icon on the screen whenever any single one is
-	// mid-flight. The optimistic update already gives instant feedback.
+	// Each BookmarkButton has its own `useMutation` instance (via its own
+	// `useBookmarks()` call), so `isToggling` is local to this button — it
+	// only disables THIS heart while its own toggle is in flight, preventing
+	// double-click races on the same course without freezing other hearts.
+	// Only the React Query cache is shared across instances, which is what
+	// makes optimistic updates propagate to every visible button instantly.
 	return (
 		<button
 			type="button"
@@ -35,9 +37,10 @@ const BookmarkButton: React.FC<BookmarkButtonProps> = ({
 				e.stopPropagation()
 				toggleBookmark(courseId)
 			}}
+			disabled={isToggling}
 			aria-label={active ? "Remove bookmark" : "Bookmark this course"}
 			aria-pressed={active}
-			className={`inline-flex items-center justify-center rounded-full p-2 backdrop-blur-md border transition-all active:scale-90 ${
+			className={`inline-flex items-center justify-center rounded-full p-2 backdrop-blur-md border transition-all active:scale-90 disabled:opacity-70 disabled:cursor-wait ${
 				active
 					? "bg-brand-cyan/20 border-brand-cyan/40 text-brand-cyan"
 					: "bg-black/30 border-white/10 text-white/60 hover:text-white hover:border-white/30"

@@ -2,6 +2,7 @@ import { Routes, Route, Outlet } from "react-router-dom"
 import Footer from "./components/Footer"
 import NavBar from "./components/NavBar"
 import Admin from "./pages/Admin"
+import Community from "./pages/Community"
 import Credential from "./pages/Credential"
 import Dao from "./pages/Dao"
 import Debug from "./pages/Debug"
@@ -20,6 +21,7 @@ function App() {
 				<Route path="/dao" element={<Dao />} />
 				<Route path="/leaderboard" element={<Leaderboard />} />
 				<Route path="/profile" element={<Profile />} />
+				<Route path="/community" element={<Community />} />
 				<Route path="/admin" element={<Admin />} />
 				<Route path="/treasury" element={<Treasury />} />
 				<Route path="/credentials/:nftId" element={<Credential />} />

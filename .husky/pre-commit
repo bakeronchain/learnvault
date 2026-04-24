@@ -1,1 +1,9 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
 npx lint-staged
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --verbose
+else
+  echo "[Husky] Warning: gitleaks not found. Skipping secret scan."
+fi

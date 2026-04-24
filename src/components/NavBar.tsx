@@ -10,6 +10,7 @@ export default function NavBar() {
 	const navLinks = [
 		{ to: "/learn", label: t("nav.learn") },
 		{ to: "/dao", label: t("nav.dao") },
+		{ to: "/community", label: "Community" },
 		{ to: "/leaderboard", label: t("nav.leaderboard") },
 		{ to: "/treasury", label: t("nav.treasury") },
 		{ to: "/profile", label: t("nav.profile") },

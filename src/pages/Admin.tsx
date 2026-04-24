@@ -733,7 +733,10 @@ const MilestoneQueue: React.FC = () => {
 							type="button"
 							disabled={page <= 1}
 							onClick={() => handlePageChange(page - 1)}
+
 							aria-label="Previous page"
+
+
 							className="px-3 py-1 rounded-xl border border-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
 						>
 							← Prev
@@ -742,7 +745,9 @@ const MilestoneQueue: React.FC = () => {
 							type="button"
 							disabled={page >= totalPages}
 							onClick={() => handlePageChange(page + 1)}
+
 							aria-label="Next page"
+
 							className="px-3 py-1 rounded-xl border border-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
 						>
 							Next →

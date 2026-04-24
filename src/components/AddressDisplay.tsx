@@ -58,16 +58,17 @@ export const AddressDisplay: React.FC<AddressDisplayProps> = ({
 
 	const getExplorerUrl = () => {
 		const activeNetwork = (walletNetwork || stellarNetwork).toLowerCase()
-		const baseUrl = activeNetwork.includes("public") || activeNetwork.includes("mainnet")
-			? "https://stellar.expert/explorer/public/account/"
-			: activeNetwork.includes("futurenet")
-			? "https://futurenet.stellar.expert/explorer/futurenet/account/"
-			: "https://testnet.stellar.expert/explorer/testnet/account/"
+		const baseUrl =
+			activeNetwork.includes("public") || activeNetwork.includes("mainnet")
+				? "https://stellar.expert/explorer/public/account/"
+				: activeNetwork.includes("futurenet")
+				? "https://futurenet.stellar.expert/explorer/futurenet/account/"
+				: "https://testnet.stellar.expert/explorer/testnet/account/"
 		return `${baseUrl}${address}`
 	}
 
 	return (
-		<div 
+		<div
 			className={`inline-flex items-center gap-2 group/addr ${className}`}
 			onMouseEnter={() => setIsHovered(true)}
 			onMouseLeave={() => setIsHovered(false)}
@@ -80,7 +81,7 @@ export const AddressDisplay: React.FC<AddressDisplayProps> = ({
 				>
 					{fullOnHover && isHovered ? address : truncated}
 				</motion.span>
-				
+
 				<AnimatePresence>
 					{isHovered && !fullOnHover && (
 						<motion.div

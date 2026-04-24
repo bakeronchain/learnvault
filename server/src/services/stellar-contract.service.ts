@@ -6,6 +6,7 @@
 
 import { pool } from "../db/index"
 import { getRequestId } from "../lib/request-context"
+import { getRpcCache, CacheKey, TTL } from "../lib/rpc-cache"
 
 const STELLAR_NETWORK = process.env.STELLAR_NETWORK ?? "testnet"
 const STELLAR_SECRET_KEY = process.env.STELLAR_SECRET_KEY ?? ""
@@ -382,6 +383,11 @@ async function isEnrolled(
 	courseId: number,
 	_options: RequestTraceOptions = {},
 ): Promise<boolean> {
+	const cache = getRpcCache()
+	const cacheKey = CacheKey.enrollment(learnerAddress, courseId)
+	const cached = await cache.get(cacheKey)
+	if (cached !== null) return cached === "1"
+
 	if (!COURSE_MILESTONE_CONTRACT_ID) {
 		console.warn(
 			"[stellar] COURSE_MILESTONE_CONTRACT_ID not set — simulating enrollment check",
@@ -437,7 +443,9 @@ async function isEnrolled(
 
 		if (simResult.result) {
 			const { scValToNative } = await import("@stellar/stellar-sdk")
-			return scValToNative(simResult.result.retval) as boolean
+			const result = scValToNative(simResult.result.retval) as boolean
+			await cache.set(cacheKey, result ? "1" : "0", TTL.ENROLLMENT)
+			return result
 		}
 
 		return false
@@ -743,6 +751,11 @@ async function reclaimInactiveEscrow(
 }
 
 async function getLearnTokenBalance(address: string): Promise<string> {
+	const cache = getRpcCache()
+	const cacheKey = CacheKey.learnBalance(address)
+	const cached = await cache.get(cacheKey)
+	if (cached !== null) return cached
+
 	if (!LEARN_TOKEN_CONTRACT_ID) {
 		console.warn(
 			"[stellar] LEARN_TOKEN_CONTRACT_ID not set — simulating balance",
@@ -782,7 +795,9 @@ async function getLearnTokenBalance(address: string): Promise<string> {
 		)
 			return "0"
 		const { scValToNative } = await import("@stellar/stellar-sdk")
-		return scValToNative(simResult.result?.retval!).toString()
+		const result = scValToNative(simResult.result?.retval!).toString()
+		await cache.set(cacheKey, result, TTL.BALANCE)
+		return result
 	} catch (err) {
 		console.error("[stellar] getLearnTokenBalance failed:", err)
 		return "0"
@@ -790,6 +805,11 @@ async function getLearnTokenBalance(address: string): Promise<string> {
 }
 
 async function getGovernanceTokenBalance(address: string): Promise<string> {
+	const cache = getRpcCache()
+	const cacheKey = CacheKey.govBalance(address)
+	const cached = await cache.get(cacheKey)
+	if (cached !== null) return cached
+
 	if (!GOVERNANCE_TOKEN_CONTRACT_ID) {
 		console.warn(
 			"[stellar] GOVERNANCE_TOKEN_CONTRACT_ID not set — simulating balance",
@@ -829,7 +849,9 @@ async function getGovernanceTokenBalance(address: string): Promise<string> {
 		)
 			return "0"
 		const { scValToNative } = await import("@stellar/stellar-sdk")
-		return scValToNative(simResult.result?.retval!).toString()
+		const result = scValToNative(simResult.result?.retval!).toString()
+		await cache.set(cacheKey, result, TTL.BALANCE)
+		return result
 	} catch (err) {
 		console.error("[stellar] getGovernanceTokenBalance failed:", err)
 		return "0"
@@ -837,6 +859,11 @@ async function getGovernanceTokenBalance(address: string): Promise<string> {
 }
 
 async function getGovernanceVotingPower(address: string): Promise<string> {
+	const cache = getRpcCache()
+	const cacheKey = CacheKey.votingPower(address)
+	const cached = await cache.get(cacheKey)
+	if (cached !== null) return cached
+
 	if (!GOVERNANCE_TOKEN_CONTRACT_ID) {
 		console.warn(
 			"[stellar] GOVERNANCE_TOKEN_CONTRACT_ID not set — simulating voting power",
@@ -878,7 +905,9 @@ async function getGovernanceVotingPower(address: string): Promise<string> {
 		)
 			return "0"
 		const { scValToNative } = await import("@stellar/stellar-sdk")
-		return scValToNative(simResult.result?.retval!).toString()
+		const result = scValToNative(simResult.result?.retval!).toString()
+		await cache.set(cacheKey, result, TTL.VOTING_POWER)
+		return result
 	} catch (err) {
 		console.error("[stellar] getGovernanceVotingPower failed:", err)
 		return "0"
@@ -888,6 +917,11 @@ async function getGovernanceVotingPower(address: string): Promise<string> {
 async function getGovernanceDelegation(
 	address: string,
 ): Promise<string | null> {
+	const cache = getRpcCache()
+	const cacheKey = CacheKey.delegation(address)
+	const cached = await cache.get(cacheKey)
+	if (cached !== null) return cached === "__null__" ? null : cached
+
 	if (!GOVERNANCE_TOKEN_CONTRACT_ID) return null
 	try {
 		const { Contract, Address } = await import("@stellar/stellar-sdk")
@@ -926,7 +960,9 @@ async function getGovernanceDelegation(
 		const { scValToNative } = await import("@stellar/stellar-sdk")
 		const raw = scValToNative(simResult.result?.retval!)
 		// Option<Address> → null (None) or an Address string (Some)
-		return typeof raw === "string" ? raw : null
+		const result = typeof raw === "string" ? raw : null
+		await cache.set(cacheKey, result ?? "__null__", TTL.DELEGATION)
+		return result
 	} catch (err) {
 		console.error("[stellar] getGovernanceDelegation failed:", err)
 		return null

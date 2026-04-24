@@ -128,6 +128,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({ courseId, onSelectThread
                                         className="text-white/30 hover:text-red-400 transition-colors px-2 py-1"
                                         onClick={(e) => handleDelete(e, thread.id)}
                                         title="Delete thread"
+                                        aria-label="Delete thread"
                                     >
                                         ×
                                     </button>

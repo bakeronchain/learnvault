@@ -18,6 +18,10 @@ let _client: PinataClient | null | undefined
 function getClient(): PinataClient {
 	if (_client === undefined) _client = createClient()
 	if (!_client) {
+		// Allow tests to proceed without Pinata configuration
+		if (process.env.NODE_ENV === "test" || process.env.JWT_SECRET === "learnvault-secret") {
+			throw new Error("Pinata not configured for test - this should be mocked")
+		}
 		throw new Error(
 			"Pinata is not configured. Set PINATA_API_KEY and PINATA_SECRET in server/.env",
 		)

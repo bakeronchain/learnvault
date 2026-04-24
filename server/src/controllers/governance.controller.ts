@@ -2,8 +2,11 @@ import { type Request, type Response } from "express"
 import { z } from "zod"
 import sanitizeHtml from "sanitize-html"
 
+import { logger } from "../lib/logger"
 import { pool } from "../db/index"
 import { trackEscrowTimeout } from "../services/escrow-timeout.service"
+
+const log = logger.child({ module: "governance" })
 import { stellarContractService } from "../services/stellar-contract.service"
 
 type ProposalStatus = "pending" | "approved" | "rejected"
@@ -201,7 +204,7 @@ export async function getVotingPower(
 			can_vote: balanceBigInt > 0n,
 		})
 	} catch (err) {
-		console.error("[governance] getVotingPower error:", err)
+		log.error({ err }, "getVotingPower error")
 		res.status(500).json({ error: "Failed to fetch voting power" })
 	}
 }
@@ -334,7 +337,7 @@ export async function createGovernanceProposal(
 			tx_hash: contractResult.txHash,
 		})
 	} catch (err) {
-		console.error("[governance] Proposal creation failed:", err)
+		log.error({ err }, "Proposal creation failed")
 		res.status(500).json({
 			error: "Failed to create governance proposal",
 			message: err instanceof Error ? err.message : String(err),
@@ -459,7 +462,7 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 			votes_against: updatedProposal.rows[0]?.votes_against ?? "0",
 		})
 	} catch (err) {
-		console.error("[governance] Vote casting failed:", err)
+		log.error({ err }, "Vote casting failed")
 		res.status(500).json({
 			error: "Failed to cast vote",
 			message: err instanceof Error ? err.message : String(err),
@@ -497,7 +500,7 @@ export async function getProposalStatus(
 			deadline: proposal.deadline ?? null,
 		})
 	} catch (err) {
-		console.error("[governance] Get proposal status failed:", err)
+		log.error({ err }, "Get proposal status failed")
 		res.status(500).json({ error: "Failed to fetch proposal status" })
 	}
 }
@@ -545,7 +548,7 @@ export async function cancelProposal(
 
 		res.status(204).end()
 	} catch (err) {
-		console.error("[governance] Cancel proposal failed:", err)
+		log.error({ err }, "Cancel proposal failed")
 		res.status(500).json({
 			error: "Failed to cancel proposal",
 			message: err instanceof Error ? err.message : String(err),

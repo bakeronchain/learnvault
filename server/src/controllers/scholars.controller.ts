@@ -1,6 +1,9 @@
 import { type Request, type Response } from "express"
 
+import { logger } from "../lib/logger"
 import { pool } from "../db/index"
+
+const log = logger.child({ module: "scholars" })
 import { milestoneStore } from "../db/milestone-store"
 import { listEscrowTimeoutsForScholar } from "../services/escrow-timeout.service"
 import { getLeaderboardData } from "../services/leaderboard.service"
@@ -113,7 +116,7 @@ export async function getScholarMilestones(
 
 		res.status(200).json({ milestones })
 	} catch (err) {
-		console.error("[scholars] getScholarMilestones error:", err)
+		log.error({ err }, "getScholarMilestones error")
 		res.status(500).json({ error: "Failed to fetch scholar milestones" })
 	}
 }
@@ -200,7 +203,7 @@ export async function getScholarProfile(
 			joined_at: joinedAt,
 		})
 	} catch (error) {
-		console.error("[scholars] Error fetching scholar profile:", error)
+		log.error({ err: error }, "Error fetching scholar profile")
 		res.status(500).json({ error: "Failed to fetch scholar profile" })
 	}
 }
@@ -221,7 +224,7 @@ export async function getScholarCredentials(
 			await stellarContractService.getScholarCredentials(address)
 		res.status(200).json({ credentials })
 	} catch (error) {
-		console.error("[scholars] Error fetching scholar credentials:", error)
+		log.error({ err: error }, "Error fetching scholar credentials")
 		res.status(500).json({ error: "Failed to fetch scholar credentials" })
 	}
 }

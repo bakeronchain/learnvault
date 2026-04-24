@@ -515,3 +515,39 @@ fn state_persists_after_upgrade() {
     assert_eq!(metadata.metadata_uri, metadata_uri);
     assert_eq!(stored_hash, wasm_hash);
 }
+
+#[test]
+fn benchmark_costs() {
+    let e = Env::default();
+
+    // 1. Benchmark initialize
+    let fresh_admin = Address::generate(&e);
+    let id = e.register(ScholarNFT, ());
+    let fresh_client = ScholarNFTClient::new(&e, &id);
+    e.mock_all_auths();
+    e.cost_estimate().budget().reset_unlimited();
+    fresh_client.initialize(&fresh_admin);
+    let init_instr = e.cost_estimate().budget().cpu_instruction_cost();
+    let init_mem = e.cost_estimate().budget().memory_bytes_cost();
+
+    // 2. Benchmark mint
+    let user = Address::generate(&e);
+    let (_, _, client) = setup(&e);
+    e.mock_all_auths();
+    e.cost_estimate().budget().reset_unlimited();
+    client.mint(&user, &String::from_str(&e, "ipfs://test"));
+    let mint_instr = e.cost_estimate().budget().cpu_instruction_cost();
+    let mint_mem = e.cost_estimate().budget().memory_bytes_cost();
+
+    // 3. Benchmark get_all_scholars
+    e.cost_estimate().budget().reset_unlimited();
+    client.get_all_scholars();
+    let get_instr = e.cost_estimate().budget().cpu_instruction_cost();
+    let get_mem = e.cost_estimate().budget().memory_bytes_cost();
+
+    extern crate std;
+    std::println!("BENCHMARK_RESULTS: scholar_nft");
+    std::println!("initialize: instr={}, mem={}", init_instr, init_mem);
+    std::println!("mint: instr={}, mem={}", mint_instr, mint_mem);
+    std::println!("get_all_scholars: instr={}, mem={}", get_instr, get_mem);
+}

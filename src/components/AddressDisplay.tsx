@@ -150,6 +150,7 @@ export const AddressDisplay: React.FC<AddressDisplayProps> = ({
 					rel="noopener noreferrer"
 					className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-colors text-white/50 hover:text-brand-cyan"
 					title="View on Stellar Expert"
+					aria-label="View on Stellar Expert"
 				>
 					<svg
 						viewBox="0 0 24 24"

@@ -122,6 +122,7 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({ courseId, threadId, 
                                             className="text-white/30 hover:text-red-400 transition-colors px-2 py-1"
                                             onClick={() => handleDeleteReply(reply.id)}
                                             title="Delete reply"
+                                            aria-label="Delete reply"
                                         >
                                             ×
                                         </button>

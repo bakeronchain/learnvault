@@ -72,6 +72,7 @@ const GlobalSearch: React.FC = () => {
 				<input
 					type="text"
 					placeholder="Search..."
+					aria-label="Search"
 					className="glass border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm w-[180px] focus:w-[240px] focus:border-brand-cyan/40 focus:outline-none transition-all"
 					value={query}
 					onChange={(e) => {

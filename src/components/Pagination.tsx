@@ -45,6 +45,7 @@ const Pagination: React.FC<PaginationProps> = ({
 				<button
 					onClick={handlePrev}
 					disabled={page === 1}
+					aria-label="Previous page"
 					className="px-5 py-2 glass rounded-xl border border-white/10 text-xs font-black uppercase tracking-widest 
                      text-white/50 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-[0.97]"
 				>
@@ -60,6 +61,7 @@ const Pagination: React.FC<PaginationProps> = ({
 							) : (
 								<button
 									onClick={() => onPageChange(item as number)}
+									aria-label={`Page ${item}`}
 									className={`min-w-[44px] h-10 rounded-xl border text-xs font-black uppercase tracking-widest transition-all active:scale-[0.97]
                     ${
 											item === page
@@ -77,6 +79,7 @@ const Pagination: React.FC<PaginationProps> = ({
 				<button
 					onClick={handleNext}
 					disabled={page === totalPages}
+					aria-label="Next page"
 					className="px-5 py-2 glass rounded-xl border border-white/10 text-xs font-black uppercase tracking-widest 
                      text-white/50 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-[0.97]"
 				>

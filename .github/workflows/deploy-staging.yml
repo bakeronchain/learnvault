@@ -1,0 +1,286 @@
+name: Staging deployment
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: staging-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  STAGING_BACKEND_URL: ${{ secrets.STAGING_BACKEND_URL }}
+  STAGING_BACKEND_DEPLOY_TOKEN: ${{ secrets.STAGING_BACKEND_DEPLOY_TOKEN }}
+  STAGING_FRONTEND_URL: ${{ secrets.STAGING_FRONTEND_URL }}
+  STAGING_FRONTEND_DEPLOY_TOKEN: ${{ secrets.STAGING_FRONTEND_DEPLOY_TOKEN }}
+  STAGING_API_URL: ${{ secrets.STAGING_API_URL }}
+  STAGING_URL: ${{ secrets.STAGING_URL }}
+  STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL || secrets.DATABASE_URL || '' }}
+  STAGING_REDIS_URL: ${{ secrets.STAGING_REDIS_URL || secrets.REDIS_URL || '' }}
+  STELLAR_SECRET_KEY: ${{ secrets.STAGING_STELLAR_SECRET_KEY || secrets.STELLAR_SECRET_KEY || '' }}
+
+jobs:
+  build-and-test:
+    name: Build and validate staging artifacts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add Wasm target and native dependencies
+        run: |
+          rustup target add wasm32v1-none
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev libdbus-1-dev pkg-config
+
+      - name: Install stellar-scaffold CLI
+        uses: cargo-bins/cargo-binstall@main
+        with:
+          tool: stellar-scaffold-cli
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Run lint and formatting checks
+        run: |
+          npm run lint
+          npx prettier . --check
+
+      - name: Validate database migration safety
+        run: |
+          if [ -d "server/prisma" ]; then
+            npx prisma migrate dev --dry-run
+          elif [ -f "server/knexfile.js" ]; then
+            npx knex migrate:list
+          else
+            echo "No standard migration tool detected, skipping dry-run."
+          fi
+
+      - name: Build scaffold and generate contract clients
+        run: |
+          STELLAR_SCAFFOLD_ENV=staging stellar-scaffold build --build-clients 2>&1 | tee build_clients.log
+
+      - name: Verify generated clients
+        run: |
+          FAILED=$(grep -Eo "Failed: [0-9]+" build_clients.log | awk '{print $2}')
+          if [ -n "$FAILED" ] && [ "$FAILED" -gt 0 ]; then
+            echo "Client generation summary check failed: Failed: $FAILED"
+            exit 1
+          fi
+
+      - name: Build frontend and contract packages
+        run: |
+          npm run install:contracts
+          npm run build
+
+      - name: Run test suite
+        run: npm test --if-present
+
+  deploy-contracts:
+    name: Deploy contracts to testnet
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Stellar CLI
+        run: npm install -g @stellar/stellar-cli
+
+      - name: Deploy contracts to Stellar Testnet
+        env:
+          STELLAR_SECRET_KEY: ${{ env.STELLAR_SECRET_KEY }}
+        run: |
+          if [ -z "${STELLAR_SECRET_KEY}" ]; then
+            echo "STAGING_STELLAR_SECRET_KEY or STELLAR_SECRET_KEY is not configured."
+            exit 1
+          fi
+          chmod +x scripts/deploy-testnet.sh
+          ./scripts/deploy-testnet.sh
+
+  deploy-backend:
+    name: Deploy backend and run migrations
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install backend dependencies
+        run: npm ci --legacy-peer-deps
+        working-directory: server
+
+      - name: Build backend
+        run: npm run build
+        working-directory: server
+
+      - name: Run database migrations
+        env:
+          DATABASE_URL: ${{ env.STAGING_DATABASE_URL }}
+          NODE_ENV: production
+        run: |
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "STAGING_DATABASE_URL or DATABASE_URL is not configured. Cannot run migrations."
+            exit 1
+          fi
+          npm run migrate
+        working-directory: server
+
+      - name: Deploy backend to staging provider
+        if: ${{ env.STAGING_BACKEND_URL != '' && env.STAGING_BACKEND_DEPLOY_TOKEN != '' }}
+        run: |
+          echo "Triggering backend deployment webhook..."
+          curl -fsSL -X POST \
+            -H "Authorization: Bearer ${STAGING_BACKEND_DEPLOY_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"branch":"main","environment":"staging"}' \
+            "${STAGING_BACKEND_URL}"
+
+      - name: Backend deploy webhook skipped
+        if: ${{ env.STAGING_BACKEND_URL == '' || env.STAGING_BACKEND_DEPLOY_TOKEN == '' }}
+        run: |
+          echo "Skipping backend deployment webhook because STAGING_BACKEND_URL or STAGING_BACKEND_DEPLOY_TOKEN is not configured."
+
+  deploy-frontend:
+    name: Deploy frontend to staging
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Deploy frontend to staging provider
+        if: ${{ env.STAGING_FRONTEND_URL != '' && env.STAGING_FRONTEND_DEPLOY_TOKEN != '' }}
+        run: |
+          echo "Triggering frontend deployment webhook..."
+          curl -fsSL -X POST \
+            -H "Authorization: Bearer ${STAGING_FRONTEND_DEPLOY_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"branch":"main","environment":"staging"}' \
+            "${STAGING_FRONTEND_URL}"
+
+      - name: Frontend deploy webhook skipped
+        if: ${{ env.STAGING_FRONTEND_URL == '' || env.STAGING_FRONTEND_DEPLOY_TOKEN == '' }}
+        run: |
+          echo "Skipping frontend deployment webhook because STAGING_FRONTEND_URL or STAGING_FRONTEND_DEPLOY_TOKEN is not configured."
+
+  smoke-test:
+    name: Run staging smoke tests
+    needs:
+      - deploy-contracts
+      - deploy-backend
+      - deploy-frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Stellar CLI
+        run: npm install -g @stellar/stellar-cli
+
+      - name: Run contract smoke tests
+        run: chmod +x scripts/smoke-test-contracts.sh && ./scripts/smoke-test-contracts.sh
+
+      - name: Verify staging API availability
+        if: ${{ env.STAGING_API_URL != '' }}
+        run: |
+          echo "Checking staging API at ${STAGING_API_URL}"
+          curl -fSL "${STAGING_API_URL}" -o /dev/null
+
+      - name: Staging API check skipped
+        if: ${{ env.STAGING_API_URL == '' }}
+        run: |
+          echo "Skipping staging API availability verification because STAGING_API_URL is not configured."
+
+  comment-on-pr:
+    name: Post staging deployment status to merged PR
+    needs: smoke-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Post deployment status to PR
+        uses: actions/github-script@v7
+        env:
+          STAGING_URL: ${{ env.STAGING_URL }}
+          STAGING_API_URL: ${{ env.STAGING_API_URL }}
+          STAGING_FRONTEND_URL: ${{ env.STAGING_FRONTEND_URL }}
+          STAGING_BACKEND_URL: ${{ env.STAGING_BACKEND_URL }}
+        with:
+          script: |
+            const { data: pulls } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+            });
+
+            const mergedPR = pulls.find(pr => pr.merged_at);
+            if (!mergedPR) {
+              console.log('No merged PR associated with this commit. Skipping PR comment.');
+              return;
+            }
+
+            const body = `## Staging deployment completed\n\n` +
+              `- **Frontend:** ${process.env.STAGING_FRONTEND_URL || 'not configured'}\n` +
+              `- **Backend:** ${process.env.STAGING_BACKEND_URL || 'not configured'}\n` +
+              `- **API:** ${process.env.STAGING_API_URL || 'not configured'}\n` +
+              `- **Contracts:** deployed to Stellar Testnet\n\n` +
+              `Smoke tests ran after deployment. If a staging URL is missing, configure the corresponding repository secret.\n`;
+
+            await github.rest.issues.createComment({
+              issue_number: mergedPR.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });

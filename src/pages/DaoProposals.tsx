@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { Helmet } from "react-helmet"
 import { useSearchParams } from "react-router-dom"
+import ConfirmDialog from "../components/ConfirmDialog"
 import CommentSection from "../components/CommentSection"
 import Pagination from "../components/Pagination"
 import { NoProposalsEmptyState } from "../components/SkeletonLoader"
@@ -60,7 +61,21 @@ const DaoProposals: React.FC = () => {
 		isLoading,
 		error,
 		refetch,
+		cancelProposal,
+		isCancelling,
 	} = useProposals()
+
+	const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+
+	const handleCancelProposal = async () => {
+		if (!selectedProposal) return
+		try {
+			await cancelProposal(selectedProposal.id)
+			setShowCancelConfirm(false)
+		} catch (err) {
+			console.error("Cancel proposal failed", err)
+		}
+	}
 
 	const proposalParam = searchParams.get("proposal")
 	const pageParam = searchParams.get("page")
@@ -269,6 +284,18 @@ const DaoProposals: React.FC = () => {
 				))}
 			</div>
 
+			{showCancelConfirm && selectedProposal && (
+				<ConfirmDialog
+					title="Cancel Proposal"
+					description="Are you sure you want to cancel this proposal? This will permanently remove it from the DAO and any votes cast will be lost. This action cannot be undone."
+					confirmLabel="Cancel Proposal"
+					cancelLabel="Keep Proposal"
+					onConfirm={() => void handleCancelProposal()}
+					onCancel={() => setShowCancelConfirm(false)}
+					isDestructive
+				/>
+			)}
+
 			{selectedProposal && (
 				<section className="glass-card p-10 rounded-[2.5rem] border border-white/5 mb-10">
 					<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-8">
@@ -291,8 +318,21 @@ const DaoProposals: React.FC = () => {
 								</span>
 							</div>
 						</div>
-						<div className="px-5 py-2 bg-brand-cyan/10 border border-brand-cyan/30 rounded-full text-brand-cyan text-xs font-black uppercase">
-							{selectedProposal.displayStatus}
+						<div className="flex flex-col items-end gap-3">
+							<div className="px-5 py-2 bg-brand-cyan/10 border border-brand-cyan/30 rounded-full text-brand-cyan text-xs font-black uppercase">
+								{selectedProposal.displayStatus}
+							</div>
+							{selectedProposal.authorAddress === walletAddress &&
+								selectedProposal.displayStatus === "Voting Open" && (
+									<button
+										type="button"
+										onClick={() => setShowCancelConfirm(true)}
+										disabled={isCancelling}
+										className="text-[10px] font-black uppercase text-red-400/70 hover:text-red-400 transition-colors"
+									>
+										{isCancelling ? "Cancelling..." : "Cancel Proposal"}
+									</button>
+								)}
 						</div>
 					</div>
 

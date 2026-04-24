@@ -180,8 +180,8 @@ export const createCommentBodySchema = z
 	.object({
 		proposalId: optionalTrimmedString("proposalId", 100),
 		proposal_id: optionalTrimmedString("proposal_id", 100),
-		content: optionalTrimmedString("content", 2000),
-		body: optionalTrimmedString("body", 2000),
+		content: optionalTrimmedString("content"),
+		body: optionalTrimmedString("body"),
 		author_address: optionalTrimmedString("author_address", 100),
 		parentId: z
 			.number({

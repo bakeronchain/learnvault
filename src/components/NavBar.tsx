@@ -1,6 +1,17 @@
-import { useEffect, useId, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
+import { useEffect, useId, useState, useCallback } from "react"
 import { useTranslation } from "react-i18next"
 import { NavLink } from "react-router-dom"
+import { fetchCourses } from "../hooks/useCourses"
+import { fetchLeaderboard } from "../hooks/useLeaderboard"
+import { fetchProposals } from "../hooks/useProposals"
+import {
+	fetchTreasuryActivityPage,
+	fetchTreasuryStats,
+} from "../hooks/useTreasury"
+import { useWallet } from "../hooks/useWallet"
+import { fetchHistory } from "../pages/History"
+import GlobalSearch from "./GlobalSearch"
 import { ReputationBadge } from "./ReputationBadge"
 import { ThemeToggle } from "./ThemeToggle"
 import { WalletButton } from "./WalletButton"
@@ -22,13 +33,60 @@ export default function NavBar() {
 	const navLinks = [
 		{ to: "/courses", label: t("nav.learn") },
 		{ to: "/dao", label: t("nav.dao") },
+		{ to: "/community", label: "Community" },
 		{ to: "/leaderboard", label: t("nav.leaderboard") },
 		{ to: "/history", label: "Activity" },
+		{ to: "/wiki", label: t("nav.docs") },
 		{ to: "/donor", label: "Donor" },
 		{ to: "/treasury", label: t("nav.treasury") },
 	]
 
 	const closeMenu = () => setMenuOpen(false)
+
+	const queryClient = useQueryClient()
+	const { address } = useWallet()
+
+	const handlePrefetch = useCallback(
+		(to: string) => {
+			if (to === "/courses") {
+				void queryClient.prefetchQuery({
+					queryKey: ["courses"],
+					queryFn: fetchCourses,
+					staleTime: 60 * 1000,
+				})
+			} else if (to === "/dao") {
+				void queryClient.prefetchQuery({
+					queryKey: ["proposals", address],
+					queryFn: () => fetchProposals(address),
+					staleTime: 60 * 1000,
+				})
+			} else if (to === "/leaderboard") {
+				void queryClient.prefetchQuery({
+					queryKey: ["leaderboard", address],
+					queryFn: () => fetchLeaderboard(address),
+					staleTime: 300 * 1000,
+				})
+			} else if (to === "/history" && address) {
+				void queryClient.prefetchQuery({
+					queryKey: ["history", address],
+					queryFn: () => fetchHistory(address),
+					staleTime: 30 * 1000,
+				})
+			} else if (to === "/treasury") {
+				void queryClient.prefetchQuery({
+					queryKey: ["treasury", "stats"],
+					queryFn: fetchTreasuryStats,
+					staleTime: 60 * 1000,
+				})
+				void queryClient.prefetchQuery({
+					queryKey: ["treasury", "activity"],
+					queryFn: () => fetchTreasuryActivityPage(10, 0),
+					staleTime: 60 * 1000,
+				})
+			}
+		},
+		[queryClient, address],
+	)
 
 	return (
 		<header className="fixed top-0 left-0 w-full z-50 px-4 sm:px-6 py-4">
@@ -54,6 +112,7 @@ export default function NavBar() {
 						<NavLink
 							key={to}
 							to={to}
+							onMouseEnter={() => handlePrefetch(to)}
 							className={({ isActive }) =>
 								`px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
 									isActive
@@ -68,6 +127,9 @@ export default function NavBar() {
 				</nav>
 
 				<div className="flex items-center gap-3 md:gap-4">
+					<div className="hidden lg:block">
+						<GlobalSearch />
+					</div>
 					<ThemeToggle />
 
 					<ReputationBadge
@@ -148,6 +210,7 @@ export default function NavBar() {
 							key={to}
 							to={to}
 							onClick={closeMenu}
+							onMouseEnter={() => handlePrefetch(to)}
 							className={({ isActive }) =>
 								`block w-full px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
 									isActive

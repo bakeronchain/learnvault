@@ -1,7 +1,7 @@
 import { type NextFunction, type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
 
-const DEFAULT_NON_PROD_JWT_SECRET = "learnvault-secret"
+import { JWT_AUDIENCE, JWT_ISSUER } from "../services/jwt.service"
 
 type TokenPayload = {
 	sub?: string
@@ -15,11 +15,9 @@ function getJwtPublicKey(): string | undefined {
 }
 
 function getJwtSecret(): string | undefined {
-	const secret = process.env.JWT_SECRET?.trim()
-	if (secret) return secret
+	// HS256 fallback is development-only; production must use RS256 via JWT_PUBLIC_KEY.
 	if (process.env.NODE_ENV === "production") return undefined
-
-	return DEFAULT_NON_PROD_JWT_SECRET
+	return process.env.JWT_SECRET?.trim()
 }
 
 function getAdminApiKey(): string | undefined {
@@ -78,6 +76,8 @@ export function requireCourseAdmin(
 		if (jwtPublicKey) {
 			decoded = jwt.verify(token, jwtPublicKey, {
 				algorithms: ["RS256"],
+				issuer: JWT_ISSUER,
+				audience: JWT_AUDIENCE,
 			}) as TokenPayload
 		} else {
 			decoded = jwt.verify(token, jwtSecret!) as TokenPayload

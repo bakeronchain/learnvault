@@ -66,6 +66,8 @@ export const getCourses = async (
 	try {
 		const track =
 			typeof req.query.track === "string" ? req.query.track.trim() : undefined
+		const search =
+			typeof req.query.search === "string" ? req.query.search.trim() : undefined
 		const includeUnpublished =
 			typeof req.query.includeUnpublished === "string" &&
 			["1", "true", "yes"].includes(
@@ -121,6 +123,13 @@ export const getCourses = async (
 		if (track) {
 			params.push(track)
 			conditions.push(`LOWER(c.track) = LOWER($${params.length})`)
+		}
+
+		if (search) {
+			params.push(`%${search}%`)
+			conditions.push(
+				`(c.title ILIKE $${params.length} OR c.description ILIKE $${params.length})`,
+			)
 		}
 
 		if (difficulty) {

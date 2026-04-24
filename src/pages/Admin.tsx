@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query"
 import React, { useEffect, useMemo, useState } from "react"
+import ReactMarkdown from "react-markdown"
 import { useNavigate } from "react-router-dom"
 import TxHashLink from "../components/TxHashLink"
 import {
 	useAdminStats,
 	useAdminMilestones,
-	useValidatorAnalytics,
+	type BatchMilestoneResponse,
 	type MilestoneSubmission,
 } from "../hooks/useAdmin"
 import {
@@ -13,6 +14,13 @@ import {
 	useTreasuryPauseControl,
 } from "../hooks/useAdminContracts"
 import { useWallet } from "../hooks/useWallet"
+import {
+	useWikiPages,
+	useCreateWikiPage,
+	useUpdateWikiPage,
+	useDeleteWikiPage,
+	type WikiPage,
+} from "../hooks/useWiki"
 import { apiFetchJson } from "../lib/api"
 import { getAuthToken } from "../util/auth"
 import { shortenContractId } from "../util/contract"
@@ -21,6 +29,7 @@ type AdminSection =
 	| "courses"
 	| "milestones"
 	| "users"
+	| "wiki"
 	| "treasury"
 	| "contracts"
 type CourseStatus = "draft" | "published"
@@ -64,6 +73,7 @@ const sectionDescriptions: Record<AdminSection, string> = {
 	courses: "Live course records from the backend course catalog.",
 	milestones: "Review milestone reports and approvals.",
 	users: "Lookup learner profiles by wallet address.",
+	wiki: "Create and edit platform documentation and guides.",
 	treasury: "Monitor and manage live treasury controls.",
 	contracts: "Inspect deployed contract addresses and on-chain state.",
 }
@@ -215,7 +225,7 @@ const MilestoneStatsBar: React.FC = () => {
 		<div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
 			{error && (
 				<p className="md:col-span-3 text-xs text-red-400">
-					Failed to load stats: {error}
+					Could not load stats — {error}. Refresh the page to try again.
 				</p>
 			)}
 			{items.map((item) => (
@@ -278,7 +288,14 @@ const Admin: React.FC = () => {
 			<aside className="w-72 glass border-r border-white/5 p-8 flex flex-col gap-8">
 				<nav className="flex flex-col gap-2">
 					{(
-						["courses", "milestones", "users", "treasury", "contracts"] as const
+						[
+							"courses",
+							"milestones",
+							"users",
+							"wiki",
+							"treasury",
+							"contracts",
+						] as const
 					).map((section) => (
 						<button
 							key={section}
@@ -303,6 +320,7 @@ const Admin: React.FC = () => {
 				{activeSection === "courses" && <CourseManagement />}
 				{activeSection === "milestones" && <MilestoneQueue />}
 				{activeSection === "users" && <UserLookup />}
+				{activeSection === "wiki" && <WikiManagement />}
 				{activeSection === "treasury" && <TreasuryControls />}
 				{activeSection === "contracts" && <ContractInfo />}
 			</main>
@@ -339,7 +357,8 @@ const CourseManagement: React.FC = () => {
 
 			{errorMessage && (
 				<p className="text-sm text-red-400 mb-4">
-					Failed to load courses: {errorMessage}
+					Could not load courses — {errorMessage}. Use the Refresh button above
+					to retry.
 				</p>
 			)}
 
@@ -466,6 +485,82 @@ const MilestoneQueue: React.FC = () => {
 			await rejectMilestone(milestone.id)
 		}
 		await fetchAnalytics()
+	}
+
+	const pendingMilestones = milestones.filter(
+		(milestone) => milestone.status === "pending",
+	)
+	const allPendingOnPageSelected =
+		pendingMilestones.length > 0 &&
+		pendingMilestones.every((milestone) =>
+			selectedMilestoneIds.includes(milestone.id),
+		)
+	const selectedCount = selectedMilestoneIds.length
+
+	const toggleMilestoneSelection = (milestoneId: string) => {
+		setSelectedMilestoneIds((prev) =>
+			prev.includes(milestoneId)
+				? prev.filter((id) => id !== milestoneId)
+				: [...prev, milestoneId],
+		)
+	}
+
+	const toggleSelectAllPending = () => {
+		setSelectedMilestoneIds((prev) => {
+			if (allPendingOnPageSelected) {
+				return prev.filter(
+					(id) => !pendingMilestones.some((milestone) => milestone.id === id),
+				)
+			}
+
+			const nextIds = new Set(prev)
+			pendingMilestones.forEach((milestone) => nextIds.add(milestone.id))
+			return Array.from(nextIds)
+		})
+	}
+
+	const runBatchAction = async (action: "approve" | "reject") => {
+		if (selectedMilestoneIds.length === 0) return
+
+		const ids = [...selectedMilestoneIds]
+		setBatchState({
+			action,
+			total: ids.length,
+			inProgress: true,
+			results: null,
+		})
+
+		try {
+			const result =
+				action === "approve"
+					? await batchApproveMilestones(ids)
+					: await batchRejectMilestones(ids)
+
+			setBatchState({
+				action,
+				total: ids.length,
+				inProgress: false,
+				results: result,
+			})
+
+			if (result?.results.length) {
+				const succeededIds = new Set(
+					result.results
+						.filter((item) => item.success)
+						.map((item) => item.reportId),
+				)
+				setSelectedMilestoneIds((prev) =>
+					prev.filter((id) => !succeededIds.has(id)),
+				)
+			}
+		} catch {
+			setBatchState({
+				action,
+				total: ids.length,
+				inProgress: false,
+				results: null,
+			})
+		}
 	}
 
 	const totalPages = Math.max(1, Math.ceil(total / pageSize))
@@ -602,13 +697,14 @@ const MilestoneQueue: React.FC = () => {
 
 			{coursesErrorMessage && (
 				<p className="text-xs text-red-400 mb-2">
-					Failed to load course filters: {coursesErrorMessage}
+					Could not load course filters — {coursesErrorMessage}. Filters may be
+					incomplete.
 				</p>
 			)}
 
 			{error && (
 				<p className="text-xs text-red-400 mb-4">
-					Error loading milestones: {error}
+					Could not load milestones — {error}. Try refreshing the page.
 				</p>
 			)}
 
@@ -825,7 +921,8 @@ const UserLookup: React.FC = () => {
 				)}
 				{errorMessage && (
 					<p className="text-xs text-red-400 mt-3">
-						Failed to load scholar profile: {errorMessage}
+						Could not load scholar profile — {errorMessage}. Check the address
+						and try again.
 					</p>
 				)}
 
@@ -954,7 +1051,8 @@ const TreasuryControls: React.FC = () => {
 			<div className="glass border border-white/5 rounded-2xl p-6">
 				{queryError && (
 					<p className="text-sm text-red-400 mb-4">
-						Failed to load treasury contract state: {queryError}
+						Could not load treasury contract state — {queryError}. Check your
+						network connection and try again.
 					</p>
 				)}
 
@@ -1192,6 +1290,226 @@ const ContractInfo: React.FC = () => {
 					))}
 				</div>
 			</div>
+		</section>
+	)
+}
+
+const WikiManagement: React.FC = () => {
+	const { data: pages = [], isLoading } = useWikiPages()
+	const createMutation = useCreateWikiPage()
+	const updateMutation = useUpdateWikiPage()
+	const deleteMutation = useDeleteWikiPage()
+
+	const [editingPage, setEditingPage] = useState<Partial<WikiPage> | null>(null)
+	const [isPreview, setIsPreview] = useState(false)
+
+	const handleSave = async () => {
+		if (!editingPage) return
+		if (editingPage.id) {
+			await updateMutation.mutateAsync(editingPage as WikiPage & { id: number })
+		} else {
+			await createMutation.mutateAsync(editingPage)
+		}
+		setEditingPage(null)
+	}
+
+	const handleDelete = async (id: number) => {
+		if (window.confirm("Are you sure you want to delete this page?")) {
+			await deleteMutation.mutateAsync(id)
+		}
+	}
+
+	return (
+		<section>
+			<div className="flex items-center justify-between gap-4 mb-6">
+				<div>
+					<h1 className="text-3xl font-semibold text-white">Wiki Management</h1>
+					<p className="text-sm text-white/50 mt-1">
+						Manage platform documentation and guides.
+					</p>
+				</div>
+				<button
+					type="button"
+					onClick={() =>
+						setEditingPage({
+							title: "",
+							slug: "",
+							content: "",
+							category: "General",
+							isPublished: true,
+						})
+					}
+					className="px-4 py-2 rounded-xl bg-brand-cyan text-black font-bold text-sm hover:scale-105 transition-all"
+				>
+					+ New Page
+				</button>
+			</div>
+
+			{editingPage ? (
+				<div className="glass border border-white/10 rounded-2xl p-8 flex flex-col gap-6 animate-in fade-in zoom-in-95 duration-300">
+					<div className="flex items-center justify-between">
+						<h2 className="text-xl font-bold">
+							{editingPage.id ? "Edit Page" : "New Page"}
+						</h2>
+						<div className="flex gap-2">
+							<button
+								type="button"
+								onClick={() => setIsPreview(!isPreview)}
+								className="px-3 py-1 text-xs rounded-lg border border-white/10 hover:bg-white/5 transition-colors"
+							>
+								{isPreview ? "Edit Source" : "Preview"}
+							</button>
+							<button
+								type="button"
+								onClick={() => setEditingPage(null)}
+								className="px-3 py-1 text-xs rounded-lg border border-white/10 hover:bg-white/5 transition-colors"
+							>
+								Cancel
+							</button>
+						</div>
+					</div>
+
+					{isPreview ? (
+						<article className="prose prose-invert prose-brand max-w-none p-6 border border-white/5 rounded-xl min-h-[300px]">
+							<h1 className="text-3xl font-bold mb-4">
+								{editingPage.title || "Untitled"}
+							</h1>
+							<ReactMarkdown>{editingPage.content || ""}</ReactMarkdown>
+						</article>
+					) : (
+						<div className="grid grid-cols-2 gap-4">
+							<div className="flex flex-col gap-1">
+								<label className="text-xs text-white/40 uppercase tracking-widest">
+									Title
+								</label>
+								<input
+									className="glass border border-white/10 rounded-xl px-4 py-2 bg-transparent text-white"
+									value={editingPage.title}
+									onChange={(e) =>
+										setEditingPage({ ...editingPage, title: e.target.value })
+									}
+								/>
+							</div>
+							<div className="flex flex-col gap-1">
+								<label className="text-xs text-white/40 uppercase tracking-widest">
+									Slug
+								</label>
+								<input
+									className="glass border border-white/10 rounded-xl px-4 py-2 bg-transparent text-white"
+									value={editingPage.slug}
+									onChange={(e) =>
+										setEditingPage({ ...editingPage, slug: e.target.value })
+									}
+								/>
+							</div>
+							<div className="flex flex-col gap-1">
+								<label className="text-xs text-white/40 uppercase tracking-widest">
+									Category
+								</label>
+								<input
+									className="glass border border-white/10 rounded-xl px-4 py-2 bg-transparent text-white"
+									value={editingPage.category}
+									onChange={(e) =>
+										setEditingPage({ ...editingPage, category: e.target.value })
+									}
+								/>
+							</div>
+							<div className="flex items-center gap-2 pt-6">
+								<input
+									type="checkbox"
+									checked={editingPage.isPublished}
+									onChange={(e) =>
+										setEditingPage({
+											...editingPage,
+											isPublished: e.target.checked,
+										})
+									}
+								/>
+								<label className="text-sm">Published</label>
+							</div>
+							<div className="col-span-2 flex flex-col gap-1">
+								<label className="text-xs text-white/40 uppercase tracking-widest">
+									Content (Markdown)
+								</label>
+								<textarea
+									className="glass border border-white/10 rounded-xl px-4 py-2 bg-transparent text-white min-h-[400px] font-mono text-sm"
+									value={editingPage.content}
+									onChange={(e) =>
+										setEditingPage({ ...editingPage, content: e.target.value })
+									}
+								/>
+							</div>
+						</div>
+					)}
+
+					<div className="flex justify-end pt-4">
+						<button
+							type="button"
+							onClick={handleSave}
+							disabled={createMutation.isPending || updateMutation.isPending}
+							className="px-8 py-3 rounded-xl bg-brand-cyan text-black font-black uppercase tracking-widest hover:scale-105 transition-all"
+						>
+							{createMutation.isPending || updateMutation.isPending
+								? "Saving..."
+								: "Save Page"}
+						</button>
+					</div>
+				</div>
+			) : (
+				<div className="grid gap-4">
+					{isLoading ? (
+						<div className="glass border border-white/5 rounded-2xl p-6 text-sm text-white/40 animate-pulse">
+							Loading wiki pages…
+						</div>
+					) : pages.length === 0 ? (
+						<div className="glass border border-white/5 rounded-2xl p-12 text-center text-white/30">
+							No wiki pages found. Click "+ New Page" to get started.
+						</div>
+					) : (
+						pages.map((page) => (
+							<div
+								key={page.id}
+								className="glass border border-white/5 rounded-2xl p-5 flex items-center justify-between group"
+							>
+								<div>
+									<div className="flex items-center gap-3">
+										<h2 className="text-lg font-medium text-white">
+											{page.title}
+										</h2>
+										<span className="text-xs px-2 py-0.5 rounded-full bg-white/5 text-white/40">
+											{page.category}
+										</span>
+										{!page.isPublished && (
+											<span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-500 border border-yellow-500/20">
+												Draft
+											</span>
+										)}
+									</div>
+									<p className="text-xs text-white/30 mt-1">
+										/wiki/{page.slug}
+									</p>
+								</div>
+								<div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+									<button
+										type="button"
+										onClick={() => setEditingPage(page)}
+										className="p-2 rounded-lg border border-white/10 hover:bg-white/5 transition-colors"
+									>
+										Edit
+									</button>
+									<button
+										type="button"
+										onClick={() => handleDelete(page.id)}
+										className="p-2 rounded-lg border border-white/10 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+									>
+										Delete
+									</button>
+								</div>
+							</div>
+						))
+					)}
+				</div>
+			)}
 		</section>
 	)
 }

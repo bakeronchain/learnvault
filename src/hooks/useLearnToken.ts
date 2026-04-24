@@ -1,11 +1,11 @@
 import { type Api } from "@stellar/stellar-sdk/rpc"
-import type { LearnTokenInfo } from "../types/contracts"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCallback } from "react"
 import { useToast } from "../components/Toast/ToastProvider"
+import { type LearnTokenInfo } from "../types/contracts"
 import { ErrorCode, createAppError } from "../types/errors"
-import { logger } from "../utils/logger"
 import { parseError, isUserRejection } from "../utils/errors"
+import { logger } from "../utils/logger"
 import { useContractIds } from "./useContractIds"
 import { useSubscription } from "./useSubscription"
 import { useWallet } from "./useWallet"
@@ -95,7 +95,7 @@ const toBigInt = (value: unknown): bigint => {
 // Prefix used to invalidate all balance entries at once (e.g. after any mint).
 const BALANCE_QUERY_KEY_PREFIX = ["learnToken", "balance"] as const
 
-const BALANCE_STALE_TIME = 5 * 60 * 1000 // 5 minutes
+const BALANCE_STALE_TIME = 30 * 1000 // 30 seconds
 
 // The expected contract version this client was generated against.
 const EXPECTED_CONTRACT_VERSION = "1.0.0"

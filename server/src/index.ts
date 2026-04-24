@@ -1,11 +1,12 @@
-import dotenv from "dotenv"
 import path from "path"
+import dotenv from "dotenv"
 
 // Load server/.env whether you run from repo root or from server/
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
 
 import cors from "cors"
 import express from "express"
+import helmet from "helmet"
 import morgan from "morgan"
 import swaggerUi from "swagger-ui-express"
 import YAML from "yaml"
@@ -13,6 +14,9 @@ import { z } from "zod"
 
 import { initDb } from "./db/index"
 import { createNonceStore } from "./db/nonce-store"
+import { createTokenStore } from "./db/token-store"
+import { setupConsoleRequestTracing } from "./lib/request-context"
+import { createRequireTrustedOrigin } from "./middleware/csrf.middleware"
 import { errorHandler } from "./middleware/error.middleware"
 import { globalLimiter } from "./middleware/rate-limit.middleware"
 import { requestLogger } from "./middleware/request-logger.middleware"
@@ -21,6 +25,7 @@ import { adminMilestonesRouter } from "./routes/admin-milestones.routes"
 import { adminRouter } from "./routes/admin.routes"
 import { createAuthRouter } from "./routes/auth.routes"
 import { createCommentsRouter } from "./routes/comments.routes"
+import { communityRouter } from "./routes/community.routes"
 import { coursesRouter } from "./routes/courses.routes"
 import { createCredentialsRouter } from "./routes/credentials.routes"
 import { enrollmentsRouter } from "./routes/enrollments.routes"
@@ -34,6 +39,7 @@ import { scholarshipsRouter } from "./routes/scholarships.routes"
 import { treasuryRouter } from "./routes/treasury.routes"
 import { createUploadRouter } from "./routes/upload.routes"
 import { validatorRouter } from "./routes/validator.routes"
+import { wikiRouter } from "./routes/wiki.routes"
 import { createAuthService } from "./services/auth.service"
 import {
 	createJwtService,
@@ -56,6 +62,7 @@ const envSchema = z.object({
 })
 
 const env = envSchema.parse(process.env)
+setupConsoleRequestTracing()
 
 const isProduction = env.NODE_ENV === "production"
 
@@ -101,7 +108,8 @@ if (!jwtPrivateKey || !jwtPublicKey) {
 }
 
 const nonceStore = createNonceStore(env.REDIS_URL)
-const jwtService = createJwtService(jwtPrivateKey, jwtPublicKey)
+const tokenStore = createTokenStore(env.REDIS_URL)
+const jwtService = createJwtService(jwtPrivateKey, jwtPublicKey, tokenStore)
 const authService = createAuthService(nonceStore, jwtService)
 
 const app = express()
@@ -110,6 +118,27 @@ const openApiYaml = YAML.stringify(openApiSpec)
 
 app.set("trust proxy", 1)
 app.use(requestLogger)
+app.use(
+	helmet({
+		contentSecurityPolicy: {
+			directives: {
+				defaultSrc: ["'self'"],
+				scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+				connectSrc: [
+					"'self'",
+					"https://horizon-testnet.stellar.org",
+					"https://horizon.stellar.org",
+					"https://ipfs.io",
+					"https://*.stellar.org",
+				],
+				imgSrc: ["'self'", "data:", "https://ipfs.io"],
+				upgradeInsecureRequests: [],
+			},
+		},
+		xContentTypeOptions: true,
+		hsts: true,
+	}),
+)
 app.use(
 	cors({
 		origin: (origin, callback) => {
@@ -128,8 +157,10 @@ app.use(
 		credentials: true,
 		methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 		allowedHeaders: ["Content-Type", "Authorization"],
+		exposedHeaders: ["X-Request-ID"],
 	}),
 )
+app.use(createRequireTrustedOrigin(allowedOrigins))
 app.use(express.json())
 app.use(globalLimiter)
 
@@ -141,6 +172,7 @@ app.use("/api", coursesRouter)
 app.use("/api", createCredentialsRouter(jwtService))
 app.use("/api", validatorRouter)
 app.use("/api", eventsRouter)
+app.use("/api/community", communityRouter)
 app.use("/api", createCommentsRouter(jwtService))
 app.use("/api", leaderboardRouter)
 app.use("/api", governanceRouter)
@@ -152,12 +184,21 @@ app.use("/api", createUploadRouter(jwtService))
 app.use("/api", enrollmentsRouter)
 app.use("/api", scholarshipsRouter)
 app.use("/api", treasuryRouter)
+app.use("/api/wiki", wikiRouter)
 
 // Start event poller (non-prod only for now)
 if (process.env.NODE_ENV !== "production") {
 	void import("./workers/event-poller").then(({ startEventPoller }) => {
 		void startEventPoller().catch(console.error)
 	})
+}
+
+if (process.env.NODE_ENV !== "test") {
+	void import("./workers/escrow-timeout-worker").then(
+		({ startEscrowTimeoutWorker }) => {
+			void startEscrowTimeoutWorker().catch(console.error)
+		},
+	)
 }
 
 app.get("/api/docs", (_req, res) => {
@@ -186,5 +227,10 @@ process.on("SIGTERM", () => {
 	void import("./workers/event-poller").then(({ stopEventPoller }) => {
 		void stopEventPoller()
 	})
+	void import("./workers/escrow-timeout-worker").then(
+		({ stopEscrowTimeoutWorker }) => {
+			stopEscrowTimeoutWorker()
+		},
+	)
 	process.exit(0)
 })

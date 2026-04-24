@@ -25,10 +25,11 @@ jest.mock("../services/stellar-contract.service", () => ({
 }))
 
 import { pool } from "../db/index"
+import { scholarsRouter } from "../routes/scholars.routes"
+
 const mockedQuery = pool.query as jest.Mock
 
 // We need a helper to build the app with mocked dependencies
-import { scholarsRouter } from "../routes/scholars.routes"
 
 const buildApp = (): Express => {
 	const app = express()

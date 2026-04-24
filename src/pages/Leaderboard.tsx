@@ -1,65 +1,61 @@
 import { Trophy } from "lucide-react"
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import AddressDisplay from "../components/AddressDisplay"
 import { EmptyState } from "../components/states/emptyState"
 import { ErrorState } from "../components/states/errorState"
+import { useLeaderboard } from "../hooks/useLeaderboard"
 import { useWallet } from "../hooks/useWallet"
-import { API_URL } from "../lib/api"
 import { type LeaderboardEntry } from "../util/mockLeaderboardData"
-
-type LeaderboardApiEntry = {
-	rank: number
-	address: string
-	lrn_balance: string
-	courses_completed: number
-}
 
 const Leaderboard: React.FC = () => {
 	const { t } = useTranslation()
 	const { address: currentUserAddress } = useWallet()
-	const [leaders, setLeaders] = useState<LeaderboardEntry[]>([])
-	const [myRank, setMyRank] = useState<number | null>(null)
-	const [isLoading, setIsLoading] = useState(true)
-	const [error, setError] = useState<string | null>(null)
+
+	const fetchLeaderboard = useCallback(async () => {
+		setIsLoading(true)
+		setError(null)
+		try {
+			const response = await fetch(`${API_URL}/api/scholars/leaderboard`)
+
+			if (!response.ok)
+				throw new Error(
+					`Failed to load rankings (status ${response.status}). The server may be temporarily unavailable.`,
+				)
+			const result = (await response.json()) as {
+				rankings?: LeaderboardApiEntry[]
+				your_rank?: number | null
+			}
+			const rankings = Array.isArray(result.rankings) ? result.rankings : []
+			const mapped = rankings.map((item, index) => ({
+				id: `leader-${item.address}-${item.rank}-${index}`,
+				address: item.address,
+				lrnBalance: Number(item.lrn_balance ?? 0),
+				coursesCompleted: item.courses_completed ?? 0,
+				joinedDate: new Date(),
+				lastActive: new Date(),
+				rank: item.rank,
+				balance: item.lrn_balance ?? "0",
+				completedCourses: item.courses_completed ?? 0,
+				fullAddress: item.address,
+			}))
+			setLeaders(mapped)
+			setMyRank(typeof result.your_rank === "number" ? result.your_rank : null)
+		} catch (err) {
+			console.error(err)
+			setError(
+				err instanceof Error
+					? err.message
+					: "Unable to load rankings. Check your connection and try again.",
+			)
+		} finally {
+			setIsLoading(false)
+		}
+	}, [])
 
 	useEffect(() => {
-		const fetchLeaderboard = async () => {
-			try {
-				const response = await fetch(`${API_URL}/api/scholars/leaderboard`)
-
-				if (!response.ok) throw new Error("Failed to fetch leaderboard")
-				const result = (await response.json()) as {
-					rankings?: LeaderboardApiEntry[]
-					your_rank?: number | null
-				}
-				const rankings = Array.isArray(result.rankings) ? result.rankings : []
-				const mapped = rankings.map((item, index) => ({
-					id: `leader-${item.address}-${item.rank}-${index}`,
-					address: item.address,
-					lrnBalance: Number(item.lrn_balance ?? 0),
-					coursesCompleted: item.courses_completed ?? 0,
-					joinedDate: new Date(),
-					lastActive: new Date(),
-					rank: item.rank,
-					balance: item.lrn_balance ?? "0",
-					completedCourses: item.courses_completed ?? 0,
-					fullAddress: item.address,
-				}))
-				setLeaders(mapped)
-				setMyRank(
-					typeof result.your_rank === "number" ? result.your_rank : null,
-				)
-			} catch (err) {
-				console.error(err)
-				setError("Unable to load rankings. Please try again later.")
-			} finally {
-				setIsLoading(false)
-			}
-		}
-
 		fetchLeaderboard().catch(console.error)
-	}, [])
+	}, [fetchLeaderboard])
 
 	const leaderboardRows = useMemo(
 		() =>
@@ -106,7 +102,7 @@ const Leaderboard: React.FC = () => {
 					))}
 				</div>
 			) : error ? (
-				<ErrorState message={error} onRetry={() => window.location.reload()} />
+				<ErrorState message={error} onRetry={fetchLeaderboard} />
 			) : leaderboardRows.length === 0 ? (
 				<EmptyState
 					icon={Trophy}

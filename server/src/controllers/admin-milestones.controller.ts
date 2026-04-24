@@ -3,6 +3,7 @@ import { milestoneStore } from "../db/milestone-store"
 import { type AdminRequest } from "../middleware/admin.middleware"
 import { credentialService } from "../services/credential.service"
 import { createEmailService } from "../services/email.service"
+import { markEscrowActivity } from "../services/escrow-timeout.service"
 import { stellarContractService } from "../services/stellar-contract.service"
 import { templates, toPlainText } from "../templates/email-templates"
 
@@ -141,10 +142,16 @@ export async function approveMilestone(
 			report.scholar_address,
 			report.course_id,
 			report.milestone_id,
+			{ requestId: req.requestId },
 		)
 
 		// Persist decision
 		await milestoneStore.updateReportStatus(id, "approved")
+		try {
+			await markEscrowActivity(report.scholar_address, report.course_id)
+		} catch (trackingErr) {
+			console.error("[admin] escrow activity update failed:", trackingErr)
+		}
 		const auditEntry = await milestoneStore.addAuditEntry({
 			report_id: id,
 			validator_address: validatorAddress,
@@ -249,10 +256,16 @@ export async function rejectMilestone(
 			report.course_id,
 			report.milestone_id,
 			reason,
+			{ requestId: req.requestId },
 		)
 
 		// Persist decision
 		await milestoneStore.updateReportStatus(id, "rejected")
+		try {
+			await markEscrowActivity(report.scholar_address, report.course_id)
+		} catch (trackingErr) {
+			console.error("[admin] escrow activity update failed:", trackingErr)
+		}
 		const auditEntry = await milestoneStore.addAuditEntry({
 			report_id: id,
 			validator_address: validatorAddress,

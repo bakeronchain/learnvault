@@ -2,6 +2,7 @@ import { type Request, type Response } from "express"
 
 import { pool } from "../db/index"
 import { milestoneStore } from "../db/milestone-store"
+import { listEscrowTimeoutsForScholar } from "../services/escrow-timeout.service"
 import { stellarContractService } from "../services/stellar-contract.service"
 
 type ApiMilestoneStatus = "pending" | "verified" | "rejected"
@@ -58,32 +59,56 @@ export async function getScholarMilestones(
 			courseId,
 			status: internalStatus,
 		})
+		const reportIds = reports.map((report) => report.id)
+		let lastDecisionByReportId: Record<
+			number,
+			{ decided_at: unknown; contract_tx_hash: string | null }
+		> = {}
 
-		const milestones = await Promise.all(
-			reports.map(async (report) => {
-				const auditLog = await milestoneStore.getAuditForReport(report.id)
-				const lastDecision = auditLog.at(-1)
+		if (reportIds.length > 0) {
+			const auditResult = await pool.query(
+				`SELECT DISTINCT ON (report_id)
+					report_id,
+					decided_at,
+					contract_tx_hash
+				 FROM milestone_audit_log
+				 WHERE report_id = ANY($1::int[])
+				 ORDER BY report_id, decided_at DESC`,
+				[reportIds],
+			)
+			lastDecisionByReportId = Object.fromEntries(
+				auditResult.rows.map((row) => [
+					Number(row.report_id),
+					{
+						decided_at: row.decided_at,
+						contract_tx_hash:
+							typeof row.contract_tx_hash === "string"
+								? row.contract_tx_hash
+								: null,
+					},
+				]),
+			)
+		}
 
-				const evidenceUrl =
-					report.evidence_github ??
-					(report.evidence_ipfs_cid
-						? `ipfs://${report.evidence_ipfs_cid}`
-						: null)
+		const milestones = reports.map((report) => {
+			const lastDecision = lastDecisionByReportId[report.id]
+			const evidenceUrl =
+				report.evidence_github ??
+				(report.evidence_ipfs_cid ? `ipfs://${report.evidence_ipfs_cid}` : null)
 
-				return {
-					id: String(report.id),
-					course_id: report.course_id,
-					milestone_id: report.milestone_id,
-					status: mapInternalStatus(report.status),
-					evidence_url: evidenceUrl,
-					submitted_at: toIsoDateTime(report.submitted_at),
-					verified_at: lastDecision
-						? toIsoDateTime(lastDecision.decided_at)
-						: null,
-					tx_hash: lastDecision?.contract_tx_hash ?? null,
-				}
-			}),
-		)
+			return {
+				id: String(report.id),
+				course_id: report.course_id,
+				milestone_id: report.milestone_id,
+				status: mapInternalStatus(report.status),
+				evidence_url: evidenceUrl,
+				submitted_at: toIsoDateTime(report.submitted_at),
+				verified_at: lastDecision
+					? toIsoDateTime(lastDecision.decided_at)
+					: null,
+				tx_hash: lastDecision?.contract_tx_hash ?? null,
+			}
+		})
 
 		res.status(200).json({ milestones })
 	} catch (err) {
@@ -233,5 +258,24 @@ export async function getScholarCredentials(
 	} catch (error) {
 		console.error("[scholars] Error fetching scholar credentials:", error)
 		res.status(500).json({ error: "Failed to fetch scholar credentials" })
+	}
+}
+
+export async function getScholarEscrowTimeouts(
+	req: Request,
+	res: Response,
+): Promise<void> {
+	const { address } = req.params
+	if (!address) {
+		res.status(400).json({ error: "Scholar address is required" })
+		return
+	}
+
+	try {
+		const escrows = await listEscrowTimeoutsForScholar(address)
+		res.status(200).json({ escrows })
+	} catch (error) {
+		console.error("[scholars] Error fetching escrow timeout status:", error)
+		res.status(500).json({ error: "Failed to fetch escrow timeout status" })
 	}
 }

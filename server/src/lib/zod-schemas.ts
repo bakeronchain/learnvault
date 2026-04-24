@@ -109,9 +109,49 @@ export const approveMilestoneBodySchema = z
 	})
 	.strict()
 
+const milestoneIdsSchema = z
+	.array(requiredInteger("milestoneIds"))
+	.min(1, "milestoneIds must include at least one milestone id")
+	.superRefine((ids, ctx) => {
+		const seen = new Set<number>()
+		ids.forEach((id, index) => {
+			if (id <= 0) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					path: [index],
+					message: "milestoneIds entries must be positive integers",
+				})
+			}
+
+			if (seen.has(id)) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					path: [index],
+					message: "milestoneIds must not contain duplicates",
+				})
+				return
+			}
+
+			seen.add(id)
+		})
+	})
+
+export const batchApproveMilestonesBodySchema = z
+	.object({
+		milestoneIds: milestoneIdsSchema,
+	})
+	.strict()
+
 export const rejectMilestoneBodySchema = z
 	.object({
 		reason: requiredString("reason"),
+	})
+	.strict()
+
+export const batchRejectMilestonesBodySchema = z
+	.object({
+		milestoneIds: milestoneIdsSchema,
+		reason: optionalTrimmedString("reason"),
 	})
 	.strict()
 

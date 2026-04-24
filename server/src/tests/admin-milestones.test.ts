@@ -24,6 +24,25 @@ jest.mock("../services/stellar-contract.service", () => ({
 	},
 }))
 
+jest.mock("../services/email.service", () => ({
+	createEmailService: jest.fn().mockReturnValue({
+		sendNotification: jest.fn().mockResolvedValue(undefined),
+		sendAdminMilestoneNotification: jest.fn().mockResolvedValue(undefined),
+	}),
+}))
+
+jest.mock("../services/escrow-timeout.service", () => ({
+	markEscrowActivity: jest.fn().mockResolvedValue(undefined),
+}))
+
+jest.mock("../services/credential.service", () => ({
+	credentialService: {
+		mintCertificateIfComplete: jest
+			.fn()
+			.mockResolvedValue({ minted: false }),
+	},
+}))
+
 import express from "express"
 import jwt from "jsonwebtoken"
 import request from "supertest"
@@ -61,11 +80,15 @@ beforeEach(() => {
 	// passes — the pool mock ensures no real SDK call is made.
 	process.env.STELLAR_SECRET_KEY = "FAKE_TEST_KEY"
 	process.env.COURSE_MILESTONE_CONTRACT_ID = "FAKE_TEST_CONTRACT"
+	process.env.FRONTEND_URL = "http://localhost:3000"
+	process.env.NODE_ENV = "test"
 })
 
 afterEach(() => {
 	delete process.env.STELLAR_SECRET_KEY
 	delete process.env.COURSE_MILESTONE_CONTRACT_ID
+	delete process.env.FRONTEND_URL
+	delete process.env.NODE_ENV
 })
 
 describe("POST /api/milestones/submit", () => {
@@ -276,6 +299,86 @@ describe("POST /api/admin/milestones/:id/approve", () => {
 	})
 })
 
+describe("POST /api/admin/milestones/batch-approve", () => {
+	it("approves multiple pending reports and returns per-report results", async () => {
+		const reportOne = await inMemoryMilestoneStore["createReport"]({
+			scholar_address: "GSCHOLAR1",
+			course_id: "stellar-basics",
+			milestone_id: 1,
+			evidence_description: "Done",
+			evidence_github: null,
+			evidence_ipfs_cid: null,
+		})
+		const reportTwo = await inMemoryMilestoneStore["createReport"]({
+			scholar_address: "GSCHOLAR2",
+			course_id: "stellar-basics",
+			milestone_id: 2,
+			evidence_description: "Done again",
+			evidence_github: null,
+			evidence_ipfs_cid: null,
+		})
+
+		const app = buildApp()
+		const res = await request(app)
+			.post("/api/admin/milestones/batch-approve")
+			.set("Authorization", `Bearer ${makeAdminToken()}`)
+			.send({ milestoneIds: [reportOne.id, reportTwo.id] })
+
+		expect(res.status).toBe(200)
+		expect(res.body.data.succeeded).toBe(2)
+		expect(res.body.data.results).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					reportId: reportOne.id,
+					success: true,
+					status: "approved",
+				}),
+				expect.objectContaining({
+					reportId: reportTwo.id,
+					success: true,
+					status: "approved",
+				}),
+			]),
+		)
+	})
+
+	it("fails validation before processing when any report is not pending", async () => {
+		const reportOne = await inMemoryMilestoneStore["createReport"]({
+			scholar_address: "GSCHOLAR1",
+			course_id: "stellar-basics",
+			milestone_id: 1,
+			evidence_description: "Done",
+			evidence_github: null,
+			evidence_ipfs_cid: null,
+		})
+		const reportTwo = await inMemoryMilestoneStore["createReport"]({
+			scholar_address: "GSCHOLAR2",
+			course_id: "stellar-basics",
+			milestone_id: 2,
+			evidence_description: "Done again",
+			evidence_github: null,
+			evidence_ipfs_cid: null,
+		})
+		await inMemoryMilestoneStore.updateReportStatus(reportTwo.id, "approved")
+
+		const app = buildApp()
+		const res = await request(app)
+			.post("/api/admin/milestones/batch-approve")
+			.set("Authorization", `Bearer ${makeAdminToken()}`)
+			.send({ milestoneIds: [reportOne.id, reportTwo.id] })
+
+		expect(res.status).toBe(409)
+		expect(res.body.data.results).toEqual([
+			expect.objectContaining({
+				reportId: reportTwo.id,
+				success: false,
+				status: "approved",
+			}),
+		])
+		expect(stellarContractService.callVerifyMilestone).not.toHaveBeenCalled()
+	})
+})
+
 describe("POST /api/admin/milestones/:id/reject", () => {
 	it("rejects a pending report with a reason", async () => {
 		const report = await inMemoryMilestoneStore["createReport"]({
@@ -324,6 +427,55 @@ describe("POST /api/admin/milestones/:id/reject", () => {
 				message: "reason is required",
 			},
 		])
+	})
+})
+
+describe("POST /api/admin/milestones/batch-reject", () => {
+	it("rejects multiple pending reports and returns per-report results", async () => {
+		const reportOne = await inMemoryMilestoneStore["createReport"]({
+			scholar_address: "GSCHOLAR1",
+			course_id: "stellar-basics",
+			milestone_id: 1,
+			evidence_description: "Done",
+			evidence_github: null,
+			evidence_ipfs_cid: null,
+		})
+		const reportTwo = await inMemoryMilestoneStore["createReport"]({
+			scholar_address: "GSCHOLAR2",
+			course_id: "stellar-basics",
+			milestone_id: 2,
+			evidence_description: "Done again",
+			evidence_github: null,
+			evidence_ipfs_cid: null,
+		})
+
+		const app = buildApp()
+		const res = await request(app)
+			.post("/api/admin/milestones/batch-reject")
+			.set("Authorization", `Bearer ${makeAdminToken()}`)
+			.send({
+				milestoneIds: [reportOne.id, reportTwo.id],
+				reason: "Needs more evidence",
+			})
+
+		expect(res.status).toBe(200)
+		expect(res.body.data.succeeded).toBe(2)
+		expect(res.body.data.results).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					reportId: reportOne.id,
+					success: true,
+					status: "rejected",
+					reason: "Needs more evidence",
+				}),
+				expect.objectContaining({
+					reportId: reportTwo.id,
+					success: true,
+					status: "rejected",
+					reason: "Needs more evidence",
+				}),
+			]),
+		)
 	})
 })
 

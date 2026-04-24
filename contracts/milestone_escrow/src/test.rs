@@ -1,13 +1,12 @@
 extern crate std;
 
 use soroban_sdk::{
-    Address, Env, IntoVal, Val, Vec,
-    testutils::{Address as _, Ledger, LedgerInfo, MockAuth, MockAuthInvoke, Events as _},
-    Address, Env, IntoVal, Symbol, Val, Vec, symbol_short,
-    testutils::{Address as _, Events, Ledger, LedgerInfo, MockAuth, MockAuthInvoke},
+    Address, Env, IntoVal, Symbol, Val, Vec,
+    testutils::{Address as _, Events as _, Ledger, LedgerInfo, MockAuth, MockAuthInvoke},
     token::{StellarAssetClient, TokenClient},
 };
 
+use crate::{DataKey, EscrowRecord};
 use crate::{Error, MilestoneEscrow, MilestoneEscrowClient, xlm};
 
 const START_TS: u64 = 1_700_000_000;
@@ -358,6 +357,80 @@ fn overpayment_is_rejected() {
     );
 }
 
+// --- fuzz tests ---
+
+use proptest::prelude::*;
+
+proptest! {
+    #[test]
+    #[ignore]
+    fn fuzz_ledger_timestamps_30_day_timeout(
+        last_active_offset in 0..10_000_000_u64,
+        check_time_offset in 0..10_000_000_u64
+    ) {
+        let (env, contract_id, _, _, _, scholar) = setup();
+        let client = MilestoneEscrowClient::new(&env, &contract_id);
+
+        let start_time = START_TS + last_active_offset;
+        set_timestamp(&env, start_time);
+
+        create_escrow(&client, 99, &scholar, 1000, 2);
+
+        // Advance time
+        let current_time = start_time + check_time_offset;
+        set_timestamp(&env, current_time);
+
+        let result = reclaim_inactive_authorized(&client, 99);
+
+        if check_time_offset >= THIRTY_DAYS {
+            assert!(result.is_ok());
+        } else {
+            assert_eq!(
+                result.err(),
+                Some(Ok(soroban_sdk::Error::from_contract_error(
+                    crate::Error::InactivityNotReached as u32
+                )))
+            );
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn fuzz_tranche_disbursement_amounts(
+        amount in 1..100_000_000_i128,
+        tranches in 1..100_u32
+    ) {
+        let (env, contract_id, token, _, treasury, scholar) = setup();
+        let client = MilestoneEscrowClient::new(&env, &contract_id);
+
+        if amount / (tranches as i128) == 0 {
+            return Ok(());
+        }
+
+        // setup() only mints 1_000; top up so the treasury can fund this escrow
+        env.mock_all_auths();
+        stellar_asset_client(&env, &token).mint(&treasury, &amount);
+
+        create_escrow(&client, 100, &scholar, amount, tranches);
+
+        for _ in 0..tranches {
+            release_tranche_authorized(&client, 100).unwrap();
+        }
+
+        let escrow = client.get_escrow(&100).unwrap();
+        assert!(escrow.released_amount <= escrow.total_amount);
+
+        // Try one more, should fail with AllTranchesReleased
+        let over_release = release_tranche_authorized(&client, 100);
+        assert_eq!(
+            over_release.err(),
+            Some(Ok(soroban_sdk::Error::from_contract_error(
+                crate::Error::AllTranchesReleased as u32
+            )))
+        );
+    }
+}
+
 #[test]
 fn reclaim_inactive_when_fully_released_is_rejected() {
     let (env, contract_id, _token, _admin, _treasury, scholar) = setup();
@@ -502,4 +575,39 @@ mod fuzz_tests {
             assert_eq!(final_escrow.released_amount, amount);
         }
     }
+}
+
+#[test]
+fn upgrade_requires_admin_auth() {
+    let (env, contract_id, _token, _admin, _treasury, _scholar) = setup();
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+    let attacker = Address::generate(&env);
+    let wasm_hash = crate::upgrade::testutils::upload_upgrade_target(&env);
+
+    set_caller(&client, "upgrade", &attacker, (wasm_hash.clone(),));
+    assert!(client.try_upgrade(&wasm_hash).is_err());
+}
+
+#[test]
+fn state_persists_after_upgrade() {
+    let (env, contract_id, _token, admin, _treasury, scholar) = setup();
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+    create_escrow(&client, 404, &scholar, 120, 3);
+
+    let wasm_hash = crate::upgrade::testutils::upload_upgrade_target(&env);
+    set_caller(&client, "upgrade", &admin, (wasm_hash.clone(),));
+    client.upgrade(&wasm_hash);
+
+    let escrow = env.as_contract(&contract_id, || {
+        env.storage()
+            .persistent()
+            .get::<_, EscrowRecord>(&DataKey::Escrow(404))
+    });
+    let stored_hash = env.as_contract(&contract_id, || crate::upgrade::current_hash(&env));
+
+    let escrow = escrow.expect("escrow should remain after upgrade");
+    assert_eq!(escrow.scholar, scholar);
+    assert_eq!(escrow.total_amount, 120);
+    assert_eq!(escrow.total_tranches, 3);
+    assert_eq!(stored_hash, wasm_hash);
 }

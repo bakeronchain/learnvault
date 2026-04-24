@@ -48,6 +48,13 @@ jobs:
         working-directory: server
         run: npm run migrate
 
+      - name: Clean build cache
+        working-directory: server
+        run: |
+          rm -rf node_modules/.cache
+          rm -rf dist
+          npm run build --if-present || true
+
       - name: Run tests
         working-directory: server
         run: npm test

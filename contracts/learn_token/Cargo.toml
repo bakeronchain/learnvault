@@ -11,8 +11,10 @@ crate-type = ["cdylib"]
 doctest = false
 
 [dependencies]
+learnvault-shared = { workspace = true }
 soroban-sdk = { workspace = true }
 
 [dev-dependencies]
+learnvault-shared = { workspace = true, features = ["testutils"] }
 soroban-sdk = { workspace = true, features = ["testutils"] }
 proptest = { workspace = true }

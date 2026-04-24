@@ -2,8 +2,8 @@
 
 use proptest::prelude::*;
 use soroban_sdk::{
-    Address, Env,
-    testutils::Address as _,
+    Address, BytesN, Env,
+    testutils::{Address as _, MockAuth, MockAuthInvoke},
     token::{StellarAssetClient, TokenClient},
 };
 
@@ -44,7 +44,7 @@ extern crate std;
 
 use soroban_sdk::{IntoVal, testutils::Events as _};
 
-use crate::{LRNError, LearnToken, LearnTokenClient};
+use crate::{DataKey, LRNError, LearnToken, LearnTokenClient};
 
 fn setup(e: &Env) -> (Address, Address, LearnTokenClient) {
     let admin = Address::generate(e);
@@ -53,6 +53,18 @@ fn setup(e: &Env) -> (Address, Address, LearnTokenClient) {
     let client = LearnTokenClient::new(e, &id);
     client.initialize(&admin);
     (id, admin, client)
+}
+
+fn authorize_upgrade(e: &Env, contract_id: &Address, signer: &Address, wasm_hash: &BytesN<32>) {
+    e.mock_auths(&[MockAuth {
+        address: signer,
+        invoke: &MockAuthInvoke {
+            contract: contract_id,
+            fn_name: "upgrade",
+            args: (wasm_hash.clone(),).into_val(e),
+            sub_invokes: &[],
+        },
+    }]);
 }
 
 // --- mint: happy path ---
@@ -196,6 +208,41 @@ fn total_supply_starts_at_zero() {
     let e = Env::default();
     let (_, _, client) = setup(&e);
     assert_eq!(client.total_supply(), 0);
+}
+
+// --- fuzz tests ---
+
+use proptest::prelude::*;
+
+proptest! {
+    #[test]
+    #[ignore]
+    fn fuzz_mint(amount in any::<u128>()) {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        let learner = Address::generate(&e);
+
+        // The contract expects i128. Let's safely cast u128 to i128 or trap.
+        // If it's outside i128 max, it might cast to a negative number or we can just cap it / wrap it.
+        let amount_i128 = amount as i128;
+
+        let result = client.try_mint(&learner, &amount_i128);
+
+        if amount_i128 <= 0 {
+            // Must return ZeroAmount error
+            assert_eq!(
+                result.err(),
+                Some(Ok(soroban_sdk::Error::from_contract_error(
+                    crate::LRNError::ZeroAmount as u32
+                )))
+            );
+        } else {
+            // Valid mint amount, should succeed
+            assert!(result.is_ok());
+            assert_eq!(client.balance(&learner), amount_i128);
+            assert_eq!(client.total_supply(), amount_i128);
+        }
+    }
 }
 
 #[test]
@@ -700,4 +747,62 @@ fn reputation_score_matches_balance_division() {
             balance
         );
     }
+}
+
+#[test]
+fn upgrade_requires_admin_auth() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let attacker = Address::generate(&e);
+    let id = e.register(LearnToken, ());
+
+    e.mock_auths(&[MockAuth {
+        address: &admin,
+        invoke: &MockAuthInvoke {
+            contract: &id,
+            fn_name: "initialize",
+            args: (admin.clone(),).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+
+    let client = LearnTokenClient::new(&e, &id);
+    client.initialize(&admin);
+
+    let wasm_hash = crate::upgrade::testutils::upload_upgrade_target(&e);
+    authorize_upgrade(&e, &id, &attacker, &wasm_hash);
+
+    assert!(client.try_upgrade(&wasm_hash).is_err());
+}
+
+#[test]
+fn state_persists_after_upgrade() {
+    let e = Env::default();
+    let (id, admin, client) = setup(&e);
+    let learner = Address::generate(&e);
+
+    client.mint(&learner, &100);
+
+    e.set_auths(&[]);
+    let wasm_hash = crate::upgrade::testutils::upload_upgrade_target(&e);
+    authorize_upgrade(&e, &id, &admin, &wasm_hash);
+    client.upgrade(&wasm_hash);
+
+    let balance = e.as_contract(&id, || {
+        e.storage()
+            .persistent()
+            .get::<_, i128>(&DataKey::Balance(learner.clone()))
+            .unwrap_or(0)
+    });
+    let supply = e.as_contract(&id, || {
+        e.storage()
+            .persistent()
+            .get::<_, i128>(&DataKey::TotalSupply)
+            .unwrap_or(0)
+    });
+    let stored_hash = e.as_contract(&id, || crate::upgrade::current_hash(&e));
+
+    assert_eq!(balance, 100);
+    assert_eq!(supply, 100);
+    assert_eq!(stored_hash, wasm_hash);
 }

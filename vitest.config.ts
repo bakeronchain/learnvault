@@ -16,9 +16,21 @@ export default defineConfig({
 				"CGOV1234567890ABCDEFGHIJKLMN9876543210ZYXWVUTSRQPO",
 		},
 		coverage: {
-			include: ["src/util/**"],
-			reporter: ["text", "lcov"],
+			provider: "v8",
+			include: ["src/**/*.{ts,tsx}"],
+			exclude: [
+				"src/contracts/**",
+				"src/test/**",
+				"src/main.tsx",
+				"**/*.test.{ts,tsx}",
+				"**/*.d.ts",
+			],
+			reporter: ["text", "lcov", "json-summary"],
 			thresholds: {
+				lines: 80,
+				functions: 80,
+				branches: 80,
+				statements: 80,
 				"src/util/**": {
 					statements: 80,
 					branches: 80,

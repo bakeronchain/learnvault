@@ -1,12 +1,20 @@
 import React, { useMemo } from "react"
-import { useQuery } from "@tanstack/react-query"
 import { Helmet } from "react-helmet"
-import TxHashLink from "../components/TxHashLink"
+import {
+	EmptyState,
+	DashboardStatsSkeleton,
+} from "../components/SkeletonLoader"
+import { ErrorState } from "../components/states/errorState"
+import { useToast } from "../components/Toast/ToastProvider"
 import TreasuryHealthChart, {
 	type TreasuryPoint,
 } from "../components/treasury/TreasuryHealthChart"
+import TxHashLink from "../components/TxHashLink"
 import { useContractIds } from "../hooks/useContractIds"
+import { useTreasury } from "../hooks/useTreasury"
 import { useUSDC } from "../hooks/useUSDC"
+import { useWallet } from "../hooks/useWallet"
+import { connectWallet } from "../util/wallet"
 
 const API_BASE = import.meta.env.VITE_SERVER_URL || "http://localhost:4000"
 const CHART_WINDOW_DAYS = 7
@@ -27,24 +35,6 @@ interface TreasuryEvent {
 	scholar?: string
 	tx_hash: string
 	created_at: string
-}
-
-interface TreasuryActivityResponse {
-	events?: TreasuryEvent[]
-	error?: string
-}
-
-const fetchJson = async <T,>(url: string): Promise<T> => {
-	const response = await fetch(url)
-	const data = (await response.json().catch(() => ({}))) as T & {
-		error?: string
-	}
-
-	if (!response.ok) {
-		throw new Error(data.error || `Request failed for ${url}`)
-	}
-
-	return data as T
 }
 
 const startOfDay = (value: Date) =>
@@ -97,38 +87,31 @@ const buildTreasuryChartData = (events: TreasuryEvent[]): TreasuryPoint[] => {
 }
 
 const Treasury: React.FC = () => {
+	const { address } = useWallet()
+	const { showInfo } = useToast()
 	const { scholarshipTreasury } = useContractIds()
 	const { balance: treasuryUSDC, isLoading: treasuryLoading } =
 		useUSDC(scholarshipTreasury)
 
 	const {
-		data: stats,
-		isLoading: statsLoading,
-		error: statsError,
-	} = useQuery<TreasuryStats>({
-		queryKey: ["treasury", "stats"],
-		queryFn: () => fetchJson<TreasuryStats>(`${API_BASE}/api/treasury/stats`),
-		staleTime: 60 * 1000,
-	})
+		stats,
+		activity,
+		isLoading,
+		isError,
+		refetch,
+		hasMoreActivity,
+		isLoadingMoreActivity,
+		loadMoreActivity,
+	} = useTreasury()
 
-	const {
-		data: activityResponse,
-		isLoading: activityLoading,
-		error: activityError,
-		refetch: refetchActivity,
-	} = useQuery<TreasuryActivityResponse>({
-		queryKey: ["treasury", "activity", 200],
-		queryFn: () =>
-			fetchJson<TreasuryActivityResponse>(
-				`${API_BASE}/api/treasury/activity?limit=200`,
-			),
-		staleTime: 60 * 1000,
-	})
-
-	const activity = activityResponse?.events ?? []
+	const activityLoading = isLoading
+	const statsLoading = isLoading
+	const statsError = isError ? new Error("Failed to load stats") : null
+	const activityError = isError ? new Error("Failed to load activity") : null
+	const refetchActivity = refetch
 
 	const chartData = useMemo(
-		() => buildTreasuryChartData(activity),
+		() => buildTreasuryChartData(activity ?? []),
 		[activity],
 	)
 
@@ -171,6 +154,8 @@ const Treasury: React.FC = () => {
 		return `${diffDays}d ago`
 	}
 
+	const siteUrl = "https://learnvault.app"
+
 	const displayStats = stats
 		? {
 				totalTreasury: treasuryLoading
@@ -187,20 +172,30 @@ const Treasury: React.FC = () => {
 					? "Loading..."
 					: treasuryUSDC !== undefined
 						? `${treasuryUSDC.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC`
-						: statsError
+						: isError
 							? "Unavailable"
 							: "Loading...",
-				totalDisbursed: statsLoading ? "Loading..." : "Unavailable",
-				scholarsFunded: statsLoading ? "..." : "—",
-				donorsCount: statsLoading ? "..." : "—",
+				totalDisbursed: isLoading ? "Loading..." : "Unavailable",
+				scholarsFunded: isLoading ? "..." : "—",
+				donorsCount: isLoading ? "..." : "—",
 			}
 
-	const deposits = activity.filter((event) => event.type === "deposit").slice(0, 5)
-	const disbursements = activity
-		.filter((event) => event.type === "disburse")
+	const deposits = (activity ?? [])
+		.filter((e) => e.type === "deposit")
+		.slice(0, 5)
+	const disbursements = (activity ?? [])
+		.filter((e) => e.type === "disburse")
 		.slice(0, 5)
 
-	const siteUrl = "https://learnvault.app"
+	const handleDonateClick = () => {
+		if (!address) {
+			showInfo("Connect your wallet to donate to the treasury")
+			void connectWallet()
+			return
+		}
+		showInfo("Treasury donation flow will be available in the next update")
+	}
+
 	const title = `Treasury - ${displayStats.totalTreasury} - ${displayStats.scholarsFunded} Scholars Funded - LearnVault`
 	const description = `LearnVault's decentralized scholarship treasury holds ${displayStats.totalTreasury} and has funded ${displayStats.scholarsFunded} scholars. View real-time inflows and disbursements.`
 
@@ -226,32 +221,44 @@ const Treasury: React.FC = () => {
 				</p>
 			</header>
 
-			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-20">
-				<StatCard
-					label="Total in Treasury"
-					value={displayStats.totalTreasury}
-					icon={"\u{1F4B0}"}
-					color="text-brand-cyan"
-				/>
-				<StatCard
-					label="Total Disbursed"
-					value={displayStats.totalDisbursed}
-					icon={"\u{1F4B8}"}
-					color="text-brand-purple"
-				/>
-				<StatCard
-					label="Scholars Funded"
-					value={displayStats.scholarsFunded}
-					icon={"\u{1F393}"}
-					color="text-brand-emerald"
-				/>
-				<StatCard
-					label="Global Donors"
-					value={displayStats.donorsCount}
-					icon={"\u{1F30D}"}
-					color="text-brand-blue"
-				/>
-			</div>
+			{isLoading ? (
+				<DashboardStatsSkeleton />
+			) : isError ? (
+				<div className="glass-card p-8 rounded-[3rem] border border-white/5">
+					<ErrorState
+						message="Failed to load treasury stats. The data service may be temporarily unavailable."
+						onRetry={() => void refetch()}
+						showContactSupport
+					/>
+				</div>
+			) : (
+				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-20">
+					<StatCard
+						label="Total in Treasury"
+						value={displayStats.totalTreasury}
+						icon={"💰"}
+						color="text-brand-cyan"
+					/>
+					<StatCard
+						label="Total Disbursed"
+						value={displayStats.totalDisbursed}
+						icon={"💸"}
+						color="text-brand-purple"
+					/>
+					<StatCard
+						label="Scholars Funded"
+						value={displayStats.scholarsFunded}
+						icon={"🎓"}
+						color="text-brand-emerald"
+					/>
+					<StatCard
+						label="Global Donors"
+						value={displayStats.donorsCount}
+						icon={"🌍"}
+						color="text-brand-blue"
+					/>
+				</div>
+			)}
 
 			<div className="mb-20">
 				<div className="glass-card p-10 rounded-[3rem] relative overflow-hidden">
@@ -295,40 +302,53 @@ const Treasury: React.FC = () => {
 			</div>
 
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-				<ActivityFeed
-					title="Recent Community Deposits"
-					items={deposits.map((event) => ({
-						user: formatAddress(event.address || "unknown"),
-						amount: `+${formatAmount(event.amount || "0")} USDC`,
-						time: formatTime(event.created_at),
-						type: "deposit" as const,
-						txHash: event.tx_hash,
-					}))}
-					loading={activityLoading}
-					error={
-						activityError instanceof Error ? activityError.message : undefined
-					}
-					emptyMessage="No deposit activity is available yet"
-				/>
-				<ActivityFeed
-					title="Latest Disbursements"
-					items={disbursements.map((event) => ({
-						user: formatAddress(event.scholar || "unknown"),
-						amount: `-${formatAmount(event.amount || "0")} USDC`,
-						time: formatTime(event.created_at),
-						type: "disburse" as const,
-						txHash: event.tx_hash,
-					}))}
-					loading={activityLoading}
-					error={
-						activityError instanceof Error ? activityError.message : undefined
-					}
-					emptyMessage="No disbursements have been recorded yet"
-				/>
+				{(activity ?? []).length === 0 ? (
+					<div className="lg:col-span-2">
+						<EmptyState
+							icon="📭"
+							title="No treasury transactions yet"
+							description="No deposits or disbursements have been recorded yet. Check back soon for updates."
+							ctaLabel="Refresh"
+							ctaHref="#"
+						/>
+					</div>
+				) : (
+					<>
+						<ActivityFeed
+							title="Recent Community Deposits"
+							items={deposits.map((event) => ({
+								user: formatAddress(event.address || "unknown"),
+								amount: `+${formatAmount(event.amount || "0")} USDC`,
+								time: formatTime(event.created_at),
+								type: "deposit" as const,
+								txHash: event.tx_hash,
+							}))}
+							showLoadMore={hasMoreActivity}
+							loadingMore={isLoadingMoreActivity}
+							onLoadMore={() => loadMoreActivity()}
+						/>
+						<ActivityFeed
+							title="Latest Disbursements"
+							items={disbursements.map((event) => ({
+								user: formatAddress(event.scholar || "unknown"),
+								amount: `-${formatAmount(event.amount || "0")} USDC`,
+								time: formatTime(event.created_at),
+								type: "disburse" as const,
+								txHash: event.tx_hash,
+							}))}
+							showLoadMore={hasMoreActivity}
+							loadingMore={isLoadingMoreActivity}
+							onLoadMore={() => loadMoreActivity()}
+						/>
+					</>
+				)}
 			</div>
 
 			<div className="mt-20 text-center">
-				<button className="iridescent-border px-12 py-5 rounded-2xl font-black text-lg uppercase tracking-widest hover:scale-105 active:scale-95 transition-all group overflow-hidden shadow-2xl shadow-brand-cyan/20">
+				<button
+					onClick={handleDonateClick}
+					className="iridescent-border px-12 py-5 rounded-2xl font-black text-lg uppercase tracking-widest hover:scale-105 active:scale-95 transition-all group overflow-hidden shadow-2xl shadow-brand-cyan/20"
+				>
 					<span className="relative z-10">Donate to Treasury</span>
 				</button>
 			</div>
@@ -412,12 +432,18 @@ const ActivityFeed: React.FC<{
 	loading?: boolean
 	error?: string
 	emptyMessage?: string
+	showLoadMore?: boolean
+	loadingMore?: boolean
+	onLoadMore?: () => void
 }> = ({
 	title,
 	items,
 	loading = false,
 	error,
 	emptyMessage = "No activity yet",
+	showLoadMore = false,
+	loadingMore = false,
+	onLoadMore,
 }) => (
 	<div className="glass p-8 rounded-[2.5rem] border border-white/5">
 		<h3 className="text-xl font-black mb-8 border-l-4 border-brand-cyan pl-4">
@@ -442,33 +468,45 @@ const ActivityFeed: React.FC<{
 			) : items.length === 0 ? (
 				<div className="text-center text-white/40 py-8">{emptyMessage}</div>
 			) : (
-				items.map((item, i) => (
-					<div
-						key={`${item.txHash}-${i}`}
-						className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-colors group"
-					>
-						<div className="flex items-center gap-4">
-							<div
-								className={`w-2 h-2 rounded-full ${item.type === "deposit" ? "bg-brand-emerald animate-pulse" : "bg-brand-purple"}`}
-							/>
-							<div>
-								<p className="font-bold text-sm">{item.user}</p>
-								<p className="text-[10px] text-white/30 uppercase font-black tracking-widest">
-									{item.time}
-								</p>
-								<TxHashLink
-									hash={item.txHash}
-									className="mt-2 inline-flex text-[10px] font-black uppercase tracking-widest text-brand-cyan hover:underline"
-								/>
-							</div>
-						</div>
-						<p
-							className={`font-black ${item.type === "deposit" ? "text-brand-emerald" : "text-white/80"}`}
+				<>
+					{items.map((item, i) => (
+						<div
+							key={`${item.txHash}-${i}`}
+							className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-colors group"
 						>
-							{item.amount}
-						</p>
-					</div>
-				))
+							<div className="flex items-center gap-4">
+								<div
+									className={`w-2 h-2 rounded-full ${item.type === "deposit" ? "bg-brand-emerald animate-pulse" : "bg-brand-purple"}`}
+								/>
+								<div>
+									<p className="font-bold text-sm">{item.user}</p>
+									<p className="text-[10px] text-white/30 uppercase font-black tracking-widest">
+										{item.time}
+									</p>
+									<TxHashLink
+										hash={item.txHash}
+										className="mt-2 inline-flex text-[10px] font-black uppercase tracking-widest text-brand-cyan hover:underline"
+									/>
+								</div>
+							</div>
+							<p
+								className={`font-black ${item.type === "deposit" ? "text-brand-emerald" : "text-white/80"}`}
+							>
+								{item.amount}
+							</p>
+						</div>
+					))}
+					{showLoadMore && onLoadMore ? (
+						<button
+							type="button"
+							onClick={onLoadMore}
+							disabled={loadingMore}
+							className="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black uppercase tracking-[0.2em] text-white/80 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							{loadingMore ? "Loading..." : "Load More"}
+						</button>
+					) : null}
+				</>
 			)}
 		</div>
 	</div>

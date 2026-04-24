@@ -324,6 +324,8 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 name = "course_milestone"
 version = "0.0.1"
 dependencies = [
+ "learnvault-shared",
+ "proptest",
  "soroban-sdk",
  "stellar-registry",
 ]
@@ -700,6 +702,7 @@ dependencies = [
 name = "governance-token"
 version = "0.0.1"
 dependencies = [
+ "learnvault-shared",
  "soroban-sdk",
 ]
 
@@ -873,7 +876,15 @@ dependencies = [
 name = "learn-token"
 version = "0.0.1"
 dependencies = [
+ "learnvault-shared",
  "proptest",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "learnvault-shared"
+version = "0.0.1"
+dependencies = [
  "soroban-sdk",
 ]
 
@@ -922,6 +933,7 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 name = "milestone-escrow"
 version = "0.0.1"
 dependencies = [
+ "learnvault-shared",
  "proptest",
  "soroban-sdk",
  "stellar-registry",
@@ -1257,6 +1269,7 @@ dependencies = [
 name = "scholar-nft"
 version = "0.0.1"
 dependencies = [
+ "learnvault-shared",
  "soroban-sdk",
 ]
 
@@ -1265,6 +1278,7 @@ name = "scholarship-treasury"
 version = "0.0.1"
 dependencies = [
  "governance-token",
+ "learnvault-shared",
  "proptest",
  "soroban-sdk",
  "stellar-registry",

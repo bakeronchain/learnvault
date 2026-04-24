@@ -1,8 +1,11 @@
+import { BookOpen } from "lucide-react"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import { CourseFilter } from "../components/CourseFilter"
 import Pagination from "../components/Pagination"
 import { CourseCardSkeleton } from "../components/skeletons/CourseCardSkeleton"
+import { EmptyState } from "../components/states/emptyState"
+import { ErrorState } from "../components/states/errorState"
 import { useCourses } from "../hooks/useCourses"
 import { type CourseSummary } from "../types/courses"
 
@@ -14,16 +17,14 @@ const levelStyles: Record<CourseSummary["level"], string> = {
 
 const ITEMS_PER_PAGE = 4
 
-/** Converts a track label to a URL-safe slug, e.g. "Smart Contracts" → "smart-contracts" */
 function trackSlug(track: string): string {
 	return track.toLowerCase().replace(/\s+/g, "-")
 }
 
 const Courses: React.FC = () => {
 	const [searchParams, setSearchParams] = useSearchParams()
-	const { courses, isLoading, error } = useCourses()
+	const { courses, isLoading, error, refetch } = useCourses()
 
-	// Local state for the search input so filtering is instant; URL is synced after debounce
 	const [searchInput, setSearchInput] = useState(
 		() => searchParams.get("q") ?? "",
 	)
@@ -33,7 +34,6 @@ const Courses: React.FC = () => {
 	const parsedPage = parseInt(searchParams.get("page") || "1", 10)
 	const currentPage = isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
 
-	// Debounce search input → URL param (300 ms)
 	useEffect(() => {
 		const t = setTimeout(() => {
 			setSearchParams(
@@ -41,7 +41,7 @@ const Courses: React.FC = () => {
 					const next = new URLSearchParams(prev)
 					if (searchInput) next.set("q", searchInput)
 					else next.delete("q")
-					next.delete("page") // Reset to page 1 on search
+					next.delete("page")
 					return next
 				},
 				{ replace: true },
@@ -166,18 +166,25 @@ const Courses: React.FC = () => {
 			/>
 
 			{isLoading ? (
-				<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8">
+				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
 					{[1, 2, 3, 4].map((i) => (
 						<CourseCardSkeleton key={i} />
 					))}
 				</div>
 			) : error ? (
-				<div className="glass-card rounded-[2.5rem] border border-red-500/20 bg-red-500/10 p-12 text-center">
-					<h2 className="text-2xl font-black tracking-tight mb-3">
-						Couldn&apos;t load courses
-					</h2>
-					<p className="text-red-100/80 max-w-xl mx-auto">{error}</p>
-				</div>
+				<ErrorState
+					message={
+						error ||
+						"Failed to load courses. The server may be temporarily unavailable."
+					}
+					onRetry={() => void refetch()}
+				/>
+			) : courses.length === 0 ? (
+				<EmptyState
+					icon={BookOpen}
+					title="No courses available"
+					description="There are no courses yet. Check back soon!"
+				/>
 			) : filtered.length === 0 ? (
 				<div className="glass-card rounded-[2.5rem] border border-white/5 p-16 text-center">
 					<p className="text-5xl mb-6">🔍</p>
@@ -191,18 +198,18 @@ const Courses: React.FC = () => {
 					<button
 						type="button"
 						onClick={handleClear}
-						className="px-6 py-2.5 rounded-full text-sm font-bold uppercase tracking-widest border border-brand-cyan/30 text-brand-cyan hover:bg-brand-cyan/10 transition-all"
+						className="w-full sm:w-auto px-6 py-2.5 rounded-full text-sm font-bold uppercase tracking-widest border border-brand-cyan/30 text-brand-cyan hover:bg-brand-cyan/10 transition-all"
 					>
 						Clear all filters
 					</button>
 				</div>
 			) : (
 				<>
-					<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8">
+					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
 						{paginatedCourses.map((course) => (
 							<article
 								key={course.id}
-								className="glass-card rounded-[2rem] flex flex-col h-full border border-white/10 overflow-hidden group"
+								className="glass-card rounded-4xl flex flex-col h-full border border-white/10 overflow-hidden group"
 							>
 								<div
 									className={`h-36 bg-linear-to-br ${course.accentClassName} border-b border-white/10`}
@@ -226,11 +233,11 @@ const Courses: React.FC = () => {
 										{course.description}
 									</p>
 
-									<div className="mt-auto flex items-center justify-between gap-4 text-sm text-gray-400">
+									<div className="mt-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 text-sm text-gray-400">
 										<span>{course.track}</span>
 										<Link
 											to={`/courses/${course.slug}/lessons/1`}
-											className="iridescent-border px-4 py-2 rounded-xl font-semibold text-white hover:scale-105 transition-transform"
+											className="iridescent-border w-full sm:w-auto text-center px-4 py-2 rounded-xl font-semibold text-white hover:scale-105 transition-transform"
 										>
 											Open course
 										</Link>

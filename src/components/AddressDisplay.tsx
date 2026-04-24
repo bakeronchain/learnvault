@@ -1,4 +1,7 @@
-import React, { useEffect, useId, useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { useState, useId } from "react"
+import { useWallet } from "../hooks/useWallet"
+import { stellarNetwork } from "../contracts/util"
 
 export interface AddressDisplayProps {
 	address?: string | null
@@ -8,135 +11,162 @@ export interface AddressDisplayProps {
 	prefixLength?: number
 	suffixLength?: number
 	showCopyButton?: boolean
+	showExplorerLink?: boolean
+	fullOnHover?: boolean
 }
 
 export function truncateAddress(
 	address: string,
-	prefixLength = 1,
+	prefixLength = 6,
 	suffixLength = 4,
 ): string {
 	if (!address) return ""
-	if (address.includes("...")) return address
-
-	const visibleLength = prefixLength + suffixLength
-	if (address.length <= visibleLength) return address
-
+	if (address.length <= prefixLength + suffixLength + 3) return address
 	return `${address.slice(0, prefixLength)}...${address.slice(-suffixLength)}`
 }
 
-async function copyText(value: string) {
-	if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-		await navigator.clipboard.writeText(value)
-		return
-	}
-
-	if (typeof document === "undefined") {
-		throw new Error("Clipboard is not available")
-	}
-
-	const textarea = document.createElement("textarea")
-	textarea.value = value
-	textarea.setAttribute("readonly", "")
-	textarea.style.position = "absolute"
-	textarea.style.left = "-9999px"
-	document.body.appendChild(textarea)
-	textarea.select()
-
-	const copied = document.execCommand("copy")
-	document.body.removeChild(textarea)
-
-	if (!copied) {
-		throw new Error("Copy command failed")
-	}
-}
-
-const AddressDisplay: React.FC<AddressDisplayProps> = ({
+export const AddressDisplay: React.FC<AddressDisplayProps> = ({
 	address,
 	className = "",
 	addressClassName = "",
 	buttonClassName = "",
-	prefixLength = 1,
+	prefixLength = 6,
 	suffixLength = 4,
 	showCopyButton = true,
+	showExplorerLink = true,
+	fullOnHover = true,
 }) => {
-	const [copyState, setCopyState] = useState<"idle" | "copied" | "error">(
-		"idle",
-	)
+	const [copied, setCopied] = useState(false)
+	const [isHovered, setIsHovered] = useState(false)
+	const { network: walletNetwork } = useWallet()
 	const tooltipId = useId()
-
-	useEffect(() => {
-		if (copyState === "idle") return
-
-		const timeout = window.setTimeout(() => setCopyState("idle"), 1500)
-		return () => window.clearTimeout(timeout)
-	}, [copyState])
 
 	if (!address) return null
 
-	const truncatedAddress = truncateAddress(address, prefixLength, suffixLength)
+	const truncated = truncateAddress(address, prefixLength, suffixLength)
 
-	const handleCopy = async (event: React.MouseEvent<HTMLButtonElement>) => {
-		event.stopPropagation()
-
+	const handleCopy = async (e: React.MouseEvent) => {
+		e.stopPropagation()
 		try {
-			await copyText(address)
-			setCopyState("copied")
-		} catch (error) {
-			console.error("Failed to copy address:", error)
-			setCopyState("error")
+			await navigator.clipboard.writeText(address)
+			setCopied(true)
+			setTimeout(() => setCopied(false), 2000)
+		} catch (err) {
+			console.error("Failed to copy:", err)
 		}
 	}
 
+	const getExplorerUrl = () => {
+		const activeNetwork = (walletNetwork || stellarNetwork).toLowerCase()
+		const baseUrl = activeNetwork.includes("public") || activeNetwork.includes("mainnet")
+			? "https://stellar.expert/explorer/public/account/"
+			: activeNetwork.includes("futurenet")
+			? "https://futurenet.stellar.expert/explorer/futurenet/account/"
+			: "https://testnet.stellar.expert/explorer/testnet/account/"
+		return `${baseUrl}${address}`
+	}
+
 	return (
-		<span
-			className={`inline-flex min-w-0 items-center gap-2 ${className}`.trim()}
+		<div 
+			className={`inline-flex items-center gap-2 group/addr ${className}`}
+			onMouseEnter={() => setIsHovered(true)}
+			onMouseLeave={() => setIsHovered(false)}
 		>
-			<span
-				className={`min-w-0 truncate font-mono ${addressClassName}`.trim()}
-				title={address}
-			>
-				{truncatedAddress}
-			</span>
-			{showCopyButton ? (
-				<span className="relative inline-flex shrink-0 items-center">
-					<button
-						type="button"
-						onClick={handleCopy}
-						aria-label={`Copy wallet address ${address}`}
-						aria-describedby={copyState !== "idle" ? tooltipId : undefined}
-						className={`inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/45 transition-colors hover:border-brand-cyan/30 hover:text-brand-cyan focus:outline-none focus:ring-2 focus:ring-brand-cyan/40 ${buttonClassName}`.trim()}
-						title="Copy full address"
+			<div className="relative flex items-center">
+				<motion.span
+					layout
+					className={`font-mono text-sm cursor-help select-all ${addressClassName}`}
+					title={address}
+				>
+					{fullOnHover && isHovered ? address : truncated}
+				</motion.span>
+				
+				<AnimatePresence>
+					{isHovered && !fullOnHover && (
+						<motion.div
+							initial={{ opacity: 0, y: 5 }}
+							animate={{ opacity: 1, y: 0 }}
+							exit={{ opacity: 0, y: 5 }}
+							className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-slate-900 text-white text-xs rounded-lg shadow-xl border border-white/10 whitespace-nowrap z-50 pointer-events-none"
+						>
+							{address}
+						</motion.div>
+					)}
+				</AnimatePresence>
+			</div>
+
+			{showCopyButton && (
+				<motion.button
+					whileHover={{ scale: 1.1 }}
+					whileTap={{ scale: 0.9 }}
+					onClick={handleCopy}
+					className={`p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-colors relative ${buttonClassName}`}
+					aria-label="Copy address"
+				>
+					<AnimatePresence mode="wait">
+						{copied ? (
+							<motion.svg
+								key="check"
+								initial={{ scale: 0.5, opacity: 0 }}
+								animate={{ scale: 1, opacity: 1 }}
+								exit={{ scale: 0.5, opacity: 0 }}
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="3"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								className="w-3.5 h-3.5 text-green-400"
+							>
+								<polyline points="20 6 9 17 4 12" />
+							</motion.svg>
+						) : (
+							<motion.svg
+								key="copy"
+								initial={{ scale: 0.5, opacity: 0 }}
+								animate={{ scale: 1, opacity: 1 }}
+								exit={{ scale: 0.5, opacity: 0 }}
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="2"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								className="w-3.5 h-3.5 text-white/50 group-hover/addr:text-white"
+							>
+								<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+								<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+							</motion.svg>
+						)}
+					</AnimatePresence>
+				</motion.button>
+			)}
+
+			{showExplorerLink && (
+				<motion.a
+					whileHover={{ scale: 1.1 }}
+					href={getExplorerUrl()}
+					target="_blank"
+					rel="noopener noreferrer"
+					className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-colors text-white/50 hover:text-brand-cyan"
+					title="View on Stellar Expert"
+				>
+					<svg
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="2"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+						className="w-3.5 h-3.5"
 					>
-						<svg
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="2"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-							className="h-3.5 w-3.5"
-							aria-hidden="true"
-						>
-							<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-							<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-						</svg>
-					</button>
-					{copyState !== "idle" ? (
-						<span
-							id={tooltipId}
-							role="status"
-							className={`pointer-events-none absolute right-0 top-full mt-2 rounded-lg border bg-black/90 px-2 py-1 text-[10px] font-black uppercase tracking-widest shadow-lg ${
-								copyState === "copied"
-									? "border-brand-cyan/30 text-brand-cyan shadow-brand-cyan/10"
-									: "border-red-400/40 text-red-300 shadow-red-500/10"
-							}`.trim()}
-						>
-							{copyState === "copied" ? "Copied!" : "Copy failed"}
-						</span>
-					) : null}
-				</span>
-			) : null}
-		</span>
+						<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+						<polyline points="15 3 21 3 21 9" />
+						<line x1="10" y1="14" x2="21" y2="3" />
+					</svg>
+				</motion.a>
+			)}
+		</div>
 	)
 }
 

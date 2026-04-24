@@ -25,6 +25,11 @@ export interface ReputationBadgeProps {
 	size?: ReputationBadgeSize
 	/** Include formatted LRN amount next to the rank label */
 	showBalance?: boolean
+	/**
+	 * When set, rank and displayed LRN use this total (e.g. summed LRN across linked wallets)
+	 * instead of the on-chain LearnToken balance for `address`.
+	 */
+	aggregatedLrn?: number
 }
 
 /**
@@ -35,17 +40,20 @@ export function ReputationBadge({
 	className = "",
 	size = "sm",
 	showBalance = true,
+	aggregatedLrn,
 }: ReputationBadgeProps) {
 	const { address: connected } = useWallet()
 	const address = addressProp ?? connected
 
-	const { balance, isLoading } = useLearnToken(address)
+	const { balance, isLoading } = useLearnToken(address ?? "")
 
 	if (!address) return null
 
 	const styles = SIZE_CLASSES[size]
 
-	if (isLoading || balance === undefined) {
+	const useAggregated = aggregatedLrn !== undefined
+
+	if (!useAggregated && (isLoading || balance === undefined)) {
 		return (
 			<div
 				className={`inline-flex items-center rounded-full border border-white/10 bg-white/5 ${styles.root} animate-pulse ${className}`.trim()}
@@ -59,8 +67,9 @@ export function ReputationBadge({
 		)
 	}
 
-	const numericLrn =
-		balance <= BigInt(Number.MAX_SAFE_INTEGER)
+	const numericLrn = useAggregated
+		? aggregatedLrn
+		: balance! <= BigInt(Number.MAX_SAFE_INTEGER)
 			? Number(balance)
 			: Number.MAX_SAFE_INTEGER
 	const rank = getRank(numericLrn)

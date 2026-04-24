@@ -35,6 +35,8 @@ function randomNoncePayload(): string {
 
 export type AuthService = {
 	getOrCreateNonce(address: string): Promise<{ nonce: string }>
+	/** Verifies nonce signature for `address` and consumes the nonce (no JWT issued). */
+	verifyNonceSignature(address: string, signatureBase64: string): Promise<void>
 	verifyAndIssueToken(address: string, signatureBase64: string): Promise<string>
 	createChallenge(address: string): Promise<{
 		transaction: string
@@ -48,7 +50,7 @@ export function createAuthService(
 	nonceStore: NonceStore,
 	jwtService: JwtService,
 ): AuthService {
-	return {
+	const impl: AuthService = {
 		async logout(token: string): Promise<void> {
 			await jwtService.revokeToken(token)
 		},
@@ -139,10 +141,10 @@ export function createAuthService(
 			return { nonce }
 		},
 
-		async verifyAndIssueToken(
+		async verifyNonceSignature(
 			address: string,
 			signatureBase64: string,
-		): Promise<string> {
+		): Promise<void> {
 			if (!isValidStellarPublicKey(address)) {
 				throw new Error("Invalid Stellar public key")
 			}
@@ -166,7 +168,15 @@ export function createAuthService(
 			}
 
 			await nonceStore.deleteNonce(address)
+		},
+
+		async verifyAndIssueToken(
+			address: string,
+			signatureBase64: string,
+		): Promise<string> {
+			await impl.verifyNonceSignature(address, signatureBase64)
 			return jwtService.signWalletToken(address)
 		},
 	}
+	return impl
 }

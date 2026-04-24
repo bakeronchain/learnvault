@@ -54,3 +54,6 @@ src/contracts/*
 
 # test coverage
 coverage/
+
+# k6 local summary export
+summary.json

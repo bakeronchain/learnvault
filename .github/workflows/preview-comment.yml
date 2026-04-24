@@ -1,15 +1,42 @@
-# .github/workflows/preview-comment.yml
-name: Preview deployment comment
+# Preview environment: wait for Vercel, comment with URLs, optional teardown on PR close.
+#
+# Repository configuration (GitHub → Settings → Secrets and variables → Actions):
+#
+#   Variables (recommended)
+#     PREVIEW_BACKEND_PUBLIC_URL — Shown in the PR comment (e.g. https://api-staging.example.com).
+#       Configure Vercel **Preview** env vars (`VITE_SERVER_URL`, `VITE_API_URL`, Stellar `PUBLIC_*`)
+#       so the built app hits staging or a mock; this variable documents the API for reviewers.
+#
+#     PREVIEW_STRICT_TEAM — Set to "true" to allow only PR authors with author_association
+#       OWNER or MEMBER (typical for GitHub org repos). When unset, any author on a same-repo
+#       branch PR is allowed (forks are always excluded).
+#
+#   Secrets (optional — delete preview deployments on PR close via Vercel API)
+#     VERCEL_TOKEN — Token with deployment read + delete scope.
+#     VERCEL_PROJECT_ID — From Vercel → Project → Settings → General.
+#     VERCEL_TEAM_ID — Optional; team id when the project lives under a Vercel team.
+
+name: Preview environment
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, closed]
+
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
   comment-preview-url:
+    if: |
+      github.event.action != 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (vars.PREVIEW_STRICT_TEAM != 'true' ||
+       contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association))
     runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
+    concurrency:
+      group: preview-wait-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     steps:
       - name: Wait for Vercel preview
         uses: patrickedqvist/wait-for-vercel-preview@v1.3.1
@@ -18,22 +45,111 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           environment: Preview
-          max_timeout: 120
+          max_timeout: 900
 
       - name: Post preview URL comment
         if: ${{ steps.vercel_preview.outputs.url != '' }}
         uses: actions/github-script@v7
         with:
           script: |
+            const previewUrl = process.env.PREVIEW_URL;
+            const backendUrl = (process.env.BACKEND_URL || "").trim();
+            const lines = [
+              "🚀 **Preview deployed**",
+              "",
+              `**App:** ${previewUrl}`,
+              "",
+              backendUrl
+                ? `**API (staging / shared backend):** ${backendUrl}`
+                : "_Set the \`PREVIEW_BACKEND_PUBLIC_URL\` repository variable so this comment lists the staging API reviewers should use._",
+              "",
+              "Stellar: **Testnet** (per Vercel Preview / project env).",
+              "",
+              "_Ensure Vercel **Preview** environment variables include \`VITE_SERVER_URL\`, \`VITE_API_URL\` / \`VITE_API_BASE_URL\`, and contract IDs so this is a full preview._",
+            ];
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `🚀 **Preview deployed!**\n\n${process.env.PREVIEW_URL}\n\n> Built against Stellar Testnet`
-            })
+              body: lines.join("\n"),
+            });
         env:
           PREVIEW_URL: ${{ steps.vercel_preview.outputs.url }}
+          BACKEND_URL: ${{ vars.PREVIEW_BACKEND_PUBLIC_URL }}
 
-      - name: Skip missing preview
+      - name: Log when preview is missing
         if: ${{ steps.vercel_preview.outputs.url == '' }}
-        run: echo "No Vercel preview deployment found for this pull request."
+        run: |
+          echo "::notice::No Vercel Preview deployment found yet (timeout, skipped, or Vercel not linked)."
+
+  cleanup-preview:
+    if: |
+      github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    concurrency:
+      group: preview-cleanup-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    steps:
+      - name: Delete Vercel preview deployments for this PR (optional)
+        id: vercel_teardown
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VERCEL_TOKEN:-}" ] || [ -z "${VERCEL_PROJECT_ID:-}" ]; then
+            echo "::notice::Skipping Vercel API teardown (set VERCEL_TOKEN and VERCEL_PROJECT_ID to delete deployments). Vercel’s GitHub integration usually removes branch previews automatically."
+            echo "removed=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          enc_branch=$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "$HEAD_REF")
+          team_qs=""
+          if [ -n "${VERCEL_TEAM_ID:-}" ]; then
+            team_qs="&teamId=${VERCEL_TEAM_ID}"
+          fi
+          list_url="https://api.vercel.com/v6/deployments?projectId=${VERCEL_PROJECT_ID}&branch=${enc_branch}&target=preview&limit=50${team_qs}"
+          resp=$(curl -fsS -H "Authorization: Bearer ${VERCEL_TOKEN}" "$list_url")
+
+          uids=$(echo "$resp" | jq -r --arg pr "$PR_NUMBER" '
+            (.deployments // [])[]
+            | select(
+                ((.meta["githubPrId"] // .gitSource.prId // "") | tostring) == $pr
+              )
+            | .uid
+          ')
+
+          if [ -z "$uids" ]; then
+            echo "No preview deployments matched PR #${PR_NUMBER} on branch '${HEAD_REF}' (already removed or metadata mismatch)."
+            echo "removed=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          deleted=0
+          while read -r uid; do
+            [ -z "$uid" ] && continue
+            del_url="https://api.vercel.com/v13/deployments/${uid}"
+            [ -n "${VERCEL_TEAM_ID:-}" ] && del_url="${del_url}?teamId=${VERCEL_TEAM_ID}"
+            echo "Deleting deployment ${uid}..."
+            curl -fsS -X DELETE -H "Authorization: Bearer ${VERCEL_TOKEN}" "$del_url" || true
+            deleted=$((deleted + 1))
+          done <<< "$uids"
+
+          echo "removed=${deleted}" >> "$GITHUB_OUTPUT"
+          echo "Removed ${deleted} preview deployment(s) for PR #${PR_NUMBER}."
+
+      - name: Comment on PR after teardown
+        if: ${{ steps.vercel_teardown.outputs.removed != '0' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: "🔌 **Preview:** Vercel preview deployment(s) for this PR were removed via the API.",
+            });

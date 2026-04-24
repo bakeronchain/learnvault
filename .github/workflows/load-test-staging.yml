@@ -1,0 +1,73 @@
+# Weekly k6 load tests against staging + optional Slack alert on failure.
+#
+# Secrets:  STAGING_BASE_URL — API origin (e.g. https://api-staging.example.com), no trailing slash.
+# Optional: LOAD_TEST_SLACK_WEBHOOK_URL — incoming webhook for failure notifications.
+# Variables: K6_COURSE_ID — optional course_id string for milestone submit scenario.
+#
+# Baselines: edit loadtest/baseline.json with measured p95 (ms) per metric to fail on regression
+# (current p95 > baseline × regression_factor). k6 thresholds enforce p95 < 500ms per scenario tag.
+
+name: Load test (staging)
+
+on:
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+    inputs:
+      quick:
+        description: "Run a short smoke profile (K6_QUICK)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  k6-staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: grafana/setup-k6-action@v1
+
+      - name: Run k6
+        env:
+          BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+          K6_COURSE_ID: ${{ vars.K6_COURSE_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BASE_URL}" ]; then
+            echo "::error::Configure repository secret STAGING_BASE_URL (staging API origin, e.g. https://api.example.com)."
+            exit 1
+          fi
+          EXTRA=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.quick }}" = "true" ]; then
+            EXTRA="-e K6_QUICK=true"
+          fi
+          k6 run ${EXTRA} --summary-export=summary.json loadtest/staging.js
+
+      - name: Regression vs baseline
+        if: success()
+        run: node loadtest/compare-summary.mjs loadtest/baseline.json summary.json
+
+      - name: Upload k6 summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-summary-${{ github.run_id }}
+          path: summary.json
+          if-no-files-found: ignore
+
+      - name: Notify Slack on failure
+        if: failure()
+        env:
+          SLACK_URL: ${{ secrets.LOAD_TEST_SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -z "${SLACK_URL:-}" ]; then
+            exit 0
+          fi
+          payload=$(jq -nc \
+            --arg text "Load test failed: ${GITHUB_REPOSITORY} — ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            '{text: $text}')
+          curl -fsS -X POST -H "Content-Type: application/json" -d "$payload" "$SLACK_URL"

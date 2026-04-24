@@ -8,11 +8,14 @@ const requiredString = (field: string, maxLength?: number) => {
 		})
 		.trim()
 		.min(1, `${field} is required`)
-	
+
 	if (maxLength) {
-		return schema.max(maxLength, `${field} must be ${maxLength} characters or fewer`)
+		return schema.max(
+			maxLength,
+			`${field} must be ${maxLength} characters or fewer`,
+		)
 	}
-	
+
 	return schema
 }
 
@@ -23,11 +26,13 @@ const optionalTrimmedString = (field: string, maxLength?: number) => {
 		})
 		.trim()
 		.min(1, `${field} cannot be empty`)
-	
+
 	if (maxLength) {
-		return schema.max(maxLength, `${field} must be ${maxLength} characters or fewer`).optional()
+		return schema
+			.max(maxLength, `${field} must be ${maxLength} characters or fewer`)
+			.optional()
 	}
-	
+
 	return schema.optional()
 }
 
@@ -263,5 +268,18 @@ export const enrollmentBodySchema = z
 		learner_address: requiredString("learner_address", 100),
 		course_id: requiredString("course_id", 100),
 		tx_hash: requiredString("tx_hash", 200),
+	})
+	.strict()
+
+export const linkWalletBodySchema = z
+	.object({
+		address: requiredString("address", 100),
+		signature: requiredString("signature", 2000),
+	})
+	.strict()
+
+export const setPrimaryWalletBodySchema = z
+	.object({
+		address: requiredString("address", 100),
 	})
 	.strict()

@@ -1,9 +1,9 @@
 import React, { useCallback, useContext, useEffect, useState } from "react"
 import { Helmet } from "react-helmet"
 import { useTranslation } from "react-i18next"
-import { Link } from "react-router-dom"
 import { ActivityFeed } from "../components/ActivityFeed"
 import AddressDisplay from "../components/AddressDisplay"
+import { LinkedWalletsSection } from "../components/LinkedWalletsPanel"
 import LRNHistoryChart from "../components/LRNHistoryChart"
 import { ReputationBadge } from "../components/ReputationBadge"
 import {
@@ -11,10 +11,17 @@ import {
 	ProfileSkeleton,
 } from "../components/SkeletonLoader"
 import { ErrorState } from "../components/states/errorState"
-import { useScholarCredentials } from "../hooks/useScholarCredentials"
+import {
+	type MeCredential,
+	useLearnerProfile,
+} from "../hooks/useLearnerProfile"
 import { WalletContext } from "../providers/WalletProvider"
+import { getAuthToken } from "../util/auth"
 import { formatDuration, getLearningTimeSummary } from "../util/learningTime"
-import { shortenAddress } from "../util/scholarshipApplications"
+import {
+	formatLrnBalance,
+	shortenAddress,
+} from "../util/scholarshipApplications"
 
 type UserNft = {
 	id: string
@@ -22,6 +29,21 @@ type UserNft = {
 	program: string
 	date: string
 	artwork?: string
+}
+
+function mapCredentialsToNfts(items: MeCredential[] | unknown[]): UserNft[] {
+	if (!Array.isArray(items)) return []
+	return items.map((item: any) => ({
+		id: String(item.token_id ?? item.course_id ?? Math.random()),
+		course_id: item.course_id,
+		program: item.course_id ?? "Unknown course",
+		date: item.minted_at
+			? new Date(item.minted_at).toLocaleDateString()
+			: "Unknown",
+		artwork: item.metadata_uri
+			? `https://gateway.pinata.cloud/ipfs/${String(item.metadata_uri).replace("ipfs://", "")}`
+			: undefined,
+	}))
 }
 
 const Profile: React.FC = () => {
@@ -32,7 +54,10 @@ const Profile: React.FC = () => {
 	const [nfts, setNfts] = useState<UserNft[]>([])
 	const [learningTimeLabel, setLearningTimeLabel] = useState("0m")
 
-	const fetchCredentials = useCallback(async () => {
+	const hasAuth = Boolean(walletAddress && getAuthToken())
+	const { profile, isLoading: meLoading, error: meError } = useLearnerProfile()
+
+	const fetchPublicCredentials = useCallback(async () => {
 		if (!walletAddress) {
 			setNfts([])
 			setIsLoading(false)
@@ -55,21 +80,7 @@ const Profile: React.FC = () => {
 			}
 
 			const data = await response.json()
-			setNfts(
-				Array.isArray(data.data)
-					? data.data.map((item: any) => ({
-							id: String(item.token_id ?? item.course_id ?? Math.random()),
-							course_id: item.course_id,
-							program: item.course_id ?? "Unknown course",
-							date: item.minted_at
-								? new Date(item.minted_at).toLocaleDateString()
-								: "Unknown",
-							artwork: item.metadata_uri
-								? `https://gateway.pinata.cloud/ipfs/${item.metadata_uri.replace("ipfs://", "")}`
-								: undefined,
-						}))
-					: [],
-			)
+			setNfts(mapCredentialsToNfts(data.data ?? []))
 		} catch (err) {
 			console.error("[profile] error loading credentials", err)
 			setError(
@@ -81,8 +92,34 @@ const Profile: React.FC = () => {
 	}, [walletAddress])
 
 	useEffect(() => {
-		void fetchCredentials()
-	}, [fetchCredentials])
+		if (!walletAddress) {
+			setNfts([])
+			setIsLoading(false)
+			return
+		}
+		if (hasAuth) {
+			setIsLoading(meLoading)
+			if (meError && meError !== "Not authenticated") {
+				setError(meError)
+				setIsLoading(false)
+				return
+			}
+			if (!meLoading && profile) {
+				setNfts(mapCredentialsToNfts(profile.credentials))
+				setError(null)
+				setIsLoading(false)
+			}
+			return
+		}
+		void fetchPublicCredentials()
+	}, [
+		walletAddress,
+		hasAuth,
+		meLoading,
+		meError,
+		profile,
+		fetchPublicCredentials,
+	])
 
 	useEffect(() => {
 		const summary = getLearningTimeSummary()
@@ -90,9 +127,20 @@ const Profile: React.FC = () => {
 	}, [])
 
 	const siteUrl = "https://learnvault.app"
-	const userName = walletAddress ? shortenAddress(walletAddress) : "Learner"
-	const lrnBalance = "100,000"
-	const coursesCompleted = nfts.length
+	const displayAddress = profile?.primaryAddress ?? walletAddress
+	const userName = displayAddress ? shortenAddress(displayAddress) : "Learner"
+	const lrnParsed = profile?.aggregated?.lrnBalance
+		? Number(profile.aggregated.lrnBalance)
+		: NaN
+	const lrnNumeric =
+		hasAuth && profile && !Number.isNaN(lrnParsed)
+			? Math.min(lrnParsed, Number.MAX_SAFE_INTEGER)
+			: undefined
+	const lrnBalance =
+		lrnNumeric !== undefined ? formatLrnBalance(lrnNumeric) : "—"
+	const coursesCompleted = hasAuth
+		? (profile?.aggregated?.nftCount ?? profile?.credentials?.length ?? 0)
+		: nfts.length
 	const title = `${userName} — ${lrnBalance} · ${coursesCompleted} Course${
 		coursesCompleted !== 1 ? "s" : ""
 	} — LearnVault`
@@ -111,7 +159,12 @@ const Profile: React.FC = () => {
 	if (error) {
 		return (
 			<div className="p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
-				<ErrorState message={error} onRetry={fetchCredentials} />
+				<ErrorState
+					message={error}
+					onRetry={() =>
+						hasAuth ? window.location.reload() : void fetchPublicCredentials()
+					}
+				/>
 			</div>
 		)
 	}
@@ -144,7 +197,7 @@ const Profile: React.FC = () => {
 					<div className="mb-6">
 						{walletAddress ? (
 							<AddressDisplay
-								address={walletAddress}
+								address={displayAddress ?? walletAddress}
 								addressClassName="text-white/30 text-sm tracking-widest"
 								buttonClassName="h-6 w-6"
 							/>
@@ -156,7 +209,11 @@ const Profile: React.FC = () => {
 					</div>
 					<div className="flex flex-wrap justify-center md:justify-start gap-4">
 						{walletAddress ? (
-							<ReputationBadge size="md" showBalance />
+							<ReputationBadge
+								size="md"
+								showBalance
+								aggregatedLrn={lrnNumeric}
+							/>
 						) : (
 							<div className="px-5 py-2 glass rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-white/40">
 								{t("wallet.connect")}
@@ -230,6 +287,8 @@ const Profile: React.FC = () => {
 					</div>
 				)}
 			</section>
+
+			<LinkedWalletsSection />
 
 			<section className="mt-16">
 				<div className="flex items-center gap-4 mb-8">

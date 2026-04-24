@@ -968,6 +968,42 @@ fn submit_proposal_fails_when_reputation_is_below_threshold() {
 }
 
 #[test]
+fn set_min_lrn_to_propose_rejects_non_positive() {
+    let env = Env::default();
+    let (client, _, _donor, _recipient, _token_id, _gov_client, admin) = setup_with_admin(&env);
+
+    env.mock_all_auths();
+
+    let zero = client.try_set_min_lrn_to_propose(&admin, &0);
+    assert_eq!(
+        zero.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidAmount as u32
+        )))
+    );
+
+    let negative = client.try_set_min_lrn_to_propose(&admin, &-1);
+    assert_eq!(
+        negative.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidAmount as u32
+        )))
+    );
+
+    client.set_min_lrn_to_propose(&admin, &50);
+    assert_eq!(client.get_min_lrn_to_propose(), 50);
+
+    let clear_to_zero = client.try_set_min_lrn_to_propose(&admin, &0);
+    assert_eq!(
+        clear_to_zero.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidAmount as u32
+        )))
+    );
+    assert_eq!(client.get_min_lrn_to_propose(), 50);
+}
+
+#[test]
 fn submit_proposal_zero_amount_fails() {
     let env = Env::default();
     let (client, _, donor, _, _, _) = setup(&env);

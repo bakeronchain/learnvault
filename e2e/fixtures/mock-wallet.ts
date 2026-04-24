@@ -1,0 +1,41 @@
+import { type Page } from "@playwright/test"
+
+export const E2E_WALLET_ADDRESS =
+	"GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
+
+/**
+ * Provides a minimal Freighter API surface so StellarWalletsKit can read
+ * address/network/sign tx without a real extension.
+ */
+export async function installMockFreighter(page: Page) {
+	await page.addInitScript(
+		({ address }) => {
+			const networkPassphrase = "Test SDF Network ; September 2015"
+
+			;(window as any).freighterApi = {
+				isConnected: async () => true,
+				isAllowed: async () => true,
+				getPublicKey: async () => address,
+				getNetwork: async () => "TESTNET",
+				getNetworkDetails: async () => ({
+					network: "TESTNET",
+					networkPassphrase,
+				}),
+				signTransaction: async (xdr: string) => xdr,
+				signMessage: async (message: string) => `signed:${message}`,
+			}
+
+			// Use a non-freighter stored wallet id so WalletProvider rehydrates
+			// from storage without attempting a real extension handshake.
+			localStorage.setItem("walletId", JSON.stringify("hot-wallet"))
+			localStorage.setItem("walletType", JSON.stringify("hot-wallet"))
+			localStorage.setItem("walletAddress", JSON.stringify(address))
+			localStorage.setItem("walletNetwork", JSON.stringify("TESTNET"))
+			localStorage.setItem(
+				"networkPassphrase",
+				JSON.stringify(networkPassphrase),
+			)
+		},
+		{ address: E2E_WALLET_ADDRESS },
+	)
+}

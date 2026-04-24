@@ -1,234 +1,308 @@
-/**
- * pages/Dao.tsx
- *
- * Issue #44 — Add skeleton loading screens and empty state components
- * bakeronchain/learnvault
- *
- * Added: ProposalListSkeleton and NoProposalsEmptyState
- */
+import React, { useState } from "react"
+import { Link } from "react-router-dom"
+import { useDelegation } from "../hooks/useDelegation"
+import { useProposals } from "../hooks/useProposals"
+import { useWallet } from "../hooks/useWallet"
 
-import React, { useState, useEffect } from "react"
-import { useTranslation } from "react-i18next"
-import CommentSection from "../components/CommentSection"
-import {
-	ProposalListSkeleton,
-	NoProposalsEmptyState,
-	NoTokensEmptyState,
-} from "../components/SkeletonLoader"
+const GOV_DECIMALS = 7
+const GOV_DIVISOR = 10 ** GOV_DECIMALS
 
-interface Proposal {
-	id: string
-	title: string
-	description: string
-	author: string
-	status: "Active" | "Passed" | "Rejected"
-	votesFor: number
-	votesAgainst: number
-	endDate: string
+function formatGov(raw: string): string {
+	const n = Number(raw) / GOV_DIVISOR
+	return n.toLocaleString("en-US", { maximumFractionDigits: 2 })
 }
 
-const MOCK_PROPOSALS: Proposal[] = [
-	{
-		id: "1",
-		title: "Incentivize Soroban Developers with LRN",
-		description:
-			"This proposal aims to allocate 1,000,000 LRN from the treasury to reward developers who contribute to core Soroban libraries and documentation. \n\n## Goals\n- Increase ecosystem activity\n- Improve developer onboarding\n- Reward high-quality technical content",
-		author: "GA7B...4Y2K",
-		status: "Active",
-		votesFor: 450000,
-		votesAgainst: 12000,
-		endDate: "2024-04-15",
-	},
-	{
-		id: "2",
-		title: "Upgrade Protocol to v22",
-		description:
-			"Proposed upgrade to Soroban Protocol 22 to enable advanced storage optimizations and improved contract performance. \n\n### Impact\n- Lower gas fees\n- Faster execution\n- New SDK features",
-		author: "GBSU...9R3T",
-		status: "Active",
-		votesFor: 890000,
-		votesAgainst: 500,
-		endDate: "2024-04-20",
-	},
-]
+function shortenAddress(addr: string): string {
+	if (addr.length <= 12) return addr
+	return `${addr.slice(0, 6)}…${addr.slice(-4)}`
+}
 
-const Dao: React.FC = () => {
-	const { t } = useTranslation()
-	const [isLoading, setIsLoading] = useState(true)
-	const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null)
+export default function Dao() {
+	const { address } = useWallet()
+	const { proposals, votingPower, isLoading } = useProposals()
+	const {
+		delegatee,
+		isDelegating,
+		ownBalance,
+		delegatedToMe,
+		votingPower: onChainVotingPower,
+		isLoading: isDelegationLoading,
+		isUpdating,
+		delegateTo,
+		undelegate,
+	} = useDelegation()
 
-	// Issue #44 — Simulate async data fetch for skeleton demo
-	useEffect(() => {
-		const timer = setTimeout(() => setIsLoading(false), 2000)
-		return () => clearTimeout(timer)
-	}, [])
+	const [delegateeInput, setDelegateeInput] = useState("")
+	const [inputError, setInputError] = useState<string | null>(null)
 
-	if (isLoading) {
-		return (
-			<div className="p-12 max-w-5xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
-				<header className="mb-16 text-center">
-					<h1 className="text-6xl font-black mb-4 tracking-tighter text-gradient">
-						{t("pages.dao.title")}
-					</h1>
-					<p className="text-white/40 text-lg font-medium">
-						{t("pages.dao.desc")}
-					</p>
-				</header>
-				{/* Issue #44 — Proposal list skeleton */}
-				<ProposalListSkeleton />
-			</div>
-		)
+	const handleDelegate = async () => {
+		setInputError(null)
+		const trimmed = delegateeInput.trim()
+		if (!trimmed) {
+			setInputError("Enter the Stellar address of your delegatee.")
+			return
+		}
+		try {
+			await delegateTo(trimmed)
+			setDelegateeInput("")
+		} catch {
+			// errors handled in hook via toast
+		}
 	}
 
-	if (selectedProposal) {
-		return (
-			<div className="p-12 max-w-5xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
-				<button
-					onClick={() => setSelectedProposal(null)}
-					className="mb-12 flex items-center gap-2 text-white/40 hover:text-brand-cyan transition-colors font-black uppercase tracking-widest text-xs"
-				>
-					← Back to Proposals
-				</button>
-
-				<header className="mb-16">
-					<div className="flex justify-between items-start mb-6">
-						<div>
-							<h1 className="text-5xl font-black mb-4 tracking-tighter text-gradient leading-tight">
-								{selectedProposal.title}
-							</h1>
-							<div className="flex items-center gap-4 text-xs font-black uppercase tracking-widest">
-								<span className="text-brand-cyan">By {selectedProposal.author}</span>
-								<span className="w-1.5 h-1.5 bg-white/10 rounded-full" />
-								<span className="text-white/40">Ends {selectedProposal.endDate}</span>
-							</div>
-						</div>
-						<div className="px-6 py-2 bg-brand-cyan/10 border border-brand-cyan/30 rounded-full">
-							<span className="text-brand-cyan text-xs font-black uppercase tracking-widest">
-								{selectedProposal.status}
-							</span>
-						</div>
-					</div>
-
-					<div className="glass-card p-12 rounded-[3.5rem] border border-white/5 mb-16">
-						<div className="prose prose-invert prose-lg max-w-none text-white/60 leading-relaxed font-medium">
-							{selectedProposal.description.split("\n").map((para, i) => (
-								<p key={i} className="mb-4">
-									{para}
-								</p>
-							))}
-						</div>
-					</div>
-
-					<div className="grid grid-cols-2 gap-8 mb-20">
-						<div className="glass-card p-10 rounded-[2.5rem] border border-white/5 relative overflow-hidden group">
-							<div className="absolute top-0 left-0 w-full h-1 bg-brand-emerald/40" />
-							<p className="text-[10px] text-white/30 uppercase font-black tracking-widest mb-2">
-								For
-							</p>
-							<h3 className="text-3xl font-black">
-								{selectedProposal.votesFor.toLocaleString()} LRN
-							</h3>
-						</div>
-						<div className="glass-card p-10 rounded-[2.5rem] border border-white/5 relative overflow-hidden group">
-							<div className="absolute top-0 left-0 w-full h-1 bg-brand-purple/40" />
-							<p className="text-[10px] text-white/30 uppercase font-black tracking-widest mb-2">
-								Against
-							</p>
-							<h3 className="text-3xl font-black text-white/60">
-								{selectedProposal.votesAgainst.toLocaleString()} LRN
-							</h3>
-						</div>
-					</div>
-				</header>
-
-				<CommentSection
-					proposalId={selectedProposal.id}
-					proposalAuthor={selectedProposal.author}
-				/>
-			</div>
-		)
+	const handleUndelegate = async () => {
+		try {
+			await undelegate()
+		} catch {
+			// errors handled in hook via toast
+		}
 	}
 
-	if (MOCK_PROPOSALS.length === 0) {
-		return (
-			<div className="p-12 max-w-5xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
-				<header className="mb-16 text-center">
-					<h1 className="text-6xl font-black mb-4 tracking-tighter text-gradient">
-						{t("pages.dao.title")}
-					</h1>
-					<p className="text-white/40 text-lg font-medium">
-						{t("pages.dao.desc")}
-					</p>
-				</header>
-				{/* Issue #44 — No proposals empty state */}
-				<NoProposalsEmptyState />
-			</div>
-		)
-	}
+	const ownFmt = formatGov(ownBalance)
+	const delegatedFmt = formatGov(delegatedToMe)
+	const effectiveFmt = formatGov(onChainVotingPower)
 
 	return (
-		<div className="p-12 max-w-5xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
-			<header className="mb-20 text-center">
-				<h1 className="text-7xl font-black mb-6 tracking-tighter text-gradient">
-					{t("pages.dao.title", "Governance")}
+		<div className="p-8 md:p-12 max-w-5xl mx-auto text-white animate-in fade-in duration-700">
+			<header className="text-center mb-16">
+				<h1 className="text-6xl font-black mb-4 tracking-tighter text-gradient">
+					DAO Governance
 				</h1>
-				<p className="text-white/40 text-xl font-medium max-w-2xl mx-auto leading-relaxed">
-					{t(
-						"pages.dao.desc",
-						"Shape the future of LearnVault. Vote on protocol upgrades, treasury allocations, and ecosystem incentives.",
-					)}
+				<p className="text-white/40 text-lg font-medium max-w-2xl mx-auto">
+					Browse live proposals, vote with your governance tokens, and shape the
+					future of LearnVault.
 				</p>
 			</header>
 
-			<div className="grid gap-8">
-				{MOCK_PROPOSALS.map((proposal) => (
-					<div
-						key={proposal.id}
-						onClick={() => setSelectedProposal(proposal)}
-						className="glass-card p-12 rounded-[3.5rem] border border-white/5 hover:border-brand-cyan/30 hover:-translate-y-2 transition-all duration-500 cursor-pointer group"
+			{/* Stats row */}
+			<div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+				<div className="glass-card p-8 rounded-[2.5rem] border border-white/5">
+					<p className="text-[10px] uppercase font-black text-white/30 tracking-[2px] mb-2">
+						Your Voting Power
+					</p>
+					<p
+						className="text-3xl font-black text-brand-cyan"
+						data-testid="gov-token-balance"
 					>
-						<div className="flex justify-between items-start mb-8">
-							<h2 className="text-3xl font-black group-hover:text-brand-cyan transition-colors tracking-tight">
-								{proposal.title}
-							</h2>
-							<span className="px-4 py-1.5 bg-white/5 text-[10px] font-black uppercase tracking-widest rounded-full border border-white/10">
-								{proposal.status}
+						{votingPower.toString()}
+						<span className="text-xs ml-2 text-white/20 uppercase">GOV</span>
+					</p>
+					{!address && (
+						<p className="text-xs text-white/30 mt-2">
+							Connect wallet to create proposals and vote.
+						</p>
+					)}
+				</div>
+
+				<div className="glass-card p-8 rounded-[2.5rem] border border-white/5">
+					<p className="text-[10px] uppercase font-black text-white/30 tracking-[2px] mb-2">
+						Active Proposals
+					</p>
+					<p className="text-3xl font-black text-brand-purple">
+						{isLoading ? "—" : proposals.length}
+					</p>
+				</div>
+			</div>
+
+			{/* Delegation panel */}
+			{address && (
+				<div className="glass-card p-8 rounded-[2.5rem] border border-white/5 mb-12">
+					<div className="flex items-center gap-3 mb-6">
+						<span className="text-xl" aria-hidden="true">
+							🗳️
+						</span>
+						<h2 className="text-lg font-black tracking-tight">
+							Vote Delegation
+						</h2>
+						{isDelegating && (
+							<span className="ml-auto text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-brand-purple/20 text-brand-purple border border-brand-purple/20">
+								Delegating
 							</span>
-						</div>
-
-						<div className="flex items-center gap-6">
-							<div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
-								<div
-									className="h-full bg-brand-cyan shadow-[0_0_15px_rgba(0,255,240,0.5)]"
-									style={{
-										width: `${(proposal.votesFor / (proposal.votesFor + proposal.votesAgainst)) * 100}%`,
-									}}
-								/>
-							</div>
-							<div className="text-[10px] font-black uppercase tracking-widest text-white/40">
-								{Math.round(
-									(proposal.votesFor /
-										(proposal.votesFor + proposal.votesAgainst)) *
-										100,
-								)}
-								% Passing
-							</div>
-						</div>
+						)}
 					</div>
-				))}
+
+					{isDelegationLoading ? (
+						<div className="space-y-2">
+							{[1, 2, 3].map((i) => (
+								<div
+									key={i}
+									className="h-5 rounded-lg bg-white/5 animate-pulse"
+								/>
+							))}
+						</div>
+					) : (
+						<>
+							{/* Power breakdown */}
+							<div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+								<div className="rounded-2xl border border-white/5 bg-white/3 p-4">
+									<p className="text-[10px] uppercase font-black text-white/30 tracking-widest mb-1">
+										Own Balance
+									</p>
+									<p className="text-xl font-black text-white">
+										{ownFmt}
+										<span className="text-xs ml-1 text-white/20">GOV</span>
+									</p>
+								</div>
+								<div className="rounded-2xl border border-white/5 bg-white/3 p-4">
+									<p className="text-[10px] uppercase font-black text-white/30 tracking-widest mb-1">
+										Delegated to Me
+									</p>
+									<p className="text-xl font-black text-brand-cyan">
+										{delegatedFmt}
+										<span className="text-xs ml-1 text-white/20">GOV</span>
+									</p>
+								</div>
+								<div className="rounded-2xl border border-white/5 bg-white/3 p-4">
+									<p className="text-[10px] uppercase font-black text-white/30 tracking-widest mb-1">
+										Effective Power
+									</p>
+									<p className="text-xl font-black text-brand-emerald">
+										{isDelegating ? (
+											<span className="text-white/30">0</span>
+										) : (
+											effectiveFmt
+										)}
+										<span className="text-xs ml-1 text-white/20">GOV</span>
+									</p>
+								</div>
+							</div>
+
+							{/* Current delegation status */}
+							{isDelegating && delegatee && (
+								<div className="flex items-center justify-between rounded-2xl border border-brand-purple/20 bg-brand-purple/10 px-5 py-4 mb-5">
+									<div>
+										<p className="text-[10px] uppercase font-black text-white/30 tracking-widest mb-0.5">
+											Currently delegating to
+										</p>
+										<p className="font-mono text-sm text-white/80">
+											{shortenAddress(delegatee)}
+										</p>
+									</div>
+									<button
+										type="button"
+										onClick={() => void handleUndelegate()}
+										disabled={isUpdating}
+										className="px-4 py-2 text-sm font-bold rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+									>
+										{isUpdating ? "Removing…" : "Undelegate"}
+									</button>
+								</div>
+							)}
+
+							{/* Delegate form */}
+							{!isDelegating && (
+								<div>
+									<p className="text-xs text-white/40 mb-3">
+										Delegate your voting power to a trusted address. You can
+										reclaim it at any time.
+									</p>
+									<div className="flex gap-3 flex-col sm:flex-row">
+										<input
+											type="text"
+											value={delegateeInput}
+											onChange={(e) => {
+												setDelegateeInput(e.target.value)
+												setInputError(null)
+											}}
+											placeholder="Stellar address (G…)"
+											className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-mono text-white placeholder:text-white/20 focus:border-brand-cyan/40 focus:outline-none focus:ring-1 focus:ring-brand-cyan/40 transition-colors"
+										/>
+										<button
+											type="button"
+											onClick={() => void handleDelegate()}
+											disabled={isUpdating || !delegateeInput.trim()}
+											className="px-6 py-3 text-sm font-black rounded-xl bg-brand-cyan/10 border border-brand-cyan/30 text-brand-cyan hover:bg-brand-cyan/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+										>
+											{isUpdating ? "Delegating…" : "Delegate"}
+										</button>
+									</div>
+									{inputError && (
+										<p className="mt-2 text-xs text-red-400">{inputError}</p>
+									)}
+								</div>
+							)}
+						</>
+					)}
+				</div>
+			)}
+
+			{/* Action buttons */}
+			<div className="flex flex-wrap gap-4 mb-16 justify-center">
+				<Link
+					to="/dao/proposals"
+					className="iridescent-border px-10 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 active:scale-95 transition-all"
+					data-testid="view-proposals"
+				>
+					View Proposals
+				</Link>
+				<Link
+					to="/dao/propose"
+					className={`px-10 py-4 glass text-white rounded-2xl font-black text-sm uppercase tracking-widest border border-white/10 transition-all ${
+						address
+							? "hover:bg-white/10 hover:scale-105 active:scale-95"
+							: "opacity-40 pointer-events-none"
+					}`}
+					data-testid="create-proposal"
+				>
+					Create Proposal
+				</Link>
 			</div>
 
-			<div className="mt-20 glass-card p-12 rounded-[3.5rem] border border-white/5 text-center bg-brand-purple/5 border-brand-purple/20">
-				<h3 className="text-xl font-black mb-4">Voting Power</h3>
-				<p className="text-white/40 text-sm mb-6">
-					You have 250 LRN tokens available for voting.
-				</p>
-				<button className="px-10 py-4 bg-brand-purple text-white font-black uppercase tracking-widest rounded-full shadow-2xl shadow-brand-purple/40 hover:scale-105 transition-all">
-					Delegate Power
-				</button>
-			</div>
+			{/* Recent proposals */}
+			<section>
+				<h2 className="text-2xl font-black mb-8 tracking-tight text-center">
+					Recent Proposals
+				</h2>
+				{isLoading ? (
+					<div className="space-y-4">
+						{[1, 2, 3].map((i) => (
+							<div
+								key={i}
+								className="h-24 rounded-[2rem] bg-white/5 animate-pulse"
+							/>
+						))}
+					</div>
+				) : proposals.length === 0 ? (
+					<div className="glass-card p-12 rounded-[2.5rem] border border-white/5 text-center">
+						<p className="text-white/40 font-medium">
+							No proposals available yet.
+						</p>
+					</div>
+				) : (
+					<div className="space-y-4">
+						{proposals.slice(0, 3).map((proposal) => (
+							<Link
+								key={proposal.id}
+								to={`/dao/proposals?proposal=${proposal.id}`}
+								className="glass-card p-6 rounded-[2rem] border border-white/5 hover:border-brand-cyan/30 transition-all flex items-center justify-between group"
+							>
+								<div>
+									<p
+										className="font-black text-white group-hover:text-brand-cyan transition-colors"
+										data-testid="proposal-title"
+									>
+										{proposal.title}
+									</p>
+									<p className="text-xs text-white/40 uppercase tracking-widest mt-1">
+										{proposal.displayStatus}
+									</p>
+								</div>
+								<div className="text-right text-xs">
+									<p
+										className="text-brand-cyan font-black"
+										data-testid="vote-count"
+									>
+										{proposal.votesFor.toString()} Yes
+									</p>
+									<p className="text-brand-purple font-black">
+										{proposal.votesAgainst.toString()} No
+									</p>
+								</div>
+							</Link>
+						))}
+					</div>
+				)}
+			</section>
 		</div>
 	)
 }
-
-export default Dao

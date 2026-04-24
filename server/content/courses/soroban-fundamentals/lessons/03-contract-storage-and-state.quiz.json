@@ -1,0 +1,39 @@
+{
+	"lessonId": "soroban-fundamentals-3",
+	"passingScore": 80,
+	"questions": [
+		{
+			"id": 1,
+			"text": "Where does Soroban contract state live when written to storage?",
+			"options": [
+				"In the user’s browser",
+				"In the Stellar ledger",
+				"Only in RAM",
+				"Only in Horizon logs"
+			],
+			"correctIndex": 1
+		},
+		{
+			"id": 2,
+			"text": "Which is a common pitfall when users can create unlimited storage keys?",
+			"options": [
+				"Unbounded storage growth",
+				"Instant transaction finality",
+				"Automatic profit",
+				"Infinite free bandwidth"
+			],
+			"correctIndex": 0
+		},
+		{
+			"id": 3,
+			"text": "What is one simple upgrade strategy for long-lived contracts?",
+			"options": [
+				"Store a schema version and plan migrations",
+				"Delete the ledger",
+				"Disable signatures",
+				"Use floating point for balances"
+			],
+			"correctIndex": 0
+		}
+	]
+}

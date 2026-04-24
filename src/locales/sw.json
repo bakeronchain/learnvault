@@ -5,5 +5,12 @@
 	"nav": {
 		"contractExplorer": "Mtafiti wa Mikataba",
 		"courses": "Kozi"
+	},
+	"usdc": {
+		"getTestUSDC": "Pata USDC ya Majaribio",
+		"minting": "Inachapisha...",
+		"mintSuccess": "Umefanikiwa kuchapisha {{amount}} USDC kwa {{address}}...",
+		"mintError": "Hitilafu katika kuchapisha USDC: {{error}}",
+		"tooltip": "Pata tokeni {{amount}} za USDC za majaribio kwa ajili ya kujaribu michango na shughuli za hazina"
 	}
 }

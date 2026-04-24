@@ -1,62 +1,262 @@
-import React from "react";
-import { courses } from "../data/courses";
+import { BookOpen } from "lucide-react"
+import React, { useCallback, useEffect, useMemo, useState } from "react"
+import { Link, useSearchParams } from "react-router-dom"
+import { CourseFilter } from "../components/CourseFilter"
+import Pagination from "../components/Pagination"
+import { CourseCardSkeleton } from "../components/skeletons/CourseCardSkeleton"
+import { EmptyState } from "../components/states/emptyState"
+import { ErrorState } from "../components/states/errorState"
+import { useCourses } from "../hooks/useCourses"
+import { type CourseSummary } from "../types/courses"
+
+const levelStyles: Record<CourseSummary["level"], string> = {
+	Beginner: "bg-brand-emerald/20 text-brand-emerald border-brand-emerald/20",
+	Intermediate: "bg-brand-purple/20 text-brand-purple border-brand-purple/20",
+	Advanced: "bg-red-500/20 text-red-400 border-red-500/20",
+}
+
+const ITEMS_PER_PAGE = 4
+
+function trackSlug(track: string): string {
+	return track.toLowerCase().replace(/\s+/g, "-")
+}
 
 const Courses: React.FC = () => {
-    return (
-        <div className="container mx-auto px-4 py-12">
-            <header className="mb-12 text-center">
-                <h1 className="text-4xl md:text-5xl font-bold mb-4 text-gradient">
-                    Course Catalog
-                </h1>
-                <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-                    Explore our expert-led learning tracks and master the future of Web3, DeFi, and Smart Contracts.
-                </p>
-            </header>
+	const [searchParams, setSearchParams] = useSearchParams()
+	const { courses, isLoading, error, refetch } = useCourses()
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                {courses.map((course, index) => (
-                    <div
-                        key={index}
-                        className="glass-card p-6 rounded-2xl flex flex-col h-full border border-white/10 hover:border-white/20 transition-all duration-300 group"
-                    >
-                        <div className="flex items-center justify-between mb-4">
-                            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-brand-blue/20 text-brand-cyan border border-brand-cyan/20">
-                                {course.track}
-                            </span>
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${course.level === "Beginner"
-                                    ? "bg-brand-emerald/20 text-brand-emerald border-brand-emerald/20"
-                                    : course.level === "Intermediate"
-                                        ? "bg-brand-purple/20 text-brand-purple border-brand-purple/20"
-                                        : "bg-red-500/20 text-red-400 border-red-500/20"
-                                } border`}>
-                                {course.level}
-                            </span>
-                        </div>
+	const [searchInput, setSearchInput] = useState(
+		() => searchParams.get("q") ?? "",
+	)
 
-                        <h3 className="text-xl font-bold mb-2 group-hover:text-brand-cyan transition-colors duration-300">
-                            {course.title}
-                        </h3>
+	const difficulty = searchParams.get("difficulty") ?? ""
+	const track = searchParams.get("track") ?? ""
+	const parsedPage = parseInt(searchParams.get("page") || "1", 10)
+	const currentPage = isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
 
-                        <div className="flex items-center text-gray-400 text-sm mb-6">
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            {course.duration}
-                        </div>
+	useEffect(() => {
+		const t = setTimeout(() => {
+			setSearchParams(
+				(prev) => {
+					const next = new URLSearchParams(prev)
+					if (searchInput) next.set("q", searchInput)
+					else next.delete("q")
+					next.delete("page")
+					return next
+				},
+				{ replace: true },
+			)
+		}, 300)
+		return () => clearTimeout(t)
+	}, [searchInput, setSearchParams])
 
-                        <div className="mt-auto">
-                            <button
-                                disabled
-                                className="w-full py-3 px-4 rounded-xl bg-white/5 border border-white/10 text-gray-500 font-semibold cursor-not-allowed hover:bg-white/10 transition-colors duration-300"
-                            >
-                                Coming Soon
-                            </button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-};
+	const handleDifficultyChange = useCallback(
+		(value: string) => {
+			setSearchParams(
+				(prev) => {
+					const next = new URLSearchParams(prev)
+					if (value) next.set("difficulty", value)
+					else next.delete("difficulty")
+					next.delete("page")
+					return next
+				},
+				{ replace: true },
+			)
+		},
+		[setSearchParams],
+	)
 
-export default Courses;
+	const handleTrackChange = useCallback(
+		(value: string) => {
+			setSearchParams(
+				(prev) => {
+					const next = new URLSearchParams(prev)
+					if (value) next.set("track", value)
+					else next.delete("track")
+					next.delete("page")
+					return next
+				},
+				{ replace: true },
+			)
+		},
+		[setSearchParams],
+	)
+
+	const handleClear = useCallback(() => {
+		setSearchInput("")
+		setSearchParams({}, { replace: true })
+	}, [setSearchParams])
+
+	const handlePageChange = (newPage: number) => {
+		setSearchParams(
+			(prev) => {
+				const next = new URLSearchParams(prev)
+				next.set("page", newPage.toString())
+				return next
+			},
+			{ replace: false },
+		)
+		window.scrollTo({ top: 0, behavior: "smooth" })
+	}
+
+	const hasActiveFilters = !!searchInput || !!difficulty || !!track
+
+	const filtered = useMemo(() => {
+		const q = searchInput.toLowerCase()
+		return courses.filter((course) => {
+			const matchesSearch =
+				!q ||
+				course.title.toLowerCase().includes(q) ||
+				course.description.toLowerCase().includes(q)
+			const matchesDifficulty = !difficulty || course.difficulty === difficulty
+			const matchesTrack = !track || trackSlug(course.track) === track
+			return matchesSearch && matchesDifficulty && matchesTrack
+		})
+	}, [courses, searchInput, difficulty, track])
+
+	const trackOptions = useMemo(() => {
+		const seen = new Set<string>()
+		const dynamicOptions = courses
+			.filter((course) => {
+				if (seen.has(course.trackKey)) return false
+				seen.add(course.trackKey)
+				return Boolean(course.trackKey)
+			})
+			.map((course) => ({
+				label: course.track,
+				value: trackSlug(course.track),
+			}))
+
+		return [{ label: "All Tracks", value: "" }, ...dynamicOptions]
+	}, [courses])
+
+	const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE))
+	const safePage = Math.min(currentPage, totalPages)
+	const startIndex = (safePage - 1) * ITEMS_PER_PAGE
+	const paginatedCourses = filtered.slice(
+		startIndex,
+		startIndex + ITEMS_PER_PAGE,
+	)
+
+	return (
+		<div className="container mx-auto px-4 py-12">
+			<header className="mb-12 text-center">
+				<p className="text-sm uppercase tracking-[0.35em] text-brand-cyan/80 mb-4">
+					Learning Tracks
+				</p>
+				<h1 className="text-4xl md:text-5xl font-bold mb-4 text-gradient">
+					Choose a path and start with a focused first lesson.
+				</h1>
+				<p className="text-gray-400 text-lg max-w-3xl mx-auto leading-relaxed">
+					Every LearnVault track is designed to move new learners from setup to
+					hands-on progress with a clear first milestone.
+				</p>
+			</header>
+
+			<CourseFilter
+				search={searchInput}
+				onSearchChange={setSearchInput}
+				difficulty={difficulty}
+				onDifficultyChange={handleDifficultyChange}
+				track={track}
+				trackOptions={trackOptions}
+				onTrackChange={handleTrackChange}
+				onClear={handleClear}
+				hasActiveFilters={hasActiveFilters}
+			/>
+
+			{isLoading ? (
+				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+					{[1, 2, 3, 4].map((i) => (
+						<CourseCardSkeleton key={i} />
+					))}
+				</div>
+			) : error ? (
+				<ErrorState
+					message={
+						error ||
+						"Failed to load courses. The server may be temporarily unavailable."
+					}
+					onRetry={() => void refetch()}
+				/>
+			) : courses.length === 0 ? (
+				<EmptyState
+					icon={BookOpen}
+					title="No courses available"
+					description="There are no courses yet. Check back soon!"
+				/>
+			) : filtered.length === 0 ? (
+				<div className="glass-card rounded-[2.5rem] border border-white/5 p-16 text-center">
+					<p className="text-5xl mb-6">🔍</p>
+					<h2 className="text-2xl font-black tracking-tight mb-3">
+						No courses match your filters
+					</h2>
+					<p className="text-white/50 mb-8 max-w-sm mx-auto">
+						Try a different search term or adjust the difficulty and track
+						filters.
+					</p>
+					<button
+						type="button"
+						onClick={handleClear}
+						className="w-full sm:w-auto px-6 py-2.5 rounded-full text-sm font-bold uppercase tracking-widest border border-brand-cyan/30 text-brand-cyan hover:bg-brand-cyan/10 transition-all"
+					>
+						Clear all filters
+					</button>
+				</div>
+			) : (
+				<>
+					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+						{paginatedCourses.map((course) => (
+							<article
+								key={course.id}
+								className="glass-card rounded-4xl flex flex-col h-full border border-white/10 overflow-hidden group"
+							>
+								<div
+									className={`h-36 bg-linear-to-br ${course.accentClassName} border-b border-white/10`}
+								/>
+								<div className="p-6 flex flex-col h-full">
+									<div className="flex items-center justify-between mb-4 gap-3">
+										<span className="px-3 py-1 rounded-full text-xs font-semibold bg-brand-blue/20 text-brand-cyan border border-brand-cyan/20">
+											{course.track}
+										</span>
+										<span
+											className={`px-3 py-1 rounded-full text-xs font-semibold border ${levelStyles[course.level]}`}
+										>
+											{course.level}
+										</span>
+									</div>
+
+									<h2 className="text-xl font-bold mb-3 group-hover:text-brand-cyan transition-colors duration-300">
+										{course.title}
+									</h2>
+									<p className="text-white/55 text-sm leading-relaxed mb-5">
+										{course.description}
+									</p>
+
+									<div className="mt-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 text-sm text-gray-400">
+										<span>{course.track}</span>
+										<Link
+											to={`/courses/${course.slug}/lessons/1`}
+											className="iridescent-border w-full sm:w-auto text-center px-4 py-2 rounded-xl font-semibold text-white hover:scale-105 transition-transform"
+										>
+											Open course
+										</Link>
+									</div>
+								</div>
+							</article>
+						))}
+					</div>
+					<div className="mt-12">
+						<Pagination
+							page={safePage}
+							totalPages={totalPages}
+							onPageChange={handlePageChange}
+						/>
+					</div>
+				</>
+			)}
+		</div>
+	)
+}
+
+export default Courses

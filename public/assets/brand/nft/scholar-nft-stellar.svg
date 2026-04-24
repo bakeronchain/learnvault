@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#05070a"/>
+      <stop offset="100%" stop-color="#071520"/>
+    </linearGradient>
+    <!-- Stellar accent: cyan/blue -->
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00d2ff"/>
+      <stop offset="100%" stop-color="#3a7bd5"/>
+    </linearGradient>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00d2ff" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#3a7bd5" stop-opacity="0.1"/>
+    </linearGradient>
+    <radialGradient id="glowCenter" cx="50%" cy="45%" r="40%">
+      <stop offset="0%" stop-color="#00d2ff" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#00d2ff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1000" height="1000" fill="url(#bgGrad)"/>
+  <rect width="1000" height="1000" fill="url(#glowCenter)"/>
+
+  <g opacity="0.04" stroke="#00d2ff" stroke-width="1">
+    <line x1="0" y1="100" x2="1000" y2="100"/><line x1="0" y1="200" x2="1000" y2="200"/>
+    <line x1="0" y1="300" x2="1000" y2="300"/><line x1="0" y1="400" x2="1000" y2="400"/>
+    <line x1="0" y1="500" x2="1000" y2="500"/><line x1="0" y1="600" x2="1000" y2="600"/>
+    <line x1="0" y1="700" x2="1000" y2="700"/><line x1="0" y1="800" x2="1000" y2="800"/>
+    <line x1="0" y1="900" x2="1000" y2="900"/>
+    <line x1="100" y1="0" x2="100" y2="1000"/><line x1="200" y1="0" x2="200" y2="1000"/>
+    <line x1="300" y1="0" x2="300" y2="1000"/><line x1="400" y1="0" x2="400" y2="1000"/>
+    <line x1="500" y1="0" x2="500" y2="1000"/><line x1="600" y1="0" x2="600" y2="1000"/>
+    <line x1="700" y1="0" x2="700" y2="1000"/><line x1="800" y1="0" x2="800" y2="1000"/>
+    <line x1="900" y1="0" x2="900" y2="1000"/>
+  </g>
+
+  <!-- Stellar star motif in background -->
+  <g opacity="0.07" fill="#00d2ff">
+    <circle cx="150" cy="180" r="3"/><circle cx="820" cy="150" r="2"/>
+    <circle cx="100" cy="600" r="2"/><circle cx="900" cy="500" r="3"/>
+    <circle cx="200" cy="850" r="2"/><circle cx="780" cy="820" r="3"/>
+    <circle cx="350" cy="120" r="1.5"/><circle cx="650" cy="100" r="2"/>
+  </g>
+
+  <path d="M0 0 L80 0 L0 80 Z" fill="url(#accentGrad)" opacity="0.15"/>
+  <path d="M1000 0 L920 0 L1000 80 Z" fill="url(#accentGrad)" opacity="0.15"/>
+  <path d="M0 1000 L80 1000 L0 920 Z" fill="url(#accentGrad)" opacity="0.15"/>
+  <path d="M1000 1000 L920 1000 L1000 920 Z" fill="url(#accentGrad)" opacity="0.15"/>
+
+  <rect x="20" y="20" width="960" height="960" rx="24" fill="none" stroke="url(#accentGrad)" stroke-width="2" opacity="0.6"/>
+  <rect x="28" y="28" width="944" height="944" rx="20" fill="none" stroke="url(#accentGrad)" stroke-width="0.5" opacity="0.2"/>
+
+  <path d="M500 160 L680 230 L680 430 C680 560 600 660 500 700 C400 660 320 560 320 430 L320 230 Z"
+        fill="url(#shieldGrad)" stroke="url(#accentGrad)" stroke-width="2"/>
+  <path d="M500 190 L655 252 L655 430 C655 545 583 635 500 670 C417 635 345 545 345 430 L345 252 Z"
+        fill="none" stroke="url(#accentGrad)" stroke-width="1" opacity="0.4"/>
+
+  <polygon points="500,270 590,310 500,350 410,310" fill="url(#accentGrad)" filter="url(#glow)"/>
+  <rect x="455" y="350" width="90" height="60" rx="8" fill="url(#accentGrad)" opacity="0.9"/>
+  <line x1="590" y1="310" x2="590" y2="360" stroke="url(#accentGrad)" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="590" cy="368" r="10" fill="#00d2ff" filter="url(#glow)"/>
+
+  <circle cx="500" cy="460" r="40" fill="#05070a" stroke="url(#accentGrad)" stroke-width="2"/>
+  <text x="500" y="468" text-anchor="middle" font-family="Inter, monospace, sans-serif" font-size="20" font-weight="800" fill="url(#accentGrad)">LRN</text>
+
+  <text x="500" y="780" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="52" font-weight="800" fill="white" letter-spacing="-1">ScholarNFT</text>
+
+  <rect x="350" y="810" width="300" height="36" rx="18" fill="url(#accentGrad)" opacity="0.15" stroke="url(#accentGrad)" stroke-width="1"/>
+  <text x="500" y="833" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="14" font-weight="600" fill="url(#accentGrad)" letter-spacing="3">VERIFIED CREDENTIAL</text>
+
+  <text x="500" y="860" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="24" font-weight="600" fill="white" opacity="0.7" letter-spacing="1">{{TRACK_NAME}}</text>
+
+  <!-- Scholar address -->
+  <text x="500" y="910" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="14" font-weight="400" fill="white" opacity="0.4" letter-spacing="2">{{SCHOLAR_ADDRESS}}</text>
+
+  <!-- Completion date -->
+  <text x="500" y="940" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="14" font-weight="400" fill="white" opacity="0.5" letter-spacing="1">{{DATE}}</text>
+
+  <text x="500" y="960" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="16" font-weight="700" fill="white" opacity="0.3" letter-spacing="4">LEARNVAULT</text>
+  <text x="500" y="980" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="400" fill="white" opacity="0.2" letter-spacing="2">POWERED BY STELLAR</text>
+</svg>

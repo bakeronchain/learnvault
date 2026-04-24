@@ -1,0 +1,24 @@
+[package]
+name = "course_milestone"
+description = "The CourseMilestone contract tracks each learner's progress and on-chain milestone submissions."
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+version.workspace = true
+
+[package.metadata.stellar]
+cargo_inherit = true
+
+[lib]
+crate-type = ["cdylib"]
+doctest = false
+
+[dependencies]
+learnvault-shared = { workspace = true }
+soroban-sdk = { workspace = true }
+stellar-registry = "0.0.4"
+
+[dev-dependencies]
+learnvault-shared = { workspace = true, features = ["testutils"] }
+soroban-sdk = { workspace = true, features = ["testutils"] }

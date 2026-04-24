@@ -1,13 +1,17 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, Address, Env,
-    Symbol,
+    Address, BytesN, Env, String, Symbol, contract, contracterror, contractevent, contractimpl,
+    contracttype, panic_with_error, symbol_short,
 };
 
-const INACTIVITY_WINDOW_SECONDS: u64 = 30 * 24 * 60 * 60;
+use learnvault_shared::upgrade;
+
+pub use upgrade::ContractUpgraded;
+
 const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
 const TREASURY_KEY: Symbol = symbol_short!("TREAS");
+const INACTIVITY_WINDOW_KEY: Symbol = symbol_short!("INACT_W");
 
 #[derive(Clone)]
 #[contracttype]
@@ -47,16 +51,48 @@ pub enum Error {
 #[contract]
 pub struct MilestoneEscrow;
 
+#[contractevent(topics = ["released"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TrancheReleased {
+    #[topic]
+    pub scholar: Address,
+    #[topic]
+    pub proposal_id: u32,
+    pub amount: i128,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EscrowCreated {
+    pub proposal_id: u32,
+    pub scholar: Address,
+    pub total_amount: i128,
+    pub total_tranches: u32,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EscrowReclaimed {
+    pub proposal_id: u32,
+    pub scholar: Address,
+    pub amount_reclaimed: i128,
+}
+
 #[contractimpl]
 impl MilestoneEscrow {
-    pub fn initialize(env: Env, admin: Address, treasury: Address) {
+    pub fn initialize(env: Env, admin: Address, treasury: Address, inactivity_window_seconds: u64) {
         if env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(&env, Error::AlreadyInitialized);
         }
         admin.require_auth();
 
+        // Keep 30 days (30 * 24 * 60 * 60) as the recommended default at deployment.
         env.storage().instance().set(&ADMIN_KEY, &admin);
+        upgrade::init(&env);
         env.storage().instance().set(&TREASURY_KEY, &treasury);
+        env.storage()
+            .instance()
+            .set(&INACTIVITY_WINDOW_KEY, &inactivity_window_seconds);
     }
 
     pub fn create_escrow(
@@ -81,7 +117,7 @@ impl MilestoneEscrow {
             panic_with_error!(&env, Error::EscrowExists);
         }
 
-        xlm::token_client(&env).transfer(&treasury, &env.current_contract_address(), &amount);
+        xlm::token_client(&env).transfer(&treasury, env.current_contract_address(), &amount);
 
         let record = EscrowRecord {
             scholar,
@@ -94,14 +130,20 @@ impl MilestoneEscrow {
             admin: Self::admin(&env),
         };
         env.storage().persistent().set(&key, &record);
+        EscrowCreated {
+            proposal_id,
+            scholar: record.scholar.clone(),
+            total_amount: record.total_amount,
+            total_tranches: record.total_tranches,
+        }
+        .publish(&env);
     }
 
     pub fn release_tranche(env: Env, proposal_id: u32) {
-        let admin = Self::admin(&env);
-        admin.require_auth();
-
         let key = DataKey::Escrow(proposal_id);
         let mut record = Self::get_or_panic(&env, &key);
+
+        record.admin.require_auth();
 
         if record.tranches_released >= record.total_tranches {
             panic_with_error!(&env, Error::AllTranchesReleased);
@@ -115,19 +157,24 @@ impl MilestoneEscrow {
         record.last_activity = env.ledger().timestamp();
         env.storage().persistent().set(&key, &record);
 
-        env.events().publish(
-            (symbol_short!("released"), record.scholar, proposal_id),
+        TrancheReleased {
+            scholar: record.scholar.clone(),
+            proposal_id,
             amount,
-        );
+        }
+        .publish(&env);
     }
 
     pub fn reclaim_inactive(env: Env, proposal_id: u32) {
         let key = DataKey::Escrow(proposal_id);
         let mut record = Self::get_or_panic(&env, &key);
 
+        record.admin.require_auth();
+
         let now = env.ledger().timestamp();
         let inactive_for = now.saturating_sub(record.last_activity);
-        if inactive_for < INACTIVITY_WINDOW_SECONDS {
+        let inactivity_window = Self::inactivity_window(&env);
+        if inactive_for < inactivity_window {
             panic_with_error!(&env, Error::InactivityNotReached);
         }
 
@@ -136,11 +183,22 @@ impl MilestoneEscrow {
             panic_with_error!(&env, Error::NothingToReclaim);
         }
 
-        xlm::token_client(&env).transfer(&env.current_contract_address(), &record.treasury, &unspent);
+        xlm::token_client(&env).transfer(
+            &env.current_contract_address(),
+            &record.treasury,
+            &unspent,
+        );
 
         record.released_amount = record.total_amount;
         record.last_activity = now;
         env.storage().persistent().set(&key, &record);
+
+        EscrowReclaimed {
+            proposal_id,
+            scholar: record.scholar.clone(),
+            amount_reclaimed: unspent,
+        }
+        .publish(&env);
     }
 
     pub fn get_escrow(env: Env, proposal_id: u32) -> Option<EscrowRecord> {
@@ -186,12 +244,35 @@ impl MilestoneEscrow {
             panic_with_error!(env, Error::NotInitialized);
         }
     }
+
+    fn inactivity_window(env: &Env) -> u64 {
+        if let Some(window) = env
+            .storage()
+            .instance()
+            .get::<_, u64>(&INACTIVITY_WINDOW_KEY)
+        {
+            window
+        } else {
+            panic_with_error!(env, Error::NotInitialized);
+        }
+    }
+
+    pub fn get_version(env: Env) -> String {
+        String::from_str(&env, "1.0.0")
+    }
+
+    /// Replace the current contract WASM with a new uploaded hash. Admin only.
+    pub fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
+        let admin = Self::admin(&env);
+        admin.require_auth();
+        upgrade::apply(&env, &admin, &new_wasm_hash);
+    }
 }
 
 mod xlm {
     #[cfg(test)]
     mod test_xlm {
-        use soroban_sdk::{symbol_short, Address, Env, Symbol};
+        use soroban_sdk::{Address, Env, Symbol, symbol_short};
 
         const XLM_KEY: Symbol = symbol_short!("XLM");
 
@@ -213,7 +294,18 @@ mod xlm {
     }
 
     #[cfg(not(test))]
-    stellar_registry::import_asset!("xlm");
+    mod live_xlm {
+        use soroban_sdk::Env;
+
+        stellar_registry::import_asset!("xlm");
+
+        pub fn token_client<'a>(env: &Env) -> soroban_sdk::token::TokenClient<'a> {
+            xlm::token_client(env)
+        }
+    }
+
+    #[cfg(not(test))]
+    pub use live_xlm::*;
 
     #[cfg(test)]
     pub use test_xlm::*;

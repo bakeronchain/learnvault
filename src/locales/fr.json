@@ -5,5 +5,12 @@
 	"nav": {
 		"contractExplorer": "Explorateur de Contrats",
 		"courses": "Cours"
+	},
+	"usdc": {
+		"getTestUSDC": "Obtenir USDC de Test",
+		"minting": "Frappe en cours...",
+		"mintSuccess": "{{amount}} USDC frappés avec succès pour {{address}}...",
+		"mintError": "Erreur lors de la frappe d'USDC: {{error}}",
+		"tooltip": "Obtenez {{amount}} jetons USDC de test pour tester les dons et les opérations de trésorerie"
 	}
 }

@@ -1,0 +1,57 @@
+[
+	{
+		"id": 1,
+		"question": "Which language do developers use to implement Soroban smart contracts?",
+		"options": ["Solidity", "Rust", "Go", "Python"],
+		"correct": 1,
+		"explanation": "Soroban contracts are written in Rust and compiled to WebAssembly (WASM), which the Soroban runtime executes on Stellar."
+	},
+	{
+		"id": 2,
+		"question": "On LearnVault, what do LRN (LearnToken) balances primarily represent?",
+		"options": [
+			"Transferable tokens meant for open market trading",
+			"Fees you pay to validators for every quiz submission",
+			"Non-transferable on-chain reputation from verified course milestone completion",
+			"The same thing as governance voting weight for every holder"
+		],
+		"correct": 2,
+		"explanation": "LRN is soulbound (non-transferable) SEP-41 tokens minted when milestones are verified; your balance reflects verified learning and on-chain academic reputation, not freely tradable value."
+	},
+	{
+		"id": 3,
+		"question": "About how long does it usually take for a Stellar transaction to reach finality once included in a ledger?",
+		"options": [
+			"Less than one second",
+			"Roughly five seconds",
+			"Around ten minutes",
+			"Typically one hour or more"
+		],
+		"correct": 1,
+		"explanation": "Stellar closes ledgers about every five seconds, so once your operation is in a ledger, settlement is fast and predictable compared to many proof-of-work chains."
+	},
+	{
+		"id": 4,
+		"question": "What is SEP-41 in the Stellar ecosystem?",
+		"options": [
+			"A hardware wallet pairing protocol",
+			"The Soroban standard for fungible token interfaces",
+			"A specification for Stellar account recovery phrases",
+			"The naming scheme for public Horizon API endpoints"
+		],
+		"correct": 1,
+		"explanation": "SEP-41 defines a standard fungible token interface for Soroban; tokens like LearnVault’s LRN follow this pattern so wallets and dApps can interact with them consistently."
+	},
+	{
+		"id": 5,
+		"question": "What is Friendbot commonly used for on Stellar?",
+		"options": [
+			"Issuing mainnet stablecoins for merchants",
+			"Funding testnet accounts with free test lumens (XLM)",
+			"Auditing Soroban contract source code",
+			"Registering .stellar domain names on production"
+		],
+		"correct": 1,
+		"explanation": "Friendbot is a testnet faucet: you give it a new testnet address and it sends a small amount of test XLM so you can pay fees and try transactions without real money."
+	}
+]

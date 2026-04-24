@@ -1,7 +1,19 @@
 # LearnVault — Official Documentation
 
+<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
+
+[![All Contributors](https://img.shields.io/badge/all_contributors-1-orange.svg?style=flat-square)](#contributors-)
+
+<!-- ALL-CONTRIBUTORS-BADGE:END -->
+
 [![Contracts CI](https://github.com/robertocarlous/learnvault/actions/workflows/contracts-ci.yml/badge.svg)](https://github.com/robertocarlous/learnvault/actions/workflows/contracts-ci.yml)
 [![Frontend CI](https://github.com/bakeronchain/learnvault/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/bakeronchain/learnvault/actions/workflows/frontend-ci.yml)
+[![Build](https://github.com/bakeronchain/learnvault/actions/workflows/build.yml/badge.svg)](https://github.com/bakeronchain/learnvault/actions/workflows/build.yml)
+[![Frontend Coverage](https://codecov.io/gh/bakeronchain/learnvault/branch/main/graph/badge.svg?flag=frontend)](https://codecov.io/gh/bakeronchain/learnvault)
+[![Backend Coverage](https://codecov.io/gh/bakeronchain/learnvault/branch/main/graph/badge.svg?flag=backend)](https://codecov.io/gh/bakeronchain/learnvault)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Built on Stellar](https://img.shields.io/badge/Built%20on-Stellar-purple)](https://stellar.org)
+[![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](https://github.com/bakeronchain/learnvault/issues)
 
 > **Learning is the proof of work. The community is the bank.**
 
@@ -21,8 +33,11 @@
 10. [Tech Stack](#tech-stack)
 11. [Roadmap](#roadmap)
 12. [Whitepaper Generation](#whitepaper-generation)
-13. [Contributing](#contributing)
-14. [Contact](#contact)
+13. [Setup](#setup)
+14. [Running Tests](#running-tests)
+15. [Contributing](#contributing)
+16. [Resources](#resources)
+17. [Contact](#contact)
 
 ---
 
@@ -98,7 +113,7 @@ stablecoins — real, stable value delivered directly to their wallets.
 │   │ Courses  │    │ LRN      │    │ Scholarship│    │
 │   │ Quizzes  │    │ Tokens   │    │ Proposals │     │
 │   │ Projects │    │ (Soulbound│   │ DAO Vote  │     │
-│   │          │    │ ERC20)   │    │ Escrow    │     │
+│   │          │    │ SEP-41)  │    │ Escrow    │     │
 │   └──────────┘    └──────────┘    └──────────┘     │
 │                                                     │
 │   ┌─────────────────────────────────────────┐       │
@@ -114,41 +129,91 @@ stablecoins — real, stable value delivered directly to their wallets.
 
 LearnVault is powered by six core smart contracts:
 
-### `LearnToken.sol`
+### `learn_token`
 
-A **soulbound ERC20** token that is minted to learners upon verified milestone
-completion. Non-transferable by design — it represents real effort, not
-speculation. Your LearnToken balance is your on-chain academic reputation score.
+A **soulbound SEP-41 fungible token** that is minted to learners upon verified
+milestone completion. Non-transferable by design — it represents real effort,
+not speculation. Your LearnToken balance is your on-chain academic reputation
+score.
 
-### `GovernanceToken.sol`
+### `governance_token`
 
-A **transferable ERC20** distributed to donors upon treasury contribution and
-earned by top learners at milestone thresholds. Used exclusively for DAO voting
-on scholarship proposals.
+A **transferable SEP-41 fungible token** distributed to donors upon treasury
+contribution and earned by top learners at milestone thresholds. Used
+exclusively for DAO voting on scholarship proposals.
 
-### `CourseMilestone.sol`
+### `course_milestone`
 
 Tracks learner progress per course. Each course has defined checkpoints verified
 by a trusted multi-sig validator (transitioning to oracle-based verification in
 V2). On successful verification, this contract triggers LearnToken minting.
 
-### `ScholarshipTreasury.sol`
+### `scholarship_treasury`
 
 Holds all donor funds in stablecoins (USDC). Funds can only be released upon
 successful proposal execution through the governance system. Tracks total
 contributions per donor. Transparent and auditable by anyone.
 
-### `MilestoneEscrow.sol`
+### `milestone_escrow`
 
 Manages approved scholarship disbursements in tranches. Funds are released as
 scholars hit agreed milestones. If a scholar is inactive for 30 days, unspent
 funds automatically return to the treasury.
 
-### `ScholarNFT.sol`
+### `scholar_nft`
 
-Mints a **soulbound ERC721 credential** to scholars who complete their funded
-programs. Non-transferable, tamper-proof, and permanently verifiable on-chain.
-Shareable with employers, DAOs, and the broader ecosystem.
+Mints a **soulbound SEP-41 NFT credential** to scholars who complete their
+funded programs. Non-transferable, tamper-proof, and permanently verifiable
+on-chain. Shareable with employers, DAOs, and the broader ecosystem.
+
+## Contract Interaction Flow
+
+```mermaid
+sequenceDiagram
+    participant Learner
+    participant Frontend
+    participant CourseMilestone
+    participant LearnToken
+    participant Donor
+    participant ScholarshipTreasury
+    participant GovernanceToken
+    participant GOV_Holder
+    participant MilestoneEscrow
+    participant Scholar
+    participant ScholarNFT
+    participant Treasury
+
+    Note over Learner, ScholarNFT: Learning & Reputation Building
+    Learner->>Frontend: Complete milestone
+    Frontend->>CourseMilestone: complete_milestone()
+    CourseMilestone->>LearnToken: mint(learner, lrn)
+    LearnToken-->>Learner: LearnTokens earned
+
+    Note over Donor, GovernanceToken: Treasury Funding
+    Donor->>Frontend: Deposit USDC
+    Frontend->>ScholarshipTreasury: deposit(usdc)
+    ScholarshipTreasury->>GovernanceToken: mint(donor, gov)
+    GovernanceToken-->>Donor: GovernanceTokens earned
+
+    Note over Learner, MilestoneEscrow: Scholarship Process
+    Learner->>Frontend: Submit scholarship proposal
+    Frontend->>ScholarshipTreasury: submit_proposal()
+
+    GOV_Holder->>Frontend: Vote on proposal
+    Frontend->>ScholarshipTreasury: vote()
+
+    ScholarshipTreasury->>MilestoneEscrow: create() [on approval]
+
+    Note over MilestoneEscrow, Treasury: Milestone Completion
+    MilestoneEscrow->>Scholar: transfer(usdc) [on milestone release]
+
+    Note over MilestoneEscrow, Treasury: Timeout Handling
+    MilestoneEscrow->>Treasury: transfer(usdc) [on timeout]
+
+    Note over Scholar, ScholarNFT: Program Completion
+    Scholar->>ScholarNFT: mint() [on program completion]
+    ScholarNFT-->>Scholar: ScholarNFT credential earned
+```
 
 ---
 
@@ -185,7 +250,7 @@ Shareable with employers, DAOs, and the broader ecosystem.
 
 LearnVault's flywheel is designed so that effort compounds over time:
 
-```
+````
 Complete Lesson
        │
        ▼
@@ -197,21 +262,22 @@ Complete Full Track ──▶ Convert LRN to Governance Tokens
        ▼
 Submit Scholarship Proposal
        │
-       ▼
-Community Votes YES
-       │
-       ▼
-Milestone-Based Funding Released
-       │
-       ▼
-Complete Funded Program
-       │
-       ▼
-Mint ScholarNFT Credential
-       │
-       ▼
-Higher Reputation ──▶ Larger Future Proposals ──▶ Loop Continues
-```
+      3. **Friendbot Funding (Testnet Only):**
+   ```bash
+   # Fund your deployer address for testing
+   stellar friendbot fund <NETWORK> <ADDRESS>
+
+   # Example:
+   stellar friendbot fund testnet GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+````
+
+**Deployer Address:**
+
+- For testing on Stellar Testnet, use the friendbot-funded deployer:
+  `GDU2P3YJ5K7E6ZK3Q2K7E6ZK3Q2K7E6ZK3Q2K7E6ZK3` │ ▼ Mint ScholarNFT Credential │
+  ▼ Higher Reputation ──▶ Larger Future Proposals ──▶ Loop Continues
+
+````
 
 The more you learn, the more power and opportunity you unlock. Wealth is not the
 barrier — effort is the currency.
@@ -246,7 +312,7 @@ resubmitted after 30 days.
 
 ### Disbursement
 
-Approved funds are locked in `MilestoneEscrow.sol` and released in tranches as
+Approved funds are locked in `milestone_escrow` and released in tranches as
 the scholar completes agreed milestones. Progress is reported by the scholar and
 confirmed by a community-elected validator committee (transitioning to oracle
 verification in V2).
@@ -279,10 +345,10 @@ transfers to token holders.
 
 | Layer              | Technology                                     |
 | ------------------ | ---------------------------------------------- |
-| Blockchain         | Stellar (primary), EVM-compatible L2 (planned) |
-| Smart Contracts    | Solidity / Stellar Soroban                     |
-| Frontend           | Next.js, TypeScript, TailwindCSS               |
-| Wallet Integration | Freighter (Stellar), MetaMask                  |
+| Blockchain         | Stellar                                        |
+| Smart Contracts    | Rust (Stellar Soroban)                         |
+| Frontend           | React 19, TypeScript, Stellar Design System    |
+| Wallet Integration | Freighter (Stellar)                            |
 | Storage            | IPFS (course content + proposal docs)          |
 | Stablecoin         | USDC                                           |
 | Backend            | Node.js, PostgreSQL                            |
@@ -320,19 +386,99 @@ transfers to token holders.
 
 ## Whitepaper Generation
 
-The LearnVault Technical Whitepaper is authored in Markdown and exported to PDF. To ensure Mermaid diagrams render correctly in the PDF export, follow this two-step build process:
+The LearnVault Technical Whitepaper is authored in Markdown and exported to PDF.
+To ensure Mermaid diagrams render correctly in the PDF export, follow this
+two-step build process:
 
-1. **Compile Diagrams to Images:**
-   Generate static PNGs from the Mermaid source files using the Mermaid CLI:
+1. **Compile Diagrams to Images:** Generate static PNGs from the Mermaid source
+   files using the Mermaid CLI:
+
    ```bash
    npx @mermaid-js/mermaid-cli -i docs/architecture.mmd -o docs/architecture.png
-   ```
+````
 
-2. **Generate the PDF:**
-   Once the diagrams are compiled and embedded as standard markdown image links, generate the final PDF using `md-to-pdf`:
+2. **Generate the PDF:** Once the diagrams are compiled and embedded as standard
+   markdown image links, generate the final PDF using `md-to-pdf`:
    ```bash
    npx md-to-pdf docs/whitepaper.md
    ```
+
+````
+
+---
+
+## Setup
+
+1. Install dependencies for the frontend and server:
+
+   ```bash
+   npm install
+   cd server && npm install
+   ```
+
+2. Copy the environment templates before starting local services:
+
+   ```bash
+   cp .env.example .env
+   cp server/.env.example server/.env
+   ```
+
+3. Fill in deployed contract IDs, Pinata credentials, and any server secrets you
+   need for your local workflow.
+
+---
+
+## Running Tests
+
+### Prerequisites
+
+1. **Install Rust and Stellar CLI:**
+   ```bash
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   npm install -g @stellar/stellar-cli
+````
+
+2. **Install Visual Studio Build Tools (Windows):**
+
+   ```bash
+   # Download Visual Studio Build Tools installer
+   # Visit: https://visualstudio.microsoft.com/downloads/
+   # Or use winget: wing install VisualStudio.2022.BuildTools
+   ```
+
+3. **Configure Environment:**
+
+   ```bash
+   # Copy the root environment template
+   cp .env.example .env
+
+   # Copy the server environment template
+   cp server/.env.example server/.env
+
+   # Edit .env with your configuration
+   # Set STELLAR_SCAFFOLD_ENV=testnet for testnet deployment
+   ```
+
+### Run Tests
+
+```bash
+npm test                 # runs all Soroban contract tests
+npm run test:contracts   # alias for the above
+npm run test:watch       # re-runs tests on file changes
+```
+
+### Lint and Format Contracts
+
+Before submitting a PR, ensure Rust contracts pass formatting and lint checks:
+
+```bash
+cargo fmt --all               # auto-format all contracts
+cargo fmt --all -- --check    # check formatting without modifying files (used in CI)
+cargo clippy --workspace -- -D warnings  # lint all contracts (warnings are errors)
+```
+
+Formatting rules are defined in `.rustfmt.toml` at the repo root
+(`edition = "2024"`, `max_width = 100`).
 
 ---
 
@@ -352,6 +498,16 @@ To contribute:
 
 All contributors are recognized on-chain and in our official documentation.
 
+Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing. We
+expect all participants to uphold these standards.
+
+---
+
+## Resources
+
+- [Glossary](docs/glossary.md) — Key terms, tokens, and contracts explained in
+  plain English
+
 ---
 
 ## Contact
@@ -367,4 +523,41 @@ LearnVault, please reach out through our official channels.
 ---
 
 _LearnVault — Built for African learners. Powered by community. Governed by
-effort._
+effort._ \n## Architecture Decisions\n\n- [ADR-001.md](docs/adr/ADR-001.md)\n-
+[ADR-002.md](docs/adr/ADR-002.md)\n- [ADR-003.md](docs/adr/ADR-003.md)\n-
+[ADR-004.md](docs/adr/ADR-004.md)\n- [ADR-005.md](docs/adr/ADR-005.md)\n-
+[ADR-006.md](docs/adr/ADR-006.md)\n- [ADR-007.md](docs/adr/ADR-007.md)\n
+
+## Contributors ✨
+
+Thanks goes to these wonderful people
+([emoji key](https://allcontributors.org/docs/en/emoji-key)):
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/bakeronchain"><img src="https://avatars.githubusercontent.com/u/242071730?v=4?s=100" width="100px;" alt="bakeronchain"/><br /><sub><b>bakeronchain</b></sub></a><br /><a href="https://github.com/bakeronchain/learnvault/commits?author=bakeronchain" title="Code">💻</a> <a href="https://github.com/bakeronchain/learnvault/commits?author=bakeronchain" title="Documentation">📖</a></td>
+    </tr>
+  </tbody>
+  <tfoot>
+    <tr>
+      <td align="center" size="13px" colspan="7">
+        <img src="https://raw.githubusercontent.com/all-contributors/all-contributors-cli/1b8533af435da9854653492b1327a23a4dbd0a10/assets/logo-small.svg">
+          <a href="https://all-contributors.js.org/docs/en/bot/usage">Add your contributions</a>
+        </img>
+      </td>
+    </tr>
+  </tfoot>
+</table>
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+
+This project follows the
+[all-contributors](https://github.com/all-contributors/all-contributors)
+specification. Contributions of any kind welcome!

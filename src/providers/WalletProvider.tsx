@@ -8,9 +8,19 @@ import {
 	useTransition,
 } from "react"
 import storage from "../util/storage"
-import { wallet, fetchBalances, type MappedBalances } from "../util/wallet"
+import { type MappedBalances } from "../util/wallet"
 
-const signTransaction = wallet.signTransaction.bind(wallet)
+type WalletSignTransaction = (
+	xdr: string,
+	opts?: { networkPassphrase?: string; address?: string; path?: string },
+) => Promise<{ signedTxXdr: string; signerAddress?: string }>
+
+const loadWalletModule = () => import("../util/wallet")
+
+const signTransaction: WalletSignTransaction = async (xdr, opts) => {
+	const { wallet } = await loadWalletModule()
+	return wallet.signTransaction(xdr, opts)
+}
 
 /**
  * A good-enough implementation of deepEqual.
@@ -38,9 +48,10 @@ export interface WalletContextType {
 	address?: string
 	balances: MappedBalances
 	isPending: boolean
+	isReconnecting: boolean
 	network?: string
 	networkPassphrase?: string
-	signTransaction: typeof wallet.signTransaction
+	signTransaction: WalletSignTransaction
 	updateBalances: () => Promise<void>
 }
 
@@ -48,6 +59,7 @@ const POLL_INTERVAL = 1000
 
 export const WalletContext = createContext<WalletContextType>({
 	isPending: true,
+	isReconnecting: true,
 	balances: {},
 	updateBalances: async () => {},
 	signTransaction,
@@ -58,6 +70,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 	const [address, setAddress] = useState<string>()
 	const [network, setNetwork] = useState<string>()
 	const [networkPassphrase, setNetworkPassphrase] = useState<string>()
+	const [isReconnecting, setIsReconnecting] = useState(true)
 	const [isPending, startTransition] = useTransition()
 	const popupLock = useRef(false)
 
@@ -70,6 +83,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 		storage.setItem("walletAddress", "")
 		storage.setItem("walletNetwork", "")
 		storage.setItem("networkPassphrase", "")
+		storage.setItem("walletType", "")
 	}
 
 	const updateBalances = useCallback(async () => {
@@ -78,6 +92,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 			return
 		}
 
+		const { fetchBalances } = await loadWalletModule()
 		const newBalances = await fetchBalances(address)
 		setBalances((prev) => {
 			if (deepEqual(newBalances, prev)) return prev
@@ -117,6 +132,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 			// network from their wallet. Note: `getAddress` MAY open their wallet
 			// extension, depending on which wallet they select!
 			try {
+				const { wallet } = await loadWalletModule()
 				popupLock.current = true
 				wallet.setWallet(walletId)
 				if (walletId !== "freighter" && walletAddr !== null) return
@@ -140,7 +156,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 				// If `getNetwork` or `getAddress` throw errors... sign the user out???
 				nullify()
 				// then log the error (instead of throwing) so we have visibility
-				// into the error while working on Scaffold Stellar but we do not
+				// into the error while working on LearnVault but we do not
 				// crash the app process
 				console.error(e)
 			} finally {
@@ -167,6 +183,10 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 		// Get the wallet address when the component is mounted for the first time
 		startTransition(async () => {
 			await updateCurrentWalletState()
+			// Mark reconnection as complete after initial state is loaded
+			if (isMounted) {
+				setIsReconnecting(false)
+			}
 			// Start polling after initial state is loaded
 
 			if (isMounted) {
@@ -189,9 +209,18 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 			balances,
 			updateBalances,
 			isPending,
+			isReconnecting,
 			signTransaction,
 		}),
-		[address, network, networkPassphrase, balances, updateBalances, isPending],
+		[
+			address,
+			network,
+			networkPassphrase,
+			balances,
+			updateBalances,
+			isPending,
+			isReconnecting,
+		],
 	)
 
 	return <WalletContext value={contextValue}>{children}</WalletContext>

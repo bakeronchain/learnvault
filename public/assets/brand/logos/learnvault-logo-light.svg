@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 64" fill="none">
+  <defs>
+    <linearGradient id="iconGradL" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0099cc"/>
+      <stop offset="50%" stop-color="#2a5fa8"/>
+      <stop offset="100%" stop-color="#00b85c"/>
+    </linearGradient>
+    <linearGradient id="textGradL" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0099cc"/>
+      <stop offset="50%" stop-color="#2a5fa8"/>
+      <stop offset="100%" stop-color="#00b85c"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Icon: vault shield with graduation cap -->
+  <g transform="translate(0, 4)">
+    <path d="M28 2 L50 10 L50 30 C50 42 40 52 28 56 C16 52 6 42 6 30 L6 10 Z"
+          fill="url(#iconGradL)" opacity="0.12" stroke="url(#iconGradL)" stroke-width="1.5"/>
+    <path d="M28 8 L44 14 L44 30 C44 39 37 47 28 50 C19 47 12 39 12 30 L12 14 Z"
+          fill="none" stroke="url(#iconGradL)" stroke-width="0.75" opacity="0.4"/>
+    <rect x="21" y="26" width="14" height="9" rx="1.5" fill="url(#iconGradL)" opacity="0.9"/>
+    <polygon points="28,18 38,23 28,28 18,23" fill="url(#iconGradL)"/>
+    <line x1="38" y1="23" x2="38" y2="30" stroke="url(#iconGradL)" stroke-width="1.5" stroke-linecap="round"/>
+    <circle cx="38" cy="31" r="1.5" fill="#00b85c"/>
+    <text x="28" y="33" text-anchor="middle" font-family="Inter, sans-serif" font-size="5" font-weight="700" fill="#ffffff" opacity="0.9">LRN</text>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="64" y="40" font-family="Inter, system-ui, sans-serif" font-size="26" font-weight="800" letter-spacing="-0.5" fill="url(#textGradL)">LearnVault</text>
+
+  <!-- Tagline -->
+  <text x="65" y="54" font-family="Inter, system-ui, sans-serif" font-size="9" font-weight="400" letter-spacing="2" fill="#1a1a2e" opacity="0.5">LEARN · EARN · GET FUNDED</text>
+</svg>

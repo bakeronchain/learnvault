@@ -1,23 +1,31 @@
-import { Router } from "express";
+import { Router } from "express"
 
-import { getEvents } from "../controllers/events.controller";
+import { getEvents } from "../controllers/events.controller"
 
-export const eventsRouter = Router();
+export const eventsRouter = Router()
 
 /**
  * @openapi
  * /api/events:
  *   get:
  *     tags: [Events]
- *     summary: List platform events
- *     security:
- *       - bearerAuth: []
+ *     summary: List indexed on-chain events
  *     parameters:
+ *       - in: query
+ *         name: contract
+ *         schema:
+ *           type: string
+ *         description: Contract ID filter
  *       - in: query
  *         name: type
  *         schema:
  *           type: string
- *         description: Optional event type filter
+ *         description: Event topic (LearnToken::Mint etc)
+ *       - in: query
+ *         name: address
+ *         schema:
+ *           type: string
+ *         description: Address in event data
  *       - in: query
  *         name: limit
  *         schema:
@@ -25,10 +33,9 @@ export const eventsRouter = Router();
  *           minimum: 1
  *           maximum: 100
  *           default: 20
- *         description: Max number of events to return
  *     responses:
  *       200:
- *         description: Events fetched successfully
+ *         description: Success
  *         content:
  *           application/json:
  *             schema:
@@ -37,10 +44,15 @@ export const eventsRouter = Router();
  *                 data:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/Event'
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer }
+ *                       contract: { type: string }
+ *                       event_type: { type: string }
+ *                       data: { type: object }
+ *                       ledger_sequence: { type: string }
+ *                       created_at: { type: string, format: date-time }
  *       500:
- *         $ref: '#/components/responses/InternalServerError'
+ *         description: Internal error
  */
-eventsRouter.get("/events", getEvents);
+eventsRouter.get("/events", getEvents)

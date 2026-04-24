@@ -1,68 +1,52 @@
-/**
- * pages/Learn.tsx
- *
- * Issue #44 — Add skeleton loading screens and empty state components
- * bakeronchain/learnvault
- *
- * Added: CourseCardSkeleton and NoCoursesEmptyState
- */
+import { Button, Card, Text } from "@stellar/design-system"
 
-import React, { useState, useEffect } from "react"
-import { useTranslation } from "react-i18next"
-import {
-	CourseCardSkeleton,
-	NoCoursesEmptyState,
-} from "../components/SkeletonLoader"
+import { MilestoneTracker } from "../components/MilestoneTracker"
+import { useCourse } from "../hooks/useCourse"
 
-const Learn: React.FC = () => {
-	const { t } = useTranslation()
-	const [isLoading, setIsLoading] = useState(true)
-	const [hasCourses] = useState(false)
+export default function Learn() {
+	const { enroll } = useCourse()
 
-	// Issue #44 — Simulate async data fetch for skeleton demo
-	useEffect(() => {
-		const timer = setTimeout(() => setIsLoading(false), 2000)
-		return () => clearTimeout(timer)
-	}, [])
+	const courseId = "stellar-basics"
+	const milestones = [
+		{ id: 1, label: "Complete Lesson 1", lrnReward: 10 },
+		{ id: 2, label: "Pass Quiz 1", lrnReward: 20 },
+		{ id: 3, label: "Build your first contract", lrnReward: 50 },
+	]
 
 	return (
-		<div className="p-12 max-w-5xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
-			<header className="mb-16 text-center">
-				<h1 className="text-6xl font-black mb-4 tracking-tighter text-gradient">
-					{t("pages.learn.title")}
-				</h1>
-				<p className="text-white/40 text-lg font-medium">
-					{t("pages.learn.desc")}
-				</p>
-			</header>
+		<div>
+			<Text as="h1" size="lg">
+				Learn
+			</Text>
 
-			{isLoading ? (
-				// Issue #44 — Course card skeletons
-				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-					{[1, 2, 3].map((i) => (
-						<CourseCardSkeleton key={i} />
-					))}
+			<Card>
+				<Text as="h2" size="md">
+					Catalog
+				</Text>
+				<Text as="p" size="sm">
+					Browse catalog → enroll → complete lesson → verify LRN increases.
+				</Text>
+				<div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+					<Text as="div" size="sm">
+						<strong>Stellar Basics</strong> ({courseId})
+					</Text>
+					<Button
+						size="sm"
+						variant="primary"
+						data-testid="enroll-course"
+						onClick={() => void enroll(courseId)}
+					>
+						Enroll
+					</Button>
 				</div>
-			) : !hasCourses ? (
-				// Issue #44 — No courses empty state
-				<NoCoursesEmptyState />
-			) : (
-				<div className="glass-card p-20 rounded-[4rem] text-center border border-white/5">
-					<div className="text-6xl mb-8 animate-bounce">⚒️</div>
-					<h2 className="text-3xl font-black mb-4">Curriculum Coming Soon</h2>
-					<p className="text-white/40 max-w-md mx-auto mb-10 leading-relaxed font-medium">
-						The LearnVault DAO is currently finalizing the "Soroban 101" and
-						"DeFi Architecture" masterclasses. Stay tuned for the genesis drop.
-					</p>
-					<div className="flex justify-center gap-4">
-						<span className="w-2 h-2 bg-brand-cyan rounded-full animate-pulse" />
-						<span className="w-2 h-2 bg-brand-cyan rounded-full animate-pulse delay-150" />
-						<span className="w-2 h-2 bg-brand-cyan rounded-full animate-pulse delay-300" />
-					</div>
-				</div>
-			)}
+			</Card>
+
+			<Card>
+				<Text as="h2" size="md">
+					Lessons
+				</Text>
+				<MilestoneTracker courseId={courseId} milestones={milestones} />
+			</Card>
 		</div>
 	)
 }
-
-export default Learn

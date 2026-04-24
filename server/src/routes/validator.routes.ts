@@ -1,8 +1,9 @@
-import { Router } from "express";
+import { Router } from "express"
+import { validateMilestone } from "../controllers/validator.controller"
+import * as schemas from "../lib/zod-schemas"
+import { validate } from "../middleware/validation.middleware"
 
-import { validateMilestone } from "../controllers/validator.controller";
-
-export const validatorRouter = Router();
+export const validatorRouter = Router()
 
 /**
  * @openapi
@@ -35,4 +36,10 @@ export const validatorRouter = Router();
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-validatorRouter.post("/validator/validate", validateMilestone);
+validatorRouter.post(
+	"/validator/validate",
+	validate({
+		body: schemas.validateMilestoneSchema,
+	}),
+	validateMilestone,
+)

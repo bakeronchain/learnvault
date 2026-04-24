@@ -5,8 +5,71 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<script type="module" src="/src/theme-init.ts"></script>
 
+		<script>
+			;(function () {
+				var storageKey = "learnvault:theme"
+				var root = document.documentElement
+
+				var applyTheme = function (theme) {
+					root.classList.remove(
+						"sds-theme-light",
+						"sds-theme-dark",
+						"light",
+						"dark",
+					)
+					if (theme === "dark") {
+						root.classList.add("sds-theme-dark", "dark")
+					} else {
+						root.classList.add("sds-theme-light", "light")
+					}
+					root.setAttribute("data-theme", theme)
+					root.setAttribute("data-sds-theme", "sds-theme-" + theme)
+					root.style.colorScheme = theme
+				}
+
+				try {
+					var raw = localStorage.getItem(storageKey)
+					var stored = raw ? JSON.parse(raw) : null
+					// Default to dark — the app is designed dark-first
+					applyTheme(stored === "light" ? "light" : "dark")
+				} catch (e) {
+					applyTheme("dark")
+				}
+			})()
+		</script>
+
 		<link rel="icon" type="image/x-icon" href="/favicon.ico" />
-		<title>Scaffold Stellar Starter App</title>
+		<title>LearnVault — Education Protocol for the Stellar Network</title>
+		<meta
+			name="description"
+			content="LearnVault is a decentralized education protocol built on Stellar. Earn ScholarNFTs, complete milestones, and participate in a governed learning ecosystem with Soroban smart contracts."
+		/>
+
+		<!-- Open Graph / Facebook -->
+		<meta property="og:type" content="website" />
+		<meta property="og:url" content="https://learnvault.org/" />
+		<meta
+			property="og:title"
+			content="LearnVault — Education Protocol for the Stellar Network"
+		/>
+		<meta
+			property="og:description"
+			content="Decentralized education, verifiable credentials, and on-chain learning on Stellar."
+		/>
+		<meta property="og:image" content="/assets/brand/og/og-homepage.svg" />
+
+		<!-- Twitter -->
+		<meta property="twitter:card" content="summary_large_image" />
+		<meta property="twitter:url" content="https://learnvault.org/" />
+		<meta
+			property="twitter:title"
+			content="LearnVault — Education Protocol for the Stellar Network"
+		/>
+		<meta
+			property="twitter:description"
+			content="Decentralized education, verifiable credentials, and on-chain learning on Stellar."
+		/>
+		<meta property="twitter:image" content="/assets/brand/og/og-homepage.svg" />
 
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

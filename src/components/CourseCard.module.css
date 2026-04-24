@@ -1,0 +1,123 @@
+/* src/components/CourseCard.module.css */
+
+.cardWrapper {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	width: 100%;
+	/* Yahan se background aur border hata diye, ab Stellar Card khud theme handle karega */
+}
+
+.coverPlaceholder {
+	height: 160px;
+	width: 100%;
+	background: linear-gradient(135deg, #00c6d8 0%, #3b82f6 100%);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: white;
+	font-size: 2.5rem;
+	font-weight: 800;
+	letter-spacing: 2px;
+}
+
+.coverImage {
+	height: 160px;
+	width: 100%;
+	object-fit: cover;
+}
+
+.cardBody {
+	padding: 24px;
+	display: flex;
+	flex-direction: column;
+	flex-grow: 1;
+}
+
+.badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	font-weight: 700;
+	padding: 4px 10px;
+	border-radius: 20px;
+	margin-bottom: 16px;
+	width: max-content;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+/* Difficulty Colors - Adjusted for both themes */
+.badgeBeginner {
+	background: rgba(34, 197, 94, 0.15);
+	color: #16a34a;
+}
+.badgeIntermediate {
+	background: rgba(234, 179, 8, 0.15);
+	color: #ca8a04;
+}
+.badgeAdvanced {
+	background: rgba(239, 68, 68, 0.15);
+	color: #dc2626;
+}
+
+.title {
+	font-size: 20px;
+	font-weight: 700;
+	margin: 0 0 8px 0;
+	line-height: 1.3;
+	color: inherit; /* Theme ke hisaab se auto text color */
+}
+
+.description {
+	font-size: 14px;
+	color: inherit;
+	opacity: 0.7; /* Secondary text dikhane ke liye opacity use kiya, color fix karne ke bajaye */
+	margin: 0 0 24px 0;
+	line-height: 1.5;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	min-height: 42px;
+}
+
+.footer {
+	margin-top: auto;
+	padding-top: 16px;
+	border-top: 1px solid rgba(156, 163, 175, 0.3); /* Transparent border dono themes pe sahi lagega */
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 24px;
+}
+
+.metrics {
+	font-size: 13px;
+	font-weight: 500;
+	color: inherit;
+	opacity: 0.7;
+}
+
+.rewardBadge {
+	font-size: 13px;
+	font-weight: 700;
+	color: #3b82f6;
+	background: rgba(59, 130, 246, 0.1);
+	padding: 4px 8px;
+	border-radius: 6px;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.buttonContainer {
+	display: flex;
+	width: 100%;
+}
+
+.buttonContainer > * {
+	width: 100%;
+	justify-content: center;
+}

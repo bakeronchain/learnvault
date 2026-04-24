@@ -1,0 +1,321 @@
+.Page {
+	max-width: 1200px;
+	margin: 0 auto;
+	display: flex;
+	flex-direction: column;
+	gap: 1.5rem;
+}
+
+.Hero {
+	padding: 2rem;
+	border: 1px solid var(--app-color-border);
+	border-radius: 1.5rem;
+	background:
+		radial-gradient(
+			circle at top right,
+			rgba(121, 198, 255, 0.15),
+			transparent 34%
+		),
+		linear-gradient(135deg, rgba(76, 110, 245, 0.08), rgba(46, 204, 113, 0.08));
+	display: flex;
+	justify-content: space-between;
+	gap: 2rem;
+	align-items: flex-start;
+}
+
+.Eyebrow {
+	margin: 0 0 0.75rem;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	font-size: 0.8rem;
+	color: var(--app-color-muted);
+}
+
+.Hero h1 {
+	margin: 0;
+	font-size: clamp(2rem, 4vw, 3rem);
+}
+
+.HeroText {
+	max-width: 52rem;
+	margin: 1rem 0 0;
+	font-size: 1.05rem;
+	line-height: 1.6;
+}
+
+.HeroMeta {
+	display: grid;
+	gap: 0.75rem;
+	min-width: 280px;
+}
+
+.HeroMeta span {
+	padding: 0.85rem 1rem;
+	border-radius: 1rem;
+	background: rgba(255, 255, 255, 0.7);
+	border: 1px solid rgba(255, 255, 255, 0.6);
+	font-weight: 600;
+}
+
+.Layout {
+	display: grid;
+	grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+	gap: 1.5rem;
+	align-items: start;
+}
+
+.MainColumn {
+	display: flex;
+	flex-direction: column;
+	gap: 1.5rem;
+}
+
+.StepRail {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.StepRow {
+	display: grid;
+	grid-template-columns: 2.5rem minmax(0, 1fr);
+	gap: 1rem;
+	align-items: start;
+	padding: 0.9rem;
+	border-radius: 1rem;
+	border: 1px solid transparent;
+}
+
+.StepRow[data-state="active"] {
+	background: rgba(76, 110, 245, 0.08);
+	border-color: rgba(76, 110, 245, 0.25);
+}
+
+.StepRow[data-state="done"] {
+	background: rgba(46, 204, 113, 0.08);
+}
+
+.StepIndex {
+	width: 2.5rem;
+	height: 2.5rem;
+	border-radius: 999px;
+	display: grid;
+	place-items: center;
+	font-weight: 700;
+	background: var(--app-color-foreground);
+	color: var(--app-color-background);
+}
+
+.StepLabel {
+	margin: 0;
+	font-weight: 700;
+}
+
+.StepCaption {
+	margin: 0.25rem 0 0;
+	color: var(--app-color-muted);
+	line-height: 1.4;
+}
+
+.StepPanel {
+	display: flex;
+	flex-direction: column;
+	gap: 1.25rem;
+}
+
+.StepPanel h2 {
+	margin: 0;
+	font-size: 1.6rem;
+}
+
+.StepDescription {
+	margin: 0;
+	color: var(--app-color-muted);
+	line-height: 1.6;
+}
+
+.StatGrid,
+.ReviewGrid,
+.FormGrid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 1rem;
+}
+
+.StatCard,
+.ReviewBlock,
+.MilestoneCard {
+	padding: 1rem;
+	border-radius: 1rem;
+	border: 1px solid var(--app-color-border);
+	background: var(--app-surface-highlight);
+}
+
+.StatCard strong,
+.ReviewBlock strong {
+	font-size: 1.05rem;
+}
+
+.StatLabel,
+.ReviewBlock span,
+.Field span {
+	display: block;
+	margin-bottom: 0.45rem;
+	font-size: 0.9rem;
+	font-weight: 700;
+}
+
+.Field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.45rem;
+}
+
+.Field input,
+.Field textarea {
+	width: 100%;
+	box-sizing: border-box;
+	padding: 0.9rem 1rem;
+	border-radius: 0.9rem;
+	border: 1px solid var(--app-color-border);
+	background: var(--app-color-background);
+	color: inherit;
+	font: inherit;
+}
+
+.Field input:focus-visible,
+.Field textarea:focus-visible {
+	border-color: rgba(76, 110, 245, 0.45);
+}
+
+.Field input[aria-invalid="true"],
+.Field textarea[aria-invalid="true"] {
+	border-color: var(--app-color-danger);
+}
+
+.Field textarea {
+	resize: vertical;
+	min-height: 120px;
+}
+
+.FullWidth {
+	grid-column: 1 / -1;
+}
+
+.MilestoneStack,
+.ReviewMilestones {
+	display: grid;
+	gap: 1rem;
+}
+
+.MilestoneCard {
+	display: grid;
+	gap: 1rem;
+}
+
+.MilestoneCard legend {
+	padding: 0 0.35rem;
+	font-size: 1.1rem;
+	font-weight: 700;
+}
+
+.ReviewMilestone {
+	padding: 0.85rem 1rem;
+	border-radius: 0.85rem;
+	background: rgba(76, 110, 245, 0.06);
+}
+
+.ReviewMilestone p,
+.ReviewBlock p {
+	margin: 0.35rem 0 0;
+	color: var(--app-color-muted);
+	line-height: 1.5;
+}
+
+.CheckboxRow {
+	display: flex;
+	gap: 0.75rem;
+	align-items: flex-start;
+	padding: 1rem;
+	border-radius: 1rem;
+	border: 1px solid var(--app-color-border);
+	cursor: pointer;
+}
+
+.CheckboxRow input {
+	margin-top: 0.25rem;
+}
+
+.CheckboxText {
+	line-height: 1.5;
+}
+
+.ActionRow {
+	display: flex;
+	justify-content: space-between;
+	gap: 1rem;
+	flex-wrap: wrap;
+	margin-top: 1rem;
+}
+
+.ActionRow a {
+	display: inline-flex;
+	text-decoration: none;
+}
+
+.HelperText {
+	margin: 0;
+	color: var(--app-color-muted);
+}
+
+.ErrorText {
+	margin: 0;
+	color: var(--app-color-danger);
+	font-size: 0.95rem;
+}
+
+.SuccessText {
+	color: var(--app-color-success);
+}
+
+.WarningText {
+	color: var(--sds-clr-orange-11);
+}
+
+@media (max-width: 960px) {
+	.Hero {
+		flex-direction: column;
+	}
+
+	.Layout {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (max-width: 720px) {
+	.Page {
+		gap: 1rem;
+	}
+
+	.Hero,
+	:global(.Card) {
+		padding: 1.25rem;
+	}
+
+	.StatGrid,
+	.ReviewGrid,
+	.FormGrid {
+		grid-template-columns: 1fr;
+	}
+
+	.ActionRow {
+		flex-direction: column-reverse;
+	}
+
+	.ActionRow :global(.Button) {
+		width: 100%;
+	}
+}

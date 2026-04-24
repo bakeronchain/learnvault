@@ -11,6 +11,7 @@
 		"leaderboard": "Leaderboard",
 		"profile": "My Profile",
 		"courses": "Courses",
+		"treasury": "Treasury",
 		"discord": "Discord",
 		"twitter": "Twitter",
 		"docs": "Docs"
@@ -38,7 +39,7 @@
 			"title": "Sample Contracts",
 			"guess": "Guess The Number:",
 			"guessDesc1": "Interact with the sample contract from the ",
-			"guessLink": "Scaffold Tutorial",
+			"guessLink": "LearnVault Tutorial",
 			"guessDesc2": " using an automatically generated contract client.",
 			"other": "Or take a look at other sample contracts to get you started:",
 			"oz": "OpenZeppelin sample contracts",
@@ -47,7 +48,7 @@
 		"startBuilding": {
 			"title": "Start Building",
 			"step1": "Add your contract under ",
-			"step2": "Contracts are built by Scaffold when you run ",
+			"step2": "Contracts are built by LearnVault when you run ",
 			"step3": "Changes are rebuilt automatically by ",
 			"step4": "Interact with your contract immediately in the Contract Explorer",
 			"watch": "Watch the full process in our ",
@@ -77,6 +78,18 @@
 		"networkConnect": "Connect your wallet using this network.",
 		"networkMismatch": "Wallet is on {{wallet}}, connect to {{app}} instead."
 	},
+	"network": {
+		"testnetWarning": "You are on Stellar Testnet — tokens have no real value",
+		"futurenetWarning": "You are on Stellar Futurenet — experimental network for testing",
+		"localWarning": "You are on Local Network — for development only"
+	},
+	"usdc": {
+		"getTestUSDC": "Get Test USDC",
+		"minting": "Minting...",
+		"mintSuccess": "Successfully minted {{amount}} USDC to {{address}}...",
+		"mintError": "Error minting USDC: {{error}}",
+		"tooltip": "Get {{amount}} test USDC tokens for testing donations and treasury operations"
+	},
 	"wallet": {
 		"loading": "Loading...",
 		"connect": "Connect Wallet",
@@ -93,11 +106,29 @@
 		},
 		"dao": {
 			"title": "DAO",
-			"desc": "This is the DAO page."
+			"desc": "This is the DAO page.",
+			"lastUpdated": "Last updated: {{time}}"
 		},
 		"leaderboard": {
 			"title": "Leaderboard",
-			"desc": "This is the Leaderboard page."
+			"desc": "Top learners ranked by LRN token balance. Earn your place.",
+			"rank": "Rank",
+			"learner": "Learner",
+			"lrnBalance": "LRN Balance",
+			"courses": "Courses",
+			"joined": "Joined",
+			"searchPlaceholder": "Search by wallet address...",
+			"filterAll": "All Time",
+			"filterMonth": "This Month",
+			"filterWeek": "This Week",
+			"myRank": "My Rank",
+			"loadMore": "Load More",
+			"prev": "Previous",
+			"next": "Next",
+			"noResults": "No learners found matching your search.",
+			"connectPrompt": "Connect your wallet to see your rank.",
+			"notRanked": "Not ranked yet",
+			"page": "Page {{current}} of {{total}}"
 		},
 		"profile": {
 			"title": "My Profile",

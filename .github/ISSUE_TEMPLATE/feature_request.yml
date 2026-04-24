@@ -24,6 +24,7 @@ body:
     id: alternatives
     attributes:
       label: Alternatives considered
-      description: What alternatives did you evaluate and why were they insufficient?
+      description:
+        What alternatives did you evaluate and why were they insufficient?
     validations:
       required: false

@@ -44,7 +44,7 @@ const loadGuessClient = async (): Promise<GuessClient | null> => {
 }
 
 const missingClientMessage =
-	"Guess The Number bindings are missing. Run `stellar scaffold watch --build-clients` to generate the contract client."
+	"Guess The Number bindings are missing. Run `stellar learnvault watch --build-clients` to generate the contract client."
 
 export const GuessTheNumber = () => {
 	const { address, updateBalances, signTransaction } = useWallet()

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
-import ReactMarkdown from "react-markdown"
 import CommentCard from "./CommentCard"
 
 export interface Comment {

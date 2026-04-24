@@ -1,6 +1,6 @@
 import { formatDistanceToNow } from "date-fns"
 import React, { useState } from "react"
-import ReactMarkdown from "react-markdown"
+import SafeMarkdown from "./SafeMarkdown"
 
 export interface Comment {
 	id: number
@@ -157,7 +157,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 			</header>
 
 			<div className="prose prose-invert prose-sm max-w-none text-white/60 leading-relaxed font-medium mb-8">
-				<ReactMarkdown>{comment.content}</ReactMarkdown>
+				<SafeMarkdown content={comment.content} />
 			</div>
 
 			<footer className="flex items-center gap-6">

@@ -3,41 +3,7 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-		<script>
-			;(function () {
-				var storageKey = "learnvault:theme"
-				var root = document.documentElement
-				var themeClassNames = {
-					light: "sds-theme-light",
-					dark: "sds-theme-dark",
-				}
-
-				var applyTheme = function (theme) {
-					var themeClass = themeClassNames[theme]
-					root.classList.remove(themeClassNames.light, themeClassNames.dark)
-					root.classList.add(themeClass)
-					root.setAttribute("data-theme", theme)
-					root.setAttribute("data-sds-theme", themeClass)
-					root.style.colorScheme = theme
-				}
-
-				try {
-					var rawTheme = localStorage.getItem(storageKey)
-					var parsedTheme = rawTheme ? JSON.parse(rawTheme) : null
-					var preferredTheme =
-						parsedTheme === "light" || parsedTheme === "dark"
-							? parsedTheme
-							: window.matchMedia("(prefers-color-scheme: dark)").matches
-								? "dark"
-								: "light"
-
-					applyTheme(preferredTheme)
-				} catch (error) {
-					applyTheme("light")
-				}
-			})()
-		</script>
+		<script type="module" src="/src/theme-init.ts"></script>
 
 		<link rel="icon" type="image/x-icon" href="/favicon.ico" />
 		<title>Scaffold Stellar Starter App</title>

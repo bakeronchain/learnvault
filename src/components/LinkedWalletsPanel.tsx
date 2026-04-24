@@ -1,3 +1,4 @@
+import { StellarWalletsKit } from "@creit.tech/stellar-wallets-kit"
 import { Button } from "@stellar/design-system"
 import React, { useCallback, useContext, useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -9,6 +10,7 @@ import {
 } from "../hooks/useLearnerProfile"
 import { WalletContext } from "../providers/WalletProvider"
 import { getAuthToken } from "../util/auth"
+import "../util/wallet"
 import AddressDisplay from "./AddressDisplay"
 
 type Props = {
@@ -76,9 +78,8 @@ export function LinkedWalletsPanel({ profile, refetchProfile }: Props) {
 			}
 			const { nonce } = (await nonceRes.json()) as { nonce: string }
 
-			const { wallet } = await import("../util/wallet")
 			const passphrase = walletPassphrase ?? networkPassphrase
-			const signed = await wallet.signMessage(nonce, {
+			const signed = await StellarWalletsKit.signMessage(nonce, {
 				address: connected,
 				networkPassphrase: passphrase,
 			})
@@ -189,7 +190,7 @@ export function LinkedWalletsPanel({ profile, refetchProfile }: Props) {
 						</div>
 						{!w.isPrimary ? (
 							<Button
-								size="xs"
+								size="sm"
 								variant="tertiary"
 								disabled={busy}
 								onClick={() => void setPrimary(w.address)}

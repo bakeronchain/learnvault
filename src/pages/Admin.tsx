@@ -2,11 +2,11 @@ import { useQuery } from "@tanstack/react-query"
 import React, { useEffect, useMemo, useState } from "react"
 import ReactMarkdown from "react-markdown"
 import { useNavigate } from "react-router-dom"
+import AddressDisplay from "../components/AddressDisplay"
 import TxHashLink from "../components/TxHashLink"
 import {
 	useAdminStats,
 	useAdminMilestones,
-	type BatchMilestoneResponse,
 	type MilestoneSubmission,
 } from "../hooks/useAdmin"
 import {
@@ -24,7 +24,6 @@ import {
 import { apiFetchJson } from "../lib/api"
 import { getAuthToken } from "../util/auth"
 import { shortenContractId } from "../util/contract"
-import AddressDisplay from "../components/AddressDisplay"
 
 type AdminSection =
 	| "courses"
@@ -146,7 +145,10 @@ const ConfirmDialog: React.FC<{
 			<p className="text-sm text-white/60 mb-1">
 				Learner:{" "}
 				<span className="font-mono text-white/90">
-					<AddressDisplay address={milestone.learnerAddress} showExplorerLink={false} />
+					<AddressDisplay
+						address={milestone.learnerAddress}
+						showExplorerLink={false}
+					/>
 				</span>
 			</p>
 			<p className="text-sm text-white/60 mb-4">
@@ -464,82 +466,6 @@ const MilestoneQueue: React.FC = () => {
 		}
 	}
 
-	const pendingMilestones = milestones.filter(
-		(milestone) => milestone.status === "pending",
-	)
-	const allPendingOnPageSelected =
-		pendingMilestones.length > 0 &&
-		pendingMilestones.every((milestone) =>
-			selectedMilestoneIds.includes(milestone.id),
-		)
-	const selectedCount = selectedMilestoneIds.length
-
-	const toggleMilestoneSelection = (milestoneId: string) => {
-		setSelectedMilestoneIds((prev) =>
-			prev.includes(milestoneId)
-				? prev.filter((id) => id !== milestoneId)
-				: [...prev, milestoneId],
-		)
-	}
-
-	const toggleSelectAllPending = () => {
-		setSelectedMilestoneIds((prev) => {
-			if (allPendingOnPageSelected) {
-				return prev.filter(
-					(id) => !pendingMilestones.some((milestone) => milestone.id === id),
-				)
-			}
-
-			const nextIds = new Set(prev)
-			pendingMilestones.forEach((milestone) => nextIds.add(milestone.id))
-			return Array.from(nextIds)
-		})
-	}
-
-	const runBatchAction = async (action: "approve" | "reject") => {
-		if (selectedMilestoneIds.length === 0) return
-
-		const ids = [...selectedMilestoneIds]
-		setBatchState({
-			action,
-			total: ids.length,
-			inProgress: true,
-			results: null,
-		})
-
-		try {
-			const result =
-				action === "approve"
-					? await batchApproveMilestones(ids)
-					: await batchRejectMilestones(ids)
-
-			setBatchState({
-				action,
-				total: ids.length,
-				inProgress: false,
-				results: result,
-			})
-
-			if (result?.results.length) {
-				const succeededIds = new Set(
-					result.results
-						.filter((item) => item.success)
-						.map((item) => item.reportId),
-				)
-				setSelectedMilestoneIds((prev) =>
-					prev.filter((id) => !succeededIds.has(id)),
-				)
-			}
-		} catch {
-			setBatchState({
-				action,
-				total: ids.length,
-				inProgress: false,
-				results: null,
-			})
-		}
-	}
-
 	const totalPages = Math.max(1, Math.ceil(total / pageSize))
 	const coursesErrorMessage =
 		courseOptionsError instanceof Error ? courseOptionsError.message : null
@@ -662,10 +588,10 @@ const MilestoneQueue: React.FC = () => {
 										className="border-b border-white/5 hover:bg-white/3 transition-colors"
 									>
 										<td className="py-3 px-4">
-											<AddressDisplay 
-												address={milestone.learnerAddress} 
-												prefixLength={8} 
-												suffixLength={4} 
+											<AddressDisplay
+												address={milestone.learnerAddress}
+												prefixLength={8}
+												suffixLength={4}
 												showExplorerLink={false}
 												addressClassName="text-xs text-white/50"
 											/>

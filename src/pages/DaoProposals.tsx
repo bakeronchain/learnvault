@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { Helmet } from "react-helmet"
 import { useSearchParams } from "react-router-dom"
+import AddressDisplay from "../components/AddressDisplay"
 import CommentSection from "../components/CommentSection"
 import Pagination from "../components/Pagination"
 import { NoProposalsEmptyState } from "../components/SkeletonLoader"
@@ -18,9 +19,9 @@ type FilterType =
 	| "Rejected"
 	| "All"
 
-const ITEMS_PER_PAGE = 5
+type SortType = "newest" | "most-votes" | "ending-soon"
 
-import AddressDisplay from "../components/AddressDisplay"
+const ITEMS_PER_PAGE = 5
 
 const formatCountdown = (deadline: string | null, now: number) => {
 	if (!deadline) return "No deadline set"
@@ -50,6 +51,10 @@ const getFilterValue = (proposal: ProposalRecord): FilterType => {
 const DaoProposals: React.FC = () => {
 	const [searchParams, setSearchParams] = useSearchParams()
 	const [filter, setFilter] = useState<FilterType>("Voting Open")
+	const [sort, setSort] = useState<SortType>("newest")
+	const [searchQuery, setSearchQuery] = useState(
+		() => searchParams.get("q") ?? "",
+	)
 	const [now, setNow] = useState(() => Date.now())
 	const {
 		proposals,
@@ -72,9 +77,40 @@ const DaoProposals: React.FC = () => {
 		Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
 
 	const filteredProposals = useMemo(() => {
-		if (filter === "All") return proposals
-		return proposals.filter((proposal) => getFilterValue(proposal) === filter)
-	}, [filter, proposals])
+		let result =
+			filter === "All"
+				? proposals
+				: proposals.filter((proposal) => getFilterValue(proposal) === filter)
+
+		if (searchQuery.trim()) {
+			const q = searchQuery.toLowerCase()
+			result = result.filter(
+				(p) =>
+					p.title.toLowerCase().includes(q) ||
+					p.description.toLowerCase().includes(q),
+			)
+		}
+
+		if (sort === "newest") {
+			result = [...result].sort(
+				(a, b) =>
+					new Date(b.createdAt ?? 0).getTime() -
+					new Date(a.createdAt ?? 0).getTime(),
+			)
+		} else if (sort === "most-votes") {
+			result = [...result].sort((a, b) =>
+				Number(b.votesFor + b.votesAgainst - a.votesFor - a.votesAgainst),
+			)
+		} else if (sort === "ending-soon") {
+			result = [...result].sort((a, b) => {
+				const aDeadline = a.deadline ? new Date(a.deadline).getTime() : Infinity
+				const bDeadline = b.deadline ? new Date(b.deadline).getTime() : Infinity
+				return aDeadline - bDeadline
+			})
+		}
+
+		return result
+	}, [filter, proposals, searchQuery, sort])
 
 	const totalPages = Math.max(
 		1,
@@ -159,7 +195,22 @@ const DaoProposals: React.FC = () => {
 		setFilter(nextFilter)
 		const nextParams = new URLSearchParams(searchParams)
 		nextParams.set("page", "1")
+		if (searchQuery.trim()) nextParams.set("q", searchQuery.trim())
+		else nextParams.delete("q")
 		setSearchParams(nextParams)
+	}
+
+	const handleSearchChange = (value: string) => {
+		setSearchQuery(value)
+		const nextParams = new URLSearchParams(searchParams)
+		nextParams.set("page", "1")
+		if (value.trim()) nextParams.set("q", value.trim())
+		else nextParams.delete("q")
+		setSearchParams(nextParams, { replace: true })
+	}
+
+	const handleSortChange = (nextSort: SortType) => {
+		setSort(nextSort)
 	}
 
 	const totalVotes = selectedProposal
@@ -269,6 +320,38 @@ const DaoProposals: React.FC = () => {
 				))}
 			</div>
 
+			<div className="flex flex-col sm:flex-row gap-3 mb-6 max-w-2xl mx-auto">
+				<input
+					type="search"
+					placeholder="Search proposals by title or description…"
+					value={searchQuery}
+					onChange={(e) => handleSearchChange(e.target.value)}
+					aria-label="Search proposals"
+					className="flex-1 px-5 py-3 rounded-full border border-white/10 bg-white/5 text-white placeholder:text-white/40 text-sm font-medium focus:outline-none focus:border-brand-cyan/40 transition-colors"
+				/>
+				<select
+					value={sort}
+					onChange={(e) => handleSortChange(e.target.value as SortType)}
+					aria-label="Sort proposals"
+					className="px-5 py-3 rounded-full border border-white/10 bg-white/5 text-white text-sm font-medium focus:outline-none focus:border-brand-cyan/40 transition-colors appearance-none cursor-pointer"
+				>
+					<option value="newest" className="bg-gray-900">
+						Newest
+					</option>
+					<option value="most-votes" className="bg-gray-900">
+						Most Votes
+					</option>
+					<option value="ending-soon" className="bg-gray-900">
+						Ending Soon
+					</option>
+				</select>
+			</div>
+
+			<p className="text-center text-xs text-white/40 font-medium mb-8">
+				{filteredProposals.length} result
+				{filteredProposals.length !== 1 ? "s" : ""}
+			</p>
+
 			{selectedProposal && (
 				<section className="glass-card p-10 rounded-[2.5rem] border border-white/5 mb-10">
 					<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-8">
@@ -281,7 +364,12 @@ const DaoProposals: React.FC = () => {
 							</h2>
 							<div className="flex flex-wrap items-center gap-3 text-xs font-black uppercase tracking-widest">
 								<span className="text-brand-cyan flex items-center gap-1">
-									Applicant <AddressDisplay address={selectedProposal.authorAddress} showCopyButton={false} showExplorerLink={false} />
+									Applicant{" "}
+									<AddressDisplay
+										address={selectedProposal.authorAddress}
+										showCopyButton={false}
+										showExplorerLink={false}
+									/>
 								</span>
 								<span className="w-1.5 h-1.5 bg-white/20 rounded-full" />
 								<span className="text-white/70">ID #{selectedProposal.id}</span>
@@ -434,7 +522,12 @@ const DaoProposals: React.FC = () => {
 									{proposal.title}
 								</h2>
 								<div className="text-[10px] text-white/40 uppercase font-black tracking-widest flex items-center gap-1">
-									Applicant <AddressDisplay address={proposal.authorAddress} showCopyButton={false} showExplorerLink={false} />
+									Applicant{" "}
+									<AddressDisplay
+										address={proposal.authorAddress}
+										showCopyButton={false}
+										showExplorerLink={false}
+									/>
 								</div>
 							</div>
 							<span className="px-3 py-1 bg-white/5 text-[10px] uppercase font-black rounded-full border border-white/10">

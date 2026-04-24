@@ -1,65 +1,60 @@
 import { Trophy } from "lucide-react"
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import React, { useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import AddressDisplay from "../components/AddressDisplay"
 import { EmptyState } from "../components/states/emptyState"
 import { ErrorState } from "../components/states/errorState"
-import { useLeaderboard } from "../hooks/useLeaderboard"
+import {
+	type LeaderboardApiEntry,
+	useLeaderboard,
+} from "../hooks/useLeaderboard"
 import { useWallet } from "../hooks/useWallet"
 import { type LeaderboardEntry } from "../util/mockLeaderboardData"
 
 const Leaderboard: React.FC = () => {
 	const { t } = useTranslation()
 	const { address: currentUserAddress } = useWallet()
+	const {
+		data,
+		isLoading,
+		error: queryError,
+		refetch,
+	} = useLeaderboard(currentUserAddress ?? undefined)
 
-	const fetchLeaderboard = useCallback(async () => {
-		setIsLoading(true)
-		setError(null)
-		try {
-			const response = await fetch(`${API_URL}/api/scholars/leaderboard`)
+	const errorMessage =
+		queryError instanceof Error
+			? queryError.message
+			: queryError
+				? String(queryError)
+				: null
 
-			if (!response.ok)
-				throw new Error(
-					`Failed to load rankings (status ${response.status}). The server may be temporarily unavailable.`,
-				)
-			const result = (await response.json()) as {
-				rankings?: LeaderboardApiEntry[]
-				your_rank?: number | null
-			}
-			const rankings = Array.isArray(result.rankings) ? result.rankings : []
-			const mapped = rankings.map((item, index) => ({
-				id: `leader-${item.address}-${item.rank}-${index}`,
-				address: item.address,
-				lrnBalance: Number(item.lrn_balance ?? 0),
-				coursesCompleted: item.courses_completed ?? 0,
-				joinedDate: new Date(),
-				lastActive: new Date(),
-				rank: item.rank,
-				balance: item.lrn_balance ?? "0",
-				completedCourses: item.courses_completed ?? 0,
-				fullAddress: item.address,
-			}))
-			setLeaders(mapped)
-			setMyRank(typeof result.your_rank === "number" ? result.your_rank : null)
-		} catch (err) {
-			console.error(err)
-			setError(
-				err instanceof Error
-					? err.message
-					: "Unable to load rankings. Check your connection and try again.",
-			)
-		} finally {
-			setIsLoading(false)
-		}
-	}, [])
+	const leaderboardRows = useMemo(() => {
+		const rankings: LeaderboardApiEntry[] = Array.isArray(data?.rankings)
+			? (data!.rankings as LeaderboardApiEntry[])
+			: []
+		return rankings.map((item, index) => ({
+			id: `leader-${item.address}-${item.rank}-${index}`,
+			address: item.address,
+			lrnBalance: Number(item.lrn_balance ?? 0),
+			coursesCompleted: item.courses_completed ?? 0,
+			joinedDate: new Date(),
+			lastActive: new Date(),
+			rank: item.rank,
+			balance: item.lrn_balance ?? "0",
+			completedCourses: item.courses_completed ?? 0,
+			fullAddress: item.address,
+		}))
+	}, [data])
 
-	useEffect(() => {
-		fetchLeaderboard().catch(console.error)
-	}, [fetchLeaderboard])
+	const myRank = typeof data?.your_rank === "number" ? data.your_rank : null
 
-	const leaderboardRows = useMemo(
+	const isCurrentUser = (fullAddress: string) => {
+		return currentUserAddress?.toLowerCase() === fullAddress.toLowerCase()
+	}
+
+	const rowsForTable = useMemo(
 		() =>
-			leaders.map((leader, index) => ({
+			leaderboardRows.map((leader, index) => ({
 				...leader,
 				rank:
 					(leader as LeaderboardEntry & { rank?: number }).rank ?? index + 1,
@@ -74,12 +69,8 @@ const Leaderboard: React.FC = () => {
 					(leader as LeaderboardEntry & { fullAddress?: string }).fullAddress ??
 					leader.address,
 			})),
-		[leaders],
+		[leaderboardRows],
 	)
-
-	const isCurrentUser = (fullAddress: string) => {
-		return currentUserAddress?.toLowerCase() === fullAddress.toLowerCase()
-	}
 
 	return (
 		<div className="p-6 md:p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
@@ -101,9 +92,9 @@ const Leaderboard: React.FC = () => {
 						/>
 					))}
 				</div>
-			) : error ? (
-				<ErrorState message={error} onRetry={fetchLeaderboard} />
-			) : leaderboardRows.length === 0 ? (
+			) : errorMessage ? (
+				<ErrorState message={errorMessage} onRetry={() => void refetch()} />
+			) : rowsForTable.length === 0 ? (
 				<EmptyState
 					icon={Trophy}
 					title="No scholars yet"
@@ -129,7 +120,7 @@ const Leaderboard: React.FC = () => {
 							</tr>
 						</thead>
 						<tbody className="divide-y divide-white/5">
-							{leaderboardRows.map((leader) => (
+							{rowsForTable.map((leader) => (
 								<tr
 									key={leader.fullAddress}
 									className={`group hover:bg-white/[0.02] transition-colors ${
@@ -192,8 +183,8 @@ const Leaderboard: React.FC = () => {
 
 					<div className="p-8 bg-white/5 border-t border-white/5 flex justify-between items-center">
 						<div className="text-sm font-medium text-white/40">
-							Showing {leaderboardRows.length} top learners
-							{myRank ? ` | Your rank: #${myRank}` : ""}
+							Showing {rowsForTable.length} top learners
+							{myRank != null ? ` | Your rank: #${myRank}` : ""}
 						</div>
 						<div className="text-[10px] uppercase tracking-widest font-black text-white/20">
 							Updated every block

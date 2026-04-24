@@ -25,6 +25,7 @@ import { coursesRouter } from "./routes/courses.routes"
 import { createCredentialsRouter } from "./routes/credentials.routes"
 import { enrollmentsRouter } from "./routes/enrollments.routes"
 import { eventsRouter } from "./routes/events.routes"
+import { createForumRouter } from "./routes/forum.routes"
 import { governanceRouter } from "./routes/governance.routes"
 import { healthRouter } from "./routes/health.routes"
 import { leaderboardRouter } from "./routes/leaderboard.routes"
@@ -165,6 +166,7 @@ app.use("/api", healthRouter)
 app.use("/api/auth", createAuthRouter(authService))
 app.use("/api", createMeRouter(jwtService, authService))
 app.use("/api", coursesRouter)
+app.use("/api", createForumRouter(jwtService))
 app.use("/api", createCredentialsRouter(jwtService))
 app.use("/api", validatorRouter)
 app.use("/api", eventsRouter)

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { useState, useCallback } from "react"
 import { rpcUrl, stellarNetwork } from "../contracts/util"
+import { useContractIds } from "./useContractIds"
 
 export type ActivityEventType =
 	| "lrn_minted"
@@ -28,19 +29,6 @@ interface RpcEvent {
 	topics?: unknown[]
 	value?: unknown
 	txHash?: string
-}
-
-const readEnv = (key: string): string | undefined => {
-	const value = (import.meta.env as Record<string, unknown>)[key]
-	return typeof value === "string" && value.length > 0 ? value : undefined
-}
-
-const contractIds = {
-	learnToken: readEnv("PUBLIC_LEARN_TOKEN_CONTRACT"),
-	courseMilestone: readEnv("PUBLIC_COURSE_MILESTONE_CONTRACT"),
-	scholarNft: readEnv("PUBLIC_SCHOLAR_NFT_CONTRACT"),
-	scholarshipGov: readEnv("PUBLIC_SCHOLARSHIP_GOVERNANCE_CONTRACT"),
-	milestoneEscrow: readEnv("VITE_MILESTONE_ESCROW_CONTRACT_ID"),
 }
 
 function classifyEvent(event: RpcEvent): ActivityEventType {
@@ -95,13 +83,20 @@ async function fetchActivityEvents(
 	walletAddress: string | undefined,
 	limit: number,
 	filter?: ActivityEventFilter,
+	contractIds?: {
+		learnToken?: string
+		courseMilestone?: string
+		scholarNft?: string
+		governanceToken?: string
+		milestoneEscrow?: string
+	},
 ): Promise<ActivityEvent[]> {
 	const ids = [
-		contractIds.learnToken,
-		contractIds.courseMilestone,
-		contractIds.scholarNft,
-		contractIds.scholarshipGov,
-		contractIds.milestoneEscrow,
+		contractIds?.learnToken,
+		contractIds?.courseMilestone,
+		contractIds?.scholarNft,
+		contractIds?.governanceToken,
+		contractIds?.milestoneEscrow,
 	].filter((v): v is string => Boolean(v))
 
 	if (!ids.length) return []
@@ -173,10 +168,24 @@ export function useActivityFeed(
 	filter: ActivityEventFilter = "all",
 ) {
 	const [displayCount, setDisplayCount] = useState(limit)
+	const {
+		learnToken,
+		courseMilestone,
+		scholarNft,
+		governanceToken,
+		milestoneEscrow,
+	} = useContractIds()
 
 	const { data, isLoading, error } = useQuery({
 		queryKey: ["activity-feed", address, filter],
-		queryFn: () => fetchActivityEvents(address, 100, filter),
+		queryFn: () =>
+			fetchActivityEvents(address, 100, filter, {
+				learnToken,
+				courseMilestone,
+				scholarNft,
+				governanceToken,
+				milestoneEscrow,
+			}),
 		enabled: true,
 		staleTime: 30_000,
 		refetchInterval: 60_000,

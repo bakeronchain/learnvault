@@ -6,12 +6,17 @@
 	--color-brand-emerald: #00ff80;
 	--color-brand-purple: #8e2de2;
 
+	--color-app-bg: #05070a;
+	--color-app-text: #ffffff;
+	--color-glass-bg: rgba(15, 20, 28, 0.85);
+	--color-glass-border: rgba(255, 255, 255, 0.08);
+
 	--bg-mesh-gradient:
-		radial-gradient(at 0% 0%, rgba(0, 210, 255, 0.15) 0px, transparent 50%),
-		radial-gradient(at 50% 0%, rgba(58, 123, 213, 0.15) 0px, transparent 50%),
-		radial-gradient(at 100% 0%, rgba(0, 255, 128, 0.15) 0px, transparent 50%),
-		radial-gradient(at 0% 100%, rgba(142, 45, 226, 0.15) 0px, transparent 50%),
-		radial-gradient(at 100% 100%, rgba(0, 210, 255, 0.15) 0px, transparent 50%);
+		radial-gradient(at 0% 0%, rgba(0, 210, 255, 0.12) 0px, transparent 50%),
+		radial-gradient(at 50% 0%, rgba(58, 123, 213, 0.12) 0px, transparent 50%),
+		radial-gradient(at 100% 0%, rgba(0, 255, 128, 0.08) 0px, transparent 50%),
+		radial-gradient(at 0% 100%, rgba(142, 45, 226, 0.12) 0px, transparent 50%),
+		radial-gradient(at 100% 100%, rgba(0, 210, 255, 0.1) 0px, transparent 50%);
 
 	--animate-mesh: mesh 20s ease infinite;
 
@@ -20,101 +25,109 @@
 		100% {
 			background-position: 0% 50%;
 		}
-
 		50% {
 			background-position: 100% 50%;
 		}
 	}
-
-	@keyframes shimmer {
-		0% {
-			transform: translateX(-100%);
-		}
-
-		100% {
-			transform: translateX(100%);
-		}
-	}
 }
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
 
 :root {
 	color-scheme: dark;
+	--color-app-bg: #05070a;
+	--color-app-text: #ffffff;
+	--color-glass-bg: rgba(15, 20, 28, 0.85);
+	--color-glass-border: rgba(255, 255, 255, 0.08);
 }
 
-html {
-	scroll-behavior: smooth;
+/* Light mode overrides (activated by .sds-theme-light / .light class) */
+.sds-theme-light,
+.light {
+	color-scheme: light;
+	--color-app-bg: #f8fafc;
+	--color-app-text: #0f172a;
+	--color-glass-bg: rgba(255, 255, 255, 0.85);
+	--color-glass-border: rgba(0, 0, 0, 0.08);
 }
 
-html,
+/* Dark mode — explicit classes applied by applyTheme() */
+.sds-theme-dark,
+.dark {
+	color-scheme: dark;
+	--color-app-bg: #05070a;
+	--color-app-text: #ffffff;
+	--color-glass-bg: rgba(15, 20, 28, 0.85);
+	--color-glass-border: rgba(255, 255, 255, 0.08);
+}
+
 body {
-	margin: 0;
-	padding: 0;
-	width: 100%;
-}
-
-body {
-	background-color: #05070a;
+	background-color: var(--color-app-bg);
 	background-image: var(--bg-mesh-gradient);
 	background-size: 200% 200%;
 	animation: var(--animate-mesh);
-	color: white;
-	font-family:
-		"Inter",
-		system-ui,
-		-apple-system,
-		sans-serif;
-	-webkit-font-smoothing: antialiased;
+	color: var(--color-app-text);
+	transition:
+		background-color 0.3s ease,
+		color 0.3s ease;
+	font-family: "Inter", sans-serif;
+	min-height: 100vh;
 }
 
-a:focus-visible,
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-[tabindex]:not([tabindex="-1"]):focus-visible {
-	outline: 3px solid rgba(0, 210, 255, 0.9);
-	outline-offset: 3px;
-	box-shadow: 0 0 0 6px rgba(0, 210, 255, 0.18);
-}
-
+/* ── Glass components ─────────────────────────────────────────────────────── */
+/* 
+ * Do NOT use !important on color — it overrides all Tailwind text utilities
+ * (text-white/40, text-brand-cyan, etc.) inside every card.
+ * Only set background and border-color here.
+ */
 .glass {
-	background: rgba(255, 255, 255, 0.03);
-	backdrop-filter: blur(20px);
-	-webkit-backdrop-filter: blur(20px);
-	border: 1px solid rgba(255, 255, 255, 0.05);
+	background: var(--color-glass-bg);
+	border-color: var(--color-glass-border);
+	backdrop-filter: blur(16px);
+	-webkit-backdrop-filter: blur(16px);
 }
 
 .glass-card {
-	background: linear-gradient(
-		135deg,
-		rgba(255, 255, 255, 0.05) 0%,
-		rgba(255, 255, 255, 0.01) 100%
-	);
-	backdrop-filter: blur(24px);
-	border: 1px solid rgba(255, 255, 255, 0.08);
-	box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+	background: var(--color-glass-bg);
+	border: 1px solid var(--color-glass-border);
+	backdrop-filter: blur(16px);
+	-webkit-backdrop-filter: blur(16px);
 }
 
+/* ── Iridescent border ────────────────────────────────────────────────────── */
+/*
+ * Uses a gradient background with padding to simulate an animated border.
+ * The inner content background is set by each element using bg-[--color-app-bg]
+ * or a dark bg. Safe to use on <a>, <button>, <div> etc.
+ */
 .iridescent-border {
-	position: relative;
-	background: #11141a;
-	background-clip: padding-box;
-	border: 1px solid transparent;
+	background:
+		linear-gradient(var(--color-app-bg), var(--color-app-bg)) padding-box,
+		linear-gradient(135deg, #00d2ff, #3a7bd5, #8e2de2, #00ff80, #00d2ff)
+			border-box;
+	background-size:
+		auto,
+		300% 300%;
+	animation: iridescent 4s ease infinite;
+	border: 2px solid transparent;
+	color: var(--color-app-text);
 }
 
-.iridescent-border::before {
-	content: "";
-	position: absolute;
-	top: 0;
-	right: 0;
-	bottom: 0;
-	left: 0;
-	z-index: -1;
-	margin: -1px;
-	border-radius: inherit;
-	background: linear-gradient(to right, #00d2ff, #3a7bd5, #00ff80, #8e2de2);
+@keyframes iridescent {
+	0%,
+	100% {
+		background-position:
+			0px 0px,
+			0% 50%;
+	}
+	50% {
+		background-position:
+			0px 0px,
+			100% 50%;
+	}
 }
 
+/* ── Text gradient ────────────────────────────────────────────────────────── */
 .text-gradient {
 	background: linear-gradient(to right, #00d2ff, #3a7bd5, #00ff80);
 	-webkit-background-clip: text;
@@ -122,6 +135,7 @@ textarea:focus-visible,
 	background-clip: text;
 }
 
+/* ── Shimmer skeleton animation ───────────────────────────────────────────── */
 .animate-shimmer {
 	display: block;
 	position: relative;
@@ -138,12 +152,33 @@ textarea:focus-visible,
 	background: linear-gradient(
 		90deg,
 		transparent,
-		rgba(255, 255, 255, 0.05),
+		rgba(255, 255, 255, 0.04),
 		transparent
 	);
 	animation: shimmer 2s infinite;
 }
 
+@keyframes shimmer {
+	0% {
+		transform: translateX(-100%);
+	}
+	100% {
+		transform: translateX(100%);
+	}
+}
+
+/* ── Light mode body background ───────────────────────────────────────────── */
+.sds-theme-light body,
+.light body {
+	background-image:
+		radial-gradient(at 0% 0%, rgba(0, 210, 255, 0.06) 0px, transparent 50%),
+		radial-gradient(at 50% 0%, rgba(58, 123, 213, 0.06) 0px, transparent 50%),
+		radial-gradient(at 100% 0%, rgba(0, 255, 128, 0.04) 0px, transparent 50%),
+		radial-gradient(at 0% 100%, rgba(142, 45, 226, 0.06) 0px, transparent 50%),
+		radial-gradient(at 100% 100%, rgba(0, 210, 255, 0.05) 0px, transparent 50%);
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
 	html {
 		scroll-behavior: auto;
@@ -162,4 +197,136 @@ textarea:focus-visible,
 		animation: none;
 		background-size: auto;
 	}
+}
+
+/* ── Scrollbar (dark theme) ───────────────────────────────────────────────── */
+::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	background: rgba(255, 255, 255, 0.1);
+	border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: rgba(0, 210, 255, 0.3);
+}
+
+/* ── Selection ────────────────────────────────────────────────────────────── */
+::selection {
+	background: rgba(0, 210, 255, 0.2);
+	color: #ffffff;
+}
+
+/* ── @stellar/design-system overrides ────────────────────────────────────── */
+/* Ensure SDS buttons in dark context are readable without breaking Tailwind */
+.dark button[data-variant="secondary"],
+.sds-theme-dark button[data-variant="secondary"] {
+	color: inherit;
+}
+
+/* ── Rounded-4xl utility (Tailwind v4 may not include this) ──────────────── */
+.rounded-4xl {
+	border-radius: 2rem;
+}
+
+/* ── Nav link active glow ─────────────────────────────────────────────────── */
+@layer utilities {
+	.shadow-glow-cyan {
+		box-shadow: 0 0 20px rgba(0, 210, 255, 0.15);
+	}
+}
+
+/* ── Light mode text / background overrides ──────────────────────────────── */
+/*
+ * All page components use dark-mode Tailwind classes (text-white, text-white/40
+ * bg-white/5, etc.) without dark: prefix. These overrides make those classes
+ * readable when the user switches to light mode.
+ */
+.sds-theme-light *,
+.light * {
+	--tw-text-opacity: 1;
+}
+
+/* Remap white text to dark text in light mode */
+.sds-theme-light .text-white,
+.light .text-white {
+	color: #0f172a !important;
+}
+
+.sds-theme-light [class*="text-white/"],
+.light [class*="text-white/"] {
+	color: rgba(15, 23, 42, 0.7) !important;
+}
+
+/* White backgrounds become subtle grey in light mode */
+.sds-theme-light [class*="bg-white/"],
+.light [class*="bg-white/"] {
+	background-color: rgba(15, 23, 42, 0.06) !important;
+}
+
+/* Border white becomes visible in light mode */
+.sds-theme-light [class*="border-white/"],
+.light [class*="border-white/"] {
+	border-color: rgba(15, 23, 42, 0.12) !important;
+}
+
+/* Placeholder text */
+.sds-theme-light [class*="placeholder-white"],
+.light [class*="placeholder-white"] {
+	--tw-placeholder-opacity: 0.4;
+	color: rgba(15, 23, 42, 0.4) !important;
+}
+
+/* Textarea/input backgrounds */
+.sds-theme-light textarea,
+.sds-theme-light input,
+.light textarea,
+.light input {
+	background-color: rgba(15, 23, 42, 0.04);
+	color: #0f172a;
+	border-color: rgba(15, 23, 42, 0.15);
+}
+
+/* Glass in light mode — lighter background */
+.sds-theme-light .glass,
+.sds-theme-light .glass-card,
+.light .glass,
+.light .glass-card {
+	background: rgba(255, 255, 255, 0.75) !important;
+	border-color: rgba(15, 23, 42, 0.1) !important;
+}
+
+/* Iridescent border fill in light mode */
+.sds-theme-light .iridescent-border,
+.light .iridescent-border {
+	background:
+		linear-gradient(#ffffff, #ffffff) padding-box,
+		linear-gradient(135deg, #00d2ff, #3a7bd5, #8e2de2, #00ff80, #00d2ff)
+			border-box;
+}
+
+/* Dark absolute backgrounds like bg-[#05070a] become white */
+.sds-theme-light [style*="background: #05070a"],
+.light [style*="background: #05070a"],
+.sds-theme-light [style*="background-color: #05070a"],
+.light [style*="background-color: #05070a"] {
+	background-color: #ffffff !important;
+}
+
+/* Scrollbar in light mode */
+.sds-theme-light ::-webkit-scrollbar-thumb,
+.light ::-webkit-scrollbar-thumb {
+	background: rgba(15, 23, 42, 0.15);
+}
+
+.sds-theme-light ::-webkit-scrollbar-thumb:hover,
+.light ::-webkit-scrollbar-thumb:hover {
+	background: rgba(0, 150, 210, 0.4);
 }

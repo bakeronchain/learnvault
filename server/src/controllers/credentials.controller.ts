@@ -1,7 +1,8 @@
-import { type Request, type Response } from "express"
 import fs from "fs/promises"
 import path from "path"
+import { type Request, type Response } from "express"
 
+import { pool } from "../db/index"
 import { pinJsonToIPFS, getGatewayUrl } from "../services/pinata.service"
 
 // ---------------------------------------------------------------------------
@@ -74,16 +75,18 @@ const COURSE_IMAGE_MAP: Record<string, string> = {
 
 const DEFAULT_IMAGE = "scholar-nft-base.png"
 
-// Placeholder IPFS CIDs for badge images
-// In production, these should be uploaded to IPFS and the CIDs stored in config
 const IMAGE_CID_MAP: Record<string, string> = {
 	"scholar-nft-stellar.png":
+		process.env.BADGE_CID_STELLAR ??
 		"bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
 	"scholar-nft-soroban.png":
+		process.env.BADGE_CID_SOROBAN ??
 		"bafybeihvvlkvjkbxy6qxzjzqxzqxzqxzqxzqxzqxzqxzqxzqxzqxzqxzqx",
 	"scholar-nft-defi.png":
+		process.env.BADGE_CID_DEFI ??
 		"bafybeidefi123456789abcdefghijklmnopqrstuvwxyz1234567890abc",
 	"scholar-nft-base.png":
+		process.env.BADGE_CID_BASE ??
 		"bafybeiabc123456789defghijklmnopqrstuvwxyz1234567890abcdef",
 }
 
@@ -198,6 +201,52 @@ export async function createCredentialMetadata(
 		res.status(500).json({
 			error: "Internal server error",
 			message: "Failed to create credential metadata",
+		})
+	}
+}
+
+type CredentialRow = {
+	token_id: string | number
+	course_id: string
+	metadata_uri: string | null
+	minted_at: Date
+	revoked: boolean
+}
+
+export async function getCredentialsByAddress(
+	req: Request,
+	res: Response,
+): Promise<void> {
+	const { address } = req.params
+
+	if (!address) {
+		res.status(400).json({ error: "Scholar address is required" })
+		return
+	}
+
+	try {
+		const result = await pool.query(
+			`SELECT token_id, course_id, metadata_uri, minted_at, revoked
+			 FROM scholar_nfts
+			 WHERE scholar_address = $1
+			 ORDER BY minted_at DESC`,
+			[address],
+		)
+
+		const data = result.rows.map((row: CredentialRow) => ({
+			token_id: Number(row.token_id),
+			course_id: row.course_id,
+			metadata_uri: row.metadata_uri,
+			minted_at: row.minted_at.toISOString(),
+			revoked: row.revoked,
+		}))
+
+		res.status(200).json({ data })
+	} catch (error) {
+		console.error("Error fetching credentials by address:", error)
+		res.status(500).json({
+			error: "Internal server error",
+			message: "Failed to fetch credentials",
 		})
 	}
 }

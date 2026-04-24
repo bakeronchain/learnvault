@@ -2,11 +2,13 @@
 
 ## Current Status
 
-The NFT metadata generation endpoint is functional, but uses placeholder IPFS CIDs for badge images.
+The NFT metadata generation endpoint is functional, but uses placeholder IPFS
+CIDs for badge images.
 
 ## Action Required
 
-Upload the following badge images to IPFS and update the `IMAGE_CID_MAP` in `server/src/controllers/credentials.controller.ts`:
+Upload the following badge images to IPFS and update the `IMAGE_CID_MAP` in
+`server/src/controllers/credentials.controller.ts`:
 
 ### Images to Upload
 
@@ -45,38 +47,47 @@ Create a script to automate the upload:
 
 ```typescript
 // scripts/upload-nft-images.ts
-import fs from 'fs';
-import path from 'path';
-import { pinFileToIPFS } from '../server/src/services/pinata.service';
+import fs from "fs"
+import path from "path"
+import { pinFileToIPFS } from "../server/src/services/pinata.service"
 
 const images = [
-  'scholar-nft-stellar.png',
-  'scholar-nft-soroban.png',
-  'scholar-nft-defi.png',
-  'scholar-nft-base.png',
-];
+	"scholar-nft-stellar.png",
+	"scholar-nft-soroban.png",
+	"scholar-nft-defi.png",
+	"scholar-nft-base.png",
+]
 
 async function uploadImages() {
-  const cidMap: Record<string, string> = {};
+	const cidMap: Record<string, string> = {}
 
-  for (const imageName of images) {
-    const imagePath = path.join(__dirname, '..', 'public', 'assets', 'brand', 'nft', imageName);
-    const buffer = fs.readFileSync(imagePath);
-    
-    console.log(`Uploading ${imageName}...`);
-    const cid = await pinFileToIPFS(buffer, imageName);
-    cidMap[imageName] = cid;
-    console.log(`✓ ${imageName}: ipfs://${cid}`);
-  }
+	for (const imageName of images) {
+		const imagePath = path.join(
+			__dirname,
+			"..",
+			"public",
+			"assets",
+			"brand",
+			"nft",
+			imageName,
+		)
+		const buffer = fs.readFileSync(imagePath)
 
-  console.log('\nUpdate IMAGE_CID_MAP in credentials.controller.ts:');
-  console.log(JSON.stringify(cidMap, null, 2));
+		console.log(`Uploading ${imageName}...`)
+		const cid = await pinFileToIPFS(buffer, imageName)
+		cidMap[imageName] = cid
+		console.log(`✓ ${imageName}: ipfs://${cid}`)
+	}
+
+	console.log("\nUpdate IMAGE_CID_MAP in credentials.controller.ts:")
+	console.log(JSON.stringify(cidMap, null, 2))
 }
 
-uploadImages().catch(console.error);
+uploadImages().catch(console.error)
 ```
 
 Run with:
+
 ```bash
 cd server
 npx ts-node ../scripts/upload-nft-images.ts
@@ -84,14 +95,15 @@ npx ts-node ../scripts/upload-nft-images.ts
 
 ### Update the Controller
 
-After uploading, update the `IMAGE_CID_MAP` constant in `server/src/controllers/credentials.controller.ts`:
+After uploading, update the `IMAGE_CID_MAP` constant in
+`server/src/controllers/credentials.controller.ts`:
 
 ```typescript
 const IMAGE_CID_MAP: Record<string, string> = {
-  "scholar-nft-stellar.png": "bafybeiabc123...", // Replace with actual CID
-  "scholar-nft-soroban.png": "bafybeiabc456...", // Replace with actual CID
-  "scholar-nft-defi.png": "bafybeiabc789...",    // Replace with actual CID
-  "scholar-nft-base.png": "bafybeiabc000...",    // Replace with actual CID
+	"scholar-nft-stellar.png": "bafybeiabc123...", // Replace with actual CID
+	"scholar-nft-soroban.png": "bafybeiabc456...", // Replace with actual CID
+	"scholar-nft-defi.png": "bafybeiabc789...", // Replace with actual CID
+	"scholar-nft-base.png": "bafybeiabc000...", // Replace with actual CID
 }
 ```
 

@@ -1,4 +1,7 @@
 import React, { Component, type ErrorInfo, type ReactNode } from "react"
+import { generateRequestId } from "../utils/errors"
+
+const SUPPORT_EMAIL = "support@learnvault.app"
 
 interface Props {
 	children?: ReactNode
@@ -7,17 +10,18 @@ interface Props {
 interface State {
 	hasError: boolean
 	error: Error | null
+	requestId: string | null
 }
 
 export default class ErrorBoundary extends Component<Props, State> {
 	public state: State = {
 		hasError: false,
 		error: null,
+		requestId: null,
 	}
 
 	public static getDerivedStateFromError(error: Error): State {
-		// Update state so the next render will show the fallback UI.
-		return { hasError: true, error }
+		return { hasError: true, error, requestId: generateRequestId() }
 	}
 
 	public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
@@ -25,18 +29,22 @@ export default class ErrorBoundary extends Component<Props, State> {
 	}
 
 	private handleRetry = () => {
-		this.setState({ hasError: false, error: null })
-	}
-
-	private handleReport = () => {
-		// In a real app this would send to Sentry or similar service.
-		// For now we just log it and alert the user.
-		console.log("Error reported:", this.state.error)
-		alert("Error has been reported to the team. Thank you!")
+		this.setState({ hasError: false, error: null, requestId: null })
 	}
 
 	public render() {
 		if (this.state.hasError) {
+			const { error, requestId } = this.state
+			const subject = encodeURIComponent("LearnVault Error Report")
+			const bodyText = [
+				`Error: ${error?.message ?? "Unknown error"}`,
+				`Request ID: ${requestId ?? "N/A"}`,
+				"",
+				"Steps to reproduce:",
+				"[please describe what you were doing]",
+			].join("\n")
+			const mailtoLink = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${encodeURIComponent(bodyText)}`
+
 			return (
 				<div className="flex flex-col items-center justify-center p-8 m-4 border border-red-200/20 bg-red-500/10 rounded-xl h-full min-h-[50vh]">
 					<svg
@@ -55,10 +63,16 @@ export default class ErrorBoundary extends Component<Props, State> {
 					<h2 className="text-xl font-bold mb-2 text-white">
 						Something went wrong
 					</h2>
-					<p className="text-gray-400 mb-6 text-center max-w-md">
-						We apologize for the inconvenience. The application encountered an
-						unexpected error.
+					<p className="text-gray-400 mb-2 text-center max-w-md">
+						The application encountered an unexpected error. Try refreshing the
+						page — if the problem persists, contact support with the reference
+						ID below.
 					</p>
+					{requestId && (
+						<p className="text-xs text-gray-500 font-mono mb-6">
+							Ref: {requestId}
+						</p>
+					)}
 					<div className="flex gap-4">
 						<button
 							onClick={this.handleRetry}
@@ -66,12 +80,12 @@ export default class ErrorBoundary extends Component<Props, State> {
 						>
 							Try Again
 						</button>
-						<button
-							onClick={this.handleReport}
-							className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium border border-slate-700 transition-colors cursor-pointer"
+						<a
+							href={mailtoLink}
+							className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium border border-slate-700 transition-colors"
 						>
-							Report Issue
-						</button>
+							Contact Support
+						</a>
 					</div>
 				</div>
 			)

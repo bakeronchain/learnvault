@@ -9,7 +9,7 @@ export {
 	EVENTS_TO_INDEX,
 	EVENT_DATA_SCHEMAS,
 	DB_EVENT_SCHEMA,
-} from "../types/events.js"
+} from "../types/events"
 
 // Soroban RPC endpoints
 export const SOROBAN_RPC_URL =

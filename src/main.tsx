@@ -15,6 +15,30 @@ import { WalletProvider } from "./providers/WalletProvider.tsx"
 import "./i18n"
 import { parseError } from "./util/error"
 
+// Issue #61 — FOUC prevention: apply theme before first render
+;(function () {
+	try {
+		const saved = localStorage.getItem("learnvault:theme")
+		const theme: string = saved
+			? (JSON.parse(saved) as string)
+			: window.matchMedia("(prefers-color-scheme: dark)").matches
+				? "dark"
+				: "light"
+		const themeClass = theme === "dark" ? "sds-theme-dark" : "sds-theme-light"
+		const html = document.documentElement
+		const body = document.body
+		// Apply SDS theme class + Tailwind dark class + data attributes
+		;[html, body].forEach((el) => {
+			el.classList.remove("sds-theme-dark", "sds-theme-light", "dark", "light")
+			el.classList.add(themeClass)
+			if (theme === "dark") el.classList.add("dark")
+			el.setAttribute("data-theme", theme)
+			el.setAttribute("data-sds-theme", themeClass)
+		})
+		html.style.colorScheme = theme
+	} catch (e) {}
+})()
+
 const queryClient = new QueryClient({
 	queryCache: new QueryCache({
 		onError: (error) => {
@@ -30,6 +54,8 @@ const queryClient = new QueryClient({
 		queries: {
 			refetchOnWindowFocus: false,
 			retry: false,
+			staleTime: 30 * 1000, // 30 seconds default
+			gcTime: 10 * 60 * 1000, // 10 minutes
 		},
 	},
 })

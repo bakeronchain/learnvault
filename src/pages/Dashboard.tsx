@@ -1,20 +1,28 @@
-import React, { useContext, useEffect } from "react"
-import { useNavigate, Link } from "react-router-dom"
+import React, { useContext, useEffect, useMemo } from "react"
+import { Link, useNavigate } from "react-router-dom"
 import ActivityFeed from "../components/ActivityFeed"
 import CourseCard from "../components/CourseCard"
 import LRNBalanceWidget from "../components/LRNBalanceWidget"
 import { DashboardStatsSkeleton } from "../components/SkeletonLoader"
 import { WalletContext } from "../providers/WalletProvider"
 
-const shortenAddress = (addr: string) => {
-	if (!addr) return ""
-	return `${addr.slice(0, 5)}...${addr.slice(-4)}`
-}
+import AddressDisplay from "../components/AddressDisplay"
 
 const Dashboard: React.FC = () => {
 	const { address } = useContext(WalletContext)
 	const navigate = useNavigate()
 	const [isInitializing, setIsInitializing] = React.useState(true)
+
+	// Fetch learner profile from backend
+	const { profile, isLoading: isLoadingProfile } = useLearnerProfile()
+
+	// Fetch LRN balance from contract
+	const { balance: lrnBalance, isLoading: isLoadingBalance } =
+		useLearnToken(address)
+
+	// Fetch enrolled courses and milestone progress from contract
+	const { enrolledCourses, getCourseProgress, isCompletingMilestone } =
+		useCourse()
 
 	useEffect(() => {
 		if (address) {
@@ -34,6 +42,17 @@ const Dashboard: React.FC = () => {
 		}
 	}, [address, navigate])
 
+	// Calculate milestone count from enrolled courses' progress
+	const milestonesCompleted = useMemo(() => {
+		return enrolledCourses.reduce((total, course) => {
+			return total + getCourseProgress(course.id).completedMilestoneIds.length
+		}, 0)
+	}, [enrolledCourses, getCourseProgress])
+
+	// Check if data is still loading
+	const isLoading =
+		isLoadingProfile || isLoadingBalance || isCompletingMilestone
+
 	if (isInitializing && !address) {
 		return (
 			<div aria-busy="true" className="min-h-screen p-6 md:p-12 max-w-7xl mx-auto">
@@ -42,36 +61,45 @@ const Dashboard: React.FC = () => {
 		)
 	}
 
-	if (!address) return null
+	if (!address) {
+		return (
+			<div className="min-h-screen flex items-center justify-center px-4">
+				<div className="max-w-md text-center">
+					<h1 className="text-3xl sm:text-4xl font-black text-gradient mb-4">
+						Connect Your Wallet
+					</h1>
+					<p className="text-white/70 text-base sm:text-lg mb-8">
+						To view your learning dashboard and on-chain reputation, please
+						connect your Stellar wallet.
+					</p>
+					<Link
+						to="/"
+						className="inline-block w-full sm:w-auto text-center iridescent-border px-8 py-3 rounded-xl font-bold transition-all hover:scale-105 active:scale-95"
+					>
+						<span className="relative z-10">Connect Wallet &rarr;</span>
+					</Link>
+				</div>
+			</div>
+		)
+	}
 
 	const stats = [
-		{ label: "LRN Balance", value: 142 },
-		{ label: "Courses Enrolled", value: 2 },
-		{ label: "Milestones", value: 14 },
-		{ label: "Gov Tokens", value: 0 },
-	]
-
-	const enrolledCourses = [
 		{
-			id: "1",
-			title: "Soroban Smart Contracts",
-			description:
-				"Learn how to build scalable decentralized apps on Stellar using Rust and Soroban.",
-			difficulty: "intermediate" as const,
-			estimatedHours: 5,
-			lrnReward: 200,
-			lessonCount: 12,
+			label: "LRN Balance",
+			value: isLoading
+				? "—"
+				: lrnBalance !== undefined
+					? (Number(lrnBalance) / 1e7).toLocaleString("en-US", {
+							maximumFractionDigits: 0,
+						})
+					: "0",
 		},
 		{
-			id: "2",
-			title: "DeFi Fundamentals",
-			description:
-				"Understand the core concepts of Decentralized Finance and automated market makers.",
-			difficulty: "beginner" as const,
-			estimatedHours: 3,
-			lrnReward: 100,
-			lessonCount: 8,
+			label: "Courses Enrolled",
+			value: isLoading ? "—" : enrolledCourses.length,
 		},
+		{ label: "Milestones", value: isLoading ? "—" : milestonesCompleted },
+		{ label: "Gov Tokens", value: "0" },
 	]
 
 	return (
@@ -91,8 +119,8 @@ const Dashboard: React.FC = () => {
 			<div className="max-w-6xl mx-auto space-y-10 sm:space-y-12 relative z-10 w-full pb-20 sm:pb-24">
 				{/* ── Header ── */}
 				<header className="space-y-1">
-					<h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter text-gradient leading-tight break-all sm:break-words">
-						Welcome back, {shortenAddress(address)}
+					<h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter text-gradient leading-tight flex flex-wrap items-center gap-x-3">
+						Welcome back, <AddressDisplay address={profile?.address || address} showCopyButton={false} showExplorerLink={false} addressClassName="text-gradient" />
 					</h1>
 					<p className="text-white/50 text-sm sm:text-base md:text-lg font-medium">
 						Your learning dashboard and on-chain reputation.
@@ -103,20 +131,31 @@ const Dashboard: React.FC = () => {
 				<section aria-label="Reputation and stats">
 					<div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start">
 						{/* Balance widget — given an explicit max-width so it never overflows on mobile */}
-						<div className="w-full md:w-auto md:flex-shrink-0 max-w-xs">
+						<div className="w-full max-w-none sm:max-w-sm md:w-auto md:flex-shrink-0 md:max-w-xs">
 							<LRNBalanceWidget address={address} size="lg" />
 						</div>
 
 						{/* Stat cards grid */}
-						<div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 flex-1 w-full">
-							{stats.map((stat) => (
-								<StatCard
-									key={stat.label}
-									label={stat.label}
-									value={stat.value}
-								/>
-							))}
-						</div>
+						{isLoading ? (
+							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 flex-1 w-full">
+								{[1, 2, 3, 4].map((i) => (
+									<div
+										key={i}
+										className="glass-card p-4 sm:p-6 rounded-2xl border border-white/10 bg-white/5 animate-pulse min-h-20"
+									/>
+								))}
+							</div>
+						) : (
+							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 flex-1 w-full">
+								{stats.map((stat) => (
+									<StatCard
+										key={stat.label}
+										label={stat.label}
+										value={stat.value}
+									/>
+								))}
+							</div>
+						)}
 					</div>
 				</section>
 
@@ -131,18 +170,27 @@ const Dashboard: React.FC = () => {
 							My Courses
 						</h2>
 
-						{enrolledCourses.length > 0 ? (
+						{isLoading ? (
+							<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 items-start">
+								{[1, 2].map((i) => (
+									<div
+										key={i}
+										className="glass-card p-6 rounded-[2.5rem] border border-white/10 bg-white/5 animate-pulse min-h-80"
+									/>
+								))}
+							</div>
+						) : enrolledCourses.length > 0 ? (
 							<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 items-start">
 								{enrolledCourses.map((course) => (
 									<CourseCard
 										key={course.id}
 										id={course.id}
-										title={course.title}
-										description={course.description}
-										difficulty={course.difficulty}
-										estimatedHours={course.estimatedHours}
-										lrnReward={course.lrnReward}
-										lessonCount={course.lessonCount}
+										title={course.title || "Untitled Course"}
+										description="Active course"
+										difficulty="beginner"
+										estimatedHours={0}
+										lrnReward={0}
+										lessonCount={0}
 										isEnrolled={true}
 									/>
 								))}
@@ -154,7 +202,7 @@ const Dashboard: React.FC = () => {
 								</p>
 								<Link
 									to="/courses"
-									className="inline-block iridescent-border px-6 sm:px-8 py-3 rounded-xl font-bold transition-all hover:scale-105 active:scale-95"
+									className="inline-block w-full sm:w-auto text-center iridescent-border px-6 sm:px-8 py-3 rounded-xl font-bold transition-all hover:scale-105 active:scale-95"
 								>
 									<span className="relative z-10">
 										Enroll in your first course &rarr;

@@ -8,6 +8,11 @@ const mockAccounts = vi.fn(() => ({ accountId: mockAccountId }))
 // --- Mock modules ---
 vi.mock("@creit.tech/stellar-wallets-kit", () => {
 	class MockKit {
+		static init = vi.fn()
+		static authModal = vi.fn()
+		static disconnect = vi.fn()
+		static getNetwork = vi.fn()
+		static selectedModule = { productId: "freighter" }
 		openModal = vi.fn()
 		disconnect = vi.fn()
 		setWallet = vi.fn()
@@ -37,6 +42,8 @@ vi.mock("@stellar/stellar-sdk", () => ({
 		},
 	},
 }))
+
+vi.unmock("./wallet")
 
 import storage from "./storage"
 import { fetchBalances, connectWallet, disconnectWallet } from "./wallet"

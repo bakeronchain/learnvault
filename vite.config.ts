@@ -71,12 +71,17 @@ export default defineConfig({
 	define: {
 		global: "window",
 	},
-	envPrefix: "PUBLIC_",
+	envPrefix: ["PUBLIC_", "VITE_"],
 	server: {
 		proxy: {
 			"/friendbot": {
 				target: "http://localhost:8000/friendbot",
 				changeOrigin: true,
+			},
+			"/api": {
+				target: "http://localhost:8000",
+				changeOrigin: true,
+				// Don't rewrite /api prefix — backend expects it
 			},
 		},
 	},

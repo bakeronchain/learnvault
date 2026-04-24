@@ -45,9 +45,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm ci
+      - run: npm ci --legacy-peer-deps
       - run: npm run lint
       - run: npx prettier . --check
+      - name: Database Migration Safety Check
+        run: |
+          echo "Running migration dry-run check..."
+          # Placeholder for migration check - identifying tool
+          if [ -d "server/prisma" ]; then
+            npx prisma migrate dev --dry-run
+          elif [ -f "server/knexfile.js" ]; then
+            npx knex migrate:list
+          else
+            echo "No standard migration tool detected, skipping dry-run."
+          fi
       - name: Build with Scaffold and build client packages
         run:
           STELLAR_SCAFFOLD_ENV=development stellar-scaffold build

@@ -1,10 +1,8 @@
-import { readFileSync } from "node:fs"
-import { dirname, resolve } from "node:path"
-import { fileURLToPath } from "node:url"
 import { type ReactNode } from "react"
 import { MemoryRouter } from "react-router-dom"
 import { describe, expect, it, vi } from "vitest"
 import App from "./App"
+import appSource from "./App.tsx?raw"
 import { render, screen } from "./test/setup"
 
 vi.mock("./components/ErrorBoundary", () => ({
@@ -68,9 +66,6 @@ vi.mock("./pages/ScholarshipApply", () => ({
 vi.mock("./pages/Treasury", () => ({
 	default: () => <div>Treasury</div>,
 }))
-
-const currentDir = dirname(fileURLToPath(import.meta.url))
-const appSource = readFileSync(resolve(currentDir, "App.tsx"), "utf8")
 
 const getStaticRoutePaths = () => {
 	const routePaths = Array.from(

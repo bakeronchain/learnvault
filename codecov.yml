@@ -1,0 +1,47 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 80%
+        # Allow up to 2% drop before failing — absorbs noise from small PRs
+        threshold: 2%
+    patch:
+      default:
+        target: 80%
+        threshold: 5%
+
+flag_management:
+  default_rules:
+    # Carry the last uploaded report forward when a flag isn't re-uploaded
+    # (e.g. only the backend changed, so frontend coverage stays in history)
+    carryforward: true
+
+flags:
+  frontend:
+    paths:
+      - src/
+    carryforward: true
+  backend:
+    paths:
+      - server/src/
+    carryforward: true
+
+ignore:
+  # Generated contract clients
+  - "src/contracts/**"
+  # Test infrastructure
+  - "src/test/**"
+  - "server/src/tests/**"
+  # Entry points
+  - "src/main.tsx"
+  - "server/src/index.ts"
+  # Generated / boilerplate
+  - "server/src/openapi.ts"
+  - "server/src/templates/**"
+  - "server/src/types/**"
+  - "server/src/types.d.ts"
+  # Type declarations
+  - "**/*.d.ts"
+  # Test files
+  - "**/*.test.ts"
+  - "**/*.test.tsx"

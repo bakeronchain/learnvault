@@ -25,6 +25,16 @@ jest.mock("../db/milestone-store")
 jest.mock("../services/stellar-contract.service")
 jest.mock("../services/credential.service")
 
+jest.mock("../services/email.service", () => ({
+	createEmailService: jest.fn().mockReturnValue({
+		sendNotification: jest.fn().mockResolvedValue(undefined),
+	}),
+}))
+
+jest.mock("../services/escrow-timeout.service", () => ({
+	markEscrowActivity: jest.fn().mockResolvedValue(undefined),
+}))
+
 import express from "express"
 import jwt from "jsonwebtoken"
 import request from "supertest"
@@ -59,6 +69,12 @@ const pendingReport = {
 	evidence_description: "Completed all exercises",
 	status: "pending" as const,
 	submitted_at: new Date().toISOString(),
+	scholar_email: "scholar@example.com",
+	scholar_name: "Test Scholar",
+	course_title: "Test Course",
+	milestone_title: "Test Milestone",
+	milestone_number: 1,
+	lrn_reward: 100,
 }
 
 const approvedAuditEntry = {
@@ -108,11 +124,13 @@ beforeEach(() => {
 	// default. The 503 test removes them explicitly.
 	process.env.STELLAR_SECRET_KEY = "FAKE_TEST_SECRET"
 	process.env.COURSE_MILESTONE_CONTRACT_ID = "FAKE_CONTRACT_ID"
+	process.env.FRONTEND_URL = "http://localhost:3000"
 })
 
 afterEach(() => {
 	delete process.env.STELLAR_SECRET_KEY
 	delete process.env.COURSE_MILESTONE_CONTRACT_ID
+	delete process.env.FRONTEND_URL
 })
 
 // ── GET /api/admin/milestones/pending ────────────────────────────────────────
@@ -256,6 +274,80 @@ describe("POST /api/admin/milestones/:id/approve", () => {
 	})
 })
 
+describe("POST /api/admin/milestones/batch-approve", () => {
+	it("approves every requested pending report and returns per-report results", async () => {
+		mockStore.getReportById
+			.mockResolvedValueOnce(pendingReport)
+			.mockResolvedValueOnce({
+				...pendingReport,
+				id: 2,
+				milestone_id: 2,
+			})
+		mockStore.addAuditEntry
+			.mockResolvedValueOnce(approvedAuditEntry)
+			.mockResolvedValueOnce({
+				...approvedAuditEntry,
+				id: 2,
+				report_id: 2,
+			})
+
+		const res = await request(buildApp())
+			.post("/api/admin/milestones/batch-approve")
+			.set("Authorization", `Bearer ${makeAdminToken()}`)
+			.send({ milestoneIds: [1, 2] })
+
+		expect(res.status).toBe(200)
+		expect(res.body.data.succeeded).toBe(2)
+		expect(res.body.data.failed).toBe(0)
+		expect(res.body.data.results).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					reportId: 1,
+					success: true,
+					status: "approved",
+				}),
+				expect.objectContaining({
+					reportId: 2,
+					success: true,
+					status: "approved",
+				}),
+			]),
+		)
+		expect(mockStore.updateReportStatus).toHaveBeenNthCalledWith(
+			1,
+			1,
+			"approved",
+		)
+		expect(mockStore.updateReportStatus).toHaveBeenNthCalledWith(
+			2,
+			2,
+			"approved",
+		)
+	})
+
+	it("returns 404 when any milestone in the batch does not exist", async () => {
+		mockStore.getReportById
+			.mockResolvedValueOnce(pendingReport)
+			.mockResolvedValueOnce(null)
+
+		const res = await request(buildApp())
+			.post("/api/admin/milestones/batch-approve")
+			.set("Authorization", `Bearer ${makeAdminToken()}`)
+			.send({ milestoneIds: [1, 999] })
+
+		expect(res.status).toBe(404)
+		expect(res.body.error).toBe("One or more milestone reports were not found")
+		expect(res.body.data.results).toEqual([
+			expect.objectContaining({
+				reportId: 999,
+				success: false,
+				status: "not_found",
+			}),
+		])
+		expect(mockStellar.callVerifyMilestone).not.toHaveBeenCalled()
+	})
+})
+
 // ── POST /api/admin/milestones/:id/reject ────────────────────────────────────
 
 describe("POST /api/admin/milestones/:id/reject", () => {
@@ -348,5 +440,35 @@ describe("POST /api/admin/milestones/:id/reject", () => {
 
 		expect(res.status).toBe(401)
 		expect(mockStore.getReportById).not.toHaveBeenCalled()
+	})
+})
+
+describe("POST /api/admin/milestones/batch-reject", () => {
+	it("returns 409 when any report is already processed before the batch starts", async () => {
+		mockStore.getReportById
+			.mockResolvedValueOnce(pendingReport)
+			.mockResolvedValueOnce({
+				...pendingReport,
+				id: 2,
+				status: "approved",
+			})
+
+		const res = await request(buildApp())
+			.post("/api/admin/milestones/batch-reject")
+			.set("Authorization", `Bearer ${makeAdminToken()}`)
+			.send({ milestoneIds: [1, 2], reason: "Batch reject" })
+
+		expect(res.status).toBe(409)
+		expect(res.body.error).toBe(
+			"All milestone reports must be pending before batch processing",
+		)
+		expect(res.body.data.results).toEqual([
+			expect.objectContaining({
+				reportId: 2,
+				success: false,
+				status: "approved",
+			}),
+		])
+		expect(mockStellar.emitRejectionEvent).not.toHaveBeenCalled()
 	})
 })

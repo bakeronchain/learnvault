@@ -5,13 +5,22 @@ import {
 	isAppError,
 } from "../types/errors"
 
+export function generateRequestId(): string {
+	return `${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+}
+
 export const ERROR_MESSAGES: Record<ErrorCode, string> = {
-	[ErrorCode.WALLET_NOT_CONNECTED]: "Please connect your wallet to continue",
-	[ErrorCode.CONTRACT_NOT_DEPLOYED]: "Feature not available on this network",
-	[ErrorCode.TRANSACTION_REJECTED]: "Transaction was cancelled",
-	[ErrorCode.NETWORK_ERROR]: "Network error. Please try again.",
-	[ErrorCode.INVALID_INPUT]: "Invalid input provided",
-	[ErrorCode.UNKNOWN_ERROR]: "An unexpected error occurred",
+	[ErrorCode.WALLET_NOT_CONNECTED]:
+		"Connect your wallet to continue — use the button in the top navigation.",
+	[ErrorCode.CONTRACT_NOT_DEPLOYED]:
+		"This feature isn't available on the current network. Switch to Stellar Testnet in your wallet.",
+	[ErrorCode.TRANSACTION_REJECTED]:
+		"Transaction cancelled — nothing was sent or changed.",
+	[ErrorCode.NETWORK_ERROR]:
+		"Network request failed. Check your connection and try again.",
+	[ErrorCode.INVALID_INPUT]:
+		"One or more fields are invalid — review your input and try again.",
+	[ErrorCode.UNKNOWN_ERROR]: "An unexpected error occurred.",
 }
 
 export function parseError(error: unknown): AppError {

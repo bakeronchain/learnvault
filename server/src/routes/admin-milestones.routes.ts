@@ -1,13 +1,21 @@
+// Admin milestones routes - handles approval/rejection of milestone submissions
+// Last updated: 2025-01-24 to resolve CI caching issues
 import { Router } from "express"
 import {
+	listMilestones,
 	getPendingMilestones,
 	getMilestoneById,
 	approveMilestone,
+	batchApproveMilestones,
+	batchRejectMilestones,
 	rejectMilestone,
 } from "../controllers/admin-milestones.controller"
 import { submitMilestoneReport } from "../controllers/milestone-submit.controller"
+import { resubmitMilestoneReport } from "../controllers/milestone-resubmit.controller"
 import {
 	approveMilestoneBodySchema,
+	batchApproveMilestonesBodySchema,
+	batchRejectMilestonesBodySchema,
 	legacyMilestoneSubmitBodySchema,
 	milestoneReportIdParamSchema,
 	milestoneSubmitBodySchema,
@@ -18,6 +26,8 @@ import { milestoneSubmissionLimiter } from "../middleware/rate-limit.middleware"
 import { validate } from "../middleware/validate.middleware"
 
 export const adminMilestonesRouter = Router()
+
+adminMilestonesRouter.get("/admin/milestones", requireAdmin, listMilestones)
 
 /**
  * @openapi
@@ -108,6 +118,15 @@ adminMilestonesRouter.post(
 	approveMilestone,
 )
 
+adminMilestonesRouter.post(
+	"/admin/milestones/batch-approve",
+	requireAdmin,
+	validate({
+		body: batchApproveMilestonesBodySchema,
+	}),
+	batchApproveMilestones,
+)
+
 /**
  * @openapi
  * /api/admin/milestones/{id}/reject:
@@ -153,6 +172,15 @@ adminMilestonesRouter.post(
 		body: rejectMilestoneBodySchema,
 	}),
 	rejectMilestone,
+)
+
+adminMilestonesRouter.post(
+	"/admin/milestones/batch-reject",
+	requireAdmin,
+	validate({
+		body: batchRejectMilestonesBodySchema,
+	}),
+	batchRejectMilestones,
 )
 
 /**
@@ -209,4 +237,42 @@ adminMilestonesRouter.post(
 		body: milestoneSubmitBodySchema,
 	}),
 	submitMilestoneReport,
+)
+
+/**
+ * @openapi
+ * /api/milestones/resubmit:
+ *   post:
+ *     tags: [Milestones]
+ *     summary: Scholar resubmits a rejected milestone report
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [id]
+ *             properties:
+ *               id:
+ *                 type: integer
+ *               evidenceGithub:
+ *                 type: string
+ *               evidenceIpfsCid:
+ *                 type: string
+ *               evidenceDescription:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Report resubmitted
+ *       400:
+ *         $ref: '#/components/responses/BadRequestError'
+ *       404:
+ *         description: Report not found
+ *       429:
+ *         description: Rate limit exceeded
+ */
+adminMilestonesRouter.post(
+	"/milestones/resubmit",
+	milestoneSubmissionLimiter,
+	resubmitMilestoneReport,
 )

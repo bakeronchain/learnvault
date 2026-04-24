@@ -1,8 +1,8 @@
-import { Router } from "express";
+import { Router } from "express"
 
-import { getLeaderboard } from "../controllers/leaderboard.controller";
+import { getLeaderboard } from "../controllers/leaderboard.controller"
 
-export const leaderboardRouter = Router();
+export const leaderboardRouter = Router()
 
 /**
  * @openapi
@@ -54,4 +54,4 @@ export const leaderboardRouter = Router();
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-leaderboardRouter.get("/leaderboard", getLeaderboard);
+leaderboardRouter.get("/leaderboard", getLeaderboard)

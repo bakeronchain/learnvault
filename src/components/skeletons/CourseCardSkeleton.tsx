@@ -9,7 +9,7 @@ const CourseCardSkeleton: React.FC = () => {
 			{/* Cover Image Placeholder */}
 			<div className="relative h-48 w-full bg-white/5 border-b border-white/5 overflow-hidden">
 				<div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-[shimmer_2s_infinite] -translate-x-full" />
-				
+
 				{/* Difficulty Badge placeholder */}
 				<div className="absolute top-5 left-5">
 					<div className="w-20 h-6 bg-white/10 rounded-full animate-pulse" />
@@ -36,7 +36,7 @@ const CourseCardSkeleton: React.FC = () => {
 					<div className="w-full h-14 bg-white/10 rounded-2xl animate-pulse" />
 				</div>
 			</div>
-			
+
 			<style>{`
 				@keyframes shimmer {
 					100% {

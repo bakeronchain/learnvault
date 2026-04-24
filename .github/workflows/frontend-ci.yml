@@ -1,21 +1,22 @@
 name: Frontend CI
 
 on:
-  push:
-    paths:
-      - "src/**"
-      - "package.json"
-      - "vite.config.ts"
   pull_request:
+    branches:
+      - main
     paths:
       - "src/**"
       - "package.json"
+      - "package-lock.json"
       - "vite.config.ts"
+      - "vitest.config.ts"
+      - "tsconfig*.json"
+      - "eslint.config.js"
 
 jobs:
   frontend:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,27 +25,27 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          # We are REMOVING the cache line temporarily to force a clean download
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
+
+      - name: Type check
+        run: npm run typecheck
 
       - name: Lint
         run: npm run lint
 
-      - name: Prettier check
-        run: npx prettier --check src/
+      - name: Test with coverage
+        run: npm run test:coverage
 
-      - name: Type check
-        run: npx tsc --noEmit
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          flags: frontend
+          fail_ci_if_error: true
 
       - name: Build
         run: npm run build
-
-      - name: Upload build artifact
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: dist
-          if-no-files-found: error

@@ -2,7 +2,7 @@ import { Button } from "@stellar/design-system"
 import React from "react"
 import ReactMarkdown from "react-markdown"
 import { Link } from "react-router-dom"
-import { type Lesson } from "../data/lessons"
+import { type CourseLesson as Lesson } from "../types/courses"
 
 // A simple mock skeleton to match what's needed for content loading state
 export const LessonContentSkeleton = () => (
@@ -27,6 +27,7 @@ interface LessonContentProps {
 	isLoading: boolean
 	isCompleted: boolean
 	isCompleting: boolean
+	timeSpentLabel?: string | null
 	onMarkComplete: () => void
 	prevLessonId: number | null
 	nextLessonId: number | null
@@ -38,6 +39,7 @@ const LessonContent: React.FC<LessonContentProps> = ({
 	isLoading,
 	isCompleted,
 	isCompleting,
+	timeSpentLabel,
 	onMarkComplete,
 	prevLessonId,
 	nextLessonId,
@@ -53,6 +55,16 @@ const LessonContent: React.FC<LessonContentProps> = ({
 
 	return (
 		<section className="glass-card p-8 md:p-12 rounded-[2.5rem] border border-white/10 flex flex-col h-full">
+			<div className="mb-6 flex flex-wrap items-center gap-3">
+				<span className="rounded-full border border-brand-cyan/20 bg-brand-cyan/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.15em] text-brand-cyan">
+					Estimated: {Math.max(1, lesson.estimatedMinutes)}m
+				</span>
+				{timeSpentLabel ? (
+					<span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-bold uppercase tracking-[0.15em] text-white/80">
+						Spent: {timeSpentLabel}
+					</span>
+				) : null}
+			</div>
 			<div className="flex-1 prose prose-invert prose-brand max-w-none">
 				<ReactMarkdown>{lesson.content}</ReactMarkdown>
 			</div>
@@ -105,7 +117,7 @@ const LessonContent: React.FC<LessonContentProps> = ({
 					}
 				>
 					{isCompleted
-						? "Lesson Completed ✓"
+						? `Lesson Completed ✓${timeSpentLabel ? ` (${timeSpentLabel})` : ""}`
 						: isCompleting
 							? "Confirming..."
 							: "Mark as Complete"}

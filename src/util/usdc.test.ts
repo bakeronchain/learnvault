@@ -43,8 +43,8 @@ vi.mock("@stellar/stellar-sdk", async () => {
 				return { type: "invokeHostFunction" }
 			}
 		},
-		SorobanRpc: {
-			...actual.SorobanRpc,
+		rpc: {
+			...actual.rpc,
 			Server: class {
 				simulateTransaction = mockSimulate
 				getAccount = mockGetAccount

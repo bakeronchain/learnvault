@@ -2,13 +2,16 @@
 
 ## Overview
 
-The LearnVault backend implements strict Cross-Origin Resource Sharing (CORS) policies to ensure only authorized frontend domains can make API requests. This prevents unauthorized websites from accessing the API and protects user data.
+The LearnVault backend implements strict Cross-Origin Resource Sharing (CORS)
+policies to ensure only authorized frontend domains can make API requests. This
+prevents unauthorized websites from accessing the API and protects user data.
 
 ## Configuration
 
 ### Environment Variables
 
-Set the `FRONTEND_URL` environment variable to specify the allowed frontend origin:
+Set the `FRONTEND_URL` environment variable to specify the allowed frontend
+origin:
 
 ```env
 # Development
@@ -23,11 +26,13 @@ FRONTEND_URL=https://learnvault.app
 The backend automatically configures the following allowed origins:
 
 #### Production Mode (`NODE_ENV=production`)
+
 - `FRONTEND_URL` (from environment variable)
 - `https://learnvault.app` (production domain)
 - `https://www.learnvault.app` (production domain with www)
 
 #### Development Mode (`NODE_ENV=development`)
+
 - All production origins (for testing)
 - `http://localhost:5173` (Vite default)
 - `http://localhost:3000` (React/Next.js default)
@@ -46,7 +51,7 @@ The backend is configured with the following CORS options:
   credentials: true,              // Allow cookies and auth headers
   methods: [                       // Allowed HTTP methods
     "GET",
-    "POST", 
+    "POST",
     "PUT",
     "PATCH",
     "DELETE",
@@ -73,6 +78,7 @@ When a browser makes a cross-origin request:
 ### No-Origin Requests
 
 Requests without an `Origin` header are automatically allowed. This includes:
+
 - Server-to-server API calls
 - Mobile app requests
 - Command-line tools (curl, Postman)
@@ -81,6 +87,7 @@ Requests without an `Origin` header are automatically allowed. This includes:
 ### Credentials Support
 
 The `credentials: true` setting allows:
+
 - Cookies to be sent with cross-origin requests
 - Authorization headers to be included
 - Authenticated API calls from the frontend
@@ -88,19 +95,25 @@ The `credentials: true` setting allows:
 ## Security Benefits
 
 ### Prevents Unauthorized Access
+
 Only whitelisted domains can make API requests, preventing:
+
 - Phishing sites from accessing the API
 - Unauthorized third-party integrations
 - Cross-site request forgery (CSRF) attacks
 
 ### Protects User Data
+
 By restricting origins:
+
 - User authentication tokens are only sent to trusted domains
 - Personal data cannot be accessed by malicious websites
 - API rate limits apply per origin
 
 ### Audit Trail
+
 Blocked CORS requests are logged:
+
 ```
 CORS blocked request from origin: https://malicious-site.com
 ```
@@ -136,7 +149,7 @@ Each developer can use their own `.env` file:
 # Developer A
 FRONTEND_URL=http://localhost:5173
 
-# Developer B  
+# Developer B
 FRONTEND_URL=http://localhost:3000
 ```
 
@@ -154,15 +167,16 @@ FRONTEND_URL=https://learnvault.app
 
 ### Multiple Domains
 
-If you need to support multiple production domains, update the `allowedOrigins` array in `server/src/index.ts`:
+If you need to support multiple production domains, update the `allowedOrigins`
+array in `server/src/index.ts`:
 
 ```typescript
 const allowedOrigins = [
-  env.FRONTEND_URL || env.CORS_ORIGIN || "http://localhost:5173",
-  "https://learnvault.app",
-  "https://www.learnvault.app",
-  "https://app.learnvault.xyz",  // Add additional domains
-  "https://staging.learnvault.app",
+	env.FRONTEND_URL || env.CORS_ORIGIN || "http://localhost:5173",
+	"https://learnvault.app",
+	"https://www.learnvault.app",
+	"https://app.learnvault.xyz", // Add additional domains
+	"https://staging.learnvault.app",
 ]
 ```
 
@@ -172,21 +186,21 @@ To allow all subdomains, modify the origin validation logic:
 
 ```typescript
 origin: (origin, callback) => {
-  if (!origin) {
-    return callback(null, true)
-  }
+	if (!origin) {
+		return callback(null, true)
+	}
 
-  // Allow all *.learnvault.app subdomains
-  if (origin.endsWith('.learnvault.app')) {
-    return callback(null, true)
-  }
+	// Allow all *.learnvault.app subdomains
+	if (origin.endsWith(".learnvault.app")) {
+		return callback(null, true)
+	}
 
-  if (allowedOrigins.includes(origin)) {
-    callback(null, true)
-  } else {
-    console.warn(`CORS blocked request from origin: ${origin}`)
-    callback(new Error("Not allowed by CORS"))
-  }
+	if (allowedOrigins.includes(origin)) {
+		callback(null, true)
+	} else {
+		console.warn(`CORS blocked request from origin: ${origin}`)
+		callback(new Error("Not allowed by CORS"))
+	}
 }
 ```
 
@@ -203,6 +217,7 @@ curl -H "Origin: https://learnvault.app" \
 ```
 
 Expected response headers:
+
 ```
 Access-Control-Allow-Origin: https://learnvault.app
 Access-Control-Allow-Credentials: true
@@ -226,12 +241,12 @@ Expected: CORS error and warning in server logs
 Open the browser console on an unauthorized domain and try:
 
 ```javascript
-fetch('http://localhost:4000/api/courses', {
-  method: 'GET',
-  credentials: 'include'
+fetch("http://localhost:4000/api/courses", {
+	method: "GET",
+	credentials: "include",
 })
-.then(r => r.json())
-.catch(err => console.error('CORS blocked:', err))
+	.then((r) => r.json())
+	.catch((err) => console.error("CORS blocked:", err))
 ```
 
 ## Troubleshooting
@@ -288,16 +303,19 @@ app.use(cors({
 ### Environment Variables
 
 Old:
+
 ```env
 CORS_ORIGIN=http://localhost:5173
 ```
 
 New (recommended):
+
 ```env
 FRONTEND_URL=http://localhost:5173
 ```
 
-The old `CORS_ORIGIN` variable is still supported for backward compatibility but `FRONTEND_URL` is preferred.
+The old `CORS_ORIGIN` variable is still supported for backward compatibility but
+`FRONTEND_URL` is preferred.
 
 ## References
 

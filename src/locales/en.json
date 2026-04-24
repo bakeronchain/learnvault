@@ -11,6 +11,7 @@
 		"leaderboard": "Leaderboard",
 		"profile": "My Profile",
 		"courses": "Courses",
+		"treasury": "Treasury",
 		"discord": "Discord",
 		"twitter": "Twitter",
 		"docs": "Docs"
@@ -105,7 +106,8 @@
 		},
 		"dao": {
 			"title": "DAO",
-			"desc": "This is the DAO page."
+			"desc": "This is the DAO page.",
+			"lastUpdated": "Last updated: {{time}}"
 		},
 		"leaderboard": {
 			"title": "Leaderboard",

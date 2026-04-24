@@ -1,4 +1,3 @@
-import { type KitActions } from "@creit.tech/stellar-wallets-kit"
 import {
 	createContext,
 	useCallback,
@@ -11,7 +10,10 @@ import {
 import storage from "../util/storage"
 import { type MappedBalances } from "../util/wallet"
 
-type WalletSignTransaction = KitActions["signTransaction"]
+type WalletSignTransaction = (
+	xdr: string,
+	opts?: { networkPassphrase?: string; address?: string; path?: string },
+) => Promise<{ signedTxXdr: string; signerAddress?: string }>
 
 const loadWalletModule = () => import("../util/wallet")
 

@@ -14,23 +14,22 @@ jest.mock("../services/stellar-contract.service", () => ({
 		getEnrolledCourses: jest
 			.fn()
 			.mockResolvedValue(["stellar-basics", "defi-101"]),
-		getScholarCredentials: jest
-			.fn()
-			.mockResolvedValue([
-				{
-					token_id: 1,
-					course_id: "stellar-basics",
-					issued_at: "2026-03-26T15:00:00Z",
-				},
-			]),
+		getScholarCredentials: jest.fn().mockResolvedValue([
+			{
+				token_id: 1,
+				course_id: "stellar-basics",
+				issued_at: "2026-03-26T15:00:00Z",
+			},
+		]),
 	},
 }))
 
 import { pool } from "../db/index"
+import { scholarsRouter } from "../routes/scholars.routes"
+
 const mockedQuery = pool.query as jest.Mock
 
 // We need a helper to build the app with mocked dependencies
-import { scholarsRouter } from "../routes/scholars.routes"
 
 const buildApp = (): Express => {
 	const app = express()

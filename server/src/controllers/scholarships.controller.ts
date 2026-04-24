@@ -2,6 +2,7 @@ import { type Request, type Response } from "express"
 import { z } from "zod"
 
 import { pool } from "../db/index"
+import { trackEscrowTimeout } from "../services/escrow-timeout.service"
 import { stellarContractService } from "../services/stellar-contract.service"
 
 const applySchema = z.object({
@@ -74,8 +75,10 @@ export async function applyForScholarship(
 		}
 
 		// 2. Call the on-chain contract
-		const result =
-			await stellarContractService.submitScholarshipProposal(params)
+		const result = await stellarContractService.submitScholarshipProposal(
+			params,
+			{ requestId: req.requestId },
+		)
 
 		// 3. Store in the database
 		const dbResult = await pool.query(
@@ -97,6 +100,17 @@ export async function applyForScholarship(
 		)
 
 		const proposal_id = dbResult.rows[0]?.id
+		if (proposal_id) {
+			try {
+				await trackEscrowTimeout({
+					proposalId: proposal_id,
+					scholarAddress: applicant_address,
+					courseId: course_id,
+				})
+			} catch (trackingErr) {
+				console.error("[scholarships] escrow tracking failed:", trackingErr)
+			}
+		}
 
 		res.status(201).json({
 			proposal_id,

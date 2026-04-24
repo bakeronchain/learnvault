@@ -3,10 +3,11 @@ import { AnimatePresence, motion } from "framer-motion"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { stellarNetwork } from "../contracts/util"
-import { courses, type Course } from "../data/courses"
 import { useCourse } from "../hooks/useCourse"
+import { useCourses } from "../hooks/useCourses"
 import { useNotification } from "../hooks/useNotification"
 import { useWallet } from "../hooks/useWallet"
+import { type CourseSummary } from "../types/courses"
 import { getFriendbotUrl } from "../util/friendbot"
 import storage from "../util/storage"
 
@@ -17,8 +18,6 @@ const MAINNET_ACCOUNT_DOCS_URL =
 const STELLAR_DEX_URL = "https://stellarx.com/"
 const STELLAR_ANCHOR_DIRECTORY_URL = "https://stellar.org/anchors"
 const BALANCE_POLL_INTERVAL_MS = 4000
-
-const beginnerTracks = courses.filter((course) => course.level === "Beginner")
 
 const steps = [
 	"Welcome",
@@ -68,6 +67,11 @@ export default function OnboardingWizard({
 	const navigate = useNavigate()
 	const { addNotification } = useNotification()
 	const { enroll, enrolledCourses } = useCourse()
+	const {
+		courses,
+		isLoading: isLoadingCourses,
+		error: coursesError,
+	} = useCourses()
 	const { address, balances, updateBalances, isPending } = useWallet()
 	const headingRef = useRef<HTMLHeadingElement | null>(null)
 	const [stepIndex, setStepIndex] = useState(0)
@@ -81,11 +85,16 @@ export default function OnboardingWizard({
 	const [isEnrolling, setIsEnrolling] = useState(false)
 	const [isHidden, setIsHidden] = useState(false)
 
+	const beginnerTracks = useMemo(
+		() => courses.filter((course) => course.difficulty === "beginner"),
+		[courses],
+	)
+
 	const selectedTrack = useMemo(
 		() =>
 			beginnerTracks.find((course) => course.id === selectedTrackId) ??
 			beginnerTracks[0],
-		[selectedTrackId],
+		[beginnerTracks, selectedTrackId],
 	)
 	const currentStep = steps[stepIndex]
 	const xlmBalance = parseBalance(balances.xlm?.balance)
@@ -274,7 +283,7 @@ export default function OnboardingWizard({
 		setStepIndex(2)
 	}
 
-	const handleTrackSelection = (course: Course) => {
+	const handleTrackSelection = (course: CourseSummary) => {
 		setSelectedTrackId(course.id)
 		storage.setItem(ONBOARDING_TRACK_KEY, course.id)
 	}
@@ -319,7 +328,7 @@ export default function OnboardingWizard({
 	const handleStartLearning = () => {
 		if (!selectedTrack) return
 		completeOnboarding()
-		void navigate(`/learn?course=${selectedTrack.id}`)
+		void navigate(`/courses/${selectedTrack.slug}/lessons/1`)
 	}
 
 	if (isHidden) {
@@ -722,54 +731,78 @@ export default function OnboardingWizard({
 											<legend className="sr-only">
 												Choose your learning track
 											</legend>
-											<div className="grid gap-4 md:grid-cols-2">
-												{beginnerTracks.map((course) => {
-													const checked = course.id === selectedTrack?.id
-													return (
-														<label
-															key={course.id}
-															className={`cursor-pointer rounded-[1.5rem] border p-5 transition-all focus-within:ring-2 focus-within:ring-brand-cyan/60 ${
-																checked
-																	? "border-brand-cyan/40 bg-brand-cyan/10"
-																	: "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]"
-															}`}
-														>
-															<input
-																type="radio"
-																name="onboarding-track"
-																value={course.id}
-																checked={checked}
-																onChange={() => handleTrackSelection(course)}
-																className="sr-only"
-															/>
-															<div
-																className={`h-24 rounded-[1.25rem] bg-linear-to-br ${course.accentClassName}`}
-															/>
-															<div className="mt-4 flex items-center justify-between gap-3">
-																<div>
-																	<p className="text-xs uppercase tracking-[0.25em] text-white/45">
-																		{course.track}
-																	</p>
-																	<h4 className="mt-2 text-xl font-bold">
-																		{course.title}
-																	</h4>
+											{isLoadingCourses ? (
+												<div className="grid gap-4 md:grid-cols-2">
+													{[1, 2].map((index) => (
+														<div
+															key={index}
+															className="h-56 rounded-[1.5rem] border border-white/10 bg-white/[0.03] animate-pulse"
+														/>
+													))}
+												</div>
+											) : coursesError ? (
+												<div className="rounded-[1.5rem] border border-red-500/20 bg-red-500/10 p-5 text-sm text-red-100">
+													{coursesError}
+												</div>
+											) : beginnerTracks.length === 0 ? (
+												<div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-5 text-sm text-white/60">
+													No beginner tracks are available right now.
+												</div>
+											) : (
+												<div className="grid gap-4 md:grid-cols-2">
+													{beginnerTracks.map((course) => {
+														const checked = course.id === selectedTrack?.id
+														return (
+															<label
+																key={course.id}
+																className={`cursor-pointer rounded-[1.5rem] border p-5 transition-all focus-within:ring-2 focus-within:ring-brand-cyan/60 ${
+																	checked
+																		? "border-brand-cyan/40 bg-brand-cyan/10"
+																		: "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]"
+																}`}
+															>
+																<input
+																	type="radio"
+																	name="onboarding-track"
+																	value={course.id}
+																	checked={checked}
+																	onChange={() => handleTrackSelection(course)}
+																	className="sr-only"
+																/>
+																<div
+																	className={`h-24 rounded-[1.25rem] bg-linear-to-br ${course.accentClassName}`}
+																/>
+																<div className="mt-4 flex items-center justify-between gap-3">
+																	<div>
+																		<p className="text-xs uppercase tracking-[0.25em] text-white/45">
+																			{course.track}
+																		</p>
+																		<h4 className="mt-2 text-xl font-bold">
+																			{course.title}
+																		</h4>
+																	</div>
+																	{checked ? (
+																		<span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-cyan/20 text-brand-cyan font-bold">
+																			OK
+																		</span>
+																	) : null}
 																</div>
-																{checked ? (
-																	<span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-cyan/20 text-brand-cyan font-bold">
-																		OK
-																	</span>
-																) : null}
-															</div>
-															<p className="mt-3 text-sm text-white/60">
-																{course.description}
-															</p>
-														</label>
-													)
-												})}
-											</div>
+																<p className="mt-3 text-sm text-white/60">
+																	{course.description}
+																</p>
+															</label>
+														)
+													})}
+												</div>
+											)}
 										</fieldset>
 										<div className="mt-8 flex flex-wrap gap-4">
-											<Button size="lg" variant="primary" onClick={goNext}>
+											<Button
+												size="lg"
+												variant="primary"
+												onClick={goNext}
+												disabled={!selectedTrack}
+											>
 												Continue with {selectedTrack?.track ?? "selected track"}
 											</Button>
 											<Button size="lg" variant="tertiary" onClick={goBack}>
@@ -841,7 +874,9 @@ export default function OnboardingWizard({
 												First lesson
 											</p>
 											<h4 className="mt-2 text-2xl font-bold">
-												{selectedTrack?.firstLesson}
+												{selectedTrack
+													? `Start ${selectedTrack.title}`
+													: "Choose a track first"}
 											</h4>
 										</div>
 										<div className="mt-8 flex flex-wrap gap-4">
@@ -902,7 +937,7 @@ export default function OnboardingWizard({
 												{selectedTrack.title}
 											</p>
 											<p className="mt-2 leading-relaxed">
-												{selectedTrack.duration} - {selectedTrack.level}
+												{selectedTrack.track} - {selectedTrack.level}
 											</p>
 										</>
 									) : (

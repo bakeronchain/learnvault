@@ -78,6 +78,11 @@ export const mockContracts = {
 		apply: mockContractMethods.apply,
 		getApplication: mockContractMethods.getApplication,
 		withdraw: mockContractMethods.withdraw,
+		vote: createMockContractMethod(undefined),
+		cast_vote: createMockContractMethod(undefined),
+		get_active_proposals: createMockContractMethod([]),
+		get_proposals_by_status: createMockContractMethod([]),
+		has_voted: createMockContractMethod(false),
 	}),
 
 	guessTheNumber: createMockContractClient("guess_the_number", {

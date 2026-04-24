@@ -1,67 +1,66 @@
-import React, { useEffect, useMemo, useState } from "react"
+import { Trophy } from "lucide-react"
+import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import AddressDisplay from "../components/AddressDisplay"
 import { LeaderboardRowSkeleton } from "../components/SkeletonLoader"
 import { useWallet } from "../hooks/useWallet"
 import { type LeaderboardEntry } from "../util/mockLeaderboardData"
 
-type LeaderboardApiEntry = {
-	rank: number
-	address: string
-	lrn_balance: string
-	courses_completed: number
-}
-
 const Leaderboard: React.FC = () => {
 	const { t } = useTranslation()
 	const { address: currentUserAddress } = useWallet()
-	const [leaders, setLeaders] = useState<LeaderboardEntry[]>([])
-	const [myRank, setMyRank] = useState<number | null>(null)
-	const [isLoading, setIsLoading] = useState(true)
-	const [error, setError] = useState<string | null>(null)
+
+	const fetchLeaderboard = useCallback(async () => {
+		setIsLoading(true)
+		setError(null)
+		try {
+			const response = await fetch(`${API_URL}/api/scholars/leaderboard`)
+
+			if (!response.ok)
+				throw new Error(
+					`Failed to load rankings (status ${response.status}). The server may be temporarily unavailable.`,
+				)
+			const result = (await response.json()) as {
+				rankings?: LeaderboardApiEntry[]
+				your_rank?: number | null
+			}
+			const rankings = Array.isArray(result.rankings) ? result.rankings : []
+			const mapped = rankings.map((item, index) => ({
+				id: `leader-${item.address}-${item.rank}-${index}`,
+				address: item.address,
+				lrnBalance: Number(item.lrn_balance ?? 0),
+				coursesCompleted: item.courses_completed ?? 0,
+				joinedDate: new Date(),
+				lastActive: new Date(),
+				rank: item.rank,
+				balance: item.lrn_balance ?? "0",
+				completedCourses: item.courses_completed ?? 0,
+				fullAddress: item.address,
+			}))
+			setLeaders(mapped)
+			setMyRank(typeof result.your_rank === "number" ? result.your_rank : null)
+		} catch (err) {
+			console.error(err)
+			setError(
+				err instanceof Error
+					? err.message
+					: "Unable to load rankings. Check your connection and try again.",
+			)
+		} finally {
+			setIsLoading(false)
+		}
+	}, [])
 
 	useEffect(() => {
-		const fetchLeaderboard = async () => {
-			try {
-				const response = await fetch(
-					"http://localhost:4000/api/scholars/leaderboard?page=1&limit=25",
-				)
-				if (!response.ok) throw new Error("Failed to fetch leaderboard")
-				const result = (await response.json()) as {
-					rankings?: LeaderboardApiEntry[]
-					your_rank?: number | null
-				}
-				const rankings = Array.isArray(result.rankings) ? result.rankings : []
-				const mapped = rankings.map((item, index) => ({
-					id: `leader-${item.address}-${item.rank}-${index}`,
-					address: item.address,
-					lrnBalance: Number(item.lrn_balance ?? 0),
-					coursesCompleted: item.courses_completed ?? 0,
-					joinedDate: new Date(),
-					lastActive: new Date(),
-					rank: item.rank,
-					balance: item.lrn_balance ?? "0",
-					completedCourses: item.courses_completed ?? 0,
-					fullAddress: item.address,
-				}))
-				setLeaders(mapped)
-				setMyRank(typeof result.your_rank === "number" ? result.your_rank : null)
-			} catch (err) {
-				console.error(err)
-				setError("Unable to load rankings. Please try again later.")
-			} finally {
-				setIsLoading(false)
-			}
-		}
-
 		fetchLeaderboard().catch(console.error)
-	}, [])
+	}, [fetchLeaderboard])
 
 	const leaderboardRows = useMemo(
 		() =>
 			leaders.map((leader, index) => ({
 				...leader,
-				rank: (leader as LeaderboardEntry & { rank?: number }).rank ?? index + 1,
+				rank:
+					(leader as LeaderboardEntry & { rank?: number }).rank ?? index + 1,
 				balance: String(
 					(leader as LeaderboardEntry & { balance?: string }).balance ??
 						leader.lrnBalance,
@@ -94,31 +93,13 @@ const Leaderboard: React.FC = () => {
 			{isLoading ? (
 				<LeaderboardRowSkeleton />
 			) : error ? (
-				<div className="glass-card p-20 rounded-[4rem] text-center border border-red-500/20 bg-red-500/5">
-					<div className="text-6xl mb-8">Warning</div>
-					<h2 className="text-3xl font-black mb-4 text-red-400">
-						Connection Error
-					</h2>
-					<p className="text-white/60 max-w-md mx-auto mb-6 font-medium">
-						{error}
-					</p>
-					<button
-						type="button"
-						onClick={() => window.location.reload()}
-						className="px-8 py-3 bg-white/10 hover:bg-white/20 rounded-full font-bold transition-all"
-					>
-						Try Again
-					</button>
-				</div>
+				<ErrorState message={error} onRetry={fetchLeaderboard} />
 			) : leaderboardRows.length === 0 ? (
-				<div className="glass-card p-20 rounded-[4rem] text-center border border-white/5">
-					<div className="text-6xl mb-8">Empty</div>
-					<h2 className="text-3xl font-black mb-4">Empty Leaderboard</h2>
-					<p className="text-white/40 max-w-md mx-auto font-medium">
-						No scholars have earned LRN tokens yet. Be the first to complete a
-						course!
-					</p>
-				</div>
+				<EmptyState
+					icon={Trophy}
+					title="No scholars yet"
+					description="No scholars have earned LRN tokens yet. Be the first to complete a course!"
+				/>
 			) : (
 				<div className="glass-card overflow-hidden rounded-[2.5rem] border border-white/5 shadow-2xl">
 					<table className="w-full text-left border-collapse">

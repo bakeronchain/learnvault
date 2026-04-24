@@ -15,7 +15,6 @@ export const getSystemTheme = (): Theme => {
 	) {
 		return "dark"
 	}
-
 	return "light"
 }
 
@@ -25,9 +24,7 @@ export const getStoredTheme = (): Theme | null =>
 export const resolveTheme = (): Theme => getStoredTheme() ?? getSystemTheme()
 
 export const applyTheme = (theme: Theme) => {
-	if (typeof document === "undefined") {
-		return
-	}
+	if (typeof document === "undefined") return
 
 	const themeClass = themeClasses[theme]
 	const targets = [document.documentElement, document.body].filter(
@@ -35,8 +32,16 @@ export const applyTheme = (theme: Theme) => {
 	)
 
 	targets.forEach((target) => {
-		target.classList.remove(themeClasses.light, themeClasses.dark)
+		// Issue #61 — Remove all theme classes then apply correct one
+		target.classList.remove(
+			themeClasses.light,
+			themeClasses.dark,
+			"dark",
+			"light",
+		)
 		target.classList.add(themeClass)
+		// Issue #61 — Add 'dark' class for Tailwind dark: variant support
+		if (theme === "dark") target.classList.add("dark")
 		target.setAttribute("data-theme", theme)
 		target.setAttribute("data-sds-theme", themeClass)
 	})

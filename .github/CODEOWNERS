@@ -1,0 +1,11 @@
+# Global — all PRs
+* @bakeronchain
+
+# Smart contracts — any Rust changes
+/contracts/ @bakeronchain
+
+# Frontend — any TypeScript/React changes
+/src/ @bakeronchain
+
+# CI/CD — any workflow changes require extra scrutiny
+/.github/workflows/ @bakeronchain

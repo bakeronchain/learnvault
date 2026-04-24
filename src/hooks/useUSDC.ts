@@ -6,7 +6,7 @@ import { getUSDCBalance, getUSDCContractId } from "../util/usdc"
 const USDC_DECIMALS = 7n
 const USDC_SCALE = 10n ** USDC_DECIMALS
 
-const BALANCE_STALE_TIME = 60 * 1000 // 1 minute
+const BALANCE_STALE_TIME = 30 * 1000 // 30 seconds
 
 export interface UseUSDCResult {
 	/** Raw balance as bigint (7 decimal places). undefined when no address provided. */

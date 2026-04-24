@@ -15,7 +15,10 @@ const LessonListSkeleton: React.FC = () => {
 
 			<div className="space-y-3 flex-1">
 				{[1, 2, 3, 4, 5].map((i) => (
-					<div key={i} className="flex items-start gap-3 p-3 rounded-2xl border border-white/5 bg-white/[0.02]">
+					<div
+						key={i}
+						className="flex items-start gap-3 p-3 rounded-2xl border border-white/5 bg-white/[0.02]"
+					>
 						<div className="mt-1 w-6 h-6 rounded-full bg-white/10 animate-pulse shrink-0" />
 						<div className="h-4 bg-white/5 rounded-full w-3/4 mt-2 animate-pulse" />
 					</div>

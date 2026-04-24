@@ -210,8 +210,8 @@ export const milestoneStore = {
 			 FROM milestone_reports
 			 ${whereClause}
 			 ORDER BY submitted_at DESC
-			 LIMIT $${rowValues.length - 1}
-			 OFFSET $${rowValues.length}`,
+			 LIMIT 			  + (rowValues.length - 1) + `
+			 OFFSET 			  + rowValues.length + ``,
 			rowValues,
 		)
 
@@ -375,3 +375,4 @@ export const milestoneStore = {
 		return result.rows
 	},
 }
+

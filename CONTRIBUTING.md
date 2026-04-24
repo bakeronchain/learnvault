@@ -386,3 +386,6 @@ appropriately.
 
 _LearnVault — Built for African learners. Powered by community. Governed by
 effort._
+
+## Security Standards
+- **SQL Injection:** All database queries must use parameterized placeholders (e.g., $1, ). Never use string interpolation or template literals for user-supplied data in SQL strings.

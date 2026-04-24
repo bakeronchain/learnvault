@@ -38,6 +38,10 @@ latest upstream internationalization standards.
 - Completed a full rebase and merge onto `upstream/main`.
 - Integrated `react-i18next` multi-language support across all new and existing
   interfaces.
+- Resolved merge conflicts in `server/src/index.ts`, `src/App.tsx`, and
+  `server/package.json`.
+- Fixed breaking changes in Treasury hooks and reordered React hooks in
+  `LessonView.tsx` to ensure build stability and "Rules of Hooks" compliance.
 
 ### 🛡️ Security & DevOps
 

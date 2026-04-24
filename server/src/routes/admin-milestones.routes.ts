@@ -4,11 +4,15 @@ import {
 	getPendingMilestones,
 	getMilestoneById,
 	approveMilestone,
+	batchApproveMilestones,
+	batchRejectMilestones,
 	rejectMilestone,
 } from "../controllers/admin-milestones.controller"
 import { submitMilestoneReport } from "../controllers/milestone-submit.controller"
 import {
 	approveMilestoneBodySchema,
+	batchApproveMilestonesBodySchema,
+	batchRejectMilestonesBodySchema,
 	legacyMilestoneSubmitBodySchema,
 	milestoneReportIdParamSchema,
 	milestoneSubmitBodySchema,
@@ -111,6 +115,15 @@ adminMilestonesRouter.post(
 	approveMilestone,
 )
 
+adminMilestonesRouter.post(
+	"/admin/milestones/batch-approve",
+	requireAdmin,
+	validate({
+		body: batchApproveMilestonesBodySchema,
+	}),
+	batchApproveMilestones,
+)
+
 /**
  * @openapi
  * /api/admin/milestones/{id}/reject:
@@ -156,6 +169,15 @@ adminMilestonesRouter.post(
 		body: rejectMilestoneBodySchema,
 	}),
 	rejectMilestone,
+)
+
+adminMilestonesRouter.post(
+	"/admin/milestones/batch-reject",
+	requireAdmin,
+	validate({
+		body: batchRejectMilestonesBodySchema,
+	}),
+	batchRejectMilestones,
 )
 
 /**

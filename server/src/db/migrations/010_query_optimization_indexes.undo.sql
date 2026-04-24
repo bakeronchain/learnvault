@@ -1,0 +1,9 @@
+DROP INDEX IF EXISTS idx_enrollments_learner_enrolled_at;
+DROP INDEX IF EXISTS idx_events_contract_created_at;
+DROP INDEX IF EXISTS idx_comments_proposal_created_at;
+DROP INDEX IF EXISTS idx_proposals_cancelled_status_deadline;
+DROP INDEX IF EXISTS idx_proposals_created_at;
+DROP INDEX IF EXISTS idx_milestone_audit_report_decided_at;
+DROP INDEX IF EXISTS idx_milestone_reports_status_submitted;
+DROP INDEX IF EXISTS idx_milestone_reports_course_status_submitted;
+DROP INDEX IF EXISTS idx_milestone_reports_scholar_status_submitted;

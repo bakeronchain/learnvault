@@ -13,6 +13,7 @@ import {
 import { ErrorState } from "../components/states/errorState"
 import { useScholarCredentials } from "../hooks/useScholarCredentials"
 import { WalletContext } from "../providers/WalletProvider"
+import { formatDuration, getLearningTimeSummary } from "../util/learningTime"
 import { shortenAddress } from "../util/scholarshipApplications"
 
 type UserNft = {
@@ -29,6 +30,7 @@ const Profile: React.FC = () => {
 	const [isLoading, setIsLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 	const [nfts, setNfts] = useState<UserNft[]>([])
+	const [learningTimeLabel, setLearningTimeLabel] = useState("0m")
 
 	const fetchCredentials = useCallback(async () => {
 		if (!walletAddress) {
@@ -81,6 +83,11 @@ const Profile: React.FC = () => {
 	useEffect(() => {
 		void fetchCredentials()
 	}, [fetchCredentials])
+
+	useEffect(() => {
+		const summary = getLearningTimeSummary()
+		setLearningTimeLabel(formatDuration(summary.totalSeconds))
+	}, [])
 
 	const siteUrl = "https://learnvault.app"
 	const userName = walletAddress ? shortenAddress(walletAddress) : "Learner"
@@ -155,6 +162,9 @@ const Profile: React.FC = () => {
 								{t("wallet.connect")}
 							</div>
 						)}
+						<div className="px-5 py-2 glass rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-brand-cyan">
+							Learning Time: {learningTimeLabel}
+						</div>
 					</div>
 				</div>
 			</header>

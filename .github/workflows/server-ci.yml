@@ -49,6 +49,10 @@ jobs:
         run: npm run migrate
         working-directory: server
 
+      - name: Verify migrations (apply, idempotency, rollback)
+        run: npm run migrate:verify
+        working-directory: server
+
       - name: Run tests
         run: npm test
         working-directory: server

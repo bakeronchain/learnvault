@@ -103,7 +103,7 @@ function formatDate(date: string): string {
 	}
 }
 
-async function fetchHistory(address: string): Promise<ApiEvent[]> {
+export async function fetchHistory(address: string): Promise<ApiEvent[]> {
 	const endpoint = `${API_URL}/api/events?address=${encodeURIComponent(address)}&limit=${HISTORY_LIMIT}`
 	const response = await fetch(endpoint)
 	if (!response.ok) {

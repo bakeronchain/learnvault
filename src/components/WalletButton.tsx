@@ -1,6 +1,7 @@
 import { Button, Icon, Text, Modal, Profile } from "@stellar/design-system"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
+import { Link } from "react-router-dom"
 import { useWallet } from "../hooks/useWallet"
 
 export const WalletButton = () => {
@@ -60,6 +61,19 @@ export const WalletButton = () => {
 						<code style={{ lineBreak: "anywhere" }}>{address}</code>
 						{t("wallet.disconnectPrompt")}
 					</Modal.Heading>
+					<div className="px-6 py-4 bg-white/5 border-y border-white/5">
+						<p className="text-sm text-white/50">
+							Need help with your wallet? Check out our{" "}
+							<Link
+								to="/wiki/stellar-basics"
+								onClick={() => setShowDisconnectModal(false)}
+								className="text-brand-cyan hover:underline"
+							>
+								Stellar Basics guide
+							</Link>
+							.
+						</p>
+					</div>
 					<Modal.Footer itemAlignment="stack">
 						<Button
 							size="md"

@@ -2,6 +2,7 @@ import { type Request, type Response } from "express"
 import { z } from "zod"
 
 import { pool } from "../db/index"
+import { trackEscrowTimeout } from "../services/escrow-timeout.service"
 import { stellarContractService } from "../services/stellar-contract.service"
 
 type ProposalStatus = "pending" | "approved" | "rejected"
@@ -64,14 +65,13 @@ function parseViewerAddress(value: unknown): string | null {
 
 function buildProposalSelect(viewerParamIndex?: number) {
 	const viewerVoteSelect = viewerParamIndex
-		? `,
-			(
-				SELECT v.support
-				FROM votes v
-				WHERE v.proposal_id = p.id AND v.voter_address = $${viewerParamIndex}
-				LIMIT 1
-			) AS user_vote_support`
+		? ", uv.support AS user_vote_support"
 		: ", NULL::boolean AS user_vote_support"
+	const viewerJoin = viewerParamIndex
+		? ` LEFT JOIN votes uv
+			ON uv.proposal_id = p.id
+			AND uv.voter_address = $${viewerParamIndex}`
+		: ""
 
 	return `SELECT
 			p.id,
@@ -84,7 +84,7 @@ function buildProposalSelect(viewerParamIndex?: number) {
 			p.status,
 			p.deadline,
 			p.created_at${viewerVoteSelect}
-		FROM proposals p`
+		FROM proposals p${viewerJoin}`
 }
 
 export async function getGovernanceProposals(
@@ -189,7 +189,7 @@ export async function getVotingPower(
 
 	try {
 		const rawBalance =
-			await stellarContractService.getGovernanceTokenBalance(address)
+			await stellarContractService.getGovernanceVotingPower(address)
 		const balanceBigInt = BigInt(rawBalance)
 		const whole = balanceBigInt / GOV_DIVISOR
 		const frac = balanceBigInt % GOV_DIVISOR
@@ -288,7 +288,9 @@ export async function createGovernanceProposal(
 
 		// 1. Call the on-chain contract first
 		const contractResult =
-			await stellarContractService.submitScholarshipProposal(params)
+			await stellarContractService.submitScholarshipProposal(params, {
+				requestId: req.requestId,
+			})
 
 		// 2. Only write to DB if contract call succeeded
 		const dbResult = await pool.query(
@@ -306,6 +308,16 @@ export async function createGovernanceProposal(
 		)
 
 		const proposal_id = dbResult.rows[0]?.id
+		if (proposal_id) {
+			try {
+				await trackEscrowTimeout({
+					proposalId: proposal_id,
+					scholarAddress: author_address,
+				})
+			} catch (trackingErr) {
+				console.error("[governance] escrow tracking failed:", trackingErr)
+			}
+		}
 
 		res.status(201).json({
 			proposal_id,
@@ -380,9 +392,9 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 			return
 		}
 
-		// 4. Check voter's GOV token balance (voting power)
+		// 4. Check voter's effective voting power (own balance + any delegated-to-them)
 		const rawBalance =
-			await stellarContractService.getGovernanceTokenBalance(voter_address)
+			await stellarContractService.getGovernanceVotingPower(voter_address)
 		const balanceBigInt = BigInt(rawBalance)
 
 		if (balanceBigInt <= 0n) {
@@ -394,11 +406,14 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 		}
 
 		// 5. Call the on-chain vote contract
-		const contractResult = await stellarContractService.castVote({
-			voter: voter_address,
-			proposalId: proposal_id,
-			support,
-		})
+		const contractResult = await stellarContractService.castVote(
+			{
+				voter: voter_address,
+				proposalId: proposal_id,
+				support,
+			},
+			{ requestId: req.requestId },
+		)
 
 		// 6. Write to DB after successful contract call
 		const votingPower = balanceBigInt
@@ -510,7 +525,10 @@ export async function cancelProposal(
 			return
 		}
 
-		await stellarContractService.cancelProposal({ proposalId })
+		await stellarContractService.cancelProposal(
+			{ proposalId },
+			{ requestId: req.requestId },
+		)
 		await pool.query("UPDATE proposals SET cancelled = TRUE WHERE id = $1", [
 			proposalId,
 		])
@@ -522,5 +540,40 @@ export async function cancelProposal(
 			error: "Failed to cancel proposal",
 			message: err instanceof Error ? err.message : String(err),
 		})
+	}
+}
+
+export async function getDelegation(
+	req: Request,
+	res: Response,
+): Promise<void> {
+	const { address } = req.params
+	if (!address || address.length < 50) {
+		res.status(400).json({ error: "Invalid Stellar address" })
+		return
+	}
+
+	try {
+		const [rawVotingPower, rawOwnBalance, delegatee] = await Promise.all([
+			stellarContractService.getGovernanceVotingPower(address),
+			stellarContractService.getGovernanceTokenBalance(address),
+			stellarContractService.getGovernanceDelegation(address),
+		])
+
+		const ownBalance = BigInt(rawOwnBalance)
+		const votingPower = BigInt(rawVotingPower)
+		const delegatedToMe = delegatee ? 0n : votingPower - ownBalance
+
+		res.status(200).json({
+			address,
+			delegatee,
+			is_delegating: delegatee !== null,
+			own_balance: rawOwnBalance,
+			delegated_to_me: delegatedToMe > 0n ? delegatedToMe.toString() : "0",
+			voting_power: rawVotingPower,
+		})
+	} catch (err) {
+		console.error("[governance] getDelegation error:", err)
+		res.status(500).json({ error: "Failed to fetch delegation state" })
 	}
 }

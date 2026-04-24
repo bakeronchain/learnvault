@@ -7,11 +7,11 @@ import { type JwtService } from "../services/jwt.service"
 // ---------------------------------------------------------------------------
 
 export function createRequireAuth(jwtService: JwtService) {
-	return function requireAuth(
+	return async function requireAuth(
 		req: Request,
 		res: Response,
 		next: NextFunction,
-	): void {
+	): Promise<void> {
 		const header = req.headers.authorization
 		if (!header?.startsWith("Bearer ")) {
 			res.status(401).json({ error: "Unauthorized" })
@@ -25,20 +25,59 @@ export function createRequireAuth(jwtService: JwtService) {
 		}
 
 		try {
-			const { sub } = jwtService.verifyWalletToken(token)
+			const { sub } = await jwtService.verifyWalletToken(token)
 			req.walletAddress = sub
 			;(req as AuthRequest).user = { address: sub }
 			next()
-		} catch {
-			res.status(401).json({ error: "Invalid or expired token" })
+		} catch (err) {
+			const message = err instanceof Error ? err.message : "Invalid or expired token"
+			res.status(401).json({ error: message })
 		}
 	}
 }
 
-// Extended request type for routes using createRequireAuth
+// ---------------------------------------------------------------------------
+// Standalone auth (used by self-contained routers, e.g. upload, comments)
+// ---------------------------------------------------------------------------
+
+const JWT_SECRET = process.env.JWT_SECRET || "learnvault-secret"
+const JWT_PUBLIC_KEY = process.env.JWT_PUBLIC_KEY?.replace(/\\n/g, "\n").trim()
+
 export interface AuthRequest extends Request {
 	user?: {
 		address: string
 	}
-	walletAddress?: string
 }
+
+export const authMiddleware = (
+	req: AuthRequest,
+	res: Response,
+	next: NextFunction,
+) => {
+	const authHeader = req.headers.authorization
+	if (!authHeader || !authHeader.startsWith("Bearer ")) {
+		return res.status(401).json({ error: "Unauthorized" })
+	}
+
+	const token = authHeader.split(" ")[1]
+	try {
+		let decoded: { sub?: string; address?: string }
+		if (JWT_PUBLIC_KEY) {
+			decoded = jwt.verify(token, JWT_PUBLIC_KEY, {
+				algorithms: ["RS256"],
+			}) as { sub?: string; address?: string }
+		} else {
+			decoded = jwt.verify(token, JWT_SECRET) as { sub?: string; address?: string }
+		}
+
+		const address = decoded.sub ?? decoded.address
+		if (!address) {
+			return res.status(401).json({ error: "Invalid token" })
+		}
+		req.user = { address }
+		next()
+	} catch {
+		return res.status(401).json({ error: "Invalid token" })
+	}
+}
+

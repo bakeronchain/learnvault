@@ -105,6 +105,45 @@ export class EmailService {
 
 		return allSent
 	}
+
+	async sendAdminFlagNotification(
+		contentType: string,
+		contentId: number,
+		reason: string,
+		reporterAddress: string,
+	): Promise<boolean> {
+		const adminEmails = process.env.ADMIN_EMAILS
+
+		if (!adminEmails) {
+			console.warn(
+				"[EmailService] ADMIN_EMAILS not set, skipping flag notification.",
+			)
+			return false
+		}
+
+		const adminLink = `${process.env.FRONTEND_URL || "http://localhost:3000"}/admin/moderation`
+
+		const body = `New content flag: ${contentType} #${contentId} reported by ${reporterAddress}. Reason: ${reason}. Review it here: ${adminLink}`
+
+		const emails = adminEmails.split(",").map((email) => email.trim())
+
+		let allSent = true
+		for (const email of emails) {
+			const success = await this.sendNotification({
+				to: email,
+				subject: `New Content Flag - ${contentType.toUpperCase()}`,
+				template: "admin-alert",
+				data: {
+					body,
+					adminUrl: adminLink,
+					unsubscribeUrl: "#",
+				},
+			})
+			if (!success) allSent = false
+		}
+
+		return allSent
+	}
 }
 
 export const createEmailService = (apiKey?: string) => new EmailService(apiKey)

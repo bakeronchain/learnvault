@@ -46,6 +46,9 @@ const CommentCard: React.FC<CommentCardProps> = ({
 	const [isReplying, setIsReplying] = useState(false)
 	const [replyText, setReplyText] = useState("")
 	const [replyError, setReplyError] = useState<string | null>(null)
+	const [isFlagging, setIsFlagging] = useState(false)
+	const [flagReason, setFlagReason] = useState("")
+	const [flagError, setFlagError] = useState<string | null>(null)
 	const replyFieldId = useId()
 	const replyHintId = `${replyFieldId}-hint`
 	const replyErrorId = `${replyFieldId}-error`
@@ -83,6 +86,52 @@ const CommentCard: React.FC<CommentCardProps> = ({
 			if (res.ok) onUpdate?.()
 		} catch (err) {
 			console.error("Pin failed", err)
+		}
+	}
+
+	const handleFlag = async () => {
+		if (!flagReason.trim()) {
+			setFlagError("Please provide a reason for reporting this comment.")
+			return
+		}
+
+		if (flagReason.length < 10) {
+			setFlagError("Reason must be at least 10 characters.")
+			return
+		}
+
+		const token = getAuthToken()
+		if (!token) {
+			setFlagError("Sign in to report content.")
+			return
+		}
+
+		setFlagError(null)
+		try {
+			const res = await fetch(`${API_URL}/api/content/flag`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
+				},
+				body: JSON.stringify({
+					contentType: "comment",
+					contentId: comment.id,
+					reason: flagReason,
+				}),
+			})
+
+			if (res.ok) {
+				setIsFlagging(false)
+				setFlagReason("")
+				// Show success message
+			} else {
+				const err = await res.json().catch(() => ({}))
+				setFlagError(err.error || "Failed to report comment.")
+			}
+		} catch (err) {
+			console.error("Flag failed", err)
+			setFlagError("Failed to report comment.")
 		}
 	}
 
@@ -192,6 +241,13 @@ const CommentCard: React.FC<CommentCardProps> = ({
 							Reply
 						</button>
 					)}
+					<button
+						type="button"
+						onClick={() => setIsFlagging(!isFlagging)}
+						className="text-[10px] font-black uppercase text-white/70 hover:text-red-400 transition-colors"
+					>
+						Flag
+					</button>
 				</div>
 			</header>
 
@@ -279,6 +335,59 @@ const CommentCard: React.FC<CommentCardProps> = ({
 							className="px-5 py-2 bg-brand-cyan text-black text-[10px] font-black uppercase tracking-widest rounded-full hover:scale-105 transition-all disabled:opacity-50"
 						>
 							Submit Reply
+						</button>
+					</div>
+				</div>
+			)}
+
+			{isFlagging && (
+				<div className="mt-8 pt-8 border-t border-white/5 animate-in slide-in-from-top-4 duration-500">
+					<label
+						htmlFor={`flag-reason-${comment.id}`}
+						className="block text-sm font-bold text-white mb-3"
+					>
+						Report Comment
+					</label>
+					<p className="mb-3 text-sm text-white/70">
+						Please describe why you're reporting this comment (minimum 10 characters).
+					</p>
+					<textarea
+						id={`flag-reason-${comment.id}`}
+						value={flagReason}
+						onChange={(event) => {
+							setFlagReason(event.target.value)
+							if (flagError) {
+								setFlagError(null)
+							}
+						}}
+						placeholder="Explain why you're reporting this comment..."
+						className="w-full h-24 bg-black/40 border border-white/10 rounded-2xl p-4 text-xs text-white focus:outline-none focus:border-red-500/40"
+						aria-invalid={Boolean(flagError)}
+					/>
+					{flagError && (
+						<p className="mt-3 text-sm text-red-400" role="alert">
+							{flagError}
+						</p>
+					)}
+					<div className="flex justify-end gap-3 mt-4">
+						<button
+							type="button"
+							onClick={() => {
+								setIsFlagging(false)
+								setFlagReason("")
+								setFlagError(null)
+							}}
+							className="px-5 py-2 text-[10px] font-black uppercase text-white/70 border border-white/10 rounded-full hover:bg-white/5 transition-colors"
+						>
+							Cancel
+						</button>
+						<button
+							type="button"
+							onClick={() => void handleFlag()}
+							disabled={!flagReason.trim()}
+							className="px-5 py-2 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:scale-105 transition-all disabled:opacity-50"
+						>
+							Submit Report
 						</button>
 					</div>
 				</div>

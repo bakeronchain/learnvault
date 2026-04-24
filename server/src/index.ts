@@ -106,6 +106,8 @@ const jwtService = createJwtService(jwtPrivateKey, jwtPublicKey)
 const authService = createAuthService(nonceStore, jwtService)
 
 const app = express()
+
+export { app }
 const openApiSpec = buildOpenApiSpec()
 const openApiYaml = YAML.stringify(openApiSpec)
 

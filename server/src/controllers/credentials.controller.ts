@@ -18,6 +18,7 @@ interface CourseMetadata {
 interface NFTAttribute {
 	trait_type: string
 	value: string
+	[key: string]: any
 }
 
 interface NFTMetadata {
@@ -25,7 +26,9 @@ interface NFTMetadata {
 	description: string
 	image: string
 	attributes: NFTAttribute[]
+	[key: string]: any
 }
+
 
 interface CreateMetadataRequest {
 	course_id: string

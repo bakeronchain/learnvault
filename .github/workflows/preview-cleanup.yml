@@ -1,0 +1,28 @@
+# On PR close: idempotent clean-up (comment on PR). De-provision your preview app here if you add APIs that track deployment IDs.
+name: Preview environment cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  note-cleanup:
+    if: github.event.pull_request.merged == false
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Optional cleanup comment
+        if: github.event.pull_request.head.repo.fork == false
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const num = context.payload.pull_request.number
+            const owner = context.repo.owner
+            const repo = context.repo.repo
+            await github.rest.issues.createComment({
+              issue_number: num,
+              owner,
+              repo,
+              body: `**Preview cleanup:** PR #${num} was closed. Remove any staging resources (preview app, feature branch DB, or temporary secrets) in your host provider.`
+            })

@@ -124,7 +124,7 @@ app.use(globalLimiter)
 // Routes
 app.use("/api", healthRouter)
 app.use("/api/auth", createAuthRouter(authService))
-app.use("/api", createMeRouter(jwtService))
+app.use("/api", createMeRouter(jwtService, authService))
 app.use("/api", coursesRouter)
 app.use("/api", credentialsRouter)
 app.use("/api", validatorRouter)

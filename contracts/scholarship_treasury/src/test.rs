@@ -968,6 +968,56 @@ fn submit_proposal_fails_when_reputation_is_below_threshold() {
 }
 
 #[test]
+fn set_min_lrn_to_propose_rejects_zero_and_negative() {
+    let env = Env::default();
+    let (client, _, _donor, _recipient, _token_id, _gov_client, admin) = setup_with_admin(&env);
+
+    env.mock_all_auths();
+    let zero = client.try_set_min_lrn_to_propose(&admin, &0);
+    assert_eq!(
+        zero.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidAmount as u32
+        )))
+    );
+    let neg = client.try_set_min_lrn_to_propose(&admin, &-1);
+    assert_eq!(
+        neg.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidAmount as u32
+        )))
+    );
+}
+
+#[test]
+fn clear_min_lrn_to_propose_allows_proposals_with_no_lrn() {
+    let env = Env::default();
+    let (client, _, _donor, _recipient, _token_id, gov_client, admin) = setup_with_admin(&env);
+    let applicant = Address::generate(&env);
+    let (milestone_titles, milestone_dates) = sample_milestones(&env);
+
+    env.mock_all_auths();
+    client.set_min_lrn_to_propose(&admin, &10_000);
+    client.clear_min_lrn_to_propose(&admin);
+    assert_eq!(client.get_min_lrn_to_propose(), 0);
+
+    // Applicant has 0 LRN; after clear, should still be able to propose (sufficient program funds etc.)
+    let proposal_id = client.submit_proposal(
+        &applicant,
+        &100,
+        &String::from_str(&env, "Open Program"),
+        &String::from_str(&env, "https://example.com/p"),
+        &String::from_str(&env, "No min LRN after clear"),
+        &String::from_str(&env, "2026-01-01"),
+        &milestone_titles,
+        &milestone_dates,
+    );
+    assert_eq!(proposal_id, 1);
+    // sanity: gov balance unchanged
+    assert_eq!(gov_client.balance(&applicant), 0);
+}
+
+#[test]
 fn submit_proposal_zero_amount_fails() {
     let env = Env::default();
     let (client, _, donor, _, _, _) = setup(&env);

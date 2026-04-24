@@ -1,6 +1,7 @@
 import { Router } from "express"
 
 import { getPgStatStatementsSnapshot, pool } from "../db/index"
+import { getRpcCacheStats, resetRpcCacheStats } from "../lib/rpc-cache"
 
 export const healthRouter = Router()
 
@@ -72,4 +73,15 @@ healthRouter.get("/health/db/performance", async (_req, res) => {
 			error: "Failed to fetch database performance stats",
 		})
 	}
+})
+
+/** GET /api/rpc-stats — RPC cache hit/miss counters since last reset */
+healthRouter.get("/rpc-stats", (_req, res) => {
+	res.json(getRpcCacheStats())
+})
+
+/** DELETE /api/rpc-stats — reset counters */
+healthRouter.delete("/rpc-stats", (_req, res) => {
+	resetRpcCacheStats()
+	res.json({ reset: true })
 })

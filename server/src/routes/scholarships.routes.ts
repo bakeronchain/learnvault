@@ -1,6 +1,6 @@
 import { Router } from "express"
 
-import { applyForScholarship } from "../controllers/scholarships.controller"
+import { applyForScholarship, contributeToScholarship } from "../controllers/scholarships.controller"
 import { scholarshipApplyLimiter } from "../middleware/rate-limit.middleware"
 
 export const scholarshipsRouter = Router()
@@ -65,4 +65,30 @@ scholarshipsRouter.post(
 	(req, res) => {
 		void applyForScholarship(req, res)
 	},
+)
+
+/**
+ * @openapi
+ * /api/scholarships/contribute:
+ * post:
+ * tags: [Scholarships]
+ * summary: Record a donor contribution to a scholarship
+ * description: Tracks a partial or full contribution from a donor to a scholarship proposal.
+ * requestBody:
+ * required: true
+ * content:
+ * application/json:
+ * schema:
+ * type: object
+ * properties:
+ * proposal_id: { type: integer }
+ * donor_address: { type: string }
+ * amount: { type: number }
+ * tx_hash: { type: string }
+ */
+scholarshipsRouter.post(
+    "/scholarships/contribute",
+    (req, res) => {
+        void contributeToScholarship(req, res)
+    }
 )

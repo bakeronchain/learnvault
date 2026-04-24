@@ -125,3 +125,60 @@ export async function applyForScholarship(
 		})
 	}
 }
+
+export async function contributeToScholarship(
+    req: Request,
+    res: Response,
+): Promise<void> {
+    const contributionSchema = z.object({
+        proposal_id: z.number(),
+        donor_address: z.string().min(50).max(56),
+        amount: z.number().positive(),
+        tx_hash: z.string().min(64),
+    })
+
+    const validation = contributionSchema.safeParse(req.body)
+    if (!validation.success) {
+        res.status(400).json({ error: "Invalid contribution data" })
+        return
+    }
+
+    const { proposal_id, donor_address, amount, tx_hash } = validation.data
+
+    try {
+        const client = await pool.connect()
+        try {
+            await client.query("BEGIN")
+            
+            // 1. Record the contribution
+            await client.query(
+                "INSERT INTO scholarship_contributions (proposal_id, donor_address, amount, tx_hash) VALUES (, , , )",
+                [proposal_id, donor_address, amount, tx_hash]
+            )
+
+            // 2. Update the proposal's current funding
+            const updateResult = await client.query(
+                "UPDATE proposals SET current_funding = current_funding +  WHERE id =  RETURNING current_funding, amount",
+                [amount, proposal_id]
+            )
+
+            const { current_funding, amount: target_amount } = updateResult.rows[0]
+
+            // 3. Check if fully funded
+            if (parseFloat(current_funding) >= parseFloat(target_amount)) {
+                await client.query("UPDATE proposals SET status = 'funded' WHERE id = ", [proposal_id])
+            }
+
+            await client.query("COMMIT")
+            res.status(200).json({ message: "Contribution recorded successfully", current_funding })
+        } catch (err) {
+            await client.query("ROLLBACK")
+            throw err
+        } finally {
+            client.release()
+        }
+    } catch (err) {
+        console.error("[scholarships] Contribution failed:", err)
+        res.status(500).json({ error: "Internal server error" })
+    }
+}

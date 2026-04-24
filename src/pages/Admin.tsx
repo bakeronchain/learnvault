@@ -5,7 +5,10 @@ import TxHashLink from "../components/TxHashLink"
 import {
 	useAdminStats,
 	useAdminMilestones,
+	useAdminModeration,
 	type MilestoneSubmission,
+	type FlaggedItem,
+	type ModerationAction,
 } from "../hooks/useAdmin"
 import {
 	useAdminContracts,
@@ -19,6 +22,7 @@ import { shortenContractId } from "../util/contract"
 type AdminSection =
 	| "courses"
 	| "milestones"
+	| "moderation"
 	| "users"
 	| "treasury"
 	| "contracts"
@@ -62,6 +66,7 @@ type ApiCourse = {
 const sectionDescriptions: Record<AdminSection, string> = {
 	courses: "Live course records from the backend course catalog.",
 	milestones: "Review milestone reports and approvals.",
+	moderation: "Review flagged comments and take action.",
 	users: "Lookup learner profiles by wallet address.",
 	treasury: "Monitor and manage live treasury controls.",
 	contracts: "Inspect deployed contract addresses and on-chain state.",
@@ -265,7 +270,7 @@ const Admin: React.FC = () => {
 			<aside className="w-72 glass border-r border-white/5 p-8 flex flex-col gap-8">
 				<nav className="flex flex-col gap-2">
 					{(
-						["courses", "milestones", "users", "treasury", "contracts"] as const
+						["courses", "milestones", "moderation", "users", "treasury", "contracts"] as const
 					).map((section) => (
 						<button
 							key={section}
@@ -289,6 +294,7 @@ const Admin: React.FC = () => {
 			<main className="flex-1 p-10">
 				{activeSection === "courses" && <CourseManagement />}
 				{activeSection === "milestones" && <MilestoneQueue />}
+				{activeSection === "moderation" && <ModerationQueue />}
 				{activeSection === "users" && <UserLookup />}
 				{activeSection === "treasury" && <TreasuryControls />}
 				{activeSection === "contracts" && <ContractInfo />}
@@ -654,6 +660,291 @@ const MilestoneQueue: React.FC = () => {
 					onConfirm={() => void handleConfirm()}
 					onCancel={() => setDialog(null)}
 				/>
+			)}
+		</section>
+	)
+}
+
+// ---------------------------------------------------------------------------
+// Moderation Queue
+// ---------------------------------------------------------------------------
+
+type ModerationStatusFilter = "pending" | "dismissed" | "actioned"
+
+const shortenAddr = (addr: string) =>
+	addr ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : "—"
+
+const ModerationQueue: React.FC = () => {
+	const { flags, total, page, pageSize, loading, error, fetchFlags, applyAction } =
+		useAdminModeration()
+	const [statusFilter, setStatusFilter] =
+		useState<ModerationStatusFilter>("pending")
+	const [warnDialog, setWarnDialog] = useState<FlaggedItem | null>(null)
+	const [warnReason, setWarnReason] = useState("")
+
+	useEffect(() => {
+		void fetchFlags(1, statusFilter)
+	}, [statusFilter, fetchFlags])
+
+	const totalPages = Math.max(1, Math.ceil(total / pageSize))
+
+	const handleAction = async (
+		flag: FlaggedItem,
+		action: ModerationAction,
+		reason?: string,
+	) => {
+		await applyAction(flag.id, action, reason)
+	}
+
+	const statusStyles: Record<ModerationStatusFilter, string> = {
+		pending: "text-yellow-400 bg-yellow-400/10 border-yellow-400/30",
+		dismissed: "text-white/50 bg-white/5 border-white/10",
+		actioned: "text-emerald-400 bg-emerald-400/10 border-emerald-400/30",
+	}
+
+	return (
+		<section>
+			<div className="flex items-center justify-between gap-4 mb-6">
+				<div>
+					<h1 className="text-3xl font-semibold text-white">
+						Content Moderation
+					</h1>
+					<p className="text-sm text-white/50 mt-1">
+						Flagged comments pending review.
+					</p>
+				</div>
+				<div className="flex items-center gap-2">
+					<label
+						htmlFor="mod-status-filter"
+						className="text-xs text-white/40 uppercase tracking-widest"
+					>
+						Status
+					</label>
+					<select
+						id="mod-status-filter"
+						value={statusFilter}
+						onChange={(e) =>
+							setStatusFilter(e.target.value as ModerationStatusFilter)
+						}
+						className="glass border border-white/10 text-white/80 text-sm rounded-xl px-3 py-1.5 bg-transparent focus:outline-none focus:border-white/20"
+					>
+						{(["pending", "dismissed", "actioned"] as const).map((s) => (
+							<option key={s} value={s} className="bg-gray-900">
+								{s}
+							</option>
+						))}
+					</select>
+				</div>
+			</div>
+
+			{error && (
+				<p className="text-xs text-red-400 mb-4">Error: {error}</p>
+			)}
+
+			<div className="overflow-x-auto rounded-2xl border border-white/5 glass">
+				<table className="w-full text-left">
+					<thead>
+						<tr className="border-b border-white/5 text-xs uppercase tracking-widest text-white/40">
+							<th className="py-3 px-4 font-medium">ID</th>
+							<th className="py-3 px-4 font-medium">Type</th>
+							<th className="py-3 px-4 font-medium">Content</th>
+							<th className="py-3 px-4 font-medium">Author</th>
+							<th className="py-3 px-4 font-medium">Reporter</th>
+							<th className="py-3 px-4 font-medium">Reason</th>
+							<th className="py-3 px-4 font-medium">Flags</th>
+							<th className="py-3 px-4 font-medium">Hidden</th>
+							<th className="py-3 px-4 font-medium">Flagged</th>
+							<th className="py-3 px-4 font-medium">Actions</th>
+						</tr>
+					</thead>
+					<tbody>
+						{loading && (
+							<tr>
+								<td
+									colSpan={10}
+									className="py-12 text-center text-sm text-white/40 animate-pulse"
+								>
+									Loading flagged content…
+								</td>
+							</tr>
+						)}
+
+						{!loading && flags.length === 0 && (
+							<tr>
+								<td colSpan={10} className="py-12 text-center">
+									<p className="text-white/40 text-sm">No flagged content.</p>
+								</td>
+							</tr>
+						)}
+
+						{!loading &&
+							flags.map((flag) => (
+								<tr
+									key={flag.id}
+									className="border-b border-white/5 hover:bg-white/3 transition-colors"
+								>
+									<td className="py-3 px-4 text-xs text-white/50">
+										#{flag.content_id}
+									</td>
+									<td className="py-3 px-4 text-xs text-white/70 capitalize">
+										{flag.content_type}
+									</td>
+									<td className="py-3 px-4 max-w-xs">
+										<p className="text-xs text-white/70 truncate max-w-[200px]">
+											{flag.comment_content ?? "—"}
+										</p>
+									</td>
+									<td className="py-3 px-4 font-mono text-xs text-white/50">
+										{shortenAddr(flag.comment_author ?? "")}
+									</td>
+									<td className="py-3 px-4 font-mono text-xs text-white/50">
+										{shortenAddr(flag.reporter)}
+									</td>
+									<td className="py-3 px-4 text-xs text-white/70 max-w-[140px] truncate">
+										{flag.reason}
+									</td>
+									<td className="py-3 px-4 text-xs text-white/70">
+										{flag.flag_count}
+									</td>
+									<td className="py-3 px-4">
+										{flag.is_hidden ? (
+											<span className="text-xs text-red-400">Yes</span>
+										) : (
+											<span className="text-xs text-white/30">No</span>
+										)}
+									</td>
+									<td className="py-3 px-4 text-xs text-white/50">
+										{formatDate(flag.created_at)}
+									</td>
+									<td className="py-3 px-4">
+										{flag.status === "pending" && (
+											<div className="flex gap-2 flex-wrap">
+												<button
+													type="button"
+													onClick={() =>
+														void handleAction(flag, "delete")
+													}
+													className="px-2 py-1 text-xs font-medium rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-colors"
+												>
+													Delete
+												</button>
+												<button
+													type="button"
+													onClick={() =>
+														void handleAction(flag, "dismiss")
+													}
+													className="px-2 py-1 text-xs font-medium rounded-lg bg-white/5 text-white/60 border border-white/10 hover:bg-white/10 transition-colors"
+												>
+													Dismiss
+												</button>
+												<button
+													type="button"
+													onClick={() => {
+														setWarnDialog(flag)
+														setWarnReason("")
+													}}
+													className="px-2 py-1 text-xs font-medium rounded-lg bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 hover:bg-yellow-500/20 transition-colors"
+												>
+													Warn
+												</button>
+											</div>
+										)}
+										{flag.status !== "pending" && (
+											<span
+												className={`text-xs px-2 py-0.5 rounded-full border ${statusStyles[flag.status as ModerationStatusFilter]}`}
+											>
+												{flag.status}
+											</span>
+										)}
+									</td>
+								</tr>
+							))}
+					</tbody>
+				</table>
+			</div>
+
+			{total > pageSize && (
+				<div className="flex items-center justify-between mt-4 text-sm text-white/40">
+					<span>
+						Page {page} of {totalPages} ({total} total)
+					</span>
+					<div className="flex gap-2">
+						<button
+							type="button"
+							disabled={page <= 1}
+							onClick={() => void fetchFlags(page - 1, statusFilter)}
+							className="px-3 py-1 rounded-xl border border-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+						>
+							← Prev
+						</button>
+						<button
+							type="button"
+							disabled={page >= totalPages}
+							onClick={() => void fetchFlags(page + 1, statusFilter)}
+							className="px-3 py-1 rounded-xl border border-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+						>
+							Next →
+						</button>
+					</div>
+				</div>
+			)}
+
+			{/* Warn dialog */}
+			{warnDialog && (
+				<div
+					role="dialog"
+					aria-modal="true"
+					aria-labelledby="warn-dialog-title"
+					className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+				>
+					<div className="glass border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+						<h2
+							id="warn-dialog-title"
+							className="text-lg font-semibold text-white mb-2"
+						>
+							Warn User
+						</h2>
+						<p className="text-sm text-white/60 mb-4">
+							Author:{" "}
+							<span className="font-mono text-white/90">
+								{shortenAddr(warnDialog.comment_author ?? "")}
+							</span>
+						</p>
+						<label
+							htmlFor="warn-reason-input"
+							className="block text-xs text-white/50 uppercase tracking-widest mb-2"
+						>
+							Reason (optional)
+						</label>
+						<textarea
+							id="warn-reason-input"
+							value={warnReason}
+							onChange={(e) => setWarnReason(e.target.value)}
+							placeholder="Describe the violation..."
+							maxLength={500}
+							className="w-full h-20 bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-brand-cyan/40 mb-4"
+						/>
+						<div className="flex gap-3 justify-end">
+							<button
+								type="button"
+								onClick={() => setWarnDialog(null)}
+								className="px-4 py-2 text-sm rounded-xl border border-white/10 text-white/60 hover:text-white transition-colors"
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								onClick={async () => {
+									await handleAction(warnDialog, "warn", warnReason || undefined)
+									setWarnDialog(null)
+								}}
+								className="px-4 py-2 text-sm rounded-xl font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 hover:bg-yellow-500/30 transition-colors"
+							>
+								Send Warning
+							</button>
+						</div>
+					</div>
+				</div>
 			)}
 		</section>
 	)

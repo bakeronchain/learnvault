@@ -246,6 +246,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 								comment={comment}
 								isAuthor={comment.author_address === proposalAuthor}
 								canPin={proposalAuthor === address}
+								currentUserAddress={address ?? undefined}
 								onUpdate={fetchComments}
 							/>
 							<div className="ml-12 mt-6 space-y-6 border-l border-white/5 pl-8">
@@ -254,6 +255,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 										key={reply.id}
 										comment={reply}
 										isReply
+										currentUserAddress={address ?? undefined}
 										onUpdate={fetchComments}
 									/>
 								))}

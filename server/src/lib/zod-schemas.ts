@@ -210,3 +210,30 @@ export const enrollmentBodySchema = z
 		tx_hash: requiredString("tx_hash"),
 	})
 	.strict()
+
+export const flagContentBodySchema = z
+	.object({
+		reason: z
+			.string({
+				required_error: "reason is required",
+				invalid_type_error: "reason must be a string",
+			})
+			.trim()
+			.min(1, "reason is required")
+			.max(500, "reason must be 500 characters or fewer"),
+	})
+	.strict()
+
+export const adminModerationActionSchema = z
+	.object({
+		action: z.enum(["delete", "dismiss", "warn"], {
+			required_error: "action is required",
+			invalid_type_error: "action must be one of: delete, dismiss, warn",
+		}),
+		warn_reason: z
+			.string()
+			.trim()
+			.max(500, "warn_reason must be 500 characters or fewer")
+			.optional(),
+	})
+	.strict()

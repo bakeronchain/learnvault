@@ -17,6 +17,7 @@ import { errorHandler } from "./middleware/error.middleware"
 import { globalLimiter } from "./middleware/rate-limit.middleware"
 import { requestLogger } from "./middleware/request-logger.middleware"
 import { buildOpenApiSpec } from "./openapi"
+import { createModerationRouter } from "./routes/moderation.routes"
 import { adminMilestonesRouter } from "./routes/admin-milestones.routes"
 import { adminRouter } from "./routes/admin.routes"
 import { createAuthRouter } from "./routes/auth.routes"
@@ -142,6 +143,7 @@ app.use("/api", createCredentialsRouter(jwtService))
 app.use("/api", validatorRouter)
 app.use("/api", eventsRouter)
 app.use("/api", createCommentsRouter(jwtService))
+app.use("/api", createModerationRouter(jwtService))
 app.use("/api", leaderboardRouter)
 app.use("/api", governanceRouter)
 app.use("/api", scholarsRouter)

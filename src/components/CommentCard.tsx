@@ -3,8 +3,6 @@ import React, { useId, useState } from "react"
 import ReactMarkdown from "react-markdown"
 import { getAuthToken } from "../util/auth"
 
-const API_BASE = import.meta.env.VITE_SERVER_URL ?? "http://localhost:4000"
-
 export interface Comment {
 	id: number
 	proposal_id: string
@@ -15,6 +13,8 @@ export interface Comment {
 	downvotes: number
 	is_pinned: boolean
 	created_at: string
+	flag_count?: number
+	hidden_at?: string | null
 }
 
 interface CommentCardProps {
@@ -22,6 +22,7 @@ interface CommentCardProps {
 	isAuthor?: boolean
 	isReply?: boolean
 	canPin?: boolean
+	currentUserAddress?: string
 	onUpdate?: () => void
 }
 
@@ -30,6 +31,14 @@ const API_URL = (
 	(import.meta.env.VITE_SERVER_URL as string | undefined) ??
 	""
 ).replace(/\/$/, "")
+
+const FLAG_REASONS = [
+	"Spam or self-promotion",
+	"Harassment or hate speech",
+	"Misinformation",
+	"Off-topic",
+	"Other",
+] as const
 
 const shortenAddress = (address: string) => {
 	if (!address) return ""
@@ -41,16 +50,32 @@ const CommentCard: React.FC<CommentCardProps> = ({
 	isAuthor,
 	isReply,
 	canPin,
+	currentUserAddress,
 	onUpdate,
 }) => {
 	const [isReplying, setIsReplying] = useState(false)
 	const [replyText, setReplyText] = useState("")
 	const [replyError, setReplyError] = useState<string | null>(null)
+
+	// Flag state
+	const [isFlagOpen, setIsFlagOpen] = useState(false)
+	const [flagReason, setFlagReason] = useState<string>(FLAG_REASONS[0])
+	const [flagCustomReason, setFlagCustomReason] = useState("")
+	const [flagSubmitting, setFlagSubmitting] = useState(false)
+	const [flagError, setFlagError] = useState<string | null>(null)
+	const [flagSuccess, setFlagSuccess] = useState(false)
+
 	const replyFieldId = useId()
 	const replyHintId = `${replyFieldId}-hint`
 	const replyErrorId = `${replyFieldId}-error`
 	const replySectionId = `${replyFieldId}-section`
+	const flagDialogId = `${replyFieldId}-flag-dialog`
+	const flagReasonId = `${replyFieldId}-flag-reason`
 	const authorId = `comment-${comment.id}-author`
+
+	const isOwnComment =
+		currentUserAddress &&
+		comment.author_address.toLowerCase() === currentUserAddress.toLowerCase()
 
 	const handleVote = async (type: "upvote" | "downvote") => {
 		const token = getAuthToken()
@@ -118,11 +143,59 @@ const CommentCard: React.FC<CommentCardProps> = ({
 				onUpdate?.()
 			} else {
 				const err = await res.json().catch(() => ({}))
-				setReplyError(err.error || "Reply failed.")
+				setReplyError((err as { error?: string }).error || "Reply failed.")
 			}
 		} catch (err) {
 			console.error("Reply failed", err)
 			setReplyError("Reply failed.")
+		}
+	}
+
+	const handleSubmitFlag = async () => {
+		const token = getAuthToken()
+		if (!token) {
+			setFlagError("Sign in to flag content.")
+			return
+		}
+
+		const reason =
+			flagReason === "Other" ? flagCustomReason.trim() : flagReason
+		if (!reason) {
+			setFlagError("Please provide a reason.")
+			return
+		}
+
+		setFlagSubmitting(true)
+		setFlagError(null)
+
+		try {
+			const res = await fetch(`${API_URL}/api/comments/${comment.id}/flag`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
+				},
+				body: JSON.stringify({ reason }),
+			})
+
+			if (res.ok) {
+				setFlagSuccess(true)
+				setTimeout(() => {
+					setIsFlagOpen(false)
+					setFlagSuccess(false)
+					setFlagReason(FLAG_REASONS[0])
+					setFlagCustomReason("")
+				}, 1500)
+			} else {
+				const data = await res.json().catch(() => ({}))
+				setFlagError(
+					(data as { error?: string }).error || "Failed to submit flag.",
+				)
+			}
+		} catch {
+			setFlagError("Failed to submit flag.")
+		} finally {
+			setFlagSubmitting(false)
 		}
 	}
 
@@ -171,7 +244,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 					</div>
 				</div>
 
-				<div className="flex gap-2">
+				<div className="flex gap-2 items-center">
 					{canPin && !comment.is_pinned && (
 						<button
 							type="button"
@@ -190,6 +263,23 @@ const CommentCard: React.FC<CommentCardProps> = ({
 							className="text-[10px] font-black uppercase text-white/70 hover:text-brand-cyan transition-colors"
 						>
 							Reply
+						</button>
+					)}
+					{/* Flag button — hidden for own comments */}
+					{!isOwnComment && (
+						<button
+							type="button"
+							onClick={() => {
+								setIsFlagOpen(true)
+								setFlagError(null)
+								setFlagSuccess(false)
+							}}
+							aria-haspopup="dialog"
+							aria-label={`Flag comment from ${shortenAddress(comment.author_address)}`}
+							className="text-[10px] font-black uppercase text-white/30 hover:text-red-400 transition-colors"
+							title="Flag this comment"
+						>
+							⚑ Flag
 						</button>
 					)}
 				</div>
@@ -280,6 +370,93 @@ const CommentCard: React.FC<CommentCardProps> = ({
 						>
 							Submit Reply
 						</button>
+					</div>
+				</div>
+			)}
+
+			{/* Flag dialog */}
+			{isFlagOpen && (
+				<div
+					role="dialog"
+					id={flagDialogId}
+					aria-modal="true"
+					aria-labelledby={`${flagDialogId}-title`}
+					className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+				>
+					<div className="glass border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+						<h2
+							id={`${flagDialogId}-title`}
+							className="text-base font-semibold text-white mb-1"
+						>
+							Flag Comment
+						</h2>
+						<p className="text-xs text-white/50 mb-4">
+							Help us keep the community safe. Select a reason below.
+						</p>
+
+						{flagSuccess ? (
+							<p className="text-sm text-emerald-400 text-center py-4">
+								✓ Flag submitted. Thank you.
+							</p>
+						) : (
+							<>
+								<label
+									htmlFor={flagReasonId}
+									className="block text-xs text-white/60 uppercase tracking-widest mb-2"
+								>
+									Reason
+								</label>
+								<select
+									id={flagReasonId}
+									value={flagReason}
+									onChange={(e) => setFlagReason(e.target.value)}
+									className="w-full glass border border-white/10 text-white/80 text-sm rounded-xl px-3 py-2 bg-transparent focus:outline-none focus:border-white/20 mb-3"
+								>
+									{FLAG_REASONS.map((r) => (
+										<option key={r} value={r} className="bg-gray-900">
+											{r}
+										</option>
+									))}
+								</select>
+
+								{flagReason === "Other" && (
+									<textarea
+										value={flagCustomReason}
+										onChange={(e) => setFlagCustomReason(e.target.value)}
+										placeholder="Describe the issue..."
+										maxLength={500}
+										className="w-full h-20 bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-brand-cyan/40 mb-3"
+									/>
+								)}
+
+								{flagError && (
+									<p className="text-xs text-red-400 mb-3" role="alert">
+										{flagError}
+									</p>
+								)}
+
+								<div className="flex gap-3 justify-end">
+									<button
+										type="button"
+										onClick={() => setIsFlagOpen(false)}
+										className="px-4 py-2 text-xs rounded-xl border border-white/10 text-white/60 hover:text-white transition-colors"
+									>
+										Cancel
+									</button>
+									<button
+										type="button"
+										onClick={() => void handleSubmitFlag()}
+										disabled={
+											flagSubmitting ||
+											(flagReason === "Other" && !flagCustomReason.trim())
+										}
+										className="px-4 py-2 text-xs rounded-xl font-medium bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+									>
+										{flagSubmitting ? "Submitting…" : "Submit Flag"}
+									</button>
+								</div>
+							</>
+						)}
 					</div>
 				</div>
 			)}

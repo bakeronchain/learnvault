@@ -202,3 +202,108 @@ export function useAdminMilestones() {
 		rejectMilestone,
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Moderation
+// ---------------------------------------------------------------------------
+
+export type ModerationStatus = "pending" | "dismissed" | "actioned"
+export type ModerationAction = "delete" | "dismiss" | "warn"
+
+export interface FlaggedItem {
+	id: number
+	content_type: string
+	content_id: number
+	reporter: string
+	reason: string
+	status: ModerationStatus
+	created_at: string
+	resolved_at: string | null
+	resolved_by: string | null
+	comment_content: string | null
+	comment_author: string | null
+	flag_count: number
+	is_hidden: boolean
+}
+
+interface PaginatedFlagsApi {
+	data: FlaggedItem[]
+	total: number
+	page: number
+	pageSize: number
+}
+
+export function useAdminModeration() {
+	const [flags, setFlags] = useState<FlaggedItem[]>([])
+	const [total, setTotal] = useState(0)
+	const [page, setPage] = useState(1)
+	const [loading, setLoading] = useState(false)
+	const [error, setError] = useState<string | null>(null)
+
+	const PAGE_SIZE = 20
+
+	const fetchFlags = useCallback(
+		async (
+			pageNum = 1,
+			status: ModerationStatus = "pending",
+		): Promise<void> => {
+			setLoading(true)
+			setError(null)
+			try {
+				const params = new URLSearchParams({
+					page: String(pageNum),
+					pageSize: String(PAGE_SIZE),
+					status,
+				})
+				const result = await apiFetchJson<PaginatedFlagsApi>(
+					`/api/admin/moderation?${params.toString()}`,
+					{ auth: true },
+				)
+				setFlags(result.data)
+				setTotal(result.total)
+				setPage(result.page)
+			} catch (err: unknown) {
+				setError(err instanceof Error ? err.message : "Unknown error")
+			} finally {
+				setLoading(false)
+			}
+		},
+		[],
+	)
+
+	const applyAction = useCallback(
+		async (
+			flagId: number,
+			action: ModerationAction,
+			warnReason?: string,
+		): Promise<boolean> => {
+			try {
+				await apiFetchJson(`/api/admin/moderation/${flagId}/action`, {
+					method: "POST",
+					auth: true,
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ action, warn_reason: warnReason }),
+				})
+				// Optimistically remove from list
+				setFlags((prev) => prev.filter((f) => f.id !== flagId))
+				setTotal((prev) => Math.max(0, prev - 1))
+				return true
+			} catch (err: unknown) {
+				setError(err instanceof Error ? err.message : "Action failed")
+				return false
+			}
+		},
+		[],
+	)
+
+	return {
+		flags,
+		total,
+		page,
+		pageSize: PAGE_SIZE,
+		loading,
+		error,
+		fetchFlags,
+		applyAction,
+	}
+}

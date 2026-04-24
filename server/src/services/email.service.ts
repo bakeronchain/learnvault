@@ -105,6 +105,65 @@ export class EmailService {
 
 		return allSent
 	}
+
+	async sendAdminFlagNotification(opts: {
+		contentType: string
+		contentId: number
+		reporter: string
+		reason: string
+		flagCount: number
+	}): Promise<boolean> {
+		const adminEmails = process.env.ADMIN_EMAILS
+
+		if (!adminEmails) {
+			console.warn(
+				"[EmailService] ADMIN_EMAILS not set, skipping flag notification.",
+			)
+			return false
+		}
+
+		const adminUrl = `${process.env.FRONTEND_URL || "http://localhost:3000"}/admin`
+		const emails = adminEmails.split(",").map((e) => e.trim())
+
+		let allSent = true
+		for (const email of emails) {
+			const success = await this.sendNotification({
+				to: email,
+				subject: `[LearnVault] New content flag — ${opts.contentType} #${opts.contentId}`,
+				template: "admin-flag-alert",
+				data: {
+					contentType: opts.contentType,
+					contentId: String(opts.contentId),
+					reporter: opts.reporter,
+					reason: opts.reason,
+					flagCount: String(opts.flagCount),
+					adminUrl,
+					unsubscribeUrl: "#",
+				},
+			})
+			if (!success) allSent = false
+		}
+
+		return allSent
+	}
+
+	async sendUserWarnNotification(opts: {
+		to: string
+		contentType: string
+		reason?: string
+	}): Promise<boolean> {
+		return this.sendNotification({
+			to: opts.to,
+			subject: "[LearnVault] Community guidelines warning",
+			template: "user-warn",
+			data: {
+				contentType: opts.contentType,
+				reason: opts.reason ?? "",
+				guidelinesUrl: `${process.env.FRONTEND_URL || "http://localhost:3000"}/guidelines`,
+				unsubscribeUrl: "#",
+			},
+		})
+	}
 }
 
 export const createEmailService = (apiKey?: string) => new EmailService(apiKey)

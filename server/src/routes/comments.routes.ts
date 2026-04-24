@@ -44,7 +44,7 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 		const offset = Math.max(parseInt(req.query.offset as string) || 0, 0)
 		try {
 			const result = await pool.query(
-				`SELECT * FROM comments WHERE proposal_id = $1 AND deleted_at IS NULL ORDER BY is_pinned DESC, created_at ASC LIMIT $2 OFFSET $3`,
+				`SELECT * FROM comments WHERE proposal_id = $1 AND deleted_at IS NULL AND hidden_at IS NULL ORDER BY is_pinned DESC, created_at ASC LIMIT $2 OFFSET $3`,
 				[proposalId, limit, offset],
 			)
 			res.json(result.rows)

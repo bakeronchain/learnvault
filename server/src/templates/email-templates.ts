@@ -196,6 +196,40 @@ export const templates: Record<string, (vars: EmailVariables) => string> = {
   `,
 			vars,
 		),
+
+	"admin-flag-alert": (vars) =>
+		baseLayout(
+			`
+    <p><strong>Attention Admin,</strong></p>
+    <p>A piece of content has been flagged for review on LearnVault.</p>
+    <hr />
+    <ul>
+        <li><strong>Content type:</strong> ${vars.contentType}</li>
+        <li><strong>Content ID:</strong> ${vars.contentId}</li>
+        <li><strong>Reported by:</strong> ${vars.reporter}</li>
+        <li><strong>Reason:</strong> ${vars.reason}</li>
+        <li><strong>Total flags on this item:</strong> ${vars.flagCount}</li>
+    </ul>
+    ${vars.flagCount >= "3" ? `<p style="color:#ef4444;"><strong>⚠️ This content has been auto-hidden pending your review.</strong></p>` : ""}
+    <p><a href="${vars.adminUrl || "#"}" class="button accent">Review in Moderation Queue</a></p>
+    <p>Best,<br>LearnVault System</p>
+  `,
+			vars,
+		),
+
+	"user-warn": (vars) =>
+		baseLayout(
+			`
+    <p>Hi,</p>
+    <p>Your content on LearnVault has been reviewed by our moderation team and found to violate our community guidelines.</p>
+    <hr />
+    <p><strong>Content type:</strong> ${vars.contentType}</p>
+    ${vars.reason ? `<p><strong>Reason:</strong> ${vars.reason}</p>` : ""}
+    <p>Please review our <a href="${vars.guidelinesUrl || "#"}">community guidelines</a> to avoid further action on your account.</p>
+    <p>Best,<br>The LearnVault Team</p>
+  `,
+			vars,
+		),
 }
 
 /**

@@ -5,6 +5,7 @@ import TxHashLink from "../components/TxHashLink"
 import {
 	useAdminStats,
 	useAdminMilestones,
+	type BatchMilestoneResponse,
 	type MilestoneSubmission,
 } from "../hooks/useAdmin"
 import {
@@ -451,6 +452,82 @@ const MilestoneQueue: React.FC = () => {
 			await approveMilestone(milestone.id)
 		} else {
 			await rejectMilestone(milestone.id)
+		}
+	}
+
+	const pendingMilestones = milestones.filter(
+		(milestone) => milestone.status === "pending",
+	)
+	const allPendingOnPageSelected =
+		pendingMilestones.length > 0 &&
+		pendingMilestones.every((milestone) =>
+			selectedMilestoneIds.includes(milestone.id),
+		)
+	const selectedCount = selectedMilestoneIds.length
+
+	const toggleMilestoneSelection = (milestoneId: string) => {
+		setSelectedMilestoneIds((prev) =>
+			prev.includes(milestoneId)
+				? prev.filter((id) => id !== milestoneId)
+				: [...prev, milestoneId],
+		)
+	}
+
+	const toggleSelectAllPending = () => {
+		setSelectedMilestoneIds((prev) => {
+			if (allPendingOnPageSelected) {
+				return prev.filter(
+					(id) => !pendingMilestones.some((milestone) => milestone.id === id),
+				)
+			}
+
+			const nextIds = new Set(prev)
+			pendingMilestones.forEach((milestone) => nextIds.add(milestone.id))
+			return Array.from(nextIds)
+		})
+	}
+
+	const runBatchAction = async (action: "approve" | "reject") => {
+		if (selectedMilestoneIds.length === 0) return
+
+		const ids = [...selectedMilestoneIds]
+		setBatchState({
+			action,
+			total: ids.length,
+			inProgress: true,
+			results: null,
+		})
+
+		try {
+			const result =
+				action === "approve"
+					? await batchApproveMilestones(ids)
+					: await batchRejectMilestones(ids)
+
+			setBatchState({
+				action,
+				total: ids.length,
+				inProgress: false,
+				results: result,
+			})
+
+			if (result?.results.length) {
+				const succeededIds = new Set(
+					result.results
+						.filter((item) => item.success)
+						.map((item) => item.reportId),
+				)
+				setSelectedMilestoneIds((prev) =>
+					prev.filter((id) => !succeededIds.has(id)),
+				)
+			}
+		} catch {
+			setBatchState({
+				action,
+				total: ids.length,
+				inProgress: false,
+				results: null,
+			})
 		}
 	}
 

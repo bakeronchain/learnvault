@@ -635,6 +635,49 @@ fn double_initialize_fails() {
     );
 }
 
+#[test]
+fn initialize_with_zero_quorum_fails() {
+    let env = Env::default();
+    let admin = Address::generate(&env);
+    let usdc_token = Address::generate(&env);
+    let gov_contract = Address::generate(&env);
+
+    let contract_id = env.register(ScholarshipTreasury, ());
+    let client = ScholarshipTreasuryClient::new(&env, &contract_id);
+
+    env.mock_all_auths();
+    let result = client.try_initialize(
+        &admin,
+        &usdc_token,
+        &gov_contract,
+        &0_i128,
+        &DEFAULT_APPROVAL_BPS,
+    );
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidAmount as u32
+        )))
+    );
+}
+
+#[test]
+fn set_quorum_with_zero_fails() {
+    let env = Env::default();
+    let (client, _, _, _, _, _) = setup(&env);
+
+    env.mock_all_auths();
+    let result = client.try_set_quorum(&0_i128);
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidAmount as u32
+        )))
+    );
+}
+
 // ============================================================================
 // DEPOSIT TESTS
 // ============================================================================

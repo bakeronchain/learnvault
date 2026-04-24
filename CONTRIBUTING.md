@@ -164,6 +164,28 @@ Both processes are displayed in the same terminal with color-coded prefixes
 
 ---
 
+## Run Backend in Docker
+
+If you are working strictly on the backend, you can spin up the Node.js API, PostgreSQL database, and Redis container locally using Docker Compose:
+
+```bash
+cd server
+docker-compose up -d
+```
+
+This will run the backend on **http://localhost:4000** with live-reloading enabled.
+
+### Run Backend Tests in Docker
+
+You can run the full backend test suite in an isolated Docker environment:
+
+```bash
+cd server
+docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit
+```
+
+---
+
 ## Project Structure
 
 ```

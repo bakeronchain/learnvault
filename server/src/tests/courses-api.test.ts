@@ -80,6 +80,42 @@ describe("GET /api/courses", () => {
 		expect(res.body.total).toBe(0)
 	})
 
+	it("applies search across course title and description", async () => {
+		mockedQuery
+			.mockResolvedValueOnce({ rows: [{ count: "1" }] })
+			.mockResolvedValueOnce({
+				rows: [
+					{
+						id: 1,
+						slug: "stellar-basics",
+						title: "Stellar Basics",
+						description: "Learn how Stellar works",
+						cover_image_url: null,
+						track: "web3",
+						difficulty: "beginner",
+						published_at: "2026-01-01T00:00:00.000Z",
+						created_at: "2026-01-01T00:00:00.000Z",
+						updated_at: "2026-01-02T00:00:00.000Z",
+					},
+				],
+			})
+
+		const res = await request(buildApp()).get("/api/courses?search=stellar")
+
+		expect(res.status).toBe(200)
+		expect(res.body.total).toBe(1)
+		expect(mockedQuery).toHaveBeenNthCalledWith(
+			1,
+			expect.stringContaining("c.title ILIKE $2 OR c.description ILIKE $2"),
+			["%stellar%"],
+		)
+		expect(mockedQuery).toHaveBeenNthCalledWith(
+			2,
+			expect.stringContaining("c.title ILIKE $2 OR c.description ILIKE $2"),
+			["%stellar%", 12, 0],
+		)
+	})
+
 	it("enforces max limit and computes pages", async () => {
 		mockedQuery
 			.mockResolvedValueOnce({ rows: [{ count: "120" }] })

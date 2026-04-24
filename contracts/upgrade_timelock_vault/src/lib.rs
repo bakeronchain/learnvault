@@ -63,6 +63,8 @@ pub enum UpgradeTimelockError {
     UpgradeNotFound = 4,
     /// Timelock period has not elapsed yet.
     TimelockNotExpired = 5,
+    /// Contract has already been initialized.
+    AlreadyInitialized = 6,
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +135,7 @@ impl UpgradeTimelockVault {
     /// Sets the admin and default timelock duration (48 hours).
     pub fn initialize(env: Env, admin: Address) {
         if env.storage().instance().has(&ADMIN_KEY) {
-            panic_with_error!(&env, UpgradeTimelockError::NotInitialized);
+            panic_with_error!(&env, UpgradeTimelockError::AlreadyInitialized);
         }
         env.storage().instance().set(&ADMIN_KEY, &admin);
         env.storage()
@@ -326,7 +328,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "Error(Contract, #1)")]
+    #[should_panic(expected = "Error(Contract, #6)")]
     fn test_initialize_twice_fails() {
         let env = create_env();
         let admin = create_admin(&env);

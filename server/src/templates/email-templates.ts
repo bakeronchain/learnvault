@@ -196,6 +196,20 @@ export const templates: Record<string, (vars: EmailVariables) => string> = {
   `,
 			vars,
 		),
+	"forum-reply": (vars) =>
+		baseLayout(
+			`
+    <p>Hi ${vars.name},</p>
+    <p>Good news! Someone has replied to your thread <strong>${vars.threadTitle}</strong>.</p>
+    <p><strong>Reply preview:</strong></p>
+    <blockquote style="border-left: 4px solid #4f46e5; margin-left: 0; padding-left: 10px; color: #555;">
+      ${vars.replyPreview}
+    </blockquote>
+    <p><a href="${vars.threadUrl}" class="button primary">View Thread</a></p>
+    <p>Best,<br>The LearnVault Team</p>
+  `,
+			vars,
+		),
 }
 
 /**

@@ -83,7 +83,7 @@ export const LeaderboardRowSkeleton: React.FC = () => (
 		{[1, 2, 3, 4, 5].map((i) => (
 			<div
 				key={i}
-				className={`${skeletonBase} p-6 rounded-[1.5rem] border border-white/5 flex items-center gap-6`}
+				className={`${skeletonBase} p-6 rounded-3xl border border-white/5 flex items-center gap-6`}
 			>
 				<Shimmer />
 				<div className="w-8 h-4 bg-white/5 rounded-full animate-pulse" />

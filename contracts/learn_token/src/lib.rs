@@ -15,9 +15,13 @@
 //! Implements: https://github.com/bakeronchain/learnvault/issues/5
 
 use soroban_sdk::{
-    Address, Env, String, Symbol, contract, contracterror, contractimpl, contracttype,
+    Address, BytesN, Env, String, Symbol, contract, contracterror, contractimpl, contracttype,
     panic_with_error, symbol_short,
 };
+
+use learnvault_shared::upgrade;
+
+pub use upgrade::ContractUpgraded;
 
 // ---------------------------------------------------------------------------
 // Storage Constants (assuming ~6s ledger time)
@@ -79,6 +83,7 @@ impl LearnToken {
             panic_with_error!(&env, LRNError::Unauthorized);
         }
         env.storage().instance().set(&ADMIN_KEY, &admin);
+        upgrade::init(&env);
         env.storage()
             .instance()
             .set(&NAME_KEY, &String::from_str(&env, "LearnVault Learn Token"));
@@ -154,6 +159,18 @@ impl LearnToken {
         env.storage().instance().set(&ADMIN_KEY, &new_admin);
         env.events()
             .publish((symbol_short!("set_admin"),), new_admin);
+    }
+
+    /// Replace the current contract WASM with a new uploaded hash. Admin only.
+    pub fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
+        Self::extend_instance(&env);
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&ADMIN_KEY)
+            .unwrap_or_else(|| panic_with_error!(&env, LRNError::NotInitialized));
+        admin.require_auth();
+        upgrade::apply(&env, &admin, &new_wasm_hash);
     }
 
     /// Transfer is not allowed — LRN is soulbound.

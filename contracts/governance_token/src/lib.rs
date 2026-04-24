@@ -14,9 +14,13 @@
 //! Implements: https://github.com/bakeronchain/learnvault/issues/11
 
 use soroban_sdk::{
-    Address, Env, String, Symbol, contract, contracterror, contractevent, contractimpl,
+    Address, BytesN, Env, String, Symbol, contract, contracterror, contractevent, contractimpl,
     contracttype, panic_with_error, symbol_short,
 };
+
+use learnvault_shared::upgrade;
+
+pub use upgrade::ContractUpgraded;
 
 // ---------------------------------------------------------------------------
 // Storage Constants (assuming ~6s ledger time)
@@ -112,6 +116,21 @@ pub struct GOVApproved {
     pub amount: i128,
 }
 
+/// Emitted when a token holder changes their delegation to a new address.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DelegateChanged {
+    pub delegator: Address,
+    pub delegatee: Address,
+}
+
+/// Emitted when a token holder removes their delegation entirely.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DelegateRemoved {
+    pub delegator: Address,
+}
+
 // ---------------------------------------------------------------------------
 // Contract
 // ---------------------------------------------------------------------------
@@ -129,6 +148,7 @@ impl GovernanceToken {
             panic_with_error!(&env, GOVError::Unauthorized);
         }
         env.storage().instance().set(&ADMIN_KEY, &admin);
+        upgrade::init(&env);
         env.storage()
             .instance()
             .set(&NAME_KEY, &String::from_str(&env, "LearnVault Governance"));
@@ -244,6 +264,18 @@ impl GovernanceToken {
         env.storage().instance().set(&ADMIN_KEY, &new_admin);
     }
 
+    /// Replace the current contract WASM with a new uploaded hash. Admin only.
+    pub fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
+        Self::extend_instance(&env);
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&ADMIN_KEY)
+            .unwrap_or_else(|| panic_with_error!(&env, GOVError::NotInitialized));
+        admin.require_auth();
+        upgrade::apply(&env, &admin, &new_wasm_hash);
+    }
+
     // -----------------------------------------------------------------------
     // Emergency pause / unpause
     // -----------------------------------------------------------------------
@@ -284,10 +316,7 @@ impl GovernanceToken {
 
     /// Returns `true` if the contract is currently paused.
     pub fn is_paused(env: Env) -> bool {
-        env.storage()
-            .instance()
-            .get(&PAUSED_KEY)
-            .unwrap_or(false)
+        env.storage().instance().get(&PAUSED_KEY).unwrap_or(false)
     }
 
     // -----------------------------------------------------------------------
@@ -401,12 +430,18 @@ impl GovernanceToken {
             env.storage().persistent().set(&key, &(current + bal));
             env.storage()
                 .persistent()
-                .set(&DataKey::Delegate(delegator), &delegatee);
+                .set(&DataKey::Delegate(delegator.clone()), &delegatee.clone());
+            DelegateChanged {
+                delegator,
+                delegatee,
+            }
+            .publish(&env);
         } else {
             // Delegating to self is same as undelegating
             env.storage()
                 .persistent()
-                .remove(&DataKey::Delegate(delegator));
+                .remove(&DataKey::Delegate(delegator.clone()));
+            DelegateRemoved { delegator }.publish(&env);
         }
     }
 
@@ -422,7 +457,8 @@ impl GovernanceToken {
 
             env.storage()
                 .persistent()
-                .remove(&DataKey::Delegate(delegator));
+                .remove(&DataKey::Delegate(delegator.clone()));
+            DelegateRemoved { delegator }.publish(&env);
         }
     }
 
@@ -543,11 +579,7 @@ impl GovernanceToken {
     }
 
     fn assert_not_paused(env: &Env) {
-        let paused: bool = env
-            .storage()
-            .instance()
-            .get(&PAUSED_KEY)
-            .unwrap_or(false);
+        let paused: bool = env.storage().instance().get(&PAUSED_KEY).unwrap_or(false);
         if paused {
             panic_with_error!(env, GOVError::ContractPaused);
         }
@@ -575,11 +607,11 @@ mod test {
     extern crate std;
 
     use soroban_sdk::{
-        Address, Env, IntoVal, String,
-        testutils::{Address as _, Ledger, LedgerInfo},
+        Address, BytesN, Env, IntoVal, String,
+        testutils::{Address as _, Ledger, LedgerInfo, MockAuth, MockAuthInvoke},
     };
 
-    use crate::{GOVError, GovernanceToken, GovernanceTokenClient};
+    use crate::{DataKey, GOVError, GovernanceToken, GovernanceTokenClient};
 
     fn setup(e: &Env) -> (Address, Address, GovernanceTokenClient) {
         let admin = Address::generate(e);
@@ -588,6 +620,23 @@ mod test {
         let client = GovernanceTokenClient::new(e, &id);
         client.initialize(&admin);
         (id, admin, client)
+    }
+
+    fn authorize_upgrade(
+        env: &Env,
+        contract_id: &Address,
+        signer: &Address,
+        wasm_hash: &BytesN<32>,
+    ) {
+        env.mock_auths(&[MockAuth {
+            address: signer,
+            invoke: &MockAuthInvoke {
+                contract: contract_id,
+                fn_name: "upgrade",
+                args: (wasm_hash.clone(),).into_val(env),
+                sub_invokes: &[],
+            },
+        }]);
     }
 
     fn set_ledger_sequence(env: &Env, sequence_number: u32) {
@@ -616,6 +665,63 @@ mod test {
         assert_eq!(client.name(), String::from_str(&e, "LearnVault Governance"));
         assert_eq!(client.symbol(), String::from_str(&e, "GOV"));
         assert_eq!(client.decimals(), 7);
+    }
+
+    #[test]
+    fn upgrade_requires_admin_auth() {
+        let e = Env::default();
+        let admin = Address::generate(&e);
+        let attacker = Address::generate(&e);
+        let id = e.register(GovernanceToken, ());
+
+        e.mock_auths(&[MockAuth {
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "initialize",
+                args: (admin.clone(),).into_val(&e),
+                sub_invokes: &[],
+            },
+        }]);
+
+        let client = GovernanceTokenClient::new(&e, &id);
+        client.initialize(&admin);
+
+        let wasm_hash = crate::upgrade::testutils::upload_upgrade_target(&e);
+        authorize_upgrade(&e, &id, &attacker, &wasm_hash);
+        assert!(client.try_upgrade(&wasm_hash).is_err());
+    }
+
+    #[test]
+    fn state_persists_after_upgrade() {
+        let e = Env::default();
+        let (id, admin, client) = setup(&e);
+        let donor = Address::generate(&e);
+
+        client.mint(&donor, &500);
+
+        e.set_auths(&[]);
+        let wasm_hash = crate::upgrade::testutils::upload_upgrade_target(&e);
+        authorize_upgrade(&e, &id, &admin, &wasm_hash);
+        client.upgrade(&wasm_hash);
+
+        let balance = e.as_contract(&id, || {
+            e.storage()
+                .persistent()
+                .get::<_, i128>(&DataKey::Balance(donor.clone()))
+                .unwrap_or(0)
+        });
+        let supply = e.as_contract(&id, || {
+            e.storage()
+                .instance()
+                .get::<_, i128>(&DataKey::TotalSupply)
+                .unwrap_or(0)
+        });
+        let stored_hash = e.as_contract(&id, || crate::upgrade::current_hash(&e));
+
+        assert_eq!(balance, 500);
+        assert_eq!(supply, 500);
+        assert_eq!(stored_hash, wasm_hash);
     }
 
     #[test]

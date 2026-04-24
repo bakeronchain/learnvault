@@ -1,5 +1,10 @@
 process.env.JWT_SECRET = "learnvault-secret"
 process.env.ADMIN_ADDRESSES = "GADMIN123"
+process.env.NODE_ENV = "test"
+process.env.STELLAR_SECRET_KEY = "test-secret-key"
+process.env.PINATA_API_KEY = "test-api-key"
+process.env.PINATA_SECRET = "test-secret"
+process.env.FRONTEND_URL = "http://localhost:3000"
 
 import express from "express"
 import jwt from "jsonwebtoken"
@@ -31,10 +36,39 @@ jest.mock("../services/stellar-contract.service", () => ({
 	},
 }))
 
+jest.mock("../services/pinata.service", () => ({
+	getClient: jest.fn().mockReturnValue({
+		pinFileToIPFS: jest.fn().mockResolvedValue({
+			IpfsHash: "mock-ipfs-hash",
+		}),
+		pinJsonToIPFS: jest.fn().mockResolvedValue({
+			IpfsHash: "mock-json-hash",
+		}),
+	}),
+}))
+
+jest.mock("../services/email.service", () => ({
+	createEmailService: jest.fn().mockReturnValue({
+		sendNotification: jest.fn().mockResolvedValue({}),
+	}),
+}))
+
+jest.mock("../services/escrow-timeout.service", () => ({
+	trackEscrowTimeout: jest.fn().mockResolvedValue(undefined),
+}))
+
+jest.mock("../lib/request-context", () => ({
+	getRequestContext: jest.fn().mockReturnValue({
+		requestId: "test-request-id-123",
+	}),
+	runWithRequestContext: jest.fn((context, fn) => fn()),
+}))
+
 import { governanceRouter } from "../routes/governance.routes"
 
 const app = express()
 app.use(express.json())
+app.use(require("../middleware/request-logger.middleware").createRequestLogger({ enabled: false }))
 app.use("/api", governanceRouter)
 
 const JWT_SECRET = "learnvault-secret"
@@ -520,9 +554,10 @@ describe("DELETE /api/proposals/:id", () => {
 			.set("Authorization", `Bearer ${makeToken("GADMIN123")}`)
 
 		expect(response.status).toBe(204)
-		expect(stellarContractService.cancelProposal).toHaveBeenCalledWith({
-			proposalId: 12,
-		})
+		expect(stellarContractService.cancelProposal).toHaveBeenCalledWith(
+			{ proposalId: 12 },
+			{ requestId: expect.any(String) },
+		)
 		expect(pool.query).toHaveBeenNthCalledWith(
 			2,
 			"UPDATE proposals SET cancelled = TRUE WHERE id = $1",

@@ -21,6 +21,7 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 	const [amount, setAmount] = useState("")
 	const [isLoading, setIsLoading] = useState(false)
 	const [lastTxHash, setLastTxHash] = useState<string | null>(null)
+	const { scholarshipTreasury } = useContractIds()
 	const { address, signTransaction, updateBalances } = useWallet()
 	const { showSuccess, showError, showInfo } = useToast()
 
@@ -48,66 +49,40 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 			return
 		}
 
-		if (!scholarshipTreasury) {
-			showError("Scholarship treasury is not available on this network")
-			return
-		}
-
 		if (!signTransaction) {
 			showError("Wallet does not support signing")
 			return
 		}
 
+		const contractId = scholarshipTreasury ?? SCHOLARSHIP_TREASURY_CONTRACT_ID
+		if (!contractId) {
+			showError("Scholarship treasury contract is not configured")
+			return
+		}
+
 		setIsLoading(true)
 		setLastTxHash(null)
+
 		try {
 			showInfo("Waiting for wallet approval...")
-			const scholarshipTreasury = createScholarshipTreasuryContract(
-				SCHOLARSHIP_TREASURY_CONTRACT_ID,
+			const treasuryContract = createScholarshipTreasuryContract(
+				contractId,
 				address,
 			)
-			const txHash = await scholarshipTreasury.deposit(amount, signTransaction)
+			const txHash = await treasuryContract.deposit(amount, signTransaction)
 			setLastTxHash(txHash)
 			await updateBalances()
 			showSuccess(
 				`Deposit of ${formatUsdcAmount(amount)} submitted. Tx: ${txHash.slice(0, 8)}...`,
-			const depositAmount = parseFloat(amount)
-			const contract = createScholarshipTreasuryContract(
-				scholarshipTreasury,
-				address,
-			)
-
-			showInfo("Waiting for wallet approval...")
-			const txHash = await contract.deposit(
-				address,
-				depositAmount,
-				signTransaction,
-			)
-
-			showSuccess(
-				`Deposit of $${depositAmount.toLocaleString()} USDC submitted!`,
-				txHash || undefined,
 			)
 			setAmount("")
 			onDepositSuccess?.()
-		} catch (error) {
-			if (isUserRejection(error)) {
-				showInfo("Deposit cancelled")
-				return
-			}
 		} catch (error) {
 			const message =
 				error instanceof Error
 					? error.message
 					: "Failed to process deposit. Please try again."
 			showError(message)
-
-			const appError = parseError(error)
-			showError(
-				appError.message && appError.message !== "An unexpected error occurred"
-					? appError.message
-					: "Failed to process deposit. Please try again.",
-			)
 		} finally {
 			setIsLoading(false)
 		}
@@ -115,15 +90,15 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 
 	return (
 		<section className="mb-20">
-			<div className="flex items-center gap-4 mb-12">
+			<div className="mb-12 flex items-center gap-4">
 				<h2 className="text-2xl font-black tracking-tight">Deposit More</h2>
 				<div className="h-px flex-1 bg-linear-to-r from-white/10 to-transparent" />
 			</div>
 
 			<form onSubmit={handleDeposit}>
-				<div className="glass-card p-12 rounded-[3rem] border border-white/5 max-w-2xl">
+				<div className="glass-card max-w-2xl rounded-[3rem] border border-white/5 p-12">
 					<div className="mb-8">
-						<label className="text-sm text-white/40 uppercase font-black tracking-widest block mb-4">
+						<label className="mb-4 block text-sm font-black uppercase tracking-widest text-white/40">
 							Deposit Amount
 						</label>
 						<div className="relative">
@@ -135,28 +110,28 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 								value={amount}
 								onChange={handleAmountChange}
 								placeholder="0.00"
-								className="w-full bg-white/5 border border-white/10 rounded-2xl px-12 py-4 text-2xl font-black text-white placeholder:text-white/20 focus:outline-none focus:border-brand-cyan/50 focus:ring-2 focus:ring-brand-cyan/20 transition-all"
+								className="w-full rounded-2xl border border-white/10 bg-white/5 px-12 py-4 text-2xl font-black text-white placeholder:text-white/20 transition-all focus:border-brand-cyan/50 focus:outline-none focus:ring-2 focus:ring-brand-cyan/20"
 							/>
-							<span className="absolute right-6 top-1/2 -translate-y-1/2 text-sm font-black text-white/40 uppercase tracking-widest">
+							<span className="absolute right-6 top-1/2 -translate-y-1/2 text-sm font-black uppercase tracking-widest text-white/40">
 								USDC
 							</span>
 						</div>
 					</div>
 
 					<div className="mb-8">
-						<p className="text-xs text-white/40 uppercase font-black tracking-widest mb-4">
+						<p className="mb-4 text-xs font-black uppercase tracking-widest text-white/40">
 							Quick Select
 						</p>
-						<div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+						<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
 							{[100, 500, 1000, 5000].map((value) => (
 								<button
 									key={value}
 									type="button"
 									onClick={() => handleQuickAmount(value)}
-									className={`py-3 px-4 rounded-xl font-black uppercase tracking-widest text-sm transition-all ${
+									className={`rounded-xl px-4 py-3 text-sm font-black uppercase tracking-widest transition-all ${
 										amount === value.toString()
 											? "bg-brand-cyan text-black shadow-[0_0_20px_rgba(0,210,255,0.3)]"
-											: "bg-white/5 border border-white/10 text-white/40 hover:text-white hover:border-white/30"
+											: "border border-white/10 bg-white/5 text-white/40 hover:border-white/30 hover:text-white"
 									}`}
 								>
 									${value}
@@ -165,7 +140,7 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 						</div>
 					</div>
 
-					<div className="h-px bg-white/5 mb-8" />
+					<div className="mb-8 h-px bg-white/5" />
 
 					<div className="mb-8 space-y-3">
 						<div className="flex items-center justify-between text-sm">
@@ -185,10 +160,10 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 					<button
 						type="submit"
 						disabled={!address || !amount || isLoading}
-						className={`w-full py-4 px-6 font-black uppercase tracking-widest rounded-2xl transition-all ${
+						className={`w-full rounded-2xl px-6 py-4 font-black uppercase tracking-widest transition-all ${
 							!address || !amount || isLoading
-								? "bg-white/5 text-white/40 cursor-not-allowed"
-								: "bg-brand-cyan text-black hover:shadow-[0_0_30px_rgba(0,210,255,0.4)] hover:scale-105 active:scale-95"
+								? "cursor-not-allowed bg-white/5 text-white/40"
+								: "bg-brand-cyan text-black hover:scale-105 hover:shadow-[0_0_30px_rgba(0,210,255,0.4)] active:scale-95"
 						}`}
 					>
 						{isLoading
@@ -221,10 +196,6 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 						Deposits are secured on the Stellar blockchain
 						<br />
 						You&apos;ll receive governance tokens immediately
-					<p className="text-[10px] text-white/30 text-center mt-6">
-						Deposits are secured on the Stellar blockchain
-						<br />
-						You will receive governance tokens immediately
 						<br />
 						Your funds support eligible scholar proposals
 					</p>

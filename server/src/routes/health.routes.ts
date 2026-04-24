@@ -1,6 +1,6 @@
 import { Router } from "express"
 
-import { pool } from "../db/index"
+import { getPgStatStatementsSnapshot, pool } from "../db/index"
 
 export const healthRouter = Router()
 
@@ -57,6 +57,19 @@ healthRouter.get("/health", async (_req, res) => {
 			db: "disconnected",
 			uptime,
 			timestamp,
+		})
+	}
+})
+
+healthRouter.get("/health/db/performance", async (_req, res) => {
+	try {
+		const snapshot = await getPgStatStatementsSnapshot(10)
+		res.status(200).json(snapshot)
+	} catch {
+		res.status(500).json({
+			enabled: false,
+			rows: [],
+			error: "Failed to fetch database performance stats",
 		})
 	}
 })

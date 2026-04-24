@@ -2,9 +2,13 @@
 #![allow(clippy::too_many_arguments)]
 
 use soroban_sdk::{
-    Address, Env, String, Symbol, Vec, contract, contracterror, contractevent, contractimpl,
-    contracttype, panic_with_error, symbol_short,
+    Address, BytesN, Env, String, Symbol, Vec, contract, contracterror, contractevent,
+    contractimpl, contracttype, panic_with_error, symbol_short,
 };
+
+use learnvault_shared::upgrade;
+
+pub use upgrade::ContractUpgraded;
 
 // ---------------------------------------------------------------------------
 // Storage Constants (assuming ~6s ledger time)
@@ -29,11 +33,8 @@ const TOTAL_GOV_KEY: Symbol = symbol_short!("TOTALGOV");
 const MIN_LRN_TO_PROPOSE_KEY: Symbol = symbol_short!("MINPROP");
 const GOV_PER_USDC: i128 = 100;
 const PROPOSAL_DEADLINE_LEDGERS: u32 = 100_800;
-/// Minimum quorum in basis points (1 000 bps = 10 % of total GOV supply must vote).
-const MIN_QUORUM_BPS: i128 = 1_000;
 const QUORUM_KEY: Symbol = symbol_short!("QUORUM");
 const APPROVAL_BPS_KEY: Symbol = symbol_short!("APPBPS");
-const GOV_PER_USDC: i128 = 100;
 
 #[derive(Clone)]
 #[contracttype]
@@ -110,10 +111,11 @@ pub enum Error {
     /// Proposal finalized but total votes cast did not reach MIN_QUORUM_BPS.
     QuorumNotMet = 11,
     InsufficientReputation = 12,
-    VotingNotClosed = 9,
-    ProposalAlreadyExecuted = 10,
-    ProposalRejected = 11,
-    ProposalCancelled = 12,
+    VotingNotClosed = 13,
+    ProposalAlreadyExecuted = 14,
+    ProposalRejected = 15,
+    ProposalCancelled = 16,
+    Unauthorized = 17,
 }
 
 #[contract]
@@ -188,6 +190,7 @@ impl ScholarshipTreasury {
         }
 
         env.storage().instance().set(&ADMIN_KEY, &admin);
+        upgrade::init(&env);
         env.storage().instance().set(&USDC_KEY, &usdc_token);
         env.storage().instance().set(&GOV_KEY, &governance_contract);
         env.storage().instance().set(&TOTAL_KEY, &0_i128);
@@ -199,7 +202,7 @@ impl ScholarshipTreasury {
         env.storage()
             .instance()
             .set(&MIN_LRN_TO_PROPOSE_KEY, &0_i128);
-        
+
         env.storage().instance().set(&QUORUM_KEY, &quorum_threshold);
         env.storage()
             .instance()
@@ -500,20 +503,12 @@ impl ScholarshipTreasury {
             .unwrap_or(0)
     }
 
-    pub fn donor_contribution(env: Env, donor: Address) -> i128 {
-        Self::get_donor_total(env, donor)
-    }
-
-    pub fn treasury_balance(env: Env) -> i128 {
-        Self::get_balance(env)
-    }
-
     pub fn set_min_lrn_to_propose(env: Env, admin: Address, min_lrn: i128) {
         Self::assert_initialized(&env);
 
         admin.require_auth();
         if admin != Self::admin(&env) {
-            panic_with_error!(&env, Error::NotInitialized);
+            panic_with_error!(&env, Error::Unauthorized);
         }
         if min_lrn < 0 {
             panic_with_error!(&env, Error::InvalidAmount);
@@ -579,7 +574,6 @@ impl ScholarshipTreasury {
             yes_votes: 0,
             no_votes: 0,
             deadline_ledger: env.ledger().sequence() + PROPOSAL_DEADLINE_LEDGERS,
-            deadline_ledger: env.ledger().sequence() + 7 * 17_280,
             executed: false,
             cancelled: false,
         };
@@ -644,10 +638,9 @@ impl ScholarshipTreasury {
                 .storage()
                 .persistent()
                 .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+                .filter(|p| Self::proposal_status(&env, p) == status)
             {
-                if Self::proposal_status(&env, &proposal) == status {
-                    proposals.push_back(proposal);
-                }
+                proposals.push_back(proposal);
             }
             proposal_id += 1;
         }
@@ -749,7 +742,7 @@ impl ScholarshipTreasury {
         admin.require_auth();
         let stored_admin = Self::admin(&env);
         if admin != stored_admin {
-            panic_with_error!(&env, Error::NotInitialized);
+            panic_with_error!(&env, Error::Unauthorized);
         }
 
         let proposal = env
@@ -892,6 +885,15 @@ impl ScholarshipTreasury {
             .instance()
             .get(&ADMIN_KEY)
             .unwrap_or_else(|| panic_with_error!(env, Error::NotInitialized))
+    }
+
+    /// Replace the current contract WASM with a new uploaded hash. Admin only.
+    pub fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
+        Self::assert_initialized(&env);
+        Self::extend_instance(&env);
+        let admin = Self::admin(&env);
+        admin.require_auth();
+        upgrade::apply(&env, &admin, &new_wasm_hash);
     }
 
     pub fn get_version(env: Env) -> String {

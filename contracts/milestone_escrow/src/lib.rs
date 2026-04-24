@@ -1,9 +1,13 @@
 #![no_std]
 
 use soroban_sdk::{
-    Address, Env, String, Symbol, contract, contracterror, contractevent, contractimpl,
+    Address, BytesN, Env, String, Symbol, contract, contracterror, contractevent, contractimpl,
     contracttype, panic_with_error, symbol_short,
 };
+
+use learnvault_shared::upgrade;
+
+pub use upgrade::ContractUpgraded;
 
 const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
 const TREASURY_KEY: Symbol = symbol_short!("TREAS");
@@ -84,6 +88,7 @@ impl MilestoneEscrow {
 
         // Keep 30 days (30 * 24 * 60 * 60) as the recommended default at deployment.
         env.storage().instance().set(&ADMIN_KEY, &admin);
+        upgrade::init(&env);
         env.storage().instance().set(&TREASURY_KEY, &treasury);
         env.storage()
             .instance()
@@ -187,6 +192,7 @@ impl MilestoneEscrow {
         record.released_amount = record.total_amount;
         record.last_activity = now;
         env.storage().persistent().set(&key, &record);
+
         EscrowReclaimed {
             proposal_id,
             scholar: record.scholar.clone(),
@@ -253,6 +259,13 @@ impl MilestoneEscrow {
 
     pub fn get_version(env: Env) -> String {
         String::from_str(&env, "1.0.0")
+    }
+
+    /// Replace the current contract WASM with a new uploaded hash. Admin only.
+    pub fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
+        let admin = Self::admin(&env);
+        admin.require_auth();
+        upgrade::apply(&env, &admin, &new_wasm_hash);
     }
 }
 

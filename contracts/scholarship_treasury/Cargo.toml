@@ -12,10 +12,12 @@ crate-type = ["cdylib"]
 doctest = false
 
 [dependencies]
+learnvault-shared = { workspace = true }
 soroban-sdk = { workspace = true }
 stellar-registry = "0.0.4"
 
 [dev-dependencies]
+learnvault-shared = { workspace = true, features = ["testutils"] }
 soroban-sdk = { workspace = true, features = ["testutils"] }
-governance-token = { path = "../governance_token" }
 proptest = { workspace = true }
+governance-token = { path = "../governance_token" }

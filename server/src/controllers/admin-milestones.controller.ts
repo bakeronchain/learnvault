@@ -1,14 +1,18 @@
 import { type Request, type Response } from "express"
+import sanitizeHtml from "sanitize-html"
 import { milestoneStore } from "../db/milestone-store"
 import { type AdminRequest } from "../middleware/admin.middleware"
 import { credentialService } from "../services/credential.service"
 import { createEmailService } from "../services/email.service"
+import { markEscrowActivity } from "../services/escrow-timeout.service"
 import { stellarContractService } from "../services/stellar-contract.service"
 import { templates, toPlainText } from "../templates/email-templates"
 
 const emailService = createEmailService(
 	process.env.RESEND_API_KEY || process.env.EMAIL_API_KEY || "",
 )
+
+type MilestoneStatusFilter = "pending" | "approved" | "rejected"
 
 function hasStellarMilestoneCredentials(): boolean {
 	return Boolean(
@@ -17,6 +21,58 @@ function hasStellarMilestoneCredentials(): boolean {
 }
 
 // ── GET /api/admin/milestones/pending ────────────────────────────────────────
+
+export async function listMilestones(
+	req: Request,
+	res: Response,
+): Promise<void> {
+	const page =
+		typeof req.query.page === "string" ? Number.parseInt(req.query.page, 10) : 1
+	const pageSize =
+		typeof req.query.pageSize === "string"
+			? Number.parseInt(req.query.pageSize, 10)
+			: 10
+	const courseId =
+		typeof req.query.course === "string" ? req.query.course : undefined
+	const status =
+		typeof req.query.status === "string"
+			? (req.query.status as MilestoneStatusFilter)
+			: undefined
+
+	if (
+		status &&
+		status !== "pending" &&
+		status !== "approved" &&
+		status !== "rejected"
+	) {
+		res.status(400).json({ error: "Invalid milestone status filter" })
+		return
+	}
+
+	try {
+		const safePage = Number.isFinite(page) && page > 0 ? page : 1
+		const safePageSize =
+			Number.isFinite(pageSize) && pageSize > 0 ? Math.min(pageSize, 100) : 10
+		const result = await milestoneStore.listReports(
+			{
+				courseId,
+				status,
+			},
+			safePage,
+			safePageSize,
+		)
+
+		res.status(200).json({
+			data: result.data,
+			total: result.total,
+			page: safePage,
+			pageSize: safePageSize,
+		})
+	} catch (err) {
+		console.error("[admin] listMilestones error:", err)
+		res.status(500).json({ error: "Failed to fetch milestones" })
+	}
+}
 
 export async function getPendingMilestones(
 	_req: Request,
@@ -87,10 +143,16 @@ export async function approveMilestone(
 			report.scholar_address,
 			report.course_id,
 			report.milestone_id,
+			{ requestId: req.requestId },
 		)
 
 		// Persist decision
 		await milestoneStore.updateReportStatus(id, "approved")
+		try {
+			await markEscrowActivity(report.scholar_address, report.course_id)
+		} catch (trackingErr) {
+			console.error("[admin] escrow activity update failed:", trackingErr)
+		}
 		const auditEntry = await milestoneStore.addAuditEntry({
 			report_id: id,
 			validator_address: validatorAddress,
@@ -174,6 +236,20 @@ export async function rejectMilestone(
 	const { reason } = req.body as { reason: string }
 	const validatorAddress = req.adminAddress ?? "unknown"
 
+	// Validate and sanitize rejection reason
+	if (!reason || typeof reason !== "string") {
+		res.status(400).json({ error: "Rejection reason is required" })
+		return
+	}
+	if (reason.length > 1000) {
+		res.status(400).json({ error: "Rejection reason must be 1000 characters or fewer" })
+		return
+	}
+	const sanitizedReason = sanitizeHtml(reason, {
+		allowedTags: [],
+		allowedAttributes: {},
+	})
+
 	try {
 		const report = await milestoneStore.getReportById(id)
 		if (!report) {
@@ -195,15 +271,21 @@ export async function rejectMilestone(
 			report.course_id,
 			report.milestone_id,
 			reason,
+			{ requestId: req.requestId },
 		)
 
 		// Persist decision
 		await milestoneStore.updateReportStatus(id, "rejected")
+		try {
+			await markEscrowActivity(report.scholar_address, report.course_id)
+		} catch (trackingErr) {
+			console.error("[admin] escrow activity update failed:", trackingErr)
+		}
 		const auditEntry = await milestoneStore.addAuditEntry({
 			report_id: id,
 			validator_address: validatorAddress,
 			decision: "rejected",
-			rejection_reason: reason,
+			rejection_reason: sanitizedReason,
 			contract_tx_hash: contractResult.txHash,
 		})
 
@@ -222,7 +304,7 @@ export async function rejectMilestone(
 						milestoneNumber: String(
 							report.milestone_number ?? report.milestone_id,
 						),
-						rejectionReason: reason || "",
+						rejectionReason: sanitizedReason,
 						milestoneUrl: `${process.env.FRONTEND_URL || ""}/milestones`,
 						unsubscribeUrl: "#",
 					},
@@ -240,7 +322,7 @@ export async function rejectMilestone(
 			data: {
 				reportId: id,
 				status: "rejected",
-				reason,
+				reason: sanitizedReason,
 				contractTxHash: contractResult.txHash,
 				simulated: contractResult.simulated,
 				auditEntry,

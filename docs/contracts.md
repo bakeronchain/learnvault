@@ -90,6 +90,9 @@ Contracts must be deployed in this order due to cross-contract dependencies:
 The `UpgradeTimelockVault` implements a dedicated vault pattern for secure
 contract upgrades with timelock enforcement.
 
+For the current V1 in-place upgrade procedure used by the six core contracts,
+see [contract-upgrades.md](./contract-upgrades.md).
+
 ### Security Model
 
 The timelock vault provides the following security guarantees:

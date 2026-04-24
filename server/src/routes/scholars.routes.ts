@@ -5,6 +5,7 @@ import {
 	getScholarsLeaderboard,
 	getScholarProfile,
 	getScholarCredentials,
+	getScholarEscrowTimeouts,
 } from "../controllers/scholars.controller"
 
 export const scholarsRouter = Router()
@@ -169,4 +170,8 @@ scholarsRouter.get("/scholars/:address/milestones", (req, res) => {
  */
 scholarsRouter.get("/scholars/:address/credentials", (req, res) => {
 	void getScholarCredentials(req, res)
+})
+
+scholarsRouter.get("/scholars/:address/escrow-timeouts", (req, res) => {
+	void getScholarEscrowTimeouts(req, res)
 })

@@ -392,7 +392,9 @@ pub fn reclaim_inactive(env: Env, proposal_id: u32) {
 
 #### ✅ Access control enforced
 
-The `reclaim_inactive` entrypoint now requires the contract admin to authorize the call. This prevents arbitrary actors from triggering a reclaim when the inactivity window is reached. Evidence in the contract:
+The `reclaim_inactive` entrypoint now requires the contract admin to authorize
+the call. This prevents arbitrary actors from triggering a reclaim when the
+inactivity window is reached. Evidence in the contract:
 
 ```rust
 pub fn reclaim_inactive(env: Env, proposal_id: u32) {
@@ -402,7 +404,8 @@ pub fn reclaim_inactive(env: Env, proposal_id: u32) {
 }
 ```
 
-This change ensures only the configured admin (or a future extension to allow the stored treasury address) can perform reclamation.
+This change ensures only the configured admin (or a future extension to allow
+the stored treasury address) can perform reclamation.
 
 #### ✅ No Stuck State Possible
 

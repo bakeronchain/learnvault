@@ -22,6 +22,7 @@ type LessonRow = {
 	title: string
 	content_markdown: string
 	order_index: number
+	estimated_minutes: number
 	is_milestone: boolean
 	created_at: string
 	updated_at: string
@@ -52,6 +53,7 @@ const toLesson = (row: LessonRow) => ({
 	title: row.title,
 	content: row.content_markdown,
 	order: row.order_index,
+	estimatedMinutes: Number(row.estimated_minutes ?? 10),
 	isMilestone: row.is_milestone,
 	quiz: row.quiz ?? [],
 	createdAt: row.created_at,
@@ -226,6 +228,7 @@ export const getCourse = async (req: Request, res: Response): Promise<void> => {
 				l.title,
 				l.content_markdown,
 				l.order_index,
+				l.estimated_minutes,
 				BOOL_OR(m.id IS NOT NULL) AS is_milestone,
 				l.created_at,
 				l.updated_at,
@@ -280,6 +283,7 @@ export const getCourseLessonById = async (
 				l.title,
 				l.content_markdown,
 				l.order_index,
+				l.estimated_minutes,
 				BOOL_OR(m.id IS NOT NULL) AS is_milestone,
 				l.created_at,
 				l.updated_at,

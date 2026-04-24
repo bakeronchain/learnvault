@@ -9,6 +9,13 @@ import { useCourse } from "../hooks/useCourse"
 import { useCourseDetail } from "../hooks/useCourses"
 import { useWallet } from "../hooks/useWallet"
 import { connectWallet } from "../util/wallet"
+import {
+	completeLessonSession,
+	formatDuration,
+	getLessonTime,
+	startLessonSession,
+	stopLessonSession,
+} from "../util/learningTime"
 import NotFound from "./NotFound"
 
 const loadingLesson = {
@@ -38,6 +45,7 @@ const LessonView: React.FC = () => {
 
 	const [isLoadingContent, setIsLoadingContent] = useState(true)
 	const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+	const [timeSpentLabel, setTimeSpentLabel] = useState<string | null>(null)
 
 	useEffect(() => {
 		// Simulate a short content load delay
@@ -159,8 +167,35 @@ const LessonView: React.FC = () => {
 
 	const isNextLocked = !isCompleted
 
-	const handleMarkComplete = () => {
-		void completeMilestone(courseId ?? "", lessonId)
+	useEffect(() => {
+		if (!course || !lesson) return
+
+		startLessonSession(course.slug, lesson.id, lesson.estimatedMinutes)
+		const existing = getLessonTime(course.slug, lesson.id)
+		setTimeSpentLabel(
+			existing ? formatDuration(existing.secondsSpent) : formatDuration(0),
+		)
+
+		return () => {
+			const stopped = stopLessonSession(course.slug, lesson.id)
+			if (stopped) {
+				setTimeSpentLabel(formatDuration(stopped.lesson.secondsSpent))
+			}
+		}
+	}, [course, lesson])
+
+	const handleMarkComplete = async () => {
+		if (!courseId || !course || !lesson) return
+
+		const completedOnChain = await completeMilestone(courseId, lessonId)
+		if (completedOnChain) {
+			const completed = completeLessonSession(
+				course.slug,
+				lesson.id,
+				lesson.estimatedMinutes,
+			)
+			setTimeSpentLabel(formatDuration(completed.secondsSpent))
+		}
 	}
 
 	return (
@@ -249,6 +284,7 @@ const LessonView: React.FC = () => {
 						isLoading={isLoadingCourse || isLoadingContent}
 						isCompleted={isCompleted}
 						isCompleting={isCompletingMilestone}
+						timeSpentLabel={timeSpentLabel}
 						onMarkComplete={handleMarkComplete}
 						prevLessonId={prevLessonId}
 						nextLessonId={nextLessonId}

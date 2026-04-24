@@ -66,14 +66,13 @@ function parseViewerAddress(value: unknown): string | null {
 
 function buildProposalSelect(viewerParamIndex?: number) {
 	const viewerVoteSelect = viewerParamIndex
-		? `,
-			(
-				SELECT v.support
-				FROM votes v
-				WHERE v.proposal_id = p.id AND v.voter_address = $${viewerParamIndex}
-				LIMIT 1
-			) AS user_vote_support`
+		? ", uv.support AS user_vote_support"
 		: ", NULL::boolean AS user_vote_support"
+	const viewerJoin = viewerParamIndex
+		? ` LEFT JOIN votes uv
+			ON uv.proposal_id = p.id
+			AND uv.voter_address = $${viewerParamIndex}`
+		: ""
 
 	return `SELECT
 			p.id,
@@ -86,7 +85,7 @@ function buildProposalSelect(viewerParamIndex?: number) {
 			p.status,
 			p.deadline,
 			p.created_at${viewerVoteSelect}
-		FROM proposals p`
+		FROM proposals p${viewerJoin}`
 }
 
 export async function getGovernanceProposals(

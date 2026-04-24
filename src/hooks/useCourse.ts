@@ -432,14 +432,14 @@ export function useCourse() {
 					"Connect wallet before completing milestones",
 					"warning",
 				)
-				return
+				return false
 			}
 
 			const already =
 				getCourseProgress(courseId).completedMilestoneIds.includes(milestoneId)
 			if (already) {
 				addNotification("Milestone already completed", "secondary")
-				return
+				return false
 			}
 
 			setIsCompletingMilestone(true)
@@ -465,7 +465,7 @@ export function useCourse() {
 						"success",
 					)
 					await updateBalances()
-					return
+					return true
 				}
 
 				const rawTx = await callFirst(
@@ -521,12 +521,14 @@ export function useCourse() {
 				)
 				await updateBalances()
 				await refreshCourses()
+				return true
 			} catch (err) {
 				if (isUserRejection(err)) {
 					showInfo("Milestone completion cancelled")
 				} else {
 					showError("Failed to complete milestone. Please try again.")
 				}
+				return false
 			} finally {
 				setIsCompletingMilestone(false)
 			}

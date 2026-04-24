@@ -8,6 +8,7 @@ export interface CourseLesson {
 	title: string
 	content: string
 	order: number
+	estimatedMinutes: number
 	isMilestone: boolean
 }
 

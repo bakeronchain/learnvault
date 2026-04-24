@@ -36,6 +36,8 @@ type ApiLesson = {
 	content_markdown?: string
 	order?: number
 	order_index?: number
+	estimatedMinutes?: number
+	estimated_minutes?: number
 	isMilestone?: boolean
 	is_milestone?: boolean
 }
@@ -119,6 +121,10 @@ const normalizeLesson = (
 		typeof lesson.order === "number"
 			? lesson.order
 			: Number(lesson.order_index ?? 0),
+	estimatedMinutes:
+		typeof lesson.estimatedMinutes === "number"
+			? lesson.estimatedMinutes
+			: Number(lesson.estimated_minutes ?? 10),
 	isMilestone: Boolean(lesson.isMilestone ?? lesson.is_milestone),
 })
 

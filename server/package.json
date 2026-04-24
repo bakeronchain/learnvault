@@ -10,8 +10,10 @@
     "test": "jest --runInBand",
     "migrate": "ts-node scripts/migrate.ts up",
     "migrate:rollback": "ts-node scripts/migrate.ts down",
+    "migrate:verify": "ts-node scripts/verify-migrations.ts",
     "db:migrate": "npm run migrate",
-    "db:seed": "ts-node scripts/seed.ts"
+    "db:seed": "ts-node scripts/seed.ts",
+    "db:query:analyze": "ts-node scripts/query-analysis.ts"
   },
   "dependencies": {
     "@pinata/sdk": "^2.1.0",

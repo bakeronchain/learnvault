@@ -4,7 +4,7 @@ import request from "supertest"
 // Mock internal modules
 jest.mock("../db/index", () => ({
 	pool: {
-		query: jest.fn(),
+		query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
 	},
 }))
 

@@ -36,9 +36,9 @@ export const getTreasuryStats = async (
 
 		// Fetch events from the ScholarshipTreasury contract
 		const response = await server.getEvents({
-			filters: [{ contract: SCHOLARSHIP_TREASURY_CONTRACT_ID }],
-			startLedger: process.env.STARTING_LEDGER || "460000000",
-			pagination: { maxPageSize: 1000 },
+			filters: [{ contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] }],
+			startLedger: Number(process.env.STARTING_LEDGER || "460000000"),
+			limit: 1000,
 		})
 
 		let totalDeposited = BigInt(0)
@@ -48,26 +48,24 @@ export const getTreasuryStats = async (
 		let activeProposals = 0
 
 		// Parse events to calculate stats
-		for (const page of response.events) {
-			for (const event of page) {
-				const { scValToNative } = await import("@stellar/stellar-sdk")
-				const eventData = scValToNative(event.value)
+		for (const event of response.events) {
+			const { scValToNative } = await import("@stellar/stellar-sdk")
+			const eventData = scValToNative(event.value)
 
-				// Identify event type from topics
-				const topics = event.topic.map((t: any) => scValToNative(t))
-				const eventType = topics[0]
+			// Identify event type from topics
+			const topics = event.topic.map((t: any) => scValToNative(t))
+			const eventType = topics[0]
 
-				if (eventType === "deposit" || eventType === "Deposit") {
-					const amount = BigInt(eventData.amount || 0)
-					totalDeposited += amount
-					if (eventData.donor) donors.add(eventData.donor)
-				} else if (eventType === "disburse" || eventType === "Disburse") {
-					const amount = BigInt(eventData.amount || 0)
-					totalDisbursed += amount
-					if (eventData.scholar) scholars.add(eventData.scholar)
-				} else if (eventType === "proposal_submitted") {
-					activeProposals++
-				}
+			if (eventType === "deposit" || eventType === "Deposit") {
+				const amount = BigInt(eventData.amount || 0)
+				totalDeposited += amount
+				if (eventData.donor) donors.add(eventData.donor)
+			} else if (eventType === "disburse" || eventType === "Disburse") {
+				const amount = BigInt(eventData.amount || 0)
+				totalDisbursed += amount
+				if (eventData.scholar) scholars.add(eventData.scholar)
+			} else if (eventType === "proposal_submitted") {
+				activeProposals++
 			}
 		}
 
@@ -116,9 +114,9 @@ export const getTreasuryActivity = async (
 
 		// Fetch events from the ScholarshipTreasury contract
 		const response = await server.getEvents({
-			filters: [{ contract: SCHOLARSHIP_TREASURY_CONTRACT_ID }],
-			startLedger: process.env.STARTING_LEDGER || "460000000",
-			pagination: { maxPageSize: 1000 },
+			filters: [{ contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] }],
+			startLedger: Number(process.env.STARTING_LEDGER || "460000000"),
+			limit: 1000,
 		})
 
 		const events: Array<{
@@ -131,32 +129,30 @@ export const getTreasuryActivity = async (
 		}> = []
 
 		// Parse and format events
-		for (const page of response.events) {
-			for (const event of page) {
-				const { scValToNative } = await import("@stellar/stellar-sdk")
-				const eventData = scValToNative(event.value)
+		for (const event of response.events) {
+			const { scValToNative } = await import("@stellar/stellar-sdk")
+			const eventData = scValToNative(event.value)
 
-				// Identify event type from topics
-				const topics = event.topic.map((t: any) => scValToNative(t))
-				const eventType = topics[0]
+			// Identify event type from topics
+			const topics = event.topic.map((t: any) => scValToNative(t))
+			const eventType = topics[0]
 
-				if (eventType === "deposit" || eventType === "Deposit") {
-					events.push({
-						type: "deposit",
-						amount: eventData.amount?.toString() || "0",
-						address: eventData.donor || "unknown",
-						tx_hash: event.txHash || "",
-						created_at: event.ledgerClosedAt || new Date().toISOString(),
-					})
-				} else if (eventType === "disburse" || eventType === "Disburse") {
-					events.push({
-						type: "disburse",
-						scholar: eventData.scholar || "unknown",
-						amount: eventData.amount?.toString() || "0",
-						tx_hash: event.txHash || "",
-						created_at: event.ledgerClosedAt || new Date().toISOString(),
-					})
-				}
+			if (eventType === "deposit" || eventType === "Deposit") {
+				events.push({
+					type: "deposit",
+					amount: eventData.amount?.toString() || "0",
+					address: eventData.donor || "unknown",
+					tx_hash: event.txHash || "",
+					created_at: event.ledgerClosedAt || new Date().toISOString(),
+				})
+			} else if (eventType === "disburse" || eventType === "Disburse") {
+				events.push({
+					type: "disburse",
+					scholar: eventData.scholar || "unknown",
+					amount: eventData.amount?.toString() || "0",
+					tx_hash: event.txHash || "",
+					created_at: event.ledgerClosedAt || new Date().toISOString(),
+				})
 			}
 		}
 

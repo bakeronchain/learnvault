@@ -170,9 +170,9 @@ export const batchRejectMilestonesBodySchema = z
 	})
 	.strict()
 
-export const rotateAdminApiKeyBodySchema = z
+export const updateCommentBodySchema = z
 	.object({
-		currentKey: requiredString("currentKey"),
+		content: requiredString("content", 2000),
 	})
 	.strict()
 

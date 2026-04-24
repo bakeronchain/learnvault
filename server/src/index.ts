@@ -36,6 +36,7 @@ import { healthRouter } from "./routes/health.routes"
 import { leaderboardRouter } from "./routes/leaderboard.routes"
 import { createMeRouter } from "./routes/me.routes"
 import { moderationRouter } from "./routes/moderation.routes"
+import { notificationsRouter } from "./routes/notifications.routes"
 import { scholarsRouter } from "./routes/scholars.routes"
 import { scholarshipsRouter } from "./routes/scholarships.routes"
 import { treasuryRouter } from "./routes/treasury.routes"
@@ -190,6 +191,7 @@ app.use("/api", createUploadRouter(jwtService))
 app.use("/api", enrollmentsRouter)
 app.use("/api", scholarshipsRouter)
 app.use("/api", treasuryRouter)
+app.use("/api", notificationsRouter)
 app.use("/api/wiki", wikiRouter)
 
 // Start event poller (non-prod only for now)

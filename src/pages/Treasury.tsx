@@ -10,6 +10,7 @@ import TreasuryHealthChart, {
 	type TreasuryPoint,
 } from "../components/treasury/TreasuryHealthChart"
 import TxHashLink from "../components/TxHashLink"
+import { ActivityFeedSkeleton } from "../components/SkeletonLoader"
 import { useContractIds } from "../hooks/useContractIds"
 import { useTreasury } from "../hooks/useTreasury"
 import { useUSDC } from "../hooks/useUSDC"
@@ -200,7 +201,7 @@ const Treasury: React.FC = () => {
 	const description = `LearnVault's decentralized scholarship treasury holds ${displayStats.totalTreasury} and has funded ${displayStats.scholarsFunded} scholars. View real-time inflows and disbursements.`
 
 	return (
-		<div className="p-12 max-w-7xl mx-auto min-h-screen text-white animate-in fade-in duration-1000">
+		<div aria-busy={isLoading} className="p-12 max-w-7xl mx-auto min-h-screen text-white animate-in fade-in duration-1000">
 			<Helmet>
 				<title>{title}</title>
 				<meta property="og:title" content={title} />
@@ -352,6 +353,33 @@ const Treasury: React.FC = () => {
 					<span className="relative z-10">Donate to Treasury</span>
 				</button>
 			</div>
+
+			{/* Scholarship Program Metrics */}
+			<section aria-busy={isLoading} className="mt-20">
+				<h2 className="text-4xl font-black mb-2 tracking-tighter">
+					Scholarship Program
+				</h2>
+				<p className="text-white/40 text-sm mb-10">
+					Real-time health metrics for the active scholarship cohort.
+				</p>
+
+				{isLoading && (
+					<div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+						{Array.from({ length: 6 }).map((_, i) => (
+							<div
+								key={i}
+								className="h-28 rounded-3xl bg-white/5 animate-pulse"
+							/>
+						))}
+					</div>
+				)}
+
+				{!isLoading && (
+					<p className="text-white/40 text-center py-10">
+						Scholarship metrics unavailable
+					</p>
+				)}
+			</section>
 		</div>
 	)
 }
@@ -451,18 +479,7 @@ const ActivityFeed: React.FC<{
 		</h3>
 		<div className="flex flex-col gap-4">
 			{loading ? (
-				<div className="space-y-4 py-2">
-					{Array.from({ length: 3 }).map((_, index) => (
-						<div
-							key={index}
-							className="rounded-2xl border border-white/5 bg-white/5 p-5 animate-pulse"
-						>
-							<div className="h-4 w-24 rounded-full bg-white/10" />
-							<div className="mt-3 h-3 w-16 rounded-full bg-white/5" />
-							<div className="mt-4 h-4 w-28 rounded-full bg-white/10" />
-						</div>
-					))}
-				</div>
+				<ActivityFeedSkeleton rows={2} />
 			) : error ? (
 				<div className="text-center text-white/40 py-8">{error}</div>
 			) : items.length === 0 ? (

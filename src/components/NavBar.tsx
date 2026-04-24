@@ -12,6 +12,7 @@ import {
 import { useWallet } from "../hooks/useWallet"
 import { fetchHistory } from "../pages/History"
 import GlobalSearch from "./GlobalSearch"
+import { NotificationBell } from "./NotificationBell"
 import { ReputationBadge } from "./ReputationBadge"
 import { ThemeToggle } from "./ThemeToggle"
 import { WalletButton } from "./WalletButton"
@@ -20,6 +21,7 @@ export default function NavBar() {
 	const [menuOpen, setMenuOpen] = useState(false)
 	const mobileMenuId = useId()
 	const { t } = useTranslation()
+	const token = localStorage.getItem("auth_token") ?? undefined
 
 	useEffect(() => {
 		if (typeof document === "undefined") return
@@ -137,6 +139,7 @@ export default function NavBar() {
 						size="sm"
 						showBalance
 					/>
+					<NotificationBell token={token} />
 					<div className="hidden md:block scale-90 [&_button]:dark:text-black [&_button]:dark:bg-white">
 						<WalletButton />
 					</div>

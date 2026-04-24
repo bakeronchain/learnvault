@@ -67,6 +67,87 @@ let cachedAdminAddress: string | null = null
 let lastAdminCheckTime: number = 0
 const ADMIN_CACHE_TTL = 5 * 60 * 1000 // 5 minutes in milliseconds
 
+// --- Retry Utilities ---
+
+/**
+ * Determines whether an error is transient and safe to retry.
+ * Non-retryable errors: contract reverts, auth failures, missing config.
+ */
+function isRetryableError(err: unknown): boolean {
+	const msg = (err instanceof Error ? err.message : String(err)).toLowerCase()
+	// Non-retryable: config missing, auth / access-control, contract logic errors
+	const nonRetryablePatterns = [
+		"not configured",
+		"is not the contract admin",
+		"contract revert",
+		"invalid auth",
+		"bad auth",
+		"insufficient balance",
+		"already verified",
+		"already rejected",
+	]
+	if (nonRetryablePatterns.some((p) => msg.includes(p))) return false
+
+	// Retryable: transient network / rate-limit problems
+	const retryablePatterns = [
+		"timeout",
+		"etimedout",
+		"econnreset",
+		"econnrefused",
+		"enotfound",
+		"socket hang up",
+		"network",
+		"429",
+		"too many requests",
+		"rate limit",
+		"503",
+		"service unavailable",
+		"server error",
+		"sequence number",
+	]
+	return retryablePatterns.some((p) => msg.includes(p))
+}
+
+/**
+ * Executes `operation` with exponential back-off retry.
+ * Only retries when `isRetryableError` returns true.
+ *
+ * @param operation  Async function to call
+ * @param maxAttempts  Maximum total attempts (default 3)
+ * @param label  Human-readable label used in log messages
+ */
+async function withRetry<T>(
+	operation: () => Promise<T>,
+	maxAttempts = 3,
+	label = "Stellar contract call",
+): Promise<T> {
+	let lastError: unknown
+	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+		try {
+			return await operation()
+		} catch (err) {
+			lastError = err
+			if (attempt === maxAttempts || !isRetryableError(err)) {
+				break
+			}
+			const delayMs = 500 * 2 ** (attempt - 1) // 500 ms, 1 s, 2 s, …
+			console.warn(
+				`[stellar] ${label} failed (attempt ${attempt}/${maxAttempts}), retrying in ${delayMs}ms…`,
+				err instanceof Error ? err.message : String(err),
+			)
+			await new Promise<void>((resolve) => setTimeout(resolve, delayMs))
+		}
+	}
+	// Re-throw with retry context attached
+	const base = lastError instanceof Error ? lastError : new Error(String(lastError))
+	const wrapped = new Error(
+		`${base.message} (failed after ${maxAttempts} attempt${maxAttempts === 1 ? "" : "s"})`,
+	) as Error & { retriesExhausted: boolean; attempts: number }
+	wrapped.retriesExhausted = true
+	wrapped.attempts = maxAttempts
+	throw wrapped
+}
+
 async function ensureAdminRole(): Promise<void> {
 	if (!STELLAR_SECRET_KEY) {
 		throw new Error(
@@ -156,70 +237,65 @@ async function callVerifyMilestone(
 		)
 	}
 
-	try {
-		// Enforce access control before doing anything
-		await ensureAdminRole()
-		// Dynamic import so the SDK is only loaded when actually needed
-		const {
-			Keypair,
-			Contract,
-			TransactionBuilder,
-			Memo,
-			Networks,
-			BASE_FEE,
-			rpc,
-			xdr,
-		} = await import("@stellar/stellar-sdk")
+	return withRetry(async () => {
+		try {
+			// Enforce access control before doing anything
+			await ensureAdminRole()
+			// Dynamic import so the SDK is only loaded when actually needed
+			const {
+				Keypair,
+				Contract,
+				TransactionBuilder,
+				Networks,
+				BASE_FEE,
+				rpc,
+				xdr,
+			} = await import("@stellar/stellar-sdk")
 
-		const server = new rpc.Server(
-			STELLAR_NETWORK === "mainnet"
-				? "https://soroban-rpc.stellar.org"
-				: "https://soroban-testnet.stellar.org",
-		)
-
-		const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
-		const account = await server.getAccount(keypair.publicKey())
-		const contract = new Contract(COURSE_MILESTONE_CONTRACT_ID)
-
-		const txBuilder = new TransactionBuilder(account, {
-			fee: BASE_FEE,
-			networkPassphrase:
-				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-		})
-		const requestMemoValue = buildRequestMemoValue(resolveRequestId(options))
-		if (requestMemoValue) {
-			txBuilder.addMemo(Memo.text(requestMemoValue))
-		}
-
-		const tx = txBuilder
-			.addOperation(
-				contract.call(
-					"verify_milestone",
-					xdr.ScVal.scvString(scholarAddress),
-					xdr.ScVal.scvString(courseId),
-					xdr.ScVal.scvU32(milestoneId),
-				),
+			const server = new rpc.Server(
+				STELLAR_NETWORK === "mainnet"
+					? "https://soroban-rpc.stellar.org"
+					: "https://soroban-testnet.stellar.org",
 			)
-			.setTimeout(30)
-			.build()
 
-		const prepared = await server.prepareTransaction(tx)
-		prepared.sign(keypair)
+			const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
+			const account = await server.getAccount(keypair.publicKey())
+			const contract = new Contract(COURSE_MILESTONE_CONTRACT_ID)
 
-		const result = await server.sendTransaction(prepared)
-		return { txHash: result.hash, simulated: false }
-	} catch (err) {
-		const msg = err instanceof Error ? err.message : String(err)
-		// Bubble up our specific admin error without wrapping it
-		if (msg.includes("is not the contract admin")) {
-			throw err
+			const tx = new TransactionBuilder(account, {
+				fee: BASE_FEE,
+				networkPassphrase:
+					STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+			})
+				.addOperation(
+					contract.call(
+						"verify_milestone",
+						xdr.ScVal.scvString(scholarAddress),
+						xdr.ScVal.scvString(courseId),
+						xdr.ScVal.scvU32(milestoneId),
+					),
+				)
+				.setTimeout(30)
+				.build()
+
+			const prepared = await server.prepareTransaction(tx)
+			prepared.sign(keypair)
+
+			const result = await server.sendTransaction(prepared)
+			return { txHash: result.hash, simulated: false }
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err)
+			// Bubble up our specific admin error without wrapping it
+			if (msg.includes("is not the contract admin")) {
+				throw err
+			}
+			console.error("[stellar] Contract call failed:", err)
+			throw new Error(
+				"Contract call failed: " +
+					(err instanceof Error ? err.message : String(err)),
+			)
 		}
-		console.error("[stellar] Contract call failed:", err)
-		throw new Error(
-			"Contract call failed: " +
-				(err instanceof Error ? err.message : String(err)),
-		)
-	}
+	}, 3, "callVerifyMilestone")
 }
 
 async function emitRejectionEvent(
@@ -240,70 +316,65 @@ async function emitRejectionEvent(
 		)
 	}
 
-	try {
-		// Enforce access control before doing anything
-		await ensureAdminRole()
-		const {
-			Keypair,
-			Contract,
-			TransactionBuilder,
-			Memo,
-			Networks,
-			BASE_FEE,
-			rpc,
-			xdr,
-		} = await import("@stellar/stellar-sdk")
+	return withRetry(async () => {
+		try {
+			// Enforce access control before doing anything
+			await ensureAdminRole()
+			const {
+				Keypair,
+				Contract,
+				TransactionBuilder,
+				Networks,
+				BASE_FEE,
+				rpc,
+				xdr,
+			} = await import("@stellar/stellar-sdk")
 
-		const server = new rpc.Server(
-			STELLAR_NETWORK === "mainnet"
-				? "https://soroban-rpc.stellar.org"
-				: "https://soroban-testnet.stellar.org",
-		)
-
-		const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
-		const account = await server.getAccount(keypair.publicKey())
-		const contract = new Contract(COURSE_MILESTONE_CONTRACT_ID)
-
-		const txBuilder = new TransactionBuilder(account, {
-			fee: BASE_FEE,
-			networkPassphrase:
-				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-		})
-		const requestMemoValue = buildRequestMemoValue(resolveRequestId(options))
-		if (requestMemoValue) {
-			txBuilder.addMemo(Memo.text(requestMemoValue))
-		}
-
-		const tx = txBuilder
-			.addOperation(
-				contract.call(
-					"reject_milestone",
-					xdr.ScVal.scvString(scholarAddress),
-					xdr.ScVal.scvString(courseId),
-					xdr.ScVal.scvU32(milestoneId),
-					xdr.ScVal.scvString(reason),
-				),
+			const server = new rpc.Server(
+				STELLAR_NETWORK === "mainnet"
+					? "https://soroban-rpc.stellar.org"
+					: "https://soroban-testnet.stellar.org",
 			)
-			.setTimeout(30)
-			.build()
 
-		const prepared = await server.prepareTransaction(tx)
-		prepared.sign(keypair)
+			const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
+			const account = await server.getAccount(keypair.publicKey())
+			const contract = new Contract(COURSE_MILESTONE_CONTRACT_ID)
 
-		const result = await server.sendTransaction(prepared)
-		return { txHash: result.hash, simulated: false }
-	} catch (err) {
-		const msg = err instanceof Error ? err.message : String(err)
-		// Bubble up our specific admin error without wrapping it
-		if (msg.includes("is not the contract admin")) {
-			throw err
+			const tx = new TransactionBuilder(account, {
+				fee: BASE_FEE,
+				networkPassphrase:
+					STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+			})
+				.addOperation(
+					contract.call(
+						"reject_milestone",
+						xdr.ScVal.scvString(scholarAddress),
+						xdr.ScVal.scvString(courseId),
+						xdr.ScVal.scvU32(milestoneId),
+						xdr.ScVal.scvString(reason),
+					),
+				)
+				.setTimeout(30)
+				.build()
+
+			const prepared = await server.prepareTransaction(tx)
+			prepared.sign(keypair)
+
+			const result = await server.sendTransaction(prepared)
+			return { txHash: result.hash, simulated: false }
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err)
+			// Bubble up our specific admin error without wrapping it
+			if (msg.includes("is not the contract admin")) {
+				throw err
+			}
+			console.error("[stellar] Rejection event failed:", err)
+			throw new Error(
+				"Rejection event failed: " +
+					(err instanceof Error ? err.message : String(err)),
+			)
 		}
-		console.error("[stellar] Rejection event failed:", err)
-		throw new Error(
-			"Rejection event failed: " +
-				(err instanceof Error ? err.message : String(err)),
-		)
-	}
+	}, 3, "emitRejectionEvent")
 }
 
 async function callMintScholarNFT(
@@ -321,57 +392,56 @@ async function callMintScholarNFT(
 		)
 	}
 
-	try {
-		const {
-			Keypair,
-			Contract,
-			TransactionBuilder,
-			Networks,
-			BASE_FEE,
-			rpc,
-			xdr,
-			Address,
-		} = await import("@stellar/stellar-sdk")
+	return withRetry(async () => {
+		try {
+			const {
+				Keypair,
+				Contract,
+				TransactionBuilder,
+				Networks,
+				BASE_FEE,
+				rpc,
+				xdr,
+			} = await import("@stellar/stellar-sdk")
 
-		const server = new rpc.Server(
-			STELLAR_NETWORK === "mainnet"
-				? "https://soroban-rpc.stellar.org"
-				: "https://soroban-testnet.stellar.org",
-		)
-
-		const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
-		const account = await server.getAccount(keypair.publicKey())
-		const contract = new Contract(SCHOLAR_NFT_CONTRACT_ID)
-
-		// Generate a unique token ID (simple approach: use timestamp)
-		const tokenId = Date.now()
-
-		const tx = new TransactionBuilder(account, {
-			fee: BASE_FEE,
-			networkPassphrase:
-				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-		})
-			.addOperation(
-				contract.call(
-					"mint",
-					new Address(scholarAddress).toScVal(),
-					xdr.ScVal.scvU64(new xdr.Uint64(tokenId)),
-				),
+			const server = new rpc.Server(
+				STELLAR_NETWORK === "mainnet"
+					? "https://soroban-rpc.stellar.org"
+					: "https://soroban-testnet.stellar.org",
 			)
-			.setTimeout(30)
-			.build()
 
-		const prepared = await server.prepareTransaction(tx)
-		prepared.sign(keypair)
+			const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
+			const account = await server.getAccount(keypair.publicKey())
+			const contract = new Contract(SCHOLAR_NFT_CONTRACT_ID)
 
-		const result = await server.sendTransaction(prepared)
-		return { txHash: result.hash, simulated: false, tokenId }
-	} catch (err) {
-		console.error("[stellar] ScholarNFT mint failed:", err)
-		throw new Error(
-			`ScholarNFT mint failed: ${err instanceof Error ? err.message : String(err)}`,
-		)
-	}
+			const tx = new TransactionBuilder(account, {
+				fee: BASE_FEE,
+				networkPassphrase:
+					STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+			})
+				.addOperation(
+					contract.call(
+						"mint",
+						xdr.ScVal.scvString(scholarAddress),
+						xdr.ScVal.scvString(metadataUri),
+					),
+				)
+				.setTimeout(30)
+				.build()
+
+			const prepared = await server.prepareTransaction(tx)
+			prepared.sign(keypair)
+
+			const result = await server.sendTransaction(prepared)
+			return { txHash: result.hash, simulated: false }
+		} catch (err) {
+			console.error("[stellar] ScholarNFT mint failed:", err)
+			throw new Error(
+				"ScholarNFT mint failed: " +
+					(err instanceof Error ? err.message : String(err)),
+			)
+		}
+	}, 3, "callMintScholarNFT")
 }
 
 /**
@@ -462,68 +532,63 @@ async function submitScholarshipProposal(
 		)
 	}
 
-	try {
-		const {
-			Keypair,
-			Contract,
-			TransactionBuilder,
-			Memo,
-			Networks,
-			BASE_FEE,
-			rpc,
-			nativeToScVal,
-		} = await import("@stellar/stellar-sdk")
+	return withRetry(async () => {
+		try {
+			const {
+				Keypair,
+				Contract,
+				TransactionBuilder,
+				Networks,
+				BASE_FEE,
+				rpc,
+				nativeToScVal,
+			} = await import("@stellar/stellar-sdk")
 
-		const server = new rpc.Server(
-			STELLAR_NETWORK === "mainnet"
-				? "https://soroban-rpc.stellar.org"
-				: "https://soroban-testnet.stellar.org",
-		)
-
-		const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
-		const account = await server.getAccount(keypair.publicKey())
-		const contract = new Contract(SCHOLARSHIP_TREASURY_CONTRACT_ID)
-
-		const txBuilder = new TransactionBuilder(account, {
-			fee: BASE_FEE,
-			networkPassphrase:
-				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-		})
-		const requestMemoValue = buildRequestMemoValue(resolveRequestId(options))
-		if (requestMemoValue) {
-			txBuilder.addMemo(Memo.text(requestMemoValue))
-		}
-
-		const tx = txBuilder
-			.addOperation(
-				contract.call(
-					"submit_proposal",
-					nativeToScVal(params.applicant, { type: "address" }),
-					nativeToScVal(params.amount, { type: "i128" }),
-					nativeToScVal(params.programName),
-					nativeToScVal(params.programUrl),
-					nativeToScVal(params.programDescription),
-					nativeToScVal(params.startDate),
-					nativeToScVal(params.milestoneTitles),
-					nativeToScVal(params.milestoneDates),
-				),
+			const server = new rpc.Server(
+				STELLAR_NETWORK === "mainnet"
+					? "https://soroban-rpc.stellar.org"
+					: "https://soroban-testnet.stellar.org",
 			)
-			.setTimeout(30)
-			.build()
 
-		const prepared = await server.prepareTransaction(tx)
-		prepared.sign(keypair)
+			const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
+			const account = await server.getAccount(keypair.publicKey())
+			const contract = new Contract(SCHOLARSHIP_TREASURY_CONTRACT_ID)
 
-		const result = await server.sendTransaction(prepared)
+			const tx = new TransactionBuilder(account, {
+				fee: BASE_FEE,
+				networkPassphrase:
+					STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+			})
+				.addOperation(
+					contract.call(
+						"submit_proposal",
+						nativeToScVal(params.applicant, { type: "address" }),
+						nativeToScVal(params.amount, { type: "i128" }),
+						nativeToScVal(params.programName),
+						nativeToScVal(params.programUrl),
+						nativeToScVal(params.programDescription),
+						nativeToScVal(params.startDate),
+						nativeToScVal(params.milestoneTitles),
+						nativeToScVal(params.milestoneDates),
+					),
+				)
+				.setTimeout(30)
+				.build()
 
-		return { txHash: result.hash, proposalId: null, simulated: false }
-	} catch (err) {
-		console.error("[stellar] Scholarship proposal submission failed:", err)
-		throw new Error(
-			"Scholarship proposal submission failed: " +
-				(err instanceof Error ? err.message : String(err)),
-		)
-	}
+			const prepared = await server.prepareTransaction(tx)
+			prepared.sign(keypair)
+
+			const result = await server.sendTransaction(prepared)
+
+			return { txHash: result.hash, proposalId: null, simulated: false }
+		} catch (err) {
+			console.error("[stellar] Scholarship proposal submission failed:", err)
+			throw new Error(
+				"Scholarship proposal submission failed: " +
+					(err instanceof Error ? err.message : String(err)),
+			)
+		}
+	}, 3, "submitScholarshipProposal")
 }
 
 async function castVote(

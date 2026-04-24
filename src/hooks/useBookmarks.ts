@@ -14,8 +14,9 @@ const BOOKMARKS_QUERY_KEY = ["bookmarks"] as const
 /**
  * Build headers for authenticated bookmark requests. Delegates to the shared
  * `createAuthHeaders` / `getAuthToken` pair so we stay in sync with the
- * codebase's "authToken" + "auth_token" storage-key fallback, and never send
- * `Authorization: Bearer ` when no token is present.
+ * codebase's "authToken" + "auth_token" storage-key fallback. When no token
+ * is present, `createAuthHeaders()` omits the Authorization header entirely
+ * — it does NOT send a malformed `Authorization: Bearer` with an empty value.
  */
 function authHeaders(): Headers {
 	const headers = createAuthHeaders()

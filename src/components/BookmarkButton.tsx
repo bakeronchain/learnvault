@@ -22,12 +22,14 @@ const BookmarkButton: React.FC<BookmarkButtonProps> = ({
 
 	const active = isBookmarked(courseId)
 
-	// Each BookmarkButton has its own `useMutation` instance (via its own
-	// `useBookmarks()` call), so `isToggling` is local to this button — it
-	// only disables THIS heart while its own toggle is in flight, preventing
-	// double-click races on the same course without freezing other hearts.
-	// Only the React Query cache is shared across instances, which is what
-	// makes optimistic updates propagate to every visible button instantly.
+	// Each BookmarkButton calls `useBookmarks()` for itself, so each rendered
+	// button instance gets its own `useMutation` state. That means
+	// `isToggling` only reflects this specific button instance's in-flight
+	// toggle and only disables THIS heart, preventing double-click races on
+	// the same course without freezing other hearts.
+	// The shared part is the React Query cache for bookmark data, which is
+	// what makes optimistic updates appear across every visible button
+	// immediately.
 	return (
 		<button
 			type="button"

@@ -279,50 +279,20 @@ export const createCredentialMetadataBodySchema = z
 
 export const enrollmentBodySchema = z
 	.object({
-		learner_address: requiredString("learner_address", 100),
-		course_id: requiredString("course_id", 100),
-		tx_hash: requiredString("tx_hash", 200),
+		learner_address: requiredString("learner_address"),
+		course_id: requiredString("course_id"),
+		tx_hash: requiredString("tx_hash"),
 	})
 	.strict()
 
-export const userProfileSchema = z
+export const bookmarkBodySchema = z
 	.object({
-		display_name: z
-			.string()
-			.trim()
-			.min(3, "Display name must be at least 3 characters")
-			.max(50, "Display name cannot exceed 50 characters")
-			.optional()
-			.nullable(),
-		bio: z
-			.string()
-			.max(2000, "Bio cannot exceed 2000 characters")
-			.optional()
-			.nullable(),
-		avatar_url: z
-			.string()
-			.url("Avatar must be a valid URL")
-			.max(2048, "URL is too long")
-			.optional()
-			.nullable(),
-		twitter: z
-			.string()
-			.trim()
-			.max(255, "Twitter handle/URL is too long")
-			.optional()
-			.nullable(),
-		github: z
-			.string()
-			.trim()
-			.max(255, "GitHub username/URL is too long")
-			.optional()
-			.nullable(),
-		website: z
-			.string()
-			.url("Website must be a valid URL")
-			.max(2048, "URL is too long")
-			.optional()
-			.nullable(),
+		course_id: requiredString("course_id"),
 	})
 	.strict()
 
+export const bookmarkCourseIdParamSchema = z
+	.object({
+		courseId: requiredString("courseId"),
+	})
+	.strict()

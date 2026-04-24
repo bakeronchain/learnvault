@@ -97,6 +97,8 @@ export function createBookmarksRouter(jwtService: JwtService): Router {
 	 *     responses:
 	 *       204:
 	 *         description: Bookmark removed (or did not exist)
+	 *       400:
+	 *         description: Validation error
 	 *       401:
 	 *         description: Unauthorized
 	 */

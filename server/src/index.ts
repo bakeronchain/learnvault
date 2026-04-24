@@ -13,6 +13,7 @@ import { z } from "zod"
 
 import { initDb } from "./db/index"
 import { createNonceStore } from "./db/nonce-store"
+import { createRequireTrustedOrigin } from "./middleware/csrf.middleware"
 import { errorHandler } from "./middleware/error.middleware"
 import { globalLimiter } from "./middleware/rate-limit.middleware"
 import { requestLogger } from "./middleware/request-logger.middleware"
@@ -130,6 +131,7 @@ app.use(
 		allowedHeaders: ["Content-Type", "Authorization"],
 	}),
 )
+app.use(createRequireTrustedOrigin(allowedOrigins))
 app.use(express.json())
 app.use(globalLimiter)
 

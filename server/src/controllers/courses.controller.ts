@@ -1,4 +1,5 @@
 import { type Request, type Response } from "express"
+import sanitizeHtml from "sanitize-html"
 import { pool } from "../db"
 
 type CourseRow = {
@@ -331,6 +332,29 @@ export const createCourse = async (
 			}
 		}
 
+		// Validate and sanitize description
+		let description = ""
+		if (body.description) {
+			if (typeof body.description !== "string") {
+				res.status(400).json({ error: "description must be a string", field: "description" })
+				return
+			}
+			if (body.description.length > 2000) {
+				res.status(400).json({ error: "description must be 2000 characters or fewer", field: "description" })
+				return
+			}
+			description = sanitizeHtml(body.description, {
+				allowedTags: ['p', 'br', 'strong', 'em', 'ul', 'ol', 'li'],
+				allowedAttributes: {},
+			})
+		}
+
+		// Sanitize title
+		const title = sanitizeHtml(String(body.title).trim(), {
+			allowedTags: [],
+			allowedAttributes: {},
+		})
+
 		const difficulty = String(body.difficulty).toLowerCase()
 		if (!difficultyValues.has(difficulty)) {
 			res.status(400).json({ error: "Invalid difficulty", field: "difficulty" })
@@ -342,9 +366,9 @@ export const createCourse = async (
 			 VALUES ($1, $2, $3, $4, $5, $6, NULL)
 			 RETURNING id, slug, title, description, cover_image_url, track, difficulty, published_at, created_at, updated_at`,
 			[
-				String(body.title).trim(),
+				title,
 				String(body.slug).trim(),
-				typeof body.description === "string" ? body.description : "",
+				description,
 				typeof body.coverImage === "string" ? body.coverImage : null,
 				String(body.track).trim(),
 				difficulty,
@@ -394,13 +418,25 @@ export const updateCourse = async (
 		}
 
 		if ("title" in body && typeof body.title === "string") {
-			addField("title", body.title.trim())
+			const sanitizedTitle = sanitizeHtml(body.title.trim(), {
+				allowedTags: [],
+				allowedAttributes: {},
+			})
+			addField("title", sanitizedTitle)
 		}
 		if ("slug" in body && typeof body.slug === "string") {
 			addField("slug", body.slug.trim())
 		}
 		if ("description" in body && typeof body.description === "string") {
-			addField("description", body.description)
+			if (body.description.length > 2000) {
+				res.status(400).json({ error: "description must be 2000 characters or fewer", field: "description" })
+				return
+			}
+			const sanitizedDescription = sanitizeHtml(body.description, {
+				allowedTags: ['p', 'br', 'strong', 'em', 'ul', 'ol', 'li'],
+				allowedAttributes: {},
+			})
+			addField("description", sanitizedDescription)
 		}
 		if ("coverImage" in body) {
 			if (typeof body.coverImage === "string") {

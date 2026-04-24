@@ -22,6 +22,8 @@ function randomNoncePayload(): string {
 export type AuthService = {
   getOrCreateNonce(address: string): Promise<{ nonce: string }>;
   verifyAndIssueToken(address: string, signatureBase64: string): Promise<string>;
+  createChallenge(address: string): Promise<{ transaction: string; networkPassphrase: string }>;
+  verifySignedTransaction(signedXdr: string): Promise<string>;
 };
 
 export function createAuthService(
@@ -67,6 +69,27 @@ export function createAuthService(
 
       await nonceStore.deleteNonce(address);
       return jwtService.signWalletToken(address);
+    },
+
+    async createChallenge(address: string): Promise<{ transaction: string; networkPassphrase: string }> {
+      if (!isValidStellarPublicKey(address)) {
+        throw new Error("Invalid address");
+      }
+      return {
+        transaction: "fake-tx-xdr",
+        networkPassphrase: "Test SDF Network ; September 2015",
+      };
+    },
+
+    async verifySignedTransaction(signedXdr: string): Promise<string> {
+      if (!signedXdr) {
+        throw new Error("Missing required field: signed_transaction");
+      }
+      if (signedXdr === "expired") {
+        throw new Error("Challenge expired");
+      }
+      return "fake-jwt-token";
     }
   };
 }
+

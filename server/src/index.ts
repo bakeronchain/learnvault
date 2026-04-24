@@ -29,35 +29,22 @@ import { adminMilestonesRouter } from "./routes/admin-milestones.routes";
 import { uploadRouter } from "./routes/upload.routes";
 import { coursesRouter } from "./routes/courses.routes";
 import { eventsRouter } from "./routes/events.routes";
+import { treasuryRouter } from "./routes/treasury.routes";
 import { initDb } from "./db/index";
 import { buildOpenApiSpec } from "./openapi";
-import { coursesRouter } from "./routes/courses.routes";
-import { eventsRouter } from "./routes/events.routes";
-
 
 const envSchema = z.object({
 	PORT: z.coerce.number().int().positive().default(4000),
 	CORS_ORIGIN: z.string().default("http://localhost:5173"),
+	NODE_ENV: z.string().default("development"),
+	JWT_PRIVATE_KEY: z.string().optional(),
+	JWT_PUBLIC_KEY: z.string().optional(),
+	REDIS_URL: z.string().optional(),
 })
 
 const env = envSchema.parse(process.env)
 
 const app = express()
-const openApiSpec = buildOpenApiSpec()
-const openApiYaml = YAML.stringify(openApiSpec)
-
-app.use(morgan("dev"))
-app.use(
-	cors({
-		origin: env.CORS_ORIGIN,
-	}),
-)
-app.use(express.json())
-
-app.use("/api", healthRouter)
-app.use("/api", coursesRouter)
-app.use("/api", validatorRouter)
-app.use("/api", eventsRouter)
 const isProduction = env.NODE_ENV === "production";
 
 let jwtPrivateKey = env.JWT_PRIVATE_KEY;
@@ -81,17 +68,13 @@ const nonceStore = createNonceStore(env.REDIS_URL);
 const jwtService = createJwtService(jwtPrivateKey, jwtPublicKey);
 const authService = createAuthService(nonceStore, jwtService);
 
-const app = express();
-
 const openApiSpec = buildOpenApiSpec();
 const openApiYaml = YAML.stringify(openApiSpec);
 
 app.set("trust proxy", 1);
-
 app.use(morgan("dev"));
 app.use(cors({ origin: env.CORS_ORIGIN }));
 app.use(express.json());
-app.use(globalLimiter);
 
 app.use("/api", healthRouter);
 app.use("/api/auth", createAuthRouter(authService));
@@ -102,6 +85,8 @@ app.use("/api", eventsRouter);
 app.use("/api", commentsRouter);
 app.use("/api", adminMilestonesRouter);
 app.use("/api", uploadRouter);
+app.use("/api", treasuryRouter);
+
 
 app.get("/api/docs", (_req, res) => {
 	res.type("application/yaml").send(openApiYaml)

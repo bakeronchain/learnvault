@@ -1,3 +1,4 @@
+import { createPublicKey } from "node:crypto"
 import path from "path"
 // eslint-disable-next-line import/order
 import dotenv from "dotenv"
@@ -107,11 +108,26 @@ if (!jwtPrivateKey || !jwtPublicKey) {
 	const ephemeral = generateEphemeralDevJwtKeys()
 	jwtPrivateKey = ephemeral.privateKeyPem
 	jwtPublicKey = ephemeral.publicKeyPem
+	// Expose ephemeral keys to process.env so standalone middlewares (admin, course-admin)
+	// can use RS256 instead of falling back to HS256 in development.
+	process.env.JWT_PRIVATE_KEY = jwtPrivateKey
+	process.env.JWT_PUBLIC_KEY = jwtPublicKey
 }
 
 if (!jwtPrivateKey || !jwtPublicKey) {
 	throw new Error(
 		"JWT_PRIVATE_KEY and JWT_PUBLIC_KEY must be configured to start the server",
+	)
+}
+
+// Validate RSA key is at least 2048 bits to meet security requirements.
+const _pubKeyObj = createPublicKey(
+	jwtPublicKey.replace(/\\n/g, "\n").trim(),
+)
+const _keyDetails = _pubKeyObj.asymmetricKeyDetails
+if (!_keyDetails?.modulusLength || _keyDetails.modulusLength < 2048) {
+	throw new Error(
+		`JWT RSA key must be at least 2048 bits; found ${_keyDetails?.modulusLength ?? "unknown"} bits`,
 	)
 }
 

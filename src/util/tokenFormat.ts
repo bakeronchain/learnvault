@@ -28,6 +28,15 @@ export function parseUSDC(
 	return parseToken(display, decimals)
 }
 
+/**
+ * Formats a numeric LRN balance for display (e.g., "1,234").
+ */
+export function formatLrnBalance(numericLrn: number): string {
+	return numericLrn.toLocaleString("en-US", {
+		maximumFractionDigits: 0,
+	})
+}
+
 function formatToken(raw: bigint, decimals: number): string {
 	const divisor = 10n ** BigInt(decimals)
 	const isNegative = raw < 0n

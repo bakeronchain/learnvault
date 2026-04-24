@@ -72,14 +72,11 @@ impl FungibleAllowlist {
             env.storage()
                 .persistent()
                 .set(&DataKey::IsAllowed(account.clone()), &false);
-            let list: Vec<Address> = env.storage().instance().get(&DataKey::Allowlist).unwrap();
-            let mut new_list: Vec<Address> = Vec::new(&env);
-            for x in list.iter() {
-                if x != account {
-                    new_list.push_back(x);
-                }
+            let mut list: Vec<Address> = env.storage().instance().get(&DataKey::Allowlist).unwrap();
+            if let Some(idx) = list.iter().position(|x| x == account) {
+                list.remove(idx as u32);
+                env.storage().instance().set(&DataKey::Allowlist, &list);
             }
-            env.storage().instance().set(&DataKey::Allowlist, &new_list);
         }
     }
 
@@ -151,5 +148,33 @@ mod test {
 
         client.add_to_allowlist(&new_admin, &alice);
         assert_eq!(client.is_allowed(&alice), true);
+    }
+
+    #[test]
+    fn benchmark_costs() {
+        let env = Env::default();
+        let admin = Address::generate(&env);
+        let alice = Address::generate(&env);
+
+        let contract_id = env.register(FungibleAllowlist, ());
+        let client = FungibleAllowlistClient::new(&env, &contract_id);
+
+        // 1. Benchmark initialize
+        env.cost_estimate().budget().reset_unlimited();
+        client.initialize(&admin);
+        let init_instr = env.cost_estimate().budget().cpu_instruction_cost();
+        let init_mem = env.cost_estimate().budget().memory_bytes_cost();
+
+        // 2. Benchmark add_to_allowlist
+        env.mock_all_auths();
+        env.cost_estimate().budget().reset_unlimited();
+        client.add_to_allowlist(&admin, &alice);
+        let add_instr = env.cost_estimate().budget().cpu_instruction_cost();
+        let add_mem = env.cost_estimate().budget().memory_bytes_cost();
+
+        extern crate std;
+        std::println!("BENCHMARK_RESULTS: fungible_allowlist");
+        std::println!("initialize: instr={}, mem={}", init_instr, init_mem);
+        std::println!("add_to_allowlist: instr={}, mem={}", add_instr, add_mem);
     }
 }

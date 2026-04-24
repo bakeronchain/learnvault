@@ -780,3 +780,41 @@ fn state_persists_after_upgrade() {
     assert!(enrolled);
     assert_eq!(stored_hash, wasm_hash);
 }
+
+#[test]
+fn benchmark_costs() {
+    let (env, contract_id, admin, _token_id, client, _token_client) = setup();
+    let learner = Address::generate(&env);
+    let course_id = sid(&env, "rust-101");
+
+    // 1. Benchmark add_course
+    env.cost_estimate().budget().reset_unlimited();
+    add_course(&env, &contract_id, &admin, &client, &course_id, 3);
+    let add_instr = env.cost_estimate().budget().cpu_instruction_cost();
+    let add_mem = env.cost_estimate().budget().memory_bytes_cost();
+
+    // 2. Benchmark enroll
+    env.cost_estimate().budget().reset_unlimited();
+    enroll(&env, &contract_id, &learner, &client, &course_id);
+    let enroll_instr = env.cost_estimate().budget().cpu_instruction_cost();
+    let enroll_mem = env.cost_estimate().budget().memory_bytes_cost();
+
+    // 3. Benchmark complete_milestone
+    env.cost_estimate().budget().reset_unlimited();
+    authorize(
+        &env,
+        &admin,
+        &contract_id,
+        "complete_milestone",
+        (learner.clone(), course_id.clone(), 1_u32),
+    );
+    client.complete_milestone(&learner, &course_id, &1);
+    let comp_instr = env.cost_estimate().budget().cpu_instruction_cost();
+    let comp_mem = env.cost_estimate().budget().memory_bytes_cost();
+
+    extern crate std;
+    std::println!("BENCHMARK_RESULTS: course_milestone");
+    std::println!("add_course: instr={}, mem={}", add_instr, add_mem);
+    std::println!("enroll: instr={}, mem={}", enroll_instr, enroll_mem);
+    std::println!("complete_milestone: instr={}, mem={}", comp_instr, comp_mem);
+}

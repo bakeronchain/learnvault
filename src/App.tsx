@@ -1,4 +1,4 @@
-﻿import { lazy, Suspense, type ReactNode } from "react"
+import { lazy, Suspense, type ReactNode } from "react"
 import { Outlet, Route, Routes } from "react-router-dom"
 import ErrorBoundary from "./components/ErrorBoundary"
 import Footer from "./components/Footer"
@@ -25,6 +25,8 @@ const NotFound = lazy(() => import("./pages/NotFound"))
 const Profile = lazy(() => import("./pages/Profile"))
 const ScholarshipApply = lazy(() => import("./pages/ScholarshipApply"))
 const Treasury = lazy(() => import("./pages/Treasury"))
+const Wiki = lazy(() => import("./pages/Wiki"))
+const WikiPage = lazy(() => import("./pages/WikiPage"))
 
 const renderRoute = (element: ReactNode) => (
 	<ErrorBoundary>
@@ -63,6 +65,8 @@ function App() {
 						element={renderRoute(<ScholarshipApply />)}
 					/>
 					<Route path="/admin" element={renderRoute(<Admin />)} />
+					<Route path="/wiki" element={renderRoute(<Wiki />)} />
+					<Route path="/wiki/:slug" element={renderRoute(<WikiPage />)} />
 					<Route path="/treasury" element={renderRoute(<Treasury />)} />
 					<Route path="/donor" element={renderRoute(<Donor />)} />
 					<Route

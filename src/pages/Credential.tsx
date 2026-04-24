@@ -1,36 +1,32 @@
-import React, { useState, useEffect } from "react"
+import React, { useState } from "react"
 import { Helmet } from "react-helmet"
-import { useParams, Link } from "react-router-dom"
+import { useParams } from "react-router-dom"
 import TxHashLink from "../components/TxHashLink"
 import { useScholarNft } from "../hooks/useScholarNft"
-
-// ---------------------------------------------------------------------------
-// Skeleton loader
-// ---------------------------------------------------------------------------
 
 const SkeletonPulse: React.FC<{ className?: string }> = ({ className }) => (
 	<div className={`animate-pulse rounded-xl bg-white/10 ${className ?? ""}`} />
 )
 
 const CredentialSkeleton: React.FC = () => (
-	<div className="py-20 px-6 min-h-screen flex flex-col items-center gap-16 text-white relative overflow-hidden">
-		<div className="absolute top-1/4 left-1/4 w-[50%] h-[50%] bg-brand-cyan/10 blur-[150px] rounded-full -z-10" />
-		<div className="absolute bottom-1/4 right-1/4 w-[50%] h-[50%] bg-brand-purple/10 blur-[150px] rounded-full -z-10" />
+	<div className="relative flex min-h-screen flex-col items-center gap-16 overflow-hidden px-6 py-20 text-white">
+		<div className="absolute left-1/4 top-1/4 h-[50%] w-[50%] rounded-full bg-brand-cyan/10 blur-[150px] -z-10" />
+		<div className="absolute bottom-1/4 right-1/4 h-[50%] w-[50%] rounded-full bg-brand-purple/10 blur-[150px] -z-10" />
 
-		<div className="iridescent-border p-px rounded-[3rem] shadow-2xl w-full max-w-5xl">
-			<div className="glass-card w-full rounded-[3rem] overflow-hidden flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-white/10">
-				<div className="md:w-5/12 aspect-square md:aspect-auto">
-					<SkeletonPulse className="w-full h-full min-h-[320px] rounded-none" />
+		<div className="iridescent-border w-full max-w-5xl rounded-[3rem] p-px shadow-2xl">
+			<div className="glass-card flex w-full flex-col divide-y divide-white/10 overflow-hidden rounded-[3rem] md:flex-row md:divide-x md:divide-y-0">
+				<div className="aspect-square md:w-5/12 md:aspect-auto">
+					<SkeletonPulse className="h-full min-h-[320px] w-full rounded-none" />
 				</div>
-				<div className="md:w-7/12 p-16 flex flex-col justify-center gap-6">
+				<div className="flex flex-col justify-center gap-6 p-16 md:w-7/12">
 					<SkeletonPulse className="h-4 w-32" />
 					<SkeletonPulse className="h-12 w-full" />
 					<SkeletonPulse className="h-6 w-3/4" />
-					<div className="grid grid-cols-2 gap-10 mt-6">
+					<div className="mt-6 grid grid-cols-2 gap-10">
 						<SkeletonPulse className="h-14 w-full" />
 						<SkeletonPulse className="h-14 w-full" />
-						<SkeletonPulse className="h-14 w-full col-span-2" />
-						<SkeletonPulse className="h-8 w-full col-span-2" />
+						<SkeletonPulse className="col-span-2 h-14 w-full" />
+						<SkeletonPulse className="col-span-2 h-8 w-full" />
 					</div>
 				</div>
 			</div>
@@ -43,10 +39,6 @@ const CredentialSkeleton: React.FC = () => (
 	</div>
 )
 
-// ---------------------------------------------------------------------------
-// Error states
-// ---------------------------------------------------------------------------
-
 interface ErrorStateProps {
 	title: string
 	message: string
@@ -54,16 +46,16 @@ interface ErrorStateProps {
 }
 
 const ErrorState: React.FC<ErrorStateProps> = ({ title, message, icon }) => (
-	<div className="py-20 px-6 min-h-screen flex flex-col items-center justify-center gap-8 text-white relative overflow-hidden">
-		<div className="absolute top-1/4 left-1/4 w-[50%] h-[50%] bg-red-500/10 blur-[150px] rounded-full -z-10" />
+	<div className="relative flex min-h-screen flex-col items-center justify-center gap-8 overflow-hidden px-6 py-20 text-white">
+		<div className="absolute left-1/4 top-1/4 h-[50%] w-[50%] rounded-full bg-red-500/10 blur-[150px] -z-10" />
 
-		<div className="glass-card rounded-[2rem] p-16 text-center max-w-lg animate-in fade-in zoom-in duration-700">
-			<div className="text-6xl mb-6">{icon}</div>
-			<h1 className="text-3xl font-black mb-4 tracking-tight">{title}</h1>
-			<p className="text-white/60 text-lg leading-relaxed">{message}</p>
+		<div className="glass-card max-w-lg rounded-[2rem] p-16 text-center duration-700 animate-in fade-in zoom-in">
+			<div className="mb-6 text-6xl">{icon}</div>
+			<h1 className="mb-4 text-3xl font-black tracking-tight">{title}</h1>
+			<p className="text-lg leading-relaxed text-white/60">{message}</p>
 			<a
 				href="/"
-				className="mt-8 inline-block px-8 py-3 bg-brand-cyan/20 text-brand-cyan rounded-xl font-bold text-sm uppercase tracking-widest hover:bg-brand-cyan/30 transition-colors"
+				className="mt-8 inline-block rounded-xl bg-brand-cyan/20 px-8 py-3 text-sm font-bold uppercase tracking-widest text-brand-cyan transition-colors hover:bg-brand-cyan/30"
 			>
 				Back to Home
 			</a>
@@ -71,107 +63,10 @@ const ErrorState: React.FC<ErrorStateProps> = ({ title, message, icon }) => (
 	</div>
 )
 
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
 const Credential: React.FC = () => {
 	const { id } = useParams<{ id: string }>()
+	const nftId = id?.trim() || undefined
 	const [copySuccess, setCopySuccess] = useState(false)
-	const [isLoading, setIsLoading] = useState(true)
-	const [error, setError] = useState<string | null>(null)
-
-	// Simulate API call to fetch credential data
-	useEffect(() => {
-		const fetchCredential = async () => {
-			setIsLoading(true)
-			setError(null)
-			
-			try {
-				// Simulate API delay
-				await new Promise(resolve => setTimeout(resolve, 1000))
-				
-				// Validate ID format (basic check)
-				if (!id || isNaN(Number(id))) {
-					throw new Error("Invalid credential ID")
-				}
-				
-				// For demo purposes, we'll use mock data
-				// In a real implementation, this would fetch from /api/credentials/:id
-				if (id === "999") {
-					throw new Error("Credential not found or revoked")
-				}
-			} catch (err) {
-				setError(err instanceof Error ? err.message : "Failed to load credential")
-			} finally {
-				setIsLoading(false)
-			}
-		}
-		
-		if (id) {
-			fetchCredential()
-		} else {
-			setError("No credential ID provided")
-			setIsLoading(false)
-		}
-	}, [id])
-
-	// Mock credential data - in production this would come from API
-	const nft = {
-		id: id || "1",
-		programName: "Soroban Smart Contract Masterclass",
-		scholarName: "Alex Rivera",
-		completionDate: "October 24, 2024",
-		artworkUrl: "https://api.placeholder.com/600/600?text=ScholarNFT+Badge",
-		txHash: "3f40a5c6f2e1471fa3f31ba6b59f7f0dcefc36e35d5b12fb96f0c8d9f6a8b4e1",
-		issuer: "LearnVault DAO",
-		reputationPoints: "50 LRN",
-		learnerAddress: "GD5V5B3X4K3X2Y7Z8W9Q1R2T3Y4U5I6O7P8Q9R0S1T",
-		metadataUri: "ipfs://QmXyZ123..."
-	}
-
-	const siteUrl = "https://learnvault.app"
-	const title = error ? "Credential Not Found — LearnVault" : `${nft.scholarName} earned "${nft.programName}" — LearnVault`
-	const description = error ? "The requested credential could not be found or has been revoked." : `${nft.scholarName} completed "${nft.programName}" on ${nft.completionDate} and earned a verified ScholarNFT credential on LearnVault.`
-
-	// Loading state
-	if (isLoading) {
-		return (
-			<div className="py-20 px-6 min-h-screen flex flex-col items-center justify-center text-white">
-				<div className="glass-card rounded-[2.5rem] p-12 animate-pulse">
-					<div className="w-32 h-32 bg-white/10 rounded-full mb-8" />
-					<div className="h-8 w-64 bg-white/10 rounded-full mb-4" />
-					<div className="h-4 w-48 bg-white/10 rounded-full" />
-				</div>
-			</div>
-		)
-	}
-
-	// Error state
-	if (error) {
-		return (
-			<div className="py-20 px-6 min-h-screen flex flex-col items-center justify-center text-white">
-				<Helmet>
-					<title>{title}</title>
-					<meta property="og:title" content={title} />
-					<meta property="og:description" content={description} />
-				</Helmet>
-				<div className="glass-card rounded-[2.5rem] p-12 max-w-2xl text-center">
-					<div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-						<span className="text-2xl">⚠️</span>
-					</div>
-					<h1 className="text-3xl font-black mb-4">Credential Not Found</h1>
-					<p className="text-white/70 mb-8">{error}</p>
-					<Link
-						to="/profile"
-						className="inline-flex items-center gap-2 px-8 py-3 bg-brand-cyan text-black rounded-xl font-black text-sm uppercase tracking-widest hover:scale-105 transition-all"
-					>
-						← Back to Profile
-					</Link>
-				</div>
-			</div>
-		)
-	}
 	const { credential: nft, status, error } = useScholarNft(nftId)
 
 	const copyToClipboard = () => {
@@ -180,27 +75,25 @@ const Credential: React.FC = () => {
 		setTimeout(() => setCopySuccess(false), 2000)
 	}
 
-	// ---- Loading ----
 	if (status === "loading") {
 		return (
 			<>
 				<Helmet>
-					<title>Loading Credential — LearnVault</title>
+					<title>Loading Credential - LearnVault</title>
 				</Helmet>
 				<CredentialSkeleton />
 			</>
 		)
 	}
 
-	// ---- Not found ----
 	if (status === "not_found") {
 		return (
 			<>
 				<Helmet>
-					<title>Credential Not Found — LearnVault</title>
+					<title>Credential Not Found - LearnVault</title>
 				</Helmet>
 				<ErrorState
-					icon="🔍"
+					icon="?"
 					title="Credential Not Found"
 					message={`Token #${nftId ?? "?"} does not exist on-chain. It may not have been minted yet.`}
 				/>
@@ -208,15 +101,14 @@ const Credential: React.FC = () => {
 		)
 	}
 
-	// ---- Revoked ----
 	if (status === "revoked") {
 		return (
 			<>
 				<Helmet>
-					<title>Credential Revoked — LearnVault</title>
+					<title>Credential Revoked - LearnVault</title>
 				</Helmet>
 				<ErrorState
-					icon="🚫"
+					icon="!"
 					title="Credential Revoked"
 					message={
 						error ??
@@ -227,15 +119,14 @@ const Credential: React.FC = () => {
 		)
 	}
 
-	// ---- Error ----
 	if (status === "error" || !nft) {
 		return (
 			<>
 				<Helmet>
-					<title>Error — LearnVault</title>
+					<title>Error - LearnVault</title>
 				</Helmet>
 				<ErrorState
-					icon="⚠️"
+					icon="!"
 					title="Unable to Load Credential"
 					message={
 						error ??
@@ -246,142 +137,130 @@ const Credential: React.FC = () => {
 		)
 	}
 
-	// ---- Success ----
 	const siteUrl = "https://learnvault.app"
-	const title = `${nft.scholarName} earned "${nft.programName}" — LearnVault`
+	const title = `${nft.scholarName} earned "${nft.programName}" - LearnVault`
 	const description = `${nft.scholarName} completed "${nft.programName}" on ${nft.completionDate} and earned a verified ScholarNFT credential on LearnVault.`
+	const shareText = encodeURIComponent(
+		`I've just earned my ${nft.programName} credential on @LearnVault!`,
+	)
 
 	return (
-		<div className="py-20 px-6 min-h-screen flex flex-col items-center gap-16 text-white relative overflow-hidden">
+		<div className="relative flex min-h-screen flex-col items-center gap-16 overflow-hidden px-6 py-20 text-white">
 			<Helmet>
 				<title>{title}</title>
 				<meta name="description" content={description} />
 				<meta property="og:title" content={title} />
 				<meta property="og:description" content={description} />
 				<meta property="og:url" content={`${siteUrl}/credential/${nft.id}`} />
-				{nft.artworkUrl && (
+				{nft.artworkUrl ? (
 					<meta property="og:image" content={nft.artworkUrl} />
-				)}
+				) : null}
 				<meta name="twitter:card" content="summary_large_image" />
 				<meta name="twitter:title" content={title} />
 				<meta name="twitter:description" content={description} />
 			</Helmet>
 
-			<div className="absolute top-1/4 left-1/4 w-[50%] h-[50%] bg-brand-cyan/10 blur-[150px] rounded-full -z-10" />
-			<div className="absolute bottom-1/4 right-1/4 w-[50%] h-[50%] bg-brand-purple/10 blur-[150px] rounded-full -z-10" />
+			<div className="absolute left-1/4 top-1/4 h-[50%] w-[50%] rounded-full bg-brand-cyan/10 blur-[150px] -z-10" />
+			<div className="absolute bottom-1/4 right-1/4 h-[50%] w-[50%] rounded-full bg-brand-purple/10 blur-[150px] -z-10" />
 
-			<div className="iridescent-border p-px rounded-[3rem] shadow-2xl animate-in fade-in zoom-in duration-1000">
-				<div className="glass-card w-full max-w-5xl rounded-[3rem] overflow-hidden flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-white/10">
-					<div className="md:w-5/12 relative aspect-square md:aspect-auto group">
+			<div className="iridescent-border rounded-[3rem] p-px shadow-2xl duration-1000 animate-in fade-in zoom-in">
+				<div className="glass-card flex w-full max-w-5xl flex-col divide-y divide-white/10 overflow-hidden rounded-[3rem] md:flex-row md:divide-x md:divide-y-0">
+					<div className="group relative aspect-square md:w-5/12 md:aspect-auto">
 						{nft.artworkUrl ? (
 							<img
 								src={nft.artworkUrl}
 								alt={`Credential artwork for ${nft.programName} awarded to ${nft.scholarName}`}
-								className="w-full h-full object-cover opacity-90 group-hover:scale-110 transition-transform duration-1000"
+								className="h-full w-full object-cover opacity-90 transition-transform duration-1000 group-hover:scale-110"
 								onError={(e) => {
 									const target = e.currentTarget
 									target.style.display = "none"
 								}}
 							/>
 						) : (
-							<div className="w-full h-full min-h-[320px] bg-gradient-to-br from-brand-cyan/20 to-brand-purple/20 flex items-center justify-center">
-								<span className="text-6xl opacity-50">🎓</span>
+							<div className="flex h-full min-h-[320px] w-full items-center justify-center bg-gradient-to-br from-brand-cyan/20 to-brand-purple/20">
+								<span className="text-6xl opacity-50">o</span>
 							</div>
 						)}
 						<div className="absolute inset-0 bg-linear-to-t from-black/80 to-transparent" />
-						<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-12 px-8 py-3 border-[6px] border-brand-cyan text-brand-cyan font-black text-2xl tracking-[6px] bg-black/40 backdrop-blur-md whitespace-nowrap uppercase shadow-2xl">
+						<div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-12 whitespace-nowrap border-[6px] border-brand-cyan bg-black/40 px-8 py-3 text-2xl font-black uppercase tracking-[6px] text-brand-cyan shadow-2xl backdrop-blur-md">
 							Verified Scholar
 						</div>
 						<div className="absolute bottom-8 left-8">
-							<p className="text-[10px] font-black uppercase tracking-[3px] text-white/70 mb-1">
+							<p className="mb-1 text-[10px] font-black uppercase tracking-[3px] text-white/70">
 								Authenticity Hash
 							</p>
-							<code className="text-[10px] text-brand-emerald font-mono bg-black/50 px-2 py-1 rounded">
+							<code className="rounded bg-black/50 px-2 py-1 font-mono text-[10px] text-brand-emerald">
 								LV-NFT-{nft.id}-Soroban
 							</code>
 						</div>
 					</div>
 
-					<div className="md:w-7/12 p-16 flex flex-col justify-center">
+					<div className="flex flex-col justify-center p-16 md:w-7/12">
 						<div className="mb-10">
-							<div className="flex items-center gap-3 mb-4">
-								<span className="w-8 h-px bg-brand-cyan" />
+							<div className="mb-4 flex items-center gap-3">
+								<span className="h-px w-8 bg-brand-cyan" />
 								<span className="text-xs font-black uppercase tracking-[4px] text-brand-cyan">
 									Official Credential
 								</span>
 							</div>
-							<h1 className="text-5xl font-black mb-6 leading-tight tracking-tighter">
+							<h1 className="mb-6 text-5xl font-black leading-tight tracking-tighter">
 								{nft.programName}
 							</h1>
-							<p className="text-white/70 text-lg font-medium leading-relaxed">
+							<p className="text-lg font-medium leading-relaxed text-white/70">
 								This on-chain certificate verifies that{" "}
-								<span className="text-white font-bold">{nft.scholarName}</span>{" "}
+								<span className="font-bold text-white">{nft.scholarName}</span>{" "}
 								has successfully completed the program and earned a verified
 								ScholarNFT credential.
 							</p>
 						</div>
 
-						<div className="grid grid-cols-2 gap-10 mb-12">
+						<div className="mb-12 grid grid-cols-2 gap-10">
 							<div>
-								<p className="block text-[10px] uppercase font-black text-white/70 tracking-[3px] mb-2">
+								<p className="mb-2 block text-[10px] font-black uppercase tracking-[3px] text-white/70">
 									Awarded Date
 								</p>
 								<p className="text-lg font-bold">{nft.completionDate}</p>
 							</div>
-							{nft.reputationPoints && (
+							{nft.reputationPoints ? (
 								<div>
-									<p className="block text-[10px] uppercase font-black text-white/70 tracking-[3px] mb-2">
+									<p className="mb-2 block text-[10px] font-black uppercase tracking-[3px] text-white/70">
 										Reputation Earned
 									</p>
 									<p className="text-lg font-black text-brand-emerald">
 										+{nft.reputationPoints}
 									</p>
 								</div>
-							)}
+							) : null}
 							<div className="col-span-2">
-								<p className="block text-[10px] uppercase font-black text-white/70 tracking-[3px] mb-2">
+								<p className="mb-2 block text-[10px] font-black uppercase tracking-[3px] text-white/70">
 									Issued By
 								</p>
 								<div className="flex items-center gap-3">
-									<div className="w-8 h-8 rounded-full bg-linear-to-r from-brand-cyan to-brand-blue" />
+									<div className="h-8 w-8 rounded-full bg-linear-to-r from-brand-cyan to-brand-blue" />
 									<p className="text-lg font-bold text-gradient">
 										{nft.issuer}
 									</p>
 								</div>
 							</div>
 							<div className="col-span-2">
-								<p className="block text-[10px] uppercase font-black text-white/70 tracking-[3px] mb-2">
-									Learner Address
-								</p>
-								<code className="text-xs font-mono bg-black/50 px-3 py-2 rounded-lg text-brand-emerald">
-									{nft.learnerAddress}
-								</code>
-							</div>
-							<div className="col-span-2">
-								<p className="block text-[10px] uppercase font-black text-white/70 tracking-[3px] mb-2">
-									Metadata URI
-								</p>
-								<code className="text-xs font-mono bg-black/50 px-3 py-2 rounded-lg text-white/70 break-all">
-									{nft.metadataUri}
-								</code>
-							</div>
-							<div className="col-span-2">
-								<label className="block text-[10px] uppercase font-black text-white/30 tracking-[3px] mb-2">
-									Transaction Hash
-								</label>
-								<TxHashLink
-									hash={nft.txHash}
-									className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#00d2ff] hover:underline"
-								/>
+								<p className="mb-2 block text-[10px] font-black uppercase tracking-[3px] text-white/70">
 									Owner
 								</p>
-								<code className="text-xs font-mono text-brand-cyan bg-black/30 px-3 py-1.5 rounded-lg break-all">
+								<code className="break-all rounded-lg bg-black/30 px-3 py-1.5 font-mono text-xs text-brand-cyan">
 									{nft.owner}
 								</code>
 							</div>
-							{nft.txHash && (
+							<div className="col-span-2">
+								<p className="mb-2 block text-[10px] font-black uppercase tracking-[3px] text-white/70">
+									Metadata URI
+								</p>
+								<code className="break-all rounded-lg bg-black/50 px-3 py-2 font-mono text-xs text-white/70">
+									{nft.metadataUri}
+								</code>
+							</div>
+							{nft.txHash ? (
 								<div className="col-span-2">
-									<label className="block text-[10px] uppercase font-black text-white/30 tracking-[3px] mb-2">
+									<label className="mb-2 block text-[10px] font-black uppercase tracking-[3px] text-white/30">
 										Transaction Hash
 									</label>
 									<TxHashLink
@@ -389,26 +268,27 @@ const Credential: React.FC = () => {
 										className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#00d2ff] hover:underline"
 									/>
 								</div>
-							)}
+							) : null}
 						</div>
 					</div>
 				</div>
 			</div>
 
-			<div className="flex flex-wrap justify-center gap-6 animate-in slide-in-from-bottom-8 duration-1000 delay-300">
+			<div className="flex flex-wrap justify-center gap-6 duration-1000 delay-300 animate-in slide-in-from-bottom-8">
+				{nft.txHash ? (
+					<a
+						href={`https://stellar.expert/explorer/public/tx/${nft.txHash}`}
+						target="_blank"
+						rel="noopener noreferrer"
+						className="rounded-2xl bg-gradient-to-r from-brand-cyan to-brand-blue px-10 py-4 text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-brand-cyan/20 transition-all hover:scale-105 active:scale-95"
+						aria-label={`Verify ${nft.programName} credential on Stellar Explorer`}
+					>
+						Verify on-chain
+					</a>
+				) : null}
 				<a
-					href={`https://stellar.expert/explorer/public/tx/${nft.txHash}`}
-					target="_blank"
-					rel="noopener noreferrer"
-					className="px-10 py-4 bg-gradient-to-r from-brand-cyan to-brand-blue text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-brand-cyan/20"
-					aria-label={`Verify ${nft.programName} credential on Stellar Explorer`}
-				>
-					Verify on-chain →
-				</a>
-				<a
-					href={`https://twitter.com/intent/tweet?text=I've just earned my ${nft.programName} credential on @LearnVault!`}
-					href={`https://twitter.com/intent/tweet?text=I've just earned my ${encodeURIComponent(nft.programName)} credential on @LearnVault!`}
-					className="px-10 py-4 bg-[#1d9bf0] text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-[#1d9bf0]/20"
+					href={`https://twitter.com/intent/tweet?text=${shareText}`}
+					className="rounded-2xl bg-[#1d9bf0] px-10 py-4 text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-[#1d9bf0]/20 transition-all hover:scale-105 active:scale-95"
 					aria-label={`Share ${nft.programName} credential on Twitter`}
 				>
 					Share to Twitter / X
@@ -416,12 +296,12 @@ const Credential: React.FC = () => {
 				<button
 					type="button"
 					onClick={copyToClipboard}
-					className="px-10 py-4 glass text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:scale-105 active:scale-95 transition-all border border-white/10"
+					className="glass rounded-2xl border border-white/10 px-10 py-4 text-sm font-black uppercase tracking-widest text-white transition-all hover:scale-105 hover:bg-white/10 active:scale-95"
 				>
 					{copySuccess ? "Link Copied!" : "Copy Shareable Link"}
 				</button>
 			</div>
-			{copySuccess && (
+			{copySuccess ? (
 				<p
 					className="text-sm text-brand-emerald"
 					role="status"
@@ -429,7 +309,7 @@ const Credential: React.FC = () => {
 				>
 					Credential link copied to clipboard.
 				</p>
-			)}
+			) : null}
 		</div>
 	)
 }

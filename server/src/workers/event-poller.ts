@@ -1,9 +1,9 @@
 import { rpc } from "@stellar/stellar-sdk" // dynamic later
-import { INDEXER_CONFIG, getPollingTargets } from "../lib/event-config.js"
+import { INDEXER_CONFIG, getPollingTargets } from "../lib/event-config"
 import {
 	indexEventsBatch,
 	getLastIndexedLedger,
-} from "../services/event-indexer.service.js"
+} from "../services/event-indexer.service"
 
 let pollInterval: NodeJS.Timeout | null = null
 

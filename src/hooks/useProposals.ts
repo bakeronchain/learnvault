@@ -110,13 +110,19 @@ async function readJson<T>(response: Response): Promise<T> {
 	}
 
 	if (!response.ok) {
-		throw new Error(data.message || data.error || "Request failed")
+		throw new Error(
+			data.message ||
+				data.error ||
+				`Request failed (status ${response.status}). Check your connection and try again.`,
+		)
 	}
 
 	return data
 }
 
-async function fetchProposals(address?: string): Promise<ProposalListResponse> {
+export async function fetchProposals(
+	address?: string,
+): Promise<ProposalListResponse> {
 	const url = new URL(`${API_BASE}/api/proposals`)
 	if (address) {
 		url.searchParams.set("viewer_address", address)
@@ -167,12 +173,14 @@ export function useProposals() {
 	const proposalsQuery = useQuery({
 		queryKey: ["proposals", address],
 		queryFn: () => fetchProposals(address),
+		staleTime: 60 * 1000,
 	})
 
 	const votingPowerQuery = useQuery({
 		queryKey: ["proposals", "votingPower", address],
 		queryFn: () => fetchVotingPower(address),
 		enabled: Boolean(address),
+		staleTime: 60 * 1000,
 	})
 
 	const createProposalMutation = useMutation({
@@ -206,7 +214,9 @@ export function useProposals() {
 			support: boolean
 		}) => {
 			if (!address) {
-				throw new Error("Connect your wallet to vote")
+				throw new Error(
+					"Wallet not connected — connect your wallet using the button in the navigation to vote.",
+				)
 			}
 
 			const response = await fetch(`${API_BASE}/api/governance/vote`, {
@@ -249,6 +259,7 @@ export function useProposals() {
 		refetch: proposalsQuery.refetch,
 		votingPower: votingPowerQuery.data ?? 0n,
 		isLoadingVotingPower: votingPowerQuery.isLoading,
+		isVotingPowerError: votingPowerQuery.isError,
 		createProposal: createProposalMutation.mutateAsync,
 		isSubmittingProposal: createProposalMutation.isPending,
 		castVote: castVoteMutation.mutateAsync,
@@ -264,5 +275,6 @@ export function useProposal(proposalId: number | null) {
 		queryKey: ["proposal", proposalId, address],
 		queryFn: () => fetchProposal(proposalId as number, address),
 		enabled: proposalId !== null,
+		staleTime: 60 * 1000,
 	})
 }

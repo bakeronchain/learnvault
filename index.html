@@ -8,33 +8,31 @@
 			;(function () {
 				var storageKey = "learnvault:theme"
 				var root = document.documentElement
-				var themeClassNames = {
-					light: "sds-theme-light",
-					dark: "sds-theme-dark",
-				}
 
 				var applyTheme = function (theme) {
-					var themeClass = themeClassNames[theme]
-					root.classList.remove(themeClassNames.light, themeClassNames.dark)
-					root.classList.add(themeClass)
+					root.classList.remove(
+						"sds-theme-light",
+						"sds-theme-dark",
+						"light",
+						"dark",
+					)
+					if (theme === "dark") {
+						root.classList.add("sds-theme-dark", "dark")
+					} else {
+						root.classList.add("sds-theme-light", "light")
+					}
 					root.setAttribute("data-theme", theme)
-					root.setAttribute("data-sds-theme", themeClass)
+					root.setAttribute("data-sds-theme", "sds-theme-" + theme)
 					root.style.colorScheme = theme
 				}
 
 				try {
-					var rawTheme = localStorage.getItem(storageKey)
-					var parsedTheme = rawTheme ? JSON.parse(rawTheme) : null
-					var preferredTheme =
-						parsedTheme === "light" || parsedTheme === "dark"
-							? parsedTheme
-							: window.matchMedia("(prefers-color-scheme: dark)").matches
-								? "dark"
-								: "light"
-
-					applyTheme(preferredTheme)
-				} catch (error) {
-					applyTheme("light")
+					var raw = localStorage.getItem(storageKey)
+					var stored = raw ? JSON.parse(raw) : null
+					// Default to dark — the app is designed dark-first
+					applyTheme(stored === "light" ? "light" : "dark")
+				} catch (e) {
+					applyTheme("dark")
 				}
 			})()
 		</script>

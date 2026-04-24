@@ -8,10 +8,7 @@ import { useLearnerProfile } from "../hooks/useLearnerProfile"
 import { useLearnToken } from "../hooks/useLearnToken"
 import { WalletContext } from "../providers/WalletProvider"
 
-const shortenAddress = (addr: string) => {
-	if (!addr) return ""
-	return `${addr.slice(0, 5)}...${addr.slice(-4)}`
-}
+import AddressDisplay from "../components/AddressDisplay"
 
 const Dashboard: React.FC = () => {
 	const { address } = useContext(WalletContext)
@@ -81,7 +78,7 @@ const Dashboard: React.FC = () => {
 					</p>
 					<Link
 						to="/"
-						className="inline-block iridescent-border px-8 py-3 rounded-xl font-bold transition-all hover:scale-105 active:scale-95"
+						className="inline-block w-full sm:w-auto text-center iridescent-border px-8 py-3 rounded-xl font-bold transition-all hover:scale-105 active:scale-95"
 					>
 						<span className="relative z-10">Connect Wallet &rarr;</span>
 					</Link>
@@ -126,8 +123,8 @@ const Dashboard: React.FC = () => {
 			<div className="max-w-6xl mx-auto space-y-10 sm:space-y-12 relative z-10 w-full pb-20 sm:pb-24">
 				{/* ── Header ── */}
 				<header className="space-y-1">
-					<h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter text-gradient leading-tight break-all sm:break-words">
-						Welcome back, {shortenAddress(profile?.address || address)}
+					<h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter text-gradient leading-tight flex flex-wrap items-center gap-x-3">
+						Welcome back, <AddressDisplay address={profile?.address || address} showCopyButton={false} showExplorerLink={false} addressClassName="text-gradient" />
 					</h1>
 					<p className="text-white/50 text-sm sm:text-base md:text-lg font-medium">
 						Your learning dashboard and on-chain reputation.
@@ -138,13 +135,13 @@ const Dashboard: React.FC = () => {
 				<section aria-label="Reputation and stats">
 					<div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start">
 						{/* Balance widget — given an explicit max-width so it never overflows on mobile */}
-						<div className="w-full md:w-auto md:flex-shrink-0 max-w-xs">
+						<div className="w-full max-w-none sm:max-w-sm md:w-auto md:flex-shrink-0 md:max-w-xs">
 							<LRNBalanceWidget address={address} size="lg" />
 						</div>
 
 						{/* Stat cards grid */}
 						{isLoading ? (
-							<div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 flex-1 w-full">
+							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 flex-1 w-full">
 								{[1, 2, 3, 4].map((i) => (
 									<div
 										key={i}
@@ -153,7 +150,7 @@ const Dashboard: React.FC = () => {
 								))}
 							</div>
 						) : (
-							<div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 flex-1 w-full">
+							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 flex-1 w-full">
 								{stats.map((stat) => (
 									<StatCard
 										key={stat.label}
@@ -209,7 +206,7 @@ const Dashboard: React.FC = () => {
 								</p>
 								<Link
 									to="/courses"
-									className="inline-block iridescent-border px-6 sm:px-8 py-3 rounded-xl font-bold transition-all hover:scale-105 active:scale-95"
+									className="inline-block w-full sm:w-auto text-center iridescent-border px-6 sm:px-8 py-3 rounded-xl font-bold transition-all hover:scale-105 active:scale-95"
 								>
 									<span className="relative z-10">
 										Enroll in your first course &rarr;

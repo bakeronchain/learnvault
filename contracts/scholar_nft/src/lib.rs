@@ -2,9 +2,13 @@
 #![allow(deprecated)]
 
 use soroban_sdk::{
-    Address, Env, String, Symbol, contract, contracterror, contractimpl, contracttype,
+    Address, BytesN, Env, String, Symbol, Vec, contract, contracterror, contractimpl, contracttype,
     panic_with_error, symbol_short,
 };
+
+use learnvault_shared::upgrade;
+
+pub use upgrade::ContractUpgraded;
 
 const DAY_IN_LEDGERS: u32 = 17_280;
 const INSTANCE_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
@@ -28,6 +32,7 @@ pub struct ScholarMetadata {
 pub enum DataKey {
     Admin,
     Counter,
+    Scholars,
     Owner(u64),
     TokenUri(u64),
     Revoked(u64),
@@ -94,9 +99,15 @@ impl ScholarNFT {
         }
         admin.require_auth();
         env.storage().instance().set(&ADMIN_KEY, &admin);
+        upgrade::init(&env);
         env.storage().instance().set(&TOKEN_COUNTER_KEY, &0_u64);
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::Counter, &0_u64);
+        let scholars: Vec<Address> = Vec::new(&env);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Scholars, &scholars);
+        Self::extend_persistent(&env, &DataKey::Scholars);
 
         env.events()
             .publish((symbol_short!("init"),), InitializedEventData { admin });
@@ -131,6 +142,17 @@ impl ScholarNFT {
             .persistent()
             .set(&DataKey::Metadata(token_id), &metadata);
         Self::extend_persistent(&env, &DataKey::Metadata(token_id));
+
+        let mut scholars: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Scholars)
+            .unwrap_or_else(|| Vec::new(&env));
+        scholars.push_back(to.clone());
+        env.storage()
+            .persistent()
+            .set(&DataKey::Scholars, &scholars);
+        Self::extend_persistent(&env, &DataKey::Scholars);
 
         env.events().publish(
             (symbol_short!("minted"), token_id),
@@ -223,6 +245,27 @@ impl ScholarNFT {
             .instance()
             .get(&TOKEN_COUNTER_KEY)
             .unwrap_or(0_u64)
+    }
+
+    pub fn get_all_scholars(env: Env) -> Vec<Address> {
+        Self::extend_instance(&env);
+        let key = DataKey::Scholars;
+        let scholars: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or_else(|| Vec::new(&env));
+        if env.storage().persistent().has(&key) {
+            Self::extend_persistent(&env, &key);
+        }
+        scholars
+    }
+
+    /// Replace the current contract WASM with a new uploaded hash. Admin only.
+    pub fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
+        let admin = Self::get_admin(&env);
+        admin.require_auth();
+        upgrade::apply(&env, &admin, &new_wasm_hash);
     }
 
     pub fn transfer(env: Env, from: Address, to: Address, token_id: u64) {

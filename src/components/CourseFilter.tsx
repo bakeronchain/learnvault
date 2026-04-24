@@ -73,10 +73,10 @@ export const CourseFilter: React.FC<CourseFilterProps> = ({
 			</div>
 
 			{/* Filter pills + clear */}
-			<div className="flex flex-wrap items-center gap-2">
+			<div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2">
 				{/* Difficulty */}
 				<div
-					className="flex items-center gap-2 flex-wrap"
+					className="flex items-center gap-2 flex-wrap w-full sm:w-auto"
 					role="group"
 					aria-label="Filter by difficulty"
 				>
@@ -86,7 +86,7 @@ export const CourseFilter: React.FC<CourseFilterProps> = ({
 							type="button"
 							onClick={() => onDifficultyChange(opt.value)}
 							aria-pressed={difficulty === opt.value}
-							className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest border transition-all ${
+							className={`w-full sm:w-auto px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest border transition-all ${
 								difficulty === opt.value
 									? "bg-brand-cyan/10 border-brand-cyan/40 text-brand-cyan"
 									: "bg-white/5 border-white/10 text-white/55 hover:border-white/25 hover:text-white/80"
@@ -104,7 +104,7 @@ export const CourseFilter: React.FC<CourseFilterProps> = ({
 
 				{/* Track */}
 				<div
-					className="flex items-center gap-2 flex-wrap"
+					className="flex items-center gap-2 flex-wrap w-full sm:w-auto"
 					role="group"
 					aria-label="Filter by track"
 				>
@@ -114,7 +114,7 @@ export const CourseFilter: React.FC<CourseFilterProps> = ({
 							type="button"
 							onClick={() => onTrackChange(opt.value)}
 							aria-pressed={track === opt.value}
-							className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest border transition-all ${
+							className={`w-full sm:w-auto px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest border transition-all ${
 								track === opt.value
 									? "bg-brand-purple/10 border-brand-purple/40 text-brand-purple"
 									: "bg-white/5 border-white/10 text-white/55 hover:border-white/25 hover:text-white/80"
@@ -130,7 +130,7 @@ export const CourseFilter: React.FC<CourseFilterProps> = ({
 					<button
 						type="button"
 						onClick={onClear}
-						className="ml-auto px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest text-white/50 border border-white/10 hover:border-white/30 hover:text-white/80 transition-all"
+						className="w-full sm:w-auto sm:ml-auto px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest text-white/50 border border-white/10 hover:border-white/30 hover:text-white/80 transition-all"
 					>
 						Clear ×
 					</button>

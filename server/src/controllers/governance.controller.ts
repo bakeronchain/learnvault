@@ -1,5 +1,6 @@
 import { type Request, type Response } from "express"
 import { z } from "zod"
+import sanitizeHtml from "sanitize-html"
 
 import { pool } from "../db/index"
 import { stellarContractService } from "../services/stellar-contract.service"
@@ -210,7 +211,7 @@ export async function getVotingPower(
 const createProposalSchema = z.object({
 	author_address: z.string().min(50).max(56),
 	title: z.string().min(5).max(200),
-	description: z.string().min(10),
+	description: z.string().min(10).max(5000),
 	requested_amount: z.string().regex(/^\d+(\.\d+)?$/, "Must be a valid number"),
 	evidence_url: z.string().url().optional(),
 })
@@ -244,6 +245,17 @@ export async function createGovernanceProposal(
 
 	const { author_address, title, description, requested_amount, evidence_url } =
 		validation.data
+	
+	// Sanitize HTML content
+	const sanitizedTitle = sanitizeHtml(title, {
+		allowedTags: [],
+		allowedAttributes: {},
+	})
+	const sanitizedDescription = sanitizeHtml(description, {
+		allowedTags: ['p', 'br', 'strong', 'em', 'ul', 'ol', 'li'],
+		allowedAttributes: {},
+	})
+	
 	const programUrl = evidence_url ?? "https://learnvault.app/dao/proposals"
 
 	try {
@@ -302,7 +314,7 @@ export async function createGovernanceProposal(
 				created_at
 			) VALUES ($1, $2, $3, $4, 'pending', NOW() + INTERVAL '7 days', NOW())
 			RETURNING id`,
-			[author_address, title, description, amount],
+			[author_address, sanitizedTitle, sanitizedDescription, amount],
 		)
 
 		const proposal_id = dbResult.rows[0]?.id

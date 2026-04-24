@@ -1,5 +1,5 @@
 import React from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 
 import { useBookmarks } from "../hooks/useBookmarks"
 import { useCourses } from "../hooks/useCourses"
@@ -12,6 +12,7 @@ import CourseCard from "./CourseCard"
 const MyBookmarks: React.FC = () => {
 	const { bookmarks, isLoading: isLoadingBookmarks, address } = useBookmarks()
 	const { courses, isLoading: isLoadingCourses } = useCourses()
+	const navigate = useNavigate()
 
 	if (!address) return null
 
@@ -46,11 +47,16 @@ const MyBookmarks: React.FC = () => {
 							id={course.id}
 							title={course.title}
 							description={course.description}
-							difficulty={course.difficulty as "beginner" | "intermediate" | "advanced"}
+							difficulty={
+								course.difficulty as "beginner" | "intermediate" | "advanced"
+							}
 							estimatedHours={0}
 							lrnReward={0}
 							lessonCount={0}
 							coverImage={course.coverImage ?? undefined}
+							onEnroll={() =>
+								navigate(`/courses?highlight=${encodeURIComponent(course.id)}`)
+							}
 						/>
 					))}
 				</div>

@@ -1,11 +1,6 @@
-import { useEffect, useId, useState } from "react"
-import { formatDistanceToNow } from "date-fns"
+import React, { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { useWallet } from "../hooks/useWallet"
-import { getAuthToken } from "../util/auth"
 import CommentCard from "./CommentCard"
-
-const API_BASE = import.meta.env.VITE_SERVER_URL ?? "http://localhost:4000"
 
 export interface Comment {
 	id: number
@@ -24,35 +19,22 @@ interface CommentSectionProps {
 	proposalAuthor?: string
 }
 
-const API_URL = (
-	(import.meta.env.VITE_API_URL as string | undefined) ??
-	(import.meta.env.VITE_SERVER_URL as string | undefined) ??
-	""
-).replace(/\/$/, "")
-
 const CommentSection: React.FC<CommentSectionProps> = ({
 	proposalId,
 	proposalAuthor,
 }) => {
 	const { t } = useTranslation()
-	const { address } = useWallet()
-	const pollInterval = Number(import.meta.env.VITE_COMMENT_POLL_MS) || 15000
-	const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
-	const commentInputId = useId()
-	const commentHintId = `${commentInputId}-hint`
-	const commentErrorId = `${commentInputId}-error`
-	const commentStatusId = `${commentInputId}-status`
 	const [comments, setComments] = useState<Comment[]>([])
 	const [newComment, setNewComment] = useState("")
 	const [sortBy, setSortBy] = useState<"top" | "new" | "oldest">("new")
 	const [loading, setLoading] = useState(true)
-	const [submissionError, setSubmissionError] = useState<string | null>(null)
-	const [submissionStatus, setSubmissionStatus] = useState<string | null>(null)
 
 	const fetchComments = async () => {
 		setLoading(true)
 		try {
-			const res = await fetch(`${API_URL}/api/proposals/${proposalId}/comments`)
+			const res = await fetch(
+				`${import.meta.env.VITE_SERVER_URL}/api/proposals/${proposalId}/comments`,
+			)
 			const data = await res.json()
 			setComments(data)
 		} catch (err) {
@@ -63,62 +45,40 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 	}
 
 	useEffect(() => {
-		let isMounted = true
-		const safeFetch = async () => {
-			if (!isMounted) return
-			await fetchComments()
-		}
-
-		void safeFetch()
-
-		const interval = setInterval(() => void safeFetch(), pollInterval)
-		return () => {
-			isMounted = false
-			clearInterval(interval)
-		}
-	}, [fetchComments, pollInterval])
+		void fetchComments()
+	}, [proposalId])
 
 	const handlePostComment = async (parentId: number | null = null) => {
-		if (!newComment.trim()) {
-			setSubmissionError("Enter a comment before posting.")
-			setSubmissionStatus(null)
-			return
-		}
+		if (!newComment.trim()) return
 
-		const token = getAuthToken()
-		if (!token) {
-			setSubmissionError("Sign in to post a comment.")
-			setSubmissionStatus(null)
-			return
-		}
-		setSubmissionError(null)
-		setSubmissionStatus(null)
+		const token = localStorage.getItem("auth_token") || "mock-token"
 
 		try {
-			const res = await fetch(`${API_URL}/api/comments`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${token}`,
+			const res = await fetch(
+				`${import.meta.env.VITE_SERVER_URL}/api/comments`,
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${token}`,
+					},
+					body: JSON.stringify({
+						proposalId,
+						content: newComment,
+						parentId,
+					}),
 				},
-				body: JSON.stringify({
-					proposalId,
-					content: newComment,
-					parentId,
-				}),
-			})
+			)
 
 			if (res.ok) {
 				setNewComment("")
-				setSubmissionStatus("Comment posted successfully.")
 				void fetchComments()
 			} else {
 				const err = await res.json()
-				setSubmissionError(err.error || "Failed to post comment.")
+				alert(err.error || "Failed to post comment")
 			}
 		} catch (err) {
 			console.error("Error posting comment", err)
-			setSubmissionError("Failed to post comment.")
 		}
 	}
 
@@ -137,31 +97,21 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 	const getReplies = (parentId: number) =>
 		sortedComments.filter((c) => c.parent_id === parentId)
 
-	const commentDescriptionIds = [
-		commentHintId,
-		submissionError ? commentErrorId : undefined,
-		submissionStatus ? commentStatusId : undefined,
-	]
-		.filter(Boolean)
-		.join(" ")
-
 	return (
 		<div className="mt-16 border-t border-white/5 pt-16">
 			<div className="flex items-center justify-between mb-8">
 				<h3 className="text-2xl font-black tracking-tight">
 					{t("comments.title", "Discussion")}
 				</h3>
-				<div className="flex gap-4" role="group" aria-label="Sort comments">
+				<div className="flex gap-4">
 					{(["top", "new", "oldest"] as const).map((sort) => (
 						<button
-							type="button"
 							key={sort}
 							onClick={() => setSortBy(sort)}
-							aria-pressed={sortBy === sort}
 							className={`text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full transition-all ${
 								sortBy === sort
 									? "bg-brand-cyan text-black"
-									: "bg-white/5 text-white/70 hover:bg-white/10"
+									: "bg-white/5 text-white/40 hover:bg-white/10"
 							}`}
 						>
 							{sort}
@@ -171,58 +121,18 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 			</div>
 
 			<div className="mb-12">
-				<label
-					htmlFor={commentInputId}
-					className="block text-sm font-bold text-white mb-3"
-				>
-					Add a comment
-				</label>
-				<p id={commentHintId} className="mb-3 text-sm text-white/70">
-					{t(
-						"comments.placeholder",
-						"Share your thoughts. Markdown is supported.",
-					)}
-				</p>
 				<textarea
-					id={commentInputId}
 					value={newComment}
-					onChange={(event) => {
-						setNewComment(event.target.value)
-						if (submissionError) {
-							setSubmissionError(null)
-						}
-					}}
+					onChange={(e) => setNewComment(e.target.value)}
 					placeholder={t(
 						"comments.placeholder",
 						"Share your thoughts... (Markdown supported)",
 					)}
-					className="w-full h-32 bg-[#0a0c10] border border-white/10 rounded-[2rem] p-6 text-white placeholder-white/30 focus:outline-none focus:border-brand-cyan/50 transition-colors"
-					aria-invalid={Boolean(submissionError)}
-					aria-describedby={commentDescriptionIds || undefined}
+					className="w-full h-32 bg-[#0a0c10] border border-white/10 rounded-[2rem] p-6 text-white placeholder-white/20 focus:outline-none focus:border-brand-cyan/50 transition-colors"
 				/>
-				{submissionError && (
-					<p
-						id={commentErrorId}
-						className="mt-3 text-sm text-red-400"
-						role="alert"
-					>
-						{submissionError}
-					</p>
-				)}
-				{submissionStatus && (
-					<p
-						id={commentStatusId}
-						className="mt-3 text-sm text-brand-emerald"
-						role="status"
-						aria-live="polite"
-					>
-						{submissionStatus}
-					</p>
-				)}
 				<div className="flex justify-end mt-4">
 					<button
-						type="button"
-						onClick={() => void handlePostComment()}
+						onClick={() => handlePostComment()}
 						disabled={!newComment.trim()}
 						className="px-8 py-3 bg-brand-cyan text-black font-black uppercase tracking-widest rounded-full hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100"
 					>
@@ -232,11 +142,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 			</div>
 
 			{loading ? (
-				<div
-					className="text-center py-20 text-white/40 uppercase font-black tracking-widest animate-pulse"
-					role="status"
-					aria-live="polite"
-				>
+				<div className="text-center py-20 text-white/20 uppercase font-black tracking-widest animate-pulse">
 					Loading Discussion...
 				</div>
 			) : (
@@ -246,8 +152,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 							<CommentCard
 								comment={comment}
 								isAuthor={comment.author_address === proposalAuthor}
-								canPin={proposalAuthor === address}
-								canDelete={comment.author_address === address}
+								canPin={proposalAuthor === "CURRENT_USER_ADDRESS"} // Logic for pinning
 								onUpdate={fetchComments}
 							/>
 							<div className="ml-12 mt-6 space-y-6 border-l border-white/5 pl-8">
@@ -256,7 +161,6 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 										key={reply.id}
 										comment={reply}
 										isReply
-										canDelete={reply.author_address === address}
 										onUpdate={fetchComments}
 									/>
 								))}
@@ -265,14 +169,6 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 					))}
 				</div>
 			)}
-
-			<div className="mt-8 text-center">
-				<p className="text-[10px] text-white/20 uppercase font-bold tracking-[2px] italic">
-					{t("pages.dao.lastUpdated", {
-						time: lastUpdated.toLocaleTimeString(),
-					})}
-				</p>
-			</div>
 		</div>
 	)
 }

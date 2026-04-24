@@ -3,6 +3,7 @@ import { type Request, type Response } from "express"
 import { pool } from "../db/index"
 import { milestoneStore } from "../db/milestone-store"
 import { listEscrowTimeoutsForScholar } from "../services/escrow-timeout.service"
+import { getLeaderboardData } from "../services/leaderboard.service"
 import { stellarContractService } from "../services/stellar-contract.service"
 
 type ApiMilestoneStatus = "pending" | "verified" | "rejected"
@@ -132,54 +133,18 @@ export async function getScholarsLeaderboard(
 	const limit = Math.min(parsePositiveInt(req.query.limit, 50), 100)
 	const search =
 		typeof req.query.search === "string" ? req.query.search.trim() : ""
-	const offset = (page - 1) * limit
-
-	const whereClause = search ? "WHERE address ILIKE $1" : ""
-	const whereValues: unknown[] = search ? [`%${search}%`] : []
+	const viewerAddress = req.walletAddress
 
 	try {
-		const totalResult = await pool.query(
-			`SELECT COUNT(*)::int AS total FROM scholar_balances ${whereClause}`,
-			whereValues,
-		)
-		const total = Number(totalResult.rows[0]?.total ?? 0)
-
-		const rankingsValues = [...whereValues, limit, offset]
-		const rankingsResult = await pool.query(
-			`SELECT
-				ROW_NUMBER() OVER (ORDER BY lrn_balance DESC, address ASC) + $${whereValues.length + 2} AS rank,
-				address,
-				lrn_balance,
-				courses_completed
-			 FROM scholar_balances
-			 ${whereClause}
-			 ORDER BY lrn_balance DESC, address ASC
-			 LIMIT $${whereValues.length + 1}
-			 OFFSET $${whereValues.length + 2}`,
-			rankingsValues,
-		)
-
-		const currentAddress = req.walletAddress
-		let yourRank: number | null = null
-
-		if (currentAddress) {
-			const rankResult = await pool.query(
-				`SELECT rank FROM (
-					SELECT ROW_NUMBER() OVER (ORDER BY lrn_balance DESC, address ASC) AS rank, address
-					FROM scholar_balances
-				) ranked
-				WHERE address = $1`,
-				[currentAddress],
-			)
-			yourRank = rankResult.rows[0]?.rank ?? null
-		}
-
-		res.status(200).json({
-			rankings: rankingsResult.rows,
-			total,
-			your_rank: yourRank,
+		const data = await getLeaderboardData({
+			page,
+			limit,
+			search,
+			viewerAddress,
 		})
-	} catch {
+		res.status(200).json(data)
+	} catch (err) {
+		console.error("[scholars] getScholarsLeaderboard error:", err)
 		res.status(500).json({ error: "Failed to fetch scholars leaderboard" })
 	}
 }

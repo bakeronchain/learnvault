@@ -60,6 +60,11 @@ export async function getScholarMilestones(
 			status: internalStatus,
 		})
 
+		if (!reports) {
+			res.status(200).json({ milestones: [] })
+			return
+		}
+
 		const milestones = await Promise.all(
 			reports.map(async (report) => {
 				const auditLog = await milestoneStore.getAuditForReport(report.id)

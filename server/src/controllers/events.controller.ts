@@ -1,5 +1,6 @@
 import { type Request, type Response } from "express"
 import { pool } from "../db/index"
+import { socialStore } from "../db/social-store"
 
 function parsePositiveInt(value: unknown, fallback: number): number {
 	if (typeof value !== "string") return fallback
@@ -80,6 +81,20 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
 	if (addressFilter) {
 		params.push(`%${addressFilter.toLowerCase()}%`)
 		conditions.push(`LOWER(data::text) LIKE $${params.length}`)
+	}
+
+	const followedOnly = req.query.followed_only === "true"
+	const currentUser = (req as any).user?.address
+	if (followedOnly && currentUser) {
+		const followed = await socialStore.getFollowedAddresses(currentUser)
+		if (followed.length === 0) {
+			res.status(200).json({ data: [] })
+			return
+		}
+		// Match any of the followed addresses in the data text
+		const pattern = followed.map((a) => a.toLowerCase()).join("|")
+		params.push(pattern)
+		conditions.push(`data::text ~* $${params.length}`)
 	}
 
 	if (conditions.length > 0) {

@@ -33,7 +33,7 @@ import { governanceRouter } from "./routes/governance.routes"
 import { healthRouter } from "./routes/health.routes"
 import { leaderboardRouter } from "./routes/leaderboard.routes"
 import { createMeRouter } from "./routes/me.routes"
-import { scholarsRouter } from "./routes/scholars.routes"
+import { createScholarsRouter } from "./routes/scholars.routes"
 import { scholarshipsRouter } from "./routes/scholarships.routes"
 import { treasuryRouter } from "./routes/treasury.routes"
 import { createUploadRouter } from "./routes/upload.routes"
@@ -174,10 +174,9 @@ app.use("/api/community", communityRouter)
 app.use("/api", createCommentsRouter(jwtService))
 app.use("/api", leaderboardRouter)
 app.use("/api", governanceRouter)
-app.use("/api", scholarsRouter)
+app.use("/api", createScholarsRouter(jwtService))
 app.use("/api", adminRouter)
 app.use("/api", adminMilestonesRouter)
-app.use("/api", scholarsRouter)
 app.use("/api", createUploadRouter(jwtService))
 app.use("/api", enrollmentsRouter)
 app.use("/api", scholarshipsRouter)

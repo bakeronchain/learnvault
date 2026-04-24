@@ -2,6 +2,7 @@ import { type Request, type Response } from "express"
 
 import { pool } from "../db/index"
 import { milestoneStore } from "../db/milestone-store"
+import { socialStore } from "../db/social-store"
 import { listEscrowTimeoutsForScholar } from "../services/escrow-timeout.service"
 import { stellarContractService } from "../services/stellar-contract.service"
 
@@ -225,6 +226,13 @@ export async function getScholarProfile(
 		const joinedAt =
 			joinedAtResult.rows[0]?.joined_at ?? new Date().toISOString()
 
+		// 3. Fetch social data
+		const counts = await socialStore.getFollowCounts(address)
+		const currentAddress = (req as any).user?.address
+		const isFollowing = currentAddress
+			? await socialStore.isFollowing(currentAddress, address)
+			: false
+
 		res.status(200).json({
 			address,
 			lrn_balance,
@@ -233,6 +241,9 @@ export async function getScholarProfile(
 			pending_milestones: Number(stats?.pending ?? 0),
 			credentials,
 			joined_at: joinedAt,
+			follower_count: counts.followerCount,
+			following_count: counts.followingCount,
+			is_following: isFollowing,
 		})
 	} catch (error) {
 		console.error("[scholars] Error fetching scholar profile:", error)

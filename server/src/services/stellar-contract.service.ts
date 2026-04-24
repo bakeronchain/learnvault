@@ -5,6 +5,7 @@
  */
 
 import { pool } from "../db/index"
+import { getRequestId } from "../lib/request-context"
 
 const STELLAR_NETWORK = process.env.STELLAR_NETWORK ?? "testnet"
 const STELLAR_SECRET_KEY = process.env.STELLAR_SECRET_KEY ?? ""
@@ -13,6 +14,8 @@ const COURSE_MILESTONE_CONTRACT_ID =
 const SCHOLAR_NFT_CONTRACT_ID = process.env.SCHOLAR_NFT_CONTRACT_ID ?? ""
 const SCHOLARSHIP_TREASURY_CONTRACT_ID =
 	process.env.SCHOLARSHIP_TREASURY_CONTRACT_ID ?? ""
+const MILESTONE_ESCROW_CONTRACT_ID =
+	process.env.MILESTONE_ESCROW_CONTRACT_ID ?? ""
 const LEARN_TOKEN_CONTRACT_ID = process.env.LEARN_TOKEN_CONTRACT_ID ?? ""
 const GOVERNANCE_TOKEN_CONTRACT_ID =
 	process.env.GOVERNANCE_TOKEN_CONTRACT_ID ?? ""
@@ -42,6 +45,21 @@ export interface CastVoteParams {
 
 export interface CancelProposalParams {
 	proposalId: number
+}
+
+interface RequestTraceOptions {
+	requestId?: string
+}
+
+function resolveRequestId(options?: RequestTraceOptions): string | undefined {
+	return options?.requestId ?? getRequestId()
+}
+
+function buildRequestMemoValue(requestId?: string): string | null {
+	if (!requestId) return null
+	const compact = requestId.replace(/-/g, "").slice(0, 24)
+	if (!compact) return null
+	return `rid:${compact}`
 }
 
 // --- Admin Validation Cache ---
@@ -125,6 +143,7 @@ async function callVerifyMilestone(
 	scholarAddress: string,
 	courseId: string,
 	milestoneId: number,
+	options: RequestTraceOptions = {},
 ): Promise<ContractCallResult> {
 	if (!STELLAR_SECRET_KEY) {
 		throw new Error(
@@ -145,6 +164,7 @@ async function callVerifyMilestone(
 			Keypair,
 			Contract,
 			TransactionBuilder,
+			Memo,
 			Networks,
 			BASE_FEE,
 			rpc,
@@ -161,11 +181,17 @@ async function callVerifyMilestone(
 		const account = await server.getAccount(keypair.publicKey())
 		const contract = new Contract(COURSE_MILESTONE_CONTRACT_ID)
 
-		const tx = new TransactionBuilder(account, {
+		const txBuilder = new TransactionBuilder(account, {
 			fee: BASE_FEE,
 			networkPassphrase:
 				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
 		})
+		const requestMemoValue = buildRequestMemoValue(resolveRequestId(options))
+		if (requestMemoValue) {
+			txBuilder.addMemo(Memo.text(requestMemoValue))
+		}
+
+		const tx = txBuilder
 			.addOperation(
 				contract.call(
 					"verify_milestone",
@@ -201,6 +227,7 @@ async function emitRejectionEvent(
 	courseId: string,
 	milestoneId: number,
 	reason: string,
+	options: RequestTraceOptions = {},
 ): Promise<ContractCallResult> {
 	if (!STELLAR_SECRET_KEY) {
 		throw new Error(
@@ -220,6 +247,7 @@ async function emitRejectionEvent(
 			Keypair,
 			Contract,
 			TransactionBuilder,
+			Memo,
 			Networks,
 			BASE_FEE,
 			rpc,
@@ -236,11 +264,17 @@ async function emitRejectionEvent(
 		const account = await server.getAccount(keypair.publicKey())
 		const contract = new Contract(COURSE_MILESTONE_CONTRACT_ID)
 
-		const tx = new TransactionBuilder(account, {
+		const txBuilder = new TransactionBuilder(account, {
 			fee: BASE_FEE,
 			networkPassphrase:
 				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
 		})
+		const requestMemoValue = buildRequestMemoValue(resolveRequestId(options))
+		if (requestMemoValue) {
+			txBuilder.addMemo(Memo.text(requestMemoValue))
+		}
+
+		const tx = txBuilder
 			.addOperation(
 				contract.call(
 					"reject_milestone",
@@ -346,6 +380,7 @@ async function callMintScholarNFT(
 async function isEnrolled(
 	learnerAddress: string,
 	courseId: number,
+	_options: RequestTraceOptions = {},
 ): Promise<boolean> {
 	if (!COURSE_MILESTONE_CONTRACT_ID) {
 		console.warn(
@@ -414,6 +449,7 @@ async function isEnrolled(
 
 async function submitScholarshipProposal(
 	params: ScholarshipProposalParams,
+	options: RequestTraceOptions = {},
 ): Promise<ContractCallResult & { proposalId: string | null }> {
 	if (!STELLAR_SECRET_KEY) {
 		throw new Error(
@@ -431,6 +467,7 @@ async function submitScholarshipProposal(
 			Keypair,
 			Contract,
 			TransactionBuilder,
+			Memo,
 			Networks,
 			BASE_FEE,
 			rpc,
@@ -447,11 +484,17 @@ async function submitScholarshipProposal(
 		const account = await server.getAccount(keypair.publicKey())
 		const contract = new Contract(SCHOLARSHIP_TREASURY_CONTRACT_ID)
 
-		const tx = new TransactionBuilder(account, {
+		const txBuilder = new TransactionBuilder(account, {
 			fee: BASE_FEE,
 			networkPassphrase:
 				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
 		})
+		const requestMemoValue = buildRequestMemoValue(resolveRequestId(options))
+		if (requestMemoValue) {
+			txBuilder.addMemo(Memo.text(requestMemoValue))
+		}
+
+		const tx = txBuilder
 			.addOperation(
 				contract.call(
 					"submit_proposal",
@@ -483,7 +526,10 @@ async function submitScholarshipProposal(
 	}
 }
 
-async function castVote(params: CastVoteParams): Promise<ContractCallResult> {
+async function castVote(
+	params: CastVoteParams,
+	options: RequestTraceOptions = {},
+): Promise<ContractCallResult> {
 	if (!STELLAR_SECRET_KEY) {
 		throw new Error(
 			"STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction",
@@ -500,11 +546,11 @@ async function castVote(params: CastVoteParams): Promise<ContractCallResult> {
 			Keypair,
 			Contract,
 			TransactionBuilder,
+			Memo,
 			Networks,
 			BASE_FEE,
 			rpc,
 			nativeToScVal,
-			Address,
 		} = await import("@stellar/stellar-sdk")
 
 		const server = new rpc.Server(
@@ -517,11 +563,17 @@ async function castVote(params: CastVoteParams): Promise<ContractCallResult> {
 		const account = await server.getAccount(keypair.publicKey())
 		const contract = new Contract(SCHOLARSHIP_TREASURY_CONTRACT_ID)
 
-		const tx = new TransactionBuilder(account, {
+		const txBuilder = new TransactionBuilder(account, {
 			fee: BASE_FEE,
 			networkPassphrase:
 				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
 		})
+		const requestMemoValue = buildRequestMemoValue(resolveRequestId(options))
+		if (requestMemoValue) {
+			txBuilder.addMemo(Memo.text(requestMemoValue))
+		}
+
+		const tx = txBuilder
 			.addOperation(
 				contract.call(
 					"vote",
@@ -549,6 +601,7 @@ async function castVote(params: CastVoteParams): Promise<ContractCallResult> {
 
 async function cancelProposal(
 	params: CancelProposalParams,
+	options: RequestTraceOptions = {},
 ): Promise<ContractCallResult> {
 	if (!STELLAR_SECRET_KEY) {
 		throw new Error(
@@ -566,6 +619,7 @@ async function cancelProposal(
 			Keypair,
 			Contract,
 			TransactionBuilder,
+			Memo,
 			Networks,
 			BASE_FEE,
 			rpc,
@@ -582,11 +636,17 @@ async function cancelProposal(
 		const account = await server.getAccount(keypair.publicKey())
 		const contract = new Contract(SCHOLARSHIP_TREASURY_CONTRACT_ID)
 
-		const tx = new TransactionBuilder(account, {
+		const txBuilder = new TransactionBuilder(account, {
 			fee: BASE_FEE,
 			networkPassphrase:
 				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
 		})
+		const requestMemoValue = buildRequestMemoValue(resolveRequestId(options))
+		if (requestMemoValue) {
+			txBuilder.addMemo(Memo.text(requestMemoValue))
+		}
+
+		const tx = txBuilder
 			.addOperation(
 				contract.call(
 					"cancel_proposal",
@@ -606,6 +666,77 @@ async function cancelProposal(
 		console.error("[stellar] Cancel proposal failed:", err)
 		throw new Error(
 			"Cancel proposal failed: " +
+				(err instanceof Error ? err.message : String(err)),
+		)
+	}
+}
+
+async function reclaimInactiveEscrow(
+	proposalId: number,
+	options: RequestTraceOptions = {},
+): Promise<ContractCallResult> {
+	if (!STELLAR_SECRET_KEY) {
+		throw new Error(
+			"STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction",
+		)
+	}
+	if (!MILESTONE_ESCROW_CONTRACT_ID) {
+		throw new Error(
+			"MILESTONE_ESCROW_CONTRACT_ID not configured — cannot submit on-chain transaction",
+		)
+	}
+
+	try {
+		const {
+			Keypair,
+			Contract,
+			TransactionBuilder,
+			Memo,
+			Networks,
+			BASE_FEE,
+			rpc,
+			nativeToScVal,
+		} = await import("@stellar/stellar-sdk")
+
+		const server = new rpc.Server(
+			STELLAR_NETWORK === "mainnet"
+				? "https://soroban-rpc.stellar.org"
+				: "https://soroban-testnet.stellar.org",
+		)
+
+		const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
+		const account = await server.getAccount(keypair.publicKey())
+		const contract = new Contract(MILESTONE_ESCROW_CONTRACT_ID)
+
+		const txBuilder = new TransactionBuilder(account, {
+			fee: BASE_FEE,
+			networkPassphrase:
+				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+		})
+		const requestMemoValue = buildRequestMemoValue(resolveRequestId(options))
+		if (requestMemoValue) {
+			txBuilder.addMemo(Memo.text(requestMemoValue))
+		}
+
+		const tx = txBuilder
+			.addOperation(
+				contract.call(
+					"reclaim_inactive",
+					nativeToScVal(proposalId, { type: "u32" }),
+				),
+			)
+			.setTimeout(30)
+			.build()
+
+		const prepared = await server.prepareTransaction(tx)
+		prepared.sign(keypair)
+
+		const result = await server.sendTransaction(prepared)
+		return { txHash: result.hash, simulated: false }
+	} catch (err) {
+		console.error("[stellar] reclaim_inactive failed:", err)
+		throw new Error(
+			"reclaim_inactive failed: " +
 				(err instanceof Error ? err.message : String(err)),
 		)
 	}
@@ -762,6 +893,7 @@ export const stellarContractService = {
 	submitScholarshipProposal,
 	castVote,
 	cancelProposal,
+	reclaimInactiveEscrow,
 	getLearnTokenBalance,
 	getGovernanceTokenBalance,
 	getEnrolledCourses,

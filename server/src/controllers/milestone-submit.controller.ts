@@ -2,6 +2,7 @@ import { type Request, type Response } from "express"
 import sanitizeHtml from "sanitize-html"
 import { milestoneStore } from "../db/milestone-store"
 import { createEmailService } from "../services/email.service"
+import { markEscrowActivity } from "../services/escrow-timeout.service"
 
 interface MilestoneSubmitRequestBody {
 	scholarAddress?: string
@@ -59,6 +60,11 @@ export async function submitMilestoneReport(
 			evidence_ipfs_cid: evidenceIpfsCid ?? null,
 			evidence_description: evidenceDescription ?? null,
 		})
+		try {
+			await markEscrowActivity(scholarAddress, courseId)
+		} catch (trackingErr) {
+			console.error("[milestones] escrow activity update failed:", trackingErr)
+		}
 
 		emailService
 			.sendAdminMilestoneNotification(

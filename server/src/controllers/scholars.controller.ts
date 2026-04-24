@@ -2,6 +2,7 @@ import { type Request, type Response } from "express"
 
 import { pool } from "../db/index"
 import { milestoneStore } from "../db/milestone-store"
+import { listEscrowTimeoutsForScholar } from "../services/escrow-timeout.service"
 import { stellarContractService } from "../services/stellar-contract.service"
 
 type ApiMilestoneStatus = "pending" | "verified" | "rejected"
@@ -233,5 +234,24 @@ export async function getScholarCredentials(
 	} catch (error) {
 		console.error("[scholars] Error fetching scholar credentials:", error)
 		res.status(500).json({ error: "Failed to fetch scholar credentials" })
+	}
+}
+
+export async function getScholarEscrowTimeouts(
+	req: Request,
+	res: Response,
+): Promise<void> {
+	const { address } = req.params
+	if (!address) {
+		res.status(400).json({ error: "Scholar address is required" })
+		return
+	}
+
+	try {
+		const escrows = await listEscrowTimeoutsForScholar(address)
+		res.status(200).json({ escrows })
+	} catch (error) {
+		console.error("[scholars] Error fetching escrow timeout status:", error)
+		res.status(500).json({ error: "Failed to fetch escrow timeout status" })
 	}
 }

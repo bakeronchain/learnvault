@@ -18,6 +18,7 @@ import { errorHandler } from "./middleware/error.middleware"
 import { globalLimiter } from "./middleware/rate-limit.middleware"
 import { requestLogger } from "./middleware/request-logger.middleware"
 import { buildOpenApiSpec } from "./openapi"
+import { setupConsoleRequestTracing } from "./lib/request-context"
 import { adminMilestonesRouter } from "./routes/admin-milestones.routes"
 import { adminRouter } from "./routes/admin.routes"
 import { createAuthRouter } from "./routes/auth.routes"
@@ -59,6 +60,7 @@ const envSchema = z.object({
 })
 
 const env = envSchema.parse(process.env)
+setupConsoleRequestTracing()
 
 const isProduction = env.NODE_ENV === "production"
 
@@ -133,6 +135,7 @@ app.use(
 		credentials: true,
 		methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 		allowedHeaders: ["Content-Type", "Authorization"],
+		exposedHeaders: ["X-Request-ID"],
 	}),
 )
 app.use(createRequireTrustedOrigin(allowedOrigins))
@@ -165,6 +168,14 @@ if (process.env.NODE_ENV !== "production") {
 	void import("./workers/event-poller").then(({ startEventPoller }) => {
 		void startEventPoller().catch(console.error)
 	})
+}
+
+if (process.env.NODE_ENV !== "test") {
+	void import("./workers/escrow-timeout-worker").then(
+		({ startEscrowTimeoutWorker }) => {
+			void startEscrowTimeoutWorker().catch(console.error)
+		},
+	)
 }
 
 app.get("/api/docs", (_req, res) => {
@@ -201,5 +212,10 @@ process.on("SIGTERM", () => {
 	void import("./workers/event-poller").then(({ stopEventPoller }) => {
 		void stopEventPoller()
 	})
+	void import("./workers/escrow-timeout-worker").then(
+		({ stopEscrowTimeoutWorker }) => {
+			stopEscrowTimeoutWorker()
+		},
+	)
 	process.exit(0)
 })

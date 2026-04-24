@@ -19,6 +19,18 @@ export interface MilestoneProgress {
 	totalMilestones?: number
 }
 
+export interface EscrowTimeoutStatus {
+	proposalId: number
+	scholarAddress: string
+	courseId: string | null
+	daysRemaining: number
+	inactivityWindowDays: number
+	lastActivityAt: string
+	deadlineAt: string
+	reminderSentAt: string | null
+	status: "active" | "reclaimed"
+}
+
 type AnyRecord = Record<string, unknown>
 
 const mockProgressStore: Record<string, number[]> = {}
@@ -214,7 +226,39 @@ export function useCourse() {
 	const [submissionStatusMap, setSubmissionStatusMap] = useState<
 		Record<string, "pending" | "verified" | "rejected" | "none">
 	>({})
+	const [escrowTimeoutMap, setEscrowTimeoutMap] = useState<
+		Record<string, EscrowTimeoutStatus>
+	>({})
 	const [isCompletingMilestone, setIsCompletingMilestone] = useState(false)
+
+	const refreshEscrowTimeouts = useCallback(async () => {
+		if (!address) {
+			setEscrowTimeoutMap({})
+			return
+		}
+
+		try {
+			const response = await fetch(
+				`/api/scholars/${encodeURIComponent(address)}/escrow-timeouts`,
+			)
+			if (!response.ok) {
+				return
+			}
+
+			const payload = (await response.json()) as {
+				escrows?: EscrowTimeoutStatus[]
+			}
+
+			const next = Object.fromEntries(
+				(payload.escrows ?? [])
+					.filter((item) => item.courseId && item.status === "active")
+					.map((item) => [item.courseId as string, item]),
+			)
+			setEscrowTimeoutMap(next)
+		} catch (err) {
+			logger.debug("Failed to load escrow timeout status:", err)
+		}
+	}, [address])
 
 	const refreshCourses = useCallback(async () => {
 		if (!address) {
@@ -310,11 +354,22 @@ export function useCourse() {
 		void refreshCourses()
 	}, [refreshCourses])
 
+	useEffect(() => {
+		void refreshEscrowTimeouts()
+	}, [refreshEscrowTimeouts])
+
 	const getCourseProgress = useCallback(
 		(courseId: string): MilestoneProgress => {
 			return progressMap[courseId] ?? { courseId, completedMilestoneIds: [] }
 		},
 		[progressMap],
+	)
+
+	const getEscrowTimeout = useCallback(
+		(courseId: string): EscrowTimeoutStatus | null => {
+			return escrowTimeoutMap[courseId] ?? null
+		},
+		[escrowTimeoutMap],
 	)
 
 	const enroll = useCallback(
@@ -586,6 +641,7 @@ export function useCourse() {
 				showSuccess("Milestone submitted — awaiting admin review")
 				await updateBalances()
 				await refreshCourses()
+				await refreshEscrowTimeouts()
 			} catch (err) {
 				if (isUserRejection(err)) {
 					showInfo("Submission cancelled")
@@ -607,6 +663,7 @@ export function useCourse() {
 			signTransaction,
 			updateBalances,
 			refreshCourses,
+			refreshEscrowTimeouts,
 			showError,
 			showInfo,
 		],
@@ -620,6 +677,7 @@ export function useCourse() {
 			completeMilestone,
 			submitMilestone,
 			submissionStatusMap,
+			getEscrowTimeout,
 			isCompletingMilestone,
 		}),
 		[
@@ -629,6 +687,7 @@ export function useCourse() {
 			completeMilestone,
 			submitMilestone,
 			submissionStatusMap,
+			getEscrowTimeout,
 			isCompletingMilestone,
 		],
 	)

@@ -43,15 +43,6 @@ export const listBookmarks = async (
  * Create a bookmark for the authenticated learner + given course_id.
  * Idempotent: re-POSTing the same pair returns 200 with the existing row
  * instead of 409, so the frontend can treat "toggle on" as fire-and-forget.
- *
- * Implemented as a single CTE:
- *   1. `inserted` — INSERT ... ON CONFLICT DO NOTHING RETURNING ...
- *      Creates a new row OR returns nothing if the pair already exists.
- *   2. Final SELECT — UNION of the inserted row (is_new = true) and the
- *      existing row (is_new = false). Exactly one branch yields data, so
- *      we always get a row back atomically without a racy follow-up query
- *      and without forcing a no-op UPDATE (which would cause MVCC bloat
- *      under re-POST load).
  */
 export const createBookmark = async (
 	req: AuthRequest,
@@ -67,30 +58,32 @@ export const createBookmark = async (
 
 	try {
 		const result = await pool.query(
-			`WITH inserted AS (
-			   INSERT INTO bookmarks (address, course_id)
-			   VALUES ($1, $2)
-			   ON CONFLICT (address, course_id) DO NOTHING
-			   RETURNING id, course_id, created_at
-			 )
-			 SELECT id, course_id, created_at, true  AS is_new FROM inserted
-			 UNION ALL
-			 SELECT id, course_id, created_at, false AS is_new
-			 FROM bookmarks
-			 WHERE address = $1 AND course_id = $2
-			   AND NOT EXISTS (SELECT 1 FROM inserted)`,
+			`INSERT INTO bookmarks (address, course_id)
+			 VALUES ($1, $2)
+			 ON CONFLICT (address, course_id) DO NOTHING
+			 RETURNING id, course_id, created_at`,
 			[address, course_id],
 		)
 
-		const row = result.rows[0]
-		if (!row) {
-			console.error("[bookmarks] Upsert returned no rows — unexpected")
-			res.status(500).json({ error: "Failed to create bookmark" })
+		if (result.rows.length > 0) {
+			const row = result.rows[0]
+			res.status(201).json({
+				bookmark_id: row.id,
+				course_id: row.course_id,
+				created_at: row.created_at,
+			})
 			return
 		}
 
-		const status = row.is_new ? 201 : 200
-		res.status(status).json({
+		// Already bookmarked — return the existing row so the client state matches
+		const existing = await pool.query(
+			`SELECT id, course_id, created_at
+			 FROM bookmarks
+			 WHERE address = $1 AND course_id = $2`,
+			[address, course_id],
+		)
+		const row = existing.rows[0]
+		res.status(200).json({
 			bookmark_id: row.id,
 			course_id: row.course_id,
 			created_at: row.created_at,

@@ -30,12 +30,11 @@ const makeToken = (address: string) =>
 
 const testJwtService = {
 	signWalletToken: (address: string) => jwt.sign({ sub: address }, TEST_SECRET),
-	verifyWalletToken: async (token: string) => {
+	verifyWalletToken: (token: string) => {
 		const decoded = jwt.verify(token, TEST_SECRET) as { sub?: string }
 		if (!decoded.sub) throw new Error("Invalid token")
 		return { sub: decoded.sub }
 	},
-	revokeToken: async (_token: string) => {},
 }
 
 const buildApp = (): Express => {
@@ -119,7 +118,7 @@ describe("POST /api/me/bookmarks", () => {
 	it("creates a new bookmark (201)", async () => {
 		const now = new Date().toISOString()
 		mockedQuery.mockResolvedValueOnce({
-			rows: [{ id: 10, course_id: COURSE_A, created_at: now, is_new: true }],
+			rows: [{ id: 10, course_id: COURSE_A, created_at: now }],
 		})
 
 		const res = await request(buildApp())
@@ -136,12 +135,13 @@ describe("POST /api/me/bookmarks", () => {
 		expect(mockedQuery.mock.calls[0][1]).toEqual([ALICE, COURSE_A])
 	})
 
-	it("is idempotent — returns 200 when bookmark already existed", async () => {
+	it("is idempotent — returns 200 with existing row when already bookmarked", async () => {
 		const now = new Date().toISOString()
-		// CTE: INSERT ... ON CONFLICT DO NOTHING returns no row; the UNION ALL
-		// fallback SELECT returns the pre-existing row with is_new = false.
+		// First call: INSERT ... ON CONFLICT DO NOTHING → empty rows
+		mockedQuery.mockResolvedValueOnce({ rows: [] })
+		// Second call: SELECT existing row
 		mockedQuery.mockResolvedValueOnce({
-			rows: [{ id: 7, course_id: COURSE_A, created_at: now, is_new: false }],
+			rows: [{ id: 7, course_id: COURSE_A, created_at: now }],
 		})
 
 		const res = await request(buildApp())
@@ -151,17 +151,6 @@ describe("POST /api/me/bookmarks", () => {
 
 		expect(res.status).toBe(200)
 		expect(res.body.bookmark_id).toBe(7)
-	})
-
-	it("returns 500 if the upsert unexpectedly returns no rows", async () => {
-		mockedQuery.mockResolvedValueOnce({ rows: [] })
-
-		const res = await request(buildApp())
-			.post("/api/me/bookmarks")
-			.set("Authorization", makeToken(ALICE))
-			.send({ course_id: COURSE_A })
-
-		expect(res.status).toBe(500)
 	})
 
 	it("returns 400 when course_id is missing", async () => {
@@ -206,17 +195,10 @@ describe("POST /api/me/bookmarks", () => {
 	it("cannot bookmark on behalf of another address — body.address is ignored", async () => {
 		mockedQuery.mockResolvedValueOnce({
 			rows: [
-				{
-					id: 99,
-					course_id: COURSE_A,
-					created_at: new Date().toISOString(),
-					is_new: true,
-				},
+				{ id: 99, course_id: COURSE_A, created_at: new Date().toISOString() },
 			],
 		})
 
-		// strict schema rejects unknown fields, but we also want to prove that even
-		// if somehow an address slipped through, only the token-derived one reaches SQL
 		await request(buildApp())
 			.post("/api/me/bookmarks")
 			.set("Authorization", makeToken(ALICE))

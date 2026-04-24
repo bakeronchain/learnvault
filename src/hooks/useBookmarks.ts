@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { createAuthHeaders } from "../lib/api"
 import { useWallet } from "./useWallet"
 
 export interface Bookmark {
@@ -11,42 +10,11 @@ export interface Bookmark {
 
 const BOOKMARKS_QUERY_KEY = ["bookmarks"] as const
 
-/**
- * Build headers for authenticated bookmark requests. Delegates to the shared
- * `createAuthHeaders` / `getAuthToken` pair so we stay in sync with the
- * codebase's "authToken" + "auth_token" storage-key fallback. When no token
- * is present, `createAuthHeaders()` omits the Authorization header entirely
- * — it does NOT send a malformed `Authorization: Bearer` with an empty value.
- */
-function authHeaders(): Headers {
-	const headers = createAuthHeaders()
-	headers.set("Content-Type", "application/json")
-	return headers
-}
-
-/**
- * Apply a single-item toggle to a bookmarks list. Used for both optimistic
- * mutation and error rollback so they're symmetric and never snapshot the
- * whole list — that way concurrent toggles on different course IDs don't
- * clobber each other's in-flight state on failure.
- */
-function applyToggle(
-	list: Bookmark[],
-	courseId: string,
-	next: "on" | "off",
-): Bookmark[] {
-	if (next === "off") {
-		return list.filter((b) => b.course_id !== courseId)
+function authHeaders(): Record<string, string> {
+	return {
+		"Content-Type": "application/json",
+		Authorization: `Bearer ${localStorage.getItem("authToken") || ""}`,
 	}
-	if (list.some((b) => b.course_id === courseId)) return list
-	return [
-		{
-			bookmark_id: -1, // server fills real id on refetch
-			course_id: courseId,
-			created_at: new Date().toISOString(),
-		},
-		...list,
-	]
 }
 
 /**
@@ -87,7 +55,8 @@ export function useBookmarks() {
 	const toggleMutation = useMutation<
 		void,
 		Error,
-		{ courseId: string; next: "on" | "off" }
+		{ courseId: string; next: "on" | "off" },
+		{ previous?: Bookmark[] }
 	>({
 		mutationFn: async ({ courseId, next }) => {
 			const url =
@@ -95,8 +64,7 @@ export function useBookmarks() {
 					? "/api/me/bookmarks"
 					: `/api/me/bookmarks/${encodeURIComponent(courseId)}`
 			const method = next === "on" ? "POST" : "DELETE"
-			const body =
-				next === "on" ? JSON.stringify({ course_id: courseId }) : undefined
+			const body = next === "on" ? JSON.stringify({ course_id: courseId }) : undefined
 
 			const response = await fetch(url, {
 				method,
@@ -108,26 +76,40 @@ export function useBookmarks() {
 				throw new Error(err.error ?? "Failed to toggle bookmark")
 			}
 		},
-		// Granular optimistic updates: we never snapshot/restore the whole list.
-		// Instead we apply the single-item delta on mutate, and reverse the same
-		// single-item delta on error. That way two concurrent toggles on
-		// different course IDs don't clobber each other on rollback.
 		onMutate: async ({ courseId, next }) => {
-			await queryClient.cancelQueries({
-				queryKey: [...BOOKMARKS_QUERY_KEY, address],
-			})
+			await queryClient.cancelQueries({ queryKey: [...BOOKMARKS_QUERY_KEY, address] })
+			const previous = queryClient.getQueryData<Bookmark[]>([
+				...BOOKMARKS_QUERY_KEY,
+				address,
+			])
+
 			queryClient.setQueryData<Bookmark[]>(
 				[...BOOKMARKS_QUERY_KEY, address],
-				(old = []) => applyToggle(old, courseId, next),
+				(old = []) => {
+					if (next === "off") {
+						return old.filter((b) => b.course_id !== courseId)
+					}
+					if (old.some((b) => b.course_id === courseId)) return old
+					return [
+						{
+							bookmark_id: -1, // server fills real id on refetch
+							course_id: courseId,
+							created_at: new Date().toISOString(),
+						},
+						...old,
+					]
+				},
 			)
+
+			return { previous }
 		},
-		onError: (_err, { courseId, next }) => {
-			// Reverse the specific delta we applied — don't touch other rows
-			const reverse = next === "on" ? "off" : "on"
-			queryClient.setQueryData<Bookmark[]>(
-				[...BOOKMARKS_QUERY_KEY, address],
-				(current = []) => applyToggle(current, courseId, reverse),
-			)
+		onError: (_err, _vars, context) => {
+			if (context?.previous) {
+				queryClient.setQueryData(
+					[...BOOKMARKS_QUERY_KEY, address],
+					context.previous,
+				)
+			}
 		},
 		onSettled: () => {
 			void queryClient.invalidateQueries({
@@ -147,10 +129,7 @@ export function useBookmarks() {
 	return {
 		bookmarks: bookmarksQuery.data ?? [],
 		isLoading: bookmarksQuery.isLoading,
-		error:
-			bookmarksQuery.error instanceof Error
-				? bookmarksQuery.error.message
-				: null,
+		error: bookmarksQuery.error instanceof Error ? bookmarksQuery.error.message : null,
 		isBookmarked,
 		toggleBookmark,
 		isToggling: toggleMutation.isPending,

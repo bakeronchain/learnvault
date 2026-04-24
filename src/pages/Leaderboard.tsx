@@ -35,6 +35,9 @@ const Leaderboard: React.FC = () => {
 		}))
 	}, [result?.rankings])
 
+		void fetchLeaderboard()
+
+	}, [])
 	const myRank = result?.your_rank ?? null
 
 	const leaderboardRows = useMemo(

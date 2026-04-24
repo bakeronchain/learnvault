@@ -8,4 +8,16 @@ export default {
 	async get_balance() {
 		return 0n
 	},
+	async get_voting_power() {
+		return 0n
+	},
+	async get_delegate() {
+		return null
+	},
+	async delegate() {
+		return { result: null }
+	},
+	async undelegate() {
+		return { result: null }
+	},
 }

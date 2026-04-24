@@ -287,12 +287,12 @@ export const enrollmentBodySchema = z
 
 export const bookmarkBodySchema = z
 	.object({
-		course_id: requiredString("course_id"),
+		course_id: requiredString("course_id", 100),
 	})
 	.strict()
 
 export const bookmarkCourseIdParamSchema = z
 	.object({
-		courseId: requiredString("courseId"),
+		courseId: requiredString("courseId", 100),
 	})
 	.strict()

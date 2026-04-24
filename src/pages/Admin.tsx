@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import React, { useEffect, useMemo, useState } from "react"
+import ReactMarkdown from "react-markdown"
 import { useNavigate } from "react-router-dom"
 import TxHashLink from "../components/TxHashLink"
 import {
@@ -13,9 +14,6 @@ import {
 	useTreasuryPauseControl,
 } from "../hooks/useAdminContracts"
 import { useWallet } from "../hooks/useWallet"
-import { apiFetchJson } from "../lib/api"
-import { getAuthToken } from "../util/auth"
-import { shortenContractId } from "../util/contract"
 import {
 	useWikiPages,
 	useCreateWikiPage,
@@ -23,7 +21,10 @@ import {
 	useDeleteWikiPage,
 	type WikiPage,
 } from "../hooks/useWiki"
-import ReactMarkdown from "react-markdown"
+import { apiFetchJson } from "../lib/api"
+import { getAuthToken } from "../util/auth"
+import { shortenContractId } from "../util/contract"
+import AddressDisplay from "../components/AddressDisplay"
 
 type AdminSection =
 	| "courses"
@@ -145,7 +146,7 @@ const ConfirmDialog: React.FC<{
 			<p className="text-sm text-white/60 mb-1">
 				Learner:{" "}
 				<span className="font-mono text-white/90">
-					{milestone.learnerAddress}
+					<AddressDisplay address={milestone.learnerAddress} showExplorerLink={false} />
 				</span>
 			</p>
 			<p className="text-sm text-white/60 mb-4">
@@ -213,7 +214,7 @@ const MilestoneStatsBar: React.FC = () => {
 		<div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
 			{error && (
 				<p className="md:col-span-3 text-xs text-red-400">
-					Could not load stats — {error}. Refresh the page to try again.
+					Failed to load stats: {error}
 				</p>
 			)}
 			{items.map((item) => (
@@ -276,7 +277,14 @@ const Admin: React.FC = () => {
 			<aside className="w-72 glass border-r border-white/5 p-8 flex flex-col gap-8">
 				<nav className="flex flex-col gap-2">
 					{(
-						["courses", "milestones", "users", "wiki", "treasury", "contracts"] as const
+						[
+							"courses",
+							"milestones",
+							"users",
+							"wiki",
+							"treasury",
+							"contracts",
+						] as const
 					).map((section) => (
 						<button
 							key={section}
@@ -338,8 +346,7 @@ const CourseManagement: React.FC = () => {
 
 			{errorMessage && (
 				<p className="text-sm text-red-400 mb-4">
-					Could not load courses — {errorMessage}. Use the Refresh button above
-					to retry.
+					Failed to load courses: {errorMessage}
 				</p>
 			)}
 
@@ -587,14 +594,13 @@ const MilestoneQueue: React.FC = () => {
 
 			{coursesErrorMessage && (
 				<p className="text-xs text-red-400 mb-2">
-					Could not load course filters — {coursesErrorMessage}. Filters may be
-					incomplete.
+					Failed to load course filters: {coursesErrorMessage}
 				</p>
 			)}
 
 			{error && (
 				<p className="text-xs text-red-400 mb-4">
-					Could not load milestones — {error}. Try refreshing the page.
+					Error loading milestones: {error}
 				</p>
 			)}
 
@@ -654,9 +660,13 @@ const MilestoneQueue: React.FC = () => {
 										className="border-b border-white/5 hover:bg-white/3 transition-colors"
 									>
 										<td className="py-3 px-4">
-											<span className="font-mono text-xs text-white/50">
-												{shortenContractId(milestone.learnerAddress, 8, 4)}
-											</span>
+											<AddressDisplay 
+												address={milestone.learnerAddress} 
+												prefixLength={8} 
+												suffixLength={4} 
+												showExplorerLink={false}
+												addressClassName="text-xs text-white/50"
+											/>
 										</td>
 										<td className="py-3 px-4 text-sm text-white/80">
 											{milestone.course}
@@ -811,8 +821,7 @@ const UserLookup: React.FC = () => {
 				)}
 				{errorMessage && (
 					<p className="text-xs text-red-400 mt-3">
-						Could not load scholar profile — {errorMessage}. Check the address
-						and try again.
+						Failed to load scholar profile: {errorMessage}
 					</p>
 				)}
 
@@ -941,8 +950,7 @@ const TreasuryControls: React.FC = () => {
 			<div className="glass border border-white/5 rounded-2xl p-6">
 				{queryError && (
 					<p className="text-sm text-red-400 mb-4">
-						Could not load treasury contract state — {queryError}. Check your
-						network connection and try again.
+						Failed to load treasury contract state: {queryError}
 					</p>
 				)}
 
@@ -1184,8 +1192,6 @@ const ContractInfo: React.FC = () => {
 	)
 }
 
-
-
 const WikiManagement: React.FC = () => {
 	const { data: pages = [], isLoading } = useWikiPages()
 	const createMutation = useCreateWikiPage()
@@ -1377,7 +1383,9 @@ const WikiManagement: React.FC = () => {
 											</span>
 										)}
 									</div>
-									<p className="text-xs text-white/30 mt-1">/wiki/{page.slug}</p>
+									<p className="text-xs text-white/30 mt-1">
+										/wiki/{page.slug}
+									</p>
 								</div>
 								<div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
 									<button

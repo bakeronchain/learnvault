@@ -54,6 +54,7 @@ export default function NavBar() {
 						<NavLink
 							key={to}
 							to={to}
+							id={to === "/courses" ? "courses-nav-link" : undefined}
 							className={({ isActive }) =>
 								`px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
 									isActive

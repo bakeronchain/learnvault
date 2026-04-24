@@ -4,6 +4,9 @@ import {
 	toPlainText,
 	type EmailVariables,
 } from "../templates/email-templates"
+import { logger } from "../lib/logger"
+
+const log = logger.child({ module: "email" })
 
 export interface EmailOptions {
 	to: string
@@ -31,7 +34,7 @@ export class EmailService {
 		const templateFn = templates[templateName]
 
 		if (!templateFn) {
-			console.warn(`[EmailService] Template not found: ${templateName}`)
+			log.warn({ templateName }, "Email template not found")
 			return { html: "", text: "" }
 		}
 
@@ -45,10 +48,7 @@ export class EmailService {
 		const { html, text } = await this.render(options.template, options.data)
 
 		if (!this.resendClient) {
-			console.log(
-				`[EmailService] MOCK SEND to ${options.to}: ${options.subject}`,
-			)
-			console.log(html)
+			log.debug({ subject: options.subject }, "MOCK email send")
 			return true
 		}
 
@@ -63,7 +63,7 @@ export class EmailService {
 
 			return true
 		} catch (error) {
-			console.error("[EmailService] Error sending email:", error)
+			log.error({ err: error }, "Error sending email")
 			return false
 		}
 	}
@@ -76,9 +76,7 @@ export class EmailService {
 		const adminEmails = process.env.ADMIN_EMAILS
 
 		if (!adminEmails) {
-			console.warn(
-				"[EmailService] ADMIN_EMAILS not set, skipping notification.",
-			)
+			log.warn("ADMIN_EMAILS not set, skipping admin notification")
 			return false
 		}
 

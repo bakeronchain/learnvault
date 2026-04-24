@@ -41,6 +41,7 @@ export type AuthService = {
 		networkPassphrase: string
 	}>
 	verifySignedTransaction(signedTransactionXdr: string): Promise<string>
+	logout(token: string): Promise<void>
 }
 
 export function createAuthService(
@@ -48,6 +49,10 @@ export function createAuthService(
 	jwtService: JwtService,
 ): AuthService {
 	return {
+		async logout(token: string): Promise<void> {
+			await jwtService.revokeToken(token)
+		},
+
 		async createChallenge(address: string): Promise<{
 			transaction: string
 			networkPassphrase: string

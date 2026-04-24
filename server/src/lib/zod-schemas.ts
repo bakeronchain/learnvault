@@ -1,22 +1,35 @@
 import { z } from "zod"
 
-const requiredString = (field: string) =>
-	z
+const requiredString = (field: string, maxLength?: number) => {
+	const schema = z
 		.string({
 			required_error: `${field} is required`,
 			invalid_type_error: `${field} must be a string`,
 		})
 		.trim()
 		.min(1, `${field} is required`)
+	
+	if (maxLength) {
+		return schema.max(maxLength, `${field} must be ${maxLength} characters or fewer`)
+	}
+	
+	return schema
+}
 
-const optionalTrimmedString = (field: string) =>
-	z
+const optionalTrimmedString = (field: string, maxLength?: number) => {
+	const schema = z
 		.string({
 			invalid_type_error: `${field} must be a string`,
 		})
 		.trim()
 		.min(1, `${field} cannot be empty`)
-		.optional()
+	
+	if (maxLength) {
+		return schema.max(maxLength, `${field} must be ${maxLength} characters or fewer`).optional()
+	}
+	
+	return schema.optional()
+}
 
 const requiredInteger = (field: string) =>
 	z
@@ -62,8 +75,8 @@ export const legacyMilestoneSubmitBodySchema = z
 			.url("evidenceGithub must be a valid URL")
 			.max(500, "evidenceGithub must be 500 characters or fewer")
 			.optional(),
-		evidenceIpfsCid: optionalTrimmedString("evidenceIpfsCid")?.max(100, "evidenceIpfsCid must be 100 characters or fewer"),
-		evidenceDescription: optionalTrimmedString("evidenceDescription")?.max(2000, "evidenceDescription must be 2000 characters or fewer"),
+		evidenceIpfsCid: optionalTrimmedString("evidenceIpfsCid", 100),
+		evidenceDescription: optionalTrimmedString("evidenceDescription", 2000),
 	})
 	.strict()
 	.superRefine((data, ctx) => {
@@ -91,8 +104,8 @@ export const legacyMilestoneSubmitBodySchema = z
 
 export const milestoneSubmitBodySchema = z
 	.object({
-		learner_address: requiredString("learner_address").max(100),
-		course_id: requiredString("course_id").max(100),
+		learner_address: requiredString("learner_address", 100),
+		course_id: requiredString("course_id", 100),
 		milestone_id: requiredInteger("milestone_id"),
 		evidence_url: z
 			.string({
@@ -107,23 +120,23 @@ export const milestoneSubmitBodySchema = z
 
 export const approveMilestoneBodySchema = z
 	.object({
-		note: optionalTrimmedString("note")?.max(1000, "note must be 1000 characters or fewer"),
+		note: optionalTrimmedString("note", 1000),
 	})
 	.strict()
 
 export const rejectMilestoneBodySchema = z
 	.object({
-		reason: requiredString("reason").max(1000, "reason must be 1000 characters or fewer"),
+		reason: requiredString("reason", 1000),
 	})
 	.strict()
 
 export const createCommentBodySchema = z
 	.object({
-		proposalId: optionalTrimmedString("proposalId")?.max(100),
-		proposal_id: optionalTrimmedString("proposal_id")?.max(100),
-		content: optionalTrimmedString("content")?.max(2000, "content must be 2000 characters or fewer"),
-		body: optionalTrimmedString("body")?.max(2000, "body must be 2000 characters or fewer"),
-		author_address: optionalTrimmedString("author_address")?.max(100),
+		proposalId: optionalTrimmedString("proposalId", 100),
+		proposal_id: optionalTrimmedString("proposal_id", 100),
+		content: optionalTrimmedString("content", 2000),
+		body: optionalTrimmedString("body", 2000),
+		author_address: optionalTrimmedString("author_address", 100),
 		parentId: z
 			.number({
 				invalid_type_error: "parentId must be a number",
@@ -194,8 +207,8 @@ export const createCommentBodySchema = z
 
 export const createCredentialMetadataBodySchema = z
 	.object({
-		course_id: requiredString("course_id").max(100),
-		learner_address: requiredString("learner_address").max(100),
+		course_id: requiredString("course_id", 100),
+		learner_address: requiredString("learner_address", 100),
 		completed_at: z
 			.string({
 				required_error: "completed_at is required",
@@ -207,8 +220,8 @@ export const createCredentialMetadataBodySchema = z
 
 export const enrollmentBodySchema = z
 	.object({
-		learner_address: requiredString("learner_address").max(100),
-		course_id: requiredString("course_id").max(100),
-		tx_hash: requiredString("tx_hash").max(200),
+		learner_address: requiredString("learner_address", 100),
+		course_id: requiredString("course_id", 100),
+		tx_hash: requiredString("tx_hash", 200),
 	})
 	.strict()

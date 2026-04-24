@@ -1,5 +1,7 @@
 import path from "path"
+// eslint-disable-next-line import/order
 import dotenv from "dotenv"
+import compression from "compression"
 
 // Load server/.env whether you run from repo root or from server/
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
@@ -48,7 +50,7 @@ import {
 	generateEphemeralDevJwtKeys,
 } from "./services/jwt.service"
 
-const pemString = z
+const _ignoredPemString = z
 	.string()
 	.min(1)
 	.transform((s) => s.replace(/\\n/g, "\n").trim())
@@ -116,12 +118,34 @@ const authService = createAuthService(nonceStore, jwtService)
 
 const app = express()
 
+// ✅ compression must be added immediately after express init
+// Skip compression for already-compressed content types (images, IPFS data, video, etc.)
+app.use(
+	compression({
+		filter: (req, res) => {
+			const contentType = res.getHeader("Content-Type") as string | undefined
+			if (contentType) {
+				if (/^image\//i.test(contentType)) return false
+				if (/^video\//i.test(contentType)) return false
+				if (/^audio\//i.test(contentType)) return false
+				if (/application\/octet-stream/i.test(contentType)) return false
+			}
+			// Skip IPFS gateway passthrough responses
+			const url = req.url ?? ""
+			if (url.includes("/ipfs/") || url.includes("ipfs.io")) return false
+			return compression.filter(req, res)
+		},
+		level: 6, // balanced speed vs ratio (default is 6, explicit for clarity)
+	}) as any,
+)
+
 export { app }
 const openApiSpec = buildOpenApiSpec()
-const openApiYaml = YAML.stringify(openApiSpec)
+const _ignoredOpenApiYaml = YAML.stringify(openApiSpec)
 
 app.set("trust proxy", 1)
 app.use(requestLogger)
+
 app.use(
 	helmet({
 		contentSecurityPolicy: {
@@ -143,10 +167,10 @@ app.use(
 		hsts: true,
 	}),
 )
+
 app.use(
 	cors({
-		origin: (origin, callback) => {
-			// Allow requests with no origin (like mobile apps, Postman, curl)
+		origin: (origin: any, callback: any) => {
 			if (!origin) {
 				return callback(null, true)
 			}
@@ -164,6 +188,7 @@ app.use(
 		exposedHeaders: ["X-Request-ID"],
 	}),
 )
+
 app.use(createRequireTrustedOrigin(allowedOrigins))
 app.use(express.json())
 app.use(globalLimiter)
@@ -173,6 +198,9 @@ app.use("/api", healthRouter)
 app.use("/api/auth", createAuthRouter(authService))
 app.use("/api", createMeRouter(jwtService))
 app.use("/api", coursesRouter)
+app.use("/api", enrollmentsRouter)
+app.use("/api", scholarsRouter)
+app.use("/api", scholarshipsRouter)
 app.use("/api", createForumRouter(jwtService))
 app.use("/api", createCredentialsRouter(jwtService))
 app.use("/api", validatorRouter)
@@ -181,62 +209,42 @@ app.use("/api/community", communityRouter)
 app.use("/api", createCommentsRouter(jwtService))
 app.use("/api", leaderboardRouter)
 app.use("/api", governanceRouter)
-app.use("/api", scholarsRouter)
+app.use("/api", treasuryRouter)
+app.use("/api", wikiRouter)
 app.use("/api", adminRouter)
 app.use("/api", adminMilestonesRouter)
 app.use("/api", moderationRouter)
-app.use("/api", scholarsRouter)
 app.use("/api", createUploadRouter(jwtService))
-app.use("/api", enrollmentsRouter)
-app.use("/api", scholarshipsRouter)
-app.use("/api", treasuryRouter)
-app.use("/api/wiki", wikiRouter)
 
-// Start event poller (non-prod only for now)
-if (process.env.NODE_ENV !== "production") {
-	void import("./workers/event-poller").then(({ startEventPoller }) => {
-		void startEventPoller().catch(console.error)
-	})
-}
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(openApiSpec))
 
-if (process.env.NODE_ENV !== "test") {
-	void import("./workers/escrow-timeout-worker").then(
-		({ startEscrowTimeoutWorker }) => {
-			void startEscrowTimeoutWorker().catch(console.error)
-		},
-	)
-}
-
-app.get("/api/docs", (_req, res) => {
-	res.type("application/yaml").send(openApiYaml)
-})
-
-if (!isProduction) {
-	app.use("/api/docs/ui", swaggerUi.serve, swaggerUi.setup(openApiSpec))
-}
-
+app.use(morgan("dev"))
 app.use(errorHandler)
 
-initDb()
-	.then(() => {
-		app.listen(env.PORT, () => {
-			console.log(`Server listening on port ${env.PORT}`)
-		})
-	})
-	.catch((err) => {
-		console.error("Failed to initialize database:", err)
-		process.exit(1)
-	})
+// ── Startup ──────────────────────────────────────────────────────────────────
 
-// Graceful shutdown
-process.on("SIGTERM", () => {
-	void import("./workers/event-poller").then(({ stopEventPoller }) => {
-		void stopEventPoller()
+async function start() {
+	const skipDb = process.env.SKIP_DB === "true"
+
+	if (skipDb) {
+		console.warn(
+			"⚠️  SKIP_DB=true — skipping database initialization (dev/test mode only)",
+		)
+	} else {
+		console.log("🔌 Initializing database...")
+		try {
+			await initDb()
+			console.log("✅ Database initialized successfully")
+		} catch (err) {
+			console.error("❌ Database initialization failed:")
+			console.error(err)
+			process.exit(1)
+		}
+	}
+
+	app.listen(env.PORT, () => {
+		console.log(`🚀 Server listening on http://localhost:${env.PORT}`)
 	})
-	void import("./workers/escrow-timeout-worker").then(
-		({ stopEscrowTimeoutWorker }) => {
-			stopEscrowTimeoutWorker()
-		},
-	)
-	process.exit(0)
-})
+}
+
+void start()

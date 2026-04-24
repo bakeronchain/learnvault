@@ -6,16 +6,12 @@ import {
 	getPendingMilestones,
 	getMilestoneById,
 	approveMilestone,
-	batchApproveMilestones,
-	batchRejectMilestones,
 	rejectMilestone,
 } from "../controllers/admin-milestones.controller"
 import { submitMilestoneReport } from "../controllers/milestone-submit.controller"
 import { resubmitMilestoneReport } from "../controllers/milestone-resubmit.controller"
 import {
 	approveMilestoneBodySchema,
-	batchApproveMilestonesBodySchema,
-	batchRejectMilestonesBodySchema,
 	legacyMilestoneSubmitBodySchema,
 	milestoneReportIdParamSchema,
 	milestoneSubmitBodySchema,
@@ -119,52 +115,6 @@ adminMilestonesRouter.post(
 )
 
 adminMilestonesRouter.post(
-	"/admin/milestones/batch-approve",
-	requireAdmin,
-	validate({
-		body: batchApproveMilestonesBodySchema,
-	}),
-	batchApproveMilestones,
-)
-
-/**
- * @openapi
- * /api/admin/milestones/{id}/reject:
- *   post:
- *     tags: [Admin]
- *     summary: Reject a milestone report with a reason
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: integer }
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [reason]
- *             properties:
- *               reason:
- *                 type: string
- *     responses:
- *       200:
- *         description: Milestone rejected
- *       400:
- *         $ref: '#/components/responses/BadRequestError'
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
- *       403:
- *         $ref: '#/components/responses/ForbiddenError'
- *       404:
- *         $ref: '#/components/responses/NotFoundError'
- *       409:
- *         description: Report already processed
- */
-adminMilestonesRouter.post(
 	"/admin/milestones/:id/reject",
 	requireAdmin,
 	validate({
@@ -172,15 +122,6 @@ adminMilestonesRouter.post(
 		body: rejectMilestoneBodySchema,
 	}),
 	rejectMilestone,
-)
-
-adminMilestonesRouter.post(
-	"/admin/milestones/batch-reject",
-	requireAdmin,
-	validate({
-		body: batchRejectMilestonesBodySchema,
-	}),
-	batchRejectMilestones,
 )
 
 /**

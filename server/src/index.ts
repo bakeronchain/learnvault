@@ -60,22 +60,8 @@ const env = envSchema.parse(process.env)
 
 const isProduction = env.NODE_ENV === "production"
 
-// Configure allowed CORS origins
-const allowedOrigins = [
-	env.FRONTEND_URL || env.CORS_ORIGIN || "http://localhost:5173",
-	"https://learnvault.app",
-	"https://www.learnvault.app",
-]
+import { allowedOrigins } from "./config/cors-config"
 
-// In development, also allow common local dev ports
-if (!isProduction) {
-	allowedOrigins.push(
-		"http://localhost:5173",
-		"http://localhost:3000",
-		"http://localhost:5174",
-		"http://127.0.0.1:5173",
-	)
-}
 
 let jwtPrivateKey = env.JWT_PRIVATE_KEY
 let jwtPublicKey = env.JWT_PUBLIC_KEY

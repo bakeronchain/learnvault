@@ -24,6 +24,7 @@ import {
 import { apiFetchJson } from "../lib/api"
 import { getAuthToken } from "../util/auth"
 import { shortenContractId } from "../util/contract"
+import AddressDisplay from "../components/AddressDisplay"
 
 type AdminSection =
 	| "courses"
@@ -145,7 +146,7 @@ const ConfirmDialog: React.FC<{
 			<p className="text-sm text-white/60 mb-1">
 				Learner:{" "}
 				<span className="font-mono text-white/90">
-					{milestone.learnerAddress}
+					<AddressDisplay address={milestone.learnerAddress} showExplorerLink={false} />
 				</span>
 			</p>
 			<p className="text-sm text-white/60 mb-4">
@@ -659,9 +660,13 @@ const MilestoneQueue: React.FC = () => {
 										className="border-b border-white/5 hover:bg-white/3 transition-colors"
 									>
 										<td className="py-3 px-4">
-											<span className="font-mono text-xs text-white/50">
-												{shortenContractId(milestone.learnerAddress, 8, 4)}
-											</span>
+											<AddressDisplay 
+												address={milestone.learnerAddress} 
+												prefixLength={8} 
+												suffixLength={4} 
+												showExplorerLink={false}
+												addressClassName="text-xs text-white/50"
+											/>
 										</td>
 										<td className="py-3 px-4 text-sm text-white/80">
 											{milestone.course}

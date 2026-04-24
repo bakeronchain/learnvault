@@ -2,6 +2,7 @@ import { formatDistanceToNow } from "date-fns"
 import React, { useId, useState } from "react"
 import ReactMarkdown from "react-markdown"
 import { getAuthToken } from "../util/auth"
+import AddressDisplay from "./AddressDisplay"
 
 const API_BASE = import.meta.env.VITE_SERVER_URL ?? "http://localhost:4000"
 
@@ -31,10 +32,8 @@ const API_URL = (
 	""
 ).replace(/\/$/, "")
 
-const shortenAddress = (address: string) => {
-	if (!address) return ""
-	return `${address.slice(0, 6)}...${address.slice(-4)}`
-}
+
+
 
 const CommentCard: React.FC<CommentCardProps> = ({
 	comment,
@@ -156,9 +155,11 @@ const CommentCard: React.FC<CommentCardProps> = ({
 					</div>
 					<div>
 						<div className="flex items-center gap-2">
-							<span id={authorId} className="text-sm font-black text-white">
-								{shortenAddress(comment.author_address)}
-							</span>
+							<AddressDisplay 
+								address={comment.author_address} 
+								addressClassName="text-sm font-black text-white"
+								showCopyButton={false}
+							/>
 							{isAuthor && (
 								<span className="px-2 py-0.5 bg-brand-purple/20 text-brand-purple text-[8px] font-black uppercase tracking-widest rounded-sm border border-brand-purple/20">
 									Author
@@ -205,7 +206,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 						type="button"
 						onClick={() => void handleVote("upvote")}
 						className="w-8 h-8 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
-						aria-label={`Upvote comment from ${shortenAddress(comment.author_address)}`}
+						aria-label="Upvote comment"
 					>
 						👍
 					</button>
@@ -216,7 +217,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 						type="button"
 						onClick={() => void handleVote("downvote")}
 						className="w-8 h-8 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
-						aria-label={`Downvote comment from ${shortenAddress(comment.author_address)}`}
+						aria-label="Downvote comment"
 					>
 						👎
 					</button>

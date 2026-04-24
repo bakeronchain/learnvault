@@ -20,12 +20,7 @@ type FilterType =
 
 const ITEMS_PER_PAGE = 5
 
-const shortenAddress = (address: string) => {
-	if (!address) return ""
-	if (address.includes("...")) return address
-	if (address.length <= 10) return address
-	return `${address.slice(0, 6)}...${address.slice(-4)}`
-}
+import AddressDisplay from "../components/AddressDisplay"
 
 const formatCountdown = (deadline: string | null, now: number) => {
 	if (!deadline) return "No deadline set"
@@ -285,8 +280,8 @@ const DaoProposals: React.FC = () => {
 								{selectedProposal.title}
 							</h2>
 							<div className="flex flex-wrap items-center gap-3 text-xs font-black uppercase tracking-widest">
-								<span className="text-brand-cyan">
-									Applicant {shortenAddress(selectedProposal.authorAddress)}
+								<span className="text-brand-cyan flex items-center gap-1">
+									Applicant <AddressDisplay address={selectedProposal.authorAddress} showCopyButton={false} showExplorerLink={false} />
 								</span>
 								<span className="w-1.5 h-1.5 bg-white/20 rounded-full" />
 								<span className="text-white/70">ID #{selectedProposal.id}</span>
@@ -438,9 +433,9 @@ const DaoProposals: React.FC = () => {
 								>
 									{proposal.title}
 								</h2>
-								<p className="text-[10px] text-white/40 uppercase font-black tracking-widest">
-									Applicant {shortenAddress(proposal.authorAddress)}
-								</p>
+								<div className="text-[10px] text-white/40 uppercase font-black tracking-widest flex items-center gap-1">
+									Applicant <AddressDisplay address={proposal.authorAddress} showCopyButton={false} showExplorerLink={false} />
+								</div>
 							</div>
 							<span className="px-3 py-1 bg-white/5 text-[10px] uppercase font-black rounded-full border border-white/10">
 								{proposal.displayStatus}

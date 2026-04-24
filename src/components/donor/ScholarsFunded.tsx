@@ -1,5 +1,6 @@
 import React from "react"
 import { type Scholar } from "../../hooks/useDonor"
+import AddressDisplay from "../AddressDisplay"
 
 interface ScholarsFundedProps {
 	scholars: Scholar[]
@@ -35,9 +36,11 @@ export const ScholarsFunded: React.FC<ScholarsFundedProps> = ({ scholars }) => {
 							<div className="flex items-start justify-between mb-6">
 								<div>
 									<h3 className="text-xl font-black mb-2">{scholar.name}</h3>
-									<p className="text-xs text-white/40 uppercase font-black tracking-widest">
-										{scholar.id}
-									</p>
+									<AddressDisplay 
+										address={scholar.id} 
+										addressClassName="text-xs text-white/40 uppercase font-black tracking-widest"
+										showCopyButton={false}
+									/>
 								</div>
 								<span
 									className={`text-[10px] uppercase font-black tracking-widest px-3 py-1.5 rounded-full border ${getStatusBg(scholar.status)} ${getStatusColor(scholar.status)}`}

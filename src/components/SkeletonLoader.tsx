@@ -213,3 +213,42 @@ export const NoCredentialsEmptyState: React.FC = () => (
 		ctaHref="/learn"
 	/>
 )
+
+// ─── Stat Card Skeleton ───────────────────────────────────────────────────────
+// Issue #732 — Matching shape of StatCard on Treasury / Dashboard pages
+
+export const StatCardSkeleton: React.FC = () => (
+	<div className={`${skeletonBase} p-8 rounded-4xl border border-white/5`}>
+		<Shimmer />
+		<div className="w-8 h-8 bg-white/5 rounded-full mb-4 animate-pulse" />
+		<div className="h-3 bg-white/5 rounded-full w-2/3 mb-2 animate-pulse" />
+		<div className="h-6 bg-white/5 rounded-full w-1/2 animate-pulse" />
+	</div>
+)
+
+// ─── Activity Feed Item Skeleton ──────────────────────────────────────────────
+// Issue #732 — Matching shape of ActivityFeed rows on Treasury
+
+export const ActivityFeedSkeleton: React.FC<{ rows?: number }> = ({
+	rows = 3,
+}) => (
+	<div className="flex flex-col gap-4">
+		{Array.from({ length: rows }).map((_, i) => (
+			<div
+				key={i}
+				className={`${skeletonBase} flex items-center justify-between p-5 rounded-2xl border border-white/5`}
+			>
+				<Shimmer />
+				<div className="flex items-center gap-4">
+					<div className="w-2 h-2 rounded-full bg-white/5 animate-pulse" />
+					<div>
+						<div className="h-3 bg-white/5 rounded-full w-24 mb-2 animate-pulse" />
+						<div className="h-2 bg-white/5 rounded-full w-16 animate-pulse" />
+					</div>
+				</div>
+				<div className="h-4 bg-white/5 rounded-full w-16 animate-pulse" />
+			</div>
+		))}
+	</div>
+)
+

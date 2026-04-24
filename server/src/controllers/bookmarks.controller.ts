@@ -43,6 +43,11 @@ export const listBookmarks = async (
  * Create a bookmark for the authenticated learner + given course_id.
  * Idempotent: re-POSTing the same pair returns 200 with the existing row
  * instead of 409, so the frontend can treat "toggle on" as fire-and-forget.
+ *
+ * Uses a single upsert with `ON CONFLICT DO UPDATE` so we always get the row
+ * back atomically — no race window where a concurrent DELETE could leave us
+ * with no row to return. We use `xmax = 0` (returns true only for INSERTs,
+ * not UPDATEs) to distinguish "new" (201) from "already existed" (200).
  */
 export const createBookmark = async (
 	req: AuthRequest,
@@ -60,30 +65,21 @@ export const createBookmark = async (
 		const result = await pool.query(
 			`INSERT INTO bookmarks (address, course_id)
 			 VALUES ($1, $2)
-			 ON CONFLICT (address, course_id) DO NOTHING
-			 RETURNING id, course_id, created_at`,
+			 ON CONFLICT (address, course_id) DO UPDATE
+			   SET address = EXCLUDED.address
+			 RETURNING id, course_id, created_at, (xmax = 0) AS is_new`,
 			[address, course_id],
 		)
 
-		if (result.rows.length > 0) {
-			const row = result.rows[0]
-			res.status(201).json({
-				bookmark_id: row.id,
-				course_id: row.course_id,
-				created_at: row.created_at,
-			})
+		const row = result.rows[0]
+		if (!row) {
+			console.error("[bookmarks] Upsert returned no rows — unexpected")
+			res.status(500).json({ error: "Failed to create bookmark" })
 			return
 		}
 
-		// Already bookmarked — return the existing row so the client state matches
-		const existing = await pool.query(
-			`SELECT id, course_id, created_at
-			 FROM bookmarks
-			 WHERE address = $1 AND course_id = $2`,
-			[address, course_id],
-		)
-		const row = existing.rows[0]
-		res.status(200).json({
+		const status = row.is_new ? 201 : 200
+		res.status(status).json({
 			bookmark_id: row.id,
 			course_id: row.course_id,
 			created_at: row.created_at,

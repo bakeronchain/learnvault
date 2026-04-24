@@ -170,6 +170,12 @@ export const batchRejectMilestonesBodySchema = z
 	})
 	.strict()
 
+export const updateCommentBodySchema = z
+	.object({
+		content: requiredString("content", 2000),
+	})
+	.strict()
+
 export const createCommentBodySchema = z
 	.object({
 		proposalId: optionalTrimmedString("proposalId", 100),

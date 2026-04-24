@@ -33,6 +33,7 @@ export const WalletButton = () => {
 	if (!address) {
 		return (
 			<Button
+				id="connect-wallet-button"
 				variant="secondary"
 				size="md"
 				onClick={() => void handleConnect()}

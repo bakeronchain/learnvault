@@ -35,6 +35,7 @@ import { scholarshipsRouter } from "./routes/scholarships.routes"
 import { treasuryRouter } from "./routes/treasury.routes"
 import { createUploadRouter } from "./routes/upload.routes"
 import { validatorRouter } from "./routes/validator.routes"
+import { wikiRouter } from "./routes/wiki.routes"
 import { createAuthService } from "./services/auth.service"
 import { emitAdminKeyRotationAlertIfNeeded } from "./services/admin-key.service"
 import {
@@ -157,6 +158,7 @@ app.use("/api", createUploadRouter(jwtService))
 app.use("/api", enrollmentsRouter)
 app.use("/api", scholarshipsRouter)
 app.use("/api", treasuryRouter)
+app.use("/api/wiki", wikiRouter)
 
 // Start event poller (non-prod only for now)
 if (process.env.NODE_ENV !== "production") {

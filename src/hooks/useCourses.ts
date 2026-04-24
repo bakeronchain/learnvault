@@ -144,17 +144,19 @@ async function fetchJson<T>(url: string): Promise<T> {
 	return response.json() as Promise<T>
 }
 
+export async function fetchCourses(): Promise<CourseSummary[]> {
+	const response = await fetchJson<CourseListResponse | ApiCourse[]>(
+		"/api/courses",
+	)
+	const courses = Array.isArray(response) ? response : (response.data ?? [])
+	return courses.map(normalizeCourse)
+}
+
 export function useCourses() {
 	const query = useQuery({
 		queryKey: ["courses"],
-		queryFn: async (): Promise<CourseSummary[]> => {
-			const response = await fetchJson<CourseListResponse | ApiCourse[]>(
-				"/api/courses",
-			)
-			const courses = Array.isArray(response) ? response : (response.data ?? [])
-			return courses.map(normalizeCourse)
-		},
-		staleTime: 5 * 60 * 1000,
+		queryFn: fetchCourses,
+		staleTime: 60 * 1000,
 	})
 
 	return {
@@ -223,7 +225,7 @@ export function useEnrolledCourses() {
 				normalizeEnrolledCourse,
 			)
 		},
-		staleTime: 2 * 60 * 1000,
+		staleTime: 60 * 1000,
 	})
 
 	return {
@@ -252,7 +254,7 @@ export function useCourseDetail(idOrSlug: string | undefined) {
 			}
 		},
 		enabled: Boolean(idOrSlug),
-		staleTime: 5 * 60 * 1000,
+		staleTime: 60 * 1000,
 		retry: false,
 	})
 

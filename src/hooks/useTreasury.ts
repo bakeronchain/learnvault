@@ -22,7 +22,7 @@ const API_BASE =
 	(import.meta.env.VITE_SERVER_URL as string | undefined) ||
 	"/api"
 
-async function fetchTreasuryStats(): Promise<TreasuryStats> {
+export async function fetchTreasuryStats(): Promise<TreasuryStats> {
 	const response = await fetch(`${API_BASE}/treasury/stats`)
 	if (!response.ok) {
 		throw new Error("Failed to load treasury stats")
@@ -31,7 +31,7 @@ async function fetchTreasuryStats(): Promise<TreasuryStats> {
 	return data
 }
 
-async function fetchTreasuryActivity(): Promise<TreasuryEvent[]> {
+export async function fetchTreasuryActivity(): Promise<TreasuryEvent[]> {
 	const response = await fetch(`${API_BASE}/treasury/activity?limit=20`)
 	if (!response.ok) {
 		throw new Error("Failed to load treasury activity")
@@ -49,7 +49,7 @@ export function useTreasury() {
 	} = useQuery({
 		queryKey: ["treasury", "stats"],
 		queryFn: fetchTreasuryStats,
-		staleTime: 30_000,
+		staleTime: 60 * 1000,
 		refetchInterval: 60_000,
 	})
 
@@ -61,7 +61,7 @@ export function useTreasury() {
 	} = useQuery({
 		queryKey: ["treasury", "activity"],
 		queryFn: fetchTreasuryActivity,
-		staleTime: 30_000,
+		staleTime: 60 * 1000,
 		refetchInterval: 60_000,
 	})
 

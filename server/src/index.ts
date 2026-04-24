@@ -13,7 +13,6 @@ import { z } from "zod"
 
 import { initDb } from "./db/index"
 import { createNonceStore } from "./db/nonce-store"
-import { createTokenStore } from "./db/token-store"
 import { errorHandler } from "./middleware/error.middleware"
 import { globalLimiter } from "./middleware/rate-limit.middleware"
 import { requestLogger } from "./middleware/request-logger.middleware"
@@ -34,9 +33,8 @@ import { scholarsRouter } from "./routes/scholars.routes"
 import { scholarshipsRouter } from "./routes/scholarships.routes"
 import { treasuryRouter } from "./routes/treasury.routes"
 import { createUploadRouter } from "./routes/upload.routes"
-import { createUserProfileRouter } from "./routes/user-profile.routes"
 import { validatorRouter } from "./routes/validator.routes"
-import { profilesRouter } from "./routes/profiles.routes"
+import { donorsRouter } from "./routes/donors.routes"
 import { createAuthService } from "./services/auth.service"
 import {
 	createJwtService,
@@ -62,8 +60,22 @@ const env = envSchema.parse(process.env)
 
 const isProduction = env.NODE_ENV === "production"
 
-import { allowedOrigins } from "./config/cors-config"
+// Configure allowed CORS origins
+const allowedOrigins = [
+	env.FRONTEND_URL || env.CORS_ORIGIN || "http://localhost:5173",
+	"https://learnvault.app",
+	"https://www.learnvault.app",
+]
 
+// In development, also allow common local dev ports
+if (!isProduction) {
+	allowedOrigins.push(
+		"http://localhost:5173",
+		"http://localhost:3000",
+		"http://localhost:5174",
+		"http://127.0.0.1:5173",
+	)
+}
 
 let jwtPrivateKey = env.JWT_PRIVATE_KEY
 let jwtPublicKey = env.JWT_PUBLIC_KEY
@@ -90,8 +102,7 @@ if (!jwtPrivateKey || !jwtPublicKey) {
 }
 
 const nonceStore = createNonceStore(env.REDIS_URL)
-const tokenStore = createTokenStore(env.REDIS_URL)
-const jwtService = createJwtService(jwtPrivateKey, jwtPublicKey, tokenStore)
+const jwtService = createJwtService(jwtPrivateKey, jwtPublicKey)
 const authService = createAuthService(nonceStore, jwtService)
 
 const app = express()
@@ -138,12 +149,11 @@ app.use("/api", scholarsRouter)
 app.use("/api", adminRouter)
 app.use("/api", adminMilestonesRouter)
 app.use("/api", scholarsRouter)
-app.use("/api", createUserProfileRouter(jwtService))
 app.use("/api", createUploadRouter(jwtService))
 app.use("/api", enrollmentsRouter)
-app.use("/api", profilesRouter)
 app.use("/api", scholarshipsRouter)
 app.use("/api", treasuryRouter)
+app.use("/api", donorsRouter)
 
 // Start event poller (non-prod only for now)
 if (process.env.NODE_ENV !== "production") {

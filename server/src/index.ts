@@ -1,13 +1,8 @@
 import path from "path"
-import dotenv from "dotenv"
-
-// Load server/.env whether you run from repo root or from server/
-dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
-
 import cors from "cors"
+import dotenv from "dotenv"
 import express from "express"
 import helmet from "helmet"
-import morgan from "morgan"
 import swaggerUi from "swagger-ui-express"
 import YAML from "yaml"
 import { z } from "zod"
@@ -48,10 +43,8 @@ import {
 	generateEphemeralDevJwtKeys,
 } from "./services/jwt.service"
 
-const pemString = z
-	.string()
-	.min(1)
-	.transform((s) => s.replace(/\\n/g, "\n").trim())
+// Load server/.env whether you run from repo root or from server/
+dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
 
 const envSchema = z.object({
 	PORT: z.coerce.number().int().positive().default(4000),
@@ -171,7 +164,7 @@ app.use(globalLimiter)
 // Routes
 app.use("/api", healthRouter)
 app.use("/api/auth", createAuthRouter(authService))
-app.use("/api", createMeRouter(jwtService))
+app.use("/api", createMeRouter(jwtService, authService))
 app.use("/api", coursesRouter)
 app.use("/api", createForumRouter(jwtService))
 app.use("/api", createCredentialsRouter(jwtService))

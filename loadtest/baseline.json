@@ -1,0 +1,10 @@
+{
+	"_meta": "Set metrics.* to numbers (ms) after a known-good staging run to enable regression checks (current p95 must not exceed value × regression_factor).",
+	"slo_p95_ms": 500,
+	"regression_factor": 1.25,
+	"metrics": {
+		"http_req_duration{name:auth}": null,
+		"http_req_duration{name:courses}": null,
+		"http_req_duration{name:milestones}": null
+	}
+}

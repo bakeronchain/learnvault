@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { Helmet } from "react-helmet"
 import { useSearchParams } from "react-router-dom"
+import AddressDisplay from "../components/AddressDisplay"
 import CommentSection from "../components/CommentSection"
 import Pagination from "../components/Pagination"
 import { NoProposalsEmptyState } from "../components/SkeletonLoader"
@@ -21,8 +22,6 @@ type FilterType =
 type SortType = "newest" | "most-votes" | "ending-soon"
 
 const ITEMS_PER_PAGE = 5
-
-import AddressDisplay from "../components/AddressDisplay"
 
 const formatCountdown = (deadline: string | null, now: number) => {
 	if (!deadline) return "No deadline set"
@@ -365,7 +364,12 @@ const DaoProposals: React.FC = () => {
 							</h2>
 							<div className="flex flex-wrap items-center gap-3 text-xs font-black uppercase tracking-widest">
 								<span className="text-brand-cyan flex items-center gap-1">
-									Applicant <AddressDisplay address={selectedProposal.authorAddress} showCopyButton={false} showExplorerLink={false} />
+									Applicant{" "}
+									<AddressDisplay
+										address={selectedProposal.authorAddress}
+										showCopyButton={false}
+										showExplorerLink={false}
+									/>
 								</span>
 								<span className="w-1.5 h-1.5 bg-white/20 rounded-full" />
 								<span className="text-white/70">ID #{selectedProposal.id}</span>
@@ -518,7 +522,12 @@ const DaoProposals: React.FC = () => {
 									{proposal.title}
 								</h2>
 								<div className="text-[10px] text-white/40 uppercase font-black tracking-widest flex items-center gap-1">
-									Applicant <AddressDisplay address={proposal.authorAddress} showCopyButton={false} showExplorerLink={false} />
+									Applicant{" "}
+									<AddressDisplay
+										address={proposal.authorAddress}
+										showCopyButton={false}
+										showExplorerLink={false}
+									/>
 								</div>
 							</div>
 							<span className="px-3 py-1 bg-white/5 text-[10px] uppercase font-black rounded-full border border-white/10">

@@ -1,10 +1,10 @@
 import { Button } from "@stellar/design-system"
 import React, { useEffect, useMemo, useState } from "react"
 import { useParams } from "react-router-dom"
+import { CourseForum } from "../components/forum/CourseForum"
 import LessonContent from "../components/LessonContent"
 import LessonSidebar from "../components/LessonSidebar"
 import MilestoneSubmitPanel from "../components/MilestoneSubmitPanel"
-import { CourseForum } from "../components/forum/CourseForum"
 import { LessonListSkeleton } from "../components/skeletons/LessonListSkeleton"
 import { useCourse } from "../hooks/useCourse"
 import { useCourseDetail } from "../hooks/useCourses"
@@ -48,7 +48,7 @@ const LessonView: React.FC = () => {
 	const [isLoadingContent, setIsLoadingContent] = useState(true)
 	const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 	const [timeSpentLabel, setTimeSpentLabel] = useState<string | null>(null)
-	
+
 	const searchParams = new URL(window.location.href).searchParams
 	const currentTab = searchParams.get("tab") || "lesson"
 	const setTab = (tab: string) => {
@@ -58,14 +58,14 @@ const LessonView: React.FC = () => {
 		window.history.pushState({}, "", newUrl)
 		window.dispatchEvent(new Event("popstate"))
 	}
-	
+
 	// Re-render when url changes
-    const [, forceUpdate] = React.useReducer((x) => x + 1, 0)
-    useEffect(() => {
-        const handlePopState = () => forceUpdate()
-        window.addEventListener("popstate", handlePopState)
-        return () => window.removeEventListener("popstate", handlePopState)
-    }, [])
+	const [, forceUpdate] = React.useReducer((x) => x + 1, 0)
+	useEffect(() => {
+		const handlePopState = () => forceUpdate()
+		window.addEventListener("popstate", handlePopState)
+		return () => window.removeEventListener("popstate", handlePopState)
+	}, [])
 
 	const lesson = useMemo(
 		() => course?.lessons.find((candidate) => candidate.id === lessonId),
@@ -227,31 +227,35 @@ const LessonView: React.FC = () => {
 					</span>
 					<span className="text-white/40 text-sm">{course.title}</span>
 				</div>
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-				    <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
-					    {currentTab === "forum" ? "Community Forum" : lesson.title}
-				    </h1>
-                </div>
+				<div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+					<h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
+						{currentTab === "forum" ? "Community Forum" : lesson.title}
+					</h1>
+				</div>
 			</header>
 
-            <div className="flex gap-4 mb-8 border-b border-white/10">
-                <button
-                    onClick={() => setTab("lesson")}
-                    className={`pb-3 px-2 text-sm font-bold uppercase tracking-widest transition-colors ${
-                        currentTab === "lesson" ? "text-brand-cyan border-b-2 border-brand-cyan" : "text-white/40 hover:text-white/70"
-                    }`}
-                >
-                    Lesson
-                </button>
-                <button
-                    onClick={() => setTab("forum")}
-                    className={`pb-3 px-2 text-sm font-bold uppercase tracking-widest transition-colors ${
-                        currentTab === "forum" ? "text-brand-cyan border-b-2 border-brand-cyan" : "text-white/40 hover:text-white/70"
-                    }`}
-                >
-                    Forum
-                </button>
-            </div>
+			<div className="flex gap-4 mb-8 border-b border-white/10">
+				<button
+					onClick={() => setTab("lesson")}
+					className={`pb-3 px-2 text-sm font-bold uppercase tracking-widest transition-colors ${
+						currentTab === "lesson"
+							? "text-brand-cyan border-b-2 border-brand-cyan"
+							: "text-white/40 hover:text-white/70"
+					}`}
+				>
+					Lesson
+				</button>
+				<button
+					onClick={() => setTab("forum")}
+					className={`pb-3 px-2 text-sm font-bold uppercase tracking-widest transition-colors ${
+						currentTab === "forum"
+							? "text-brand-cyan border-b-2 border-brand-cyan"
+							: "text-white/40 hover:text-white/70"
+					}`}
+				>
+					Forum
+				</button>
+			</div>
 
 			<div className="lg:hidden mb-6">
 				<button

@@ -23,7 +23,9 @@
     "test:frontend": "vitest run",
     "test:contracts": "cargo test --workspace",
     "test:watch": "cargo watch -x 'test --workspace'",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "loadtest:staging": "k6 run --summary-export=summary.json loadtest/staging.js",
+    "loadtest:staging:quick": "k6 run -e K6_QUICK=true --summary-export=summary.json loadtest/staging.js"
   },
   "workspaces": [
     "packages/*"
@@ -84,7 +86,7 @@
     "prettier": "^3.8.0",
     "typescript": "~5.9.3",
     "vite": "^8.0.3",
-    "vite-plugin-node-polyfills": "^0.27.0",
+    "vite-plugin-node-polyfills": "^0.26.0",
     "vite-plugin-wasm": "^3.5.0",
     "vitest": "^4.1.1"
   },

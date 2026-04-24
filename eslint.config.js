@@ -22,4 +22,15 @@ export default [
 			},
 		},
 	},
+	{
+		files: ["loadtest/**/*.js"],
+		languageOptions: {
+			globals: {
+				...globals.node,
+				__ENV: "readonly",
+				__VU: "readonly",
+				__ITER: "readonly",
+			},
+		},
+	},
 ]

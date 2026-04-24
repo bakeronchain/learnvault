@@ -199,6 +199,8 @@ impl ScholarshipTreasury {
         env.storage().instance().set(&SCHOLARS_KEY, &0_u32);
         env.storage().instance().set(&DONORS_KEY, &0_u32);
         env.storage().instance().set(&PAUSED_KEY, &false);
+        // No reputation floor until admin calls `set_min_lrn_to_propose` with a value > 0
+        // (the setter rejects <= 0 so a configured minimum cannot be silently cleared).
         env.storage()
             .instance()
             .set(&MIN_LRN_TO_PROPOSE_KEY, &0_i128);
@@ -503,6 +505,10 @@ impl ScholarshipTreasury {
             .unwrap_or(0)
     }
 
+    /// Sets the minimum governance (LRN) balance required to submit a proposal.
+    /// `min_lrn` must be strictly positive; zero is not accepted here so admins cannot
+    /// accidentally remove an existing floor via `set_min_lrn_to_propose(0)`. Until the
+    /// first successful call, [`Self::get_min_lrn_to_propose`] remains `0` (no minimum).
     pub fn set_min_lrn_to_propose(env: Env, admin: Address, min_lrn: i128) {
         Self::assert_initialized(&env);
 
@@ -510,7 +516,7 @@ impl ScholarshipTreasury {
         if admin != Self::admin(&env) {
             panic_with_error!(&env, Error::Unauthorized);
         }
-        if min_lrn < 0 {
+        if min_lrn <= 0 {
             panic_with_error!(&env, Error::InvalidAmount);
         }
 

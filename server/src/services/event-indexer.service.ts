@@ -5,7 +5,7 @@ import {
 	INDEXER_CONFIG,
 	getPollingTargets,
 } from "../lib/event-config"
-import { getRpcCache, CacheKey } from "../lib/rpc-cache"
+import { leaderboardEmitter } from "../lib/leaderboard-emitter"
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL! })
 
@@ -16,54 +16,6 @@ export interface IndexedEvent {
 	event_type: string
 	data: Record<string, unknown>
 	ledger_sequence: string // RPC returns string, DB bigint
-}
-
-/**
- * Invalidate RPC cache entries that are stale after a new event is indexed.
- * We only invalidate keys we can derive from the event data — everything else
- * expires naturally via TTL.
- */
-async function invalidateCacheForEvent(
-	topic: string,
-	data: Record<string, unknown>,
-): Promise<void> {
-	const cache = getRpcCache()
-	const addr = typeof data.address === "string" ? data.address : null
-
-	switch (topic) {
-		case "LearnToken_Mint":
-			if (addr) {
-				await cache.invalidate(CacheKey.learnBalance(addr))
-				await cache.invalidate(CacheKey.votingPower(addr))
-			}
-			break
-		case "CourseMilestone_MilestoneComplete":
-			if (addr) {
-				const courseId =
-					typeof data.courseId === "string" ? Number(data.courseId) : null
-				if (courseId !== null && !isNaN(courseId)) {
-					await cache.invalidate(CacheKey.enrollment(addr, courseId))
-				}
-			}
-			break
-		case "ScholarshipTreasury_Deposit":
-			// Deposit mints governance tokens — invalidate gov balance + voting power
-			if (addr) {
-				await cache.invalidate(CacheKey.govBalance(addr))
-				await cache.invalidate(CacheKey.votingPower(addr))
-			}
-			break
-		case "ScholarshipTreasury_VoteCastEvent": {
-			const voter =
-				typeof data.voter === "string" ? data.voter : null
-			if (voter) {
-				await cache.invalidate(CacheKey.votingPower(voter))
-			}
-			break
-		}
-		default:
-			break
-	}
 }
 
 /**
@@ -115,7 +67,11 @@ export async function indexEventsBatch(
 						[contractId, topic, data, ledger],
 					)
 					inserted++
-					await invalidateCacheForEvent(topic, data)
+
+					// Notify leaderboard of potential balance changes
+					if (topic === "LearnToken_Mint" || topic === "ScholarNFT::minted") {
+						leaderboardEmitter.emitUpdate()
+					}
 				}
 			} catch (err) {
 				console.error(`[indexer:${contractId}:${topic}] Error:`, err)

@@ -224,8 +224,12 @@ const Treasury: React.FC = () => {
 			{isLoading ? (
 				<DashboardStatsSkeleton />
 			) : isError ? (
-				<div className="glass-card p-8 rounded-[3rem] border border-white/5 text-center text-red-400">
-					Failed to load treasury stats.
+				<div className="glass-card p-8 rounded-[3rem] border border-white/5">
+					<ErrorState
+						message="Failed to load treasury stats. The data service may be temporarily unavailable."
+						onRetry={() => void refetch()}
+						showContactSupport
+					/>
 				</div>
 			) : (
 				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-20">

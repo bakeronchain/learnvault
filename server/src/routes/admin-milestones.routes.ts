@@ -1,3 +1,4 @@
+// Admin milestones routes - handles approval/rejection of milestone submissions
 import { Router } from "express"
 import {
 	listMilestones,

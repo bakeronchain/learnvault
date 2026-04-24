@@ -1,4 +1,5 @@
 import { type Request, type Response } from "express"
+import sanitizeHtml from "sanitize-html"
 import { milestoneStore } from "../db/milestone-store"
 import { type AdminRequest } from "../middleware/admin.middleware"
 import { credentialService } from "../services/credential.service"
@@ -235,6 +236,20 @@ export async function rejectMilestone(
 	const { reason } = req.body as { reason: string }
 	const validatorAddress = req.adminAddress ?? "unknown"
 
+	// Validate and sanitize rejection reason
+	if (!reason || typeof reason !== "string") {
+		res.status(400).json({ error: "Rejection reason is required" })
+		return
+	}
+	if (reason.length > 1000) {
+		res.status(400).json({ error: "Rejection reason must be 1000 characters or fewer" })
+		return
+	}
+	const sanitizedReason = sanitizeHtml(reason, {
+		allowedTags: [],
+		allowedAttributes: {},
+	})
+
 	try {
 		const report = await milestoneStore.getReportById(id)
 		if (!report) {
@@ -270,7 +285,7 @@ export async function rejectMilestone(
 			report_id: id,
 			validator_address: validatorAddress,
 			decision: "rejected",
-			rejection_reason: reason,
+			rejection_reason: sanitizedReason,
 			contract_tx_hash: contractResult.txHash,
 		})
 
@@ -289,7 +304,7 @@ export async function rejectMilestone(
 						milestoneNumber: String(
 							report.milestone_number ?? report.milestone_id,
 						),
-						rejectionReason: reason || "",
+						rejectionReason: sanitizedReason,
 						milestoneUrl: `${process.env.FRONTEND_URL || ""}/milestones`,
 						unsubscribeUrl: "#",
 					},
@@ -307,7 +322,7 @@ export async function rejectMilestone(
 			data: {
 				reportId: id,
 				status: "rejected",
-				reason,
+				reason: sanitizedReason,
 				contractTxHash: contractResult.txHash,
 				simulated: contractResult.simulated,
 				auditEntry,

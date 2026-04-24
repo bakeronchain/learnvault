@@ -14,6 +14,7 @@ import { z } from "zod"
 
 import { initDb } from "./db/index"
 import { createNonceStore } from "./db/nonce-store"
+import { createTokenStore } from "./db/token-store"
 import { setupConsoleRequestTracing } from "./lib/request-context"
 import { createRequireTrustedOrigin } from "./middleware/csrf.middleware"
 import { errorHandler } from "./middleware/error.middleware"
@@ -30,10 +31,12 @@ import { coursesRouter } from "./routes/courses.routes"
 import { createCredentialsRouter } from "./routes/credentials.routes"
 import { enrollmentsRouter } from "./routes/enrollments.routes"
 import { eventsRouter } from "./routes/events.routes"
+import { createForumRouter } from "./routes/forum.routes"
 import { governanceRouter } from "./routes/governance.routes"
 import { healthRouter } from "./routes/health.routes"
 import { leaderboardRouter } from "./routes/leaderboard.routes"
 import { createMeRouter } from "./routes/me.routes"
+import { moderationRouter } from "./routes/moderation.routes"
 import { scholarsRouter } from "./routes/scholars.routes"
 import { scholarshipsRouter } from "./routes/scholarships.routes"
 import { treasuryRouter } from "./routes/treasury.routes"
@@ -108,10 +111,13 @@ if (!jwtPrivateKey || !jwtPublicKey) {
 }
 
 const nonceStore = createNonceStore(env.REDIS_URL)
-const jwtService = createJwtService(jwtPrivateKey, jwtPublicKey)
+const tokenStore = createTokenStore(env.REDIS_URL)
+const jwtService = createJwtService(jwtPrivateKey, jwtPublicKey, tokenStore)
 const authService = createAuthService(nonceStore, jwtService)
 
 const app = express()
+
+export { app }
 const openApiSpec = buildOpenApiSpec()
 const openApiYaml = YAML.stringify(openApiSpec)
 
@@ -168,6 +174,7 @@ app.use("/api", healthRouter)
 app.use("/api/auth", createAuthRouter(authService))
 app.use("/api", createMeRouter(jwtService))
 app.use("/api", coursesRouter)
+app.use("/api", createForumRouter(jwtService))
 app.use("/api", createCredentialsRouter(jwtService))
 app.use("/api", validatorRouter)
 app.use("/api", eventsRouter)
@@ -178,6 +185,7 @@ app.use("/api", governanceRouter)
 app.use("/api", scholarsRouter)
 app.use("/api", adminRouter)
 app.use("/api", adminMilestonesRouter)
+app.use("/api", moderationRouter)
 app.use("/api", scholarsRouter)
 app.use("/api", createUploadRouter(jwtService))
 app.use("/api", enrollmentsRouter)

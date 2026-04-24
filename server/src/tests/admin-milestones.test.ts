@@ -24,6 +24,25 @@ jest.mock("../services/stellar-contract.service", () => ({
 	},
 }))
 
+jest.mock("../services/email.service", () => ({
+	createEmailService: jest.fn().mockReturnValue({
+		sendNotification: jest.fn().mockResolvedValue(undefined),
+		sendAdminMilestoneNotification: jest.fn().mockResolvedValue(undefined),
+	}),
+}))
+
+jest.mock("../services/escrow-timeout.service", () => ({
+	markEscrowActivity: jest.fn().mockResolvedValue(undefined),
+}))
+
+jest.mock("../services/credential.service", () => ({
+	credentialService: {
+		mintCertificateIfComplete: jest
+			.fn()
+			.mockResolvedValue({ minted: false }),
+	},
+}))
+
 import express from "express"
 import jwt from "jsonwebtoken"
 import request from "supertest"
@@ -61,11 +80,15 @@ beforeEach(() => {
 	// passes — the pool mock ensures no real SDK call is made.
 	process.env.STELLAR_SECRET_KEY = "FAKE_TEST_KEY"
 	process.env.COURSE_MILESTONE_CONTRACT_ID = "FAKE_TEST_CONTRACT"
+	process.env.FRONTEND_URL = "http://localhost:3000"
+	process.env.NODE_ENV = "test"
 })
 
 afterEach(() => {
 	delete process.env.STELLAR_SECRET_KEY
 	delete process.env.COURSE_MILESTONE_CONTRACT_ID
+	delete process.env.FRONTEND_URL
+	delete process.env.NODE_ENV
 })
 
 describe("POST /api/milestones/submit", () => {

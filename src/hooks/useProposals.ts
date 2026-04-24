@@ -110,7 +110,11 @@ async function readJson<T>(response: Response): Promise<T> {
 	}
 
 	if (!response.ok) {
-		throw new Error(data.message || data.error || "Request failed")
+		throw new Error(
+			data.message ||
+				data.error ||
+				`Request failed (status ${response.status}). Check your connection and try again.`,
+		)
 	}
 
 	return data
@@ -210,7 +214,9 @@ export function useProposals() {
 			support: boolean
 		}) => {
 			if (!address) {
-				throw new Error("Connect your wallet to vote")
+				throw new Error(
+					"Wallet not connected — connect your wallet using the button in the navigation to vote.",
+				)
 			}
 
 			const response = await fetch(`${API_BASE}/api/governance/vote`, {

@@ -8,7 +8,6 @@ on:
       - "contracts/**"
       - "Cargo.toml"
       - "Cargo.lock"
-      - ".github/workflows/contracts.yml"
 
 jobs:
   contract-tests:

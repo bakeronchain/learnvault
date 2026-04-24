@@ -8,6 +8,7 @@
     "start": "node dist/index.js",
     "docs:generate": "node scripts/generate-openapi.cjs",
     "test": "jest --runInBand",
+    "test:coverage": "jest --runInBand --coverage",
     "migrate": "ts-node scripts/migrate.ts up",
     "migrate:rollback": "ts-node scripts/migrate.ts down",
     "migrate:verify": "ts-node scripts/verify-migrations.ts",

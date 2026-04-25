@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom"
 import ActivityFeed from "../components/ActivityFeed"
 import CourseCard from "../components/CourseCard"
 import LRNBalanceWidget from "../components/LRNBalanceWidget"
+import { DashboardStatsSkeleton } from "../components/SkeletonLoader"
 import { useCourse } from "../hooks/useCourse"
 import { useLearnerProfile } from "../hooks/useLearnerProfile"
 import { useLearnToken } from "../hooks/useLearnToken"
@@ -57,10 +58,8 @@ const Dashboard: React.FC = () => {
 
 	if (isInitializing && !address) {
 		return (
-			<div className="min-h-screen flex items-center justify-center">
-				<div className="animate-pulse text-white/50 tracking-widest uppercase font-black text-sm">
-					Verifying Wallet...
-				</div>
+			<div aria-busy="true" className="min-h-screen p-6 md:p-12 max-w-7xl mx-auto">
+				<DashboardStatsSkeleton />
 			</div>
 		)
 	}

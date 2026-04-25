@@ -4,6 +4,17 @@ import dotenv from "dotenv"
 // Load server/.env whether you run from repo root or from server/
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
 
+// Initialize Sentry FIRST before any other imports that might throw
+import { initSentry, sentryRequestHandler } from "./lib/sentry"
+
+initSentry({
+	dsn: process.env.SENTRY_DSN,
+	environment: process.env.NODE_ENV || "development",
+	release: process.env.SENTRY_RELEASE || process.env.GIT_COMMIT_HASH,
+	tracesSampleRate: env.NODE_ENV === "production" ? 0.1 : 1.0,
+	profilesSampleRate: env.NODE_ENV === "production" ? 0.1 : 1.0,
+})
+
 import cors from "cors"
 import express from "express"
 import helmet from "helmet"
@@ -34,7 +45,9 @@ import { governanceRouter } from "./routes/governance.routes"
 import { healthRouter } from "./routes/health.routes"
 import { leaderboardRouter } from "./routes/leaderboard.routes"
 import { createMeRouter } from "./routes/me.routes"
+import { createPeerReviewRouter } from "./routes/peer-review.routes"
 import { moderationRouter } from "./routes/moderation.routes"
+import { notificationsRouter } from "./routes/notifications.routes"
 import { scholarsRouter } from "./routes/scholars.routes"
 import { scholarshipsRouter } from "./routes/scholarships.routes"
 import { treasuryRouter } from "./routes/treasury.routes"
@@ -121,6 +134,7 @@ const openApiYaml = YAML.stringify(openApiSpec)
 
 app.set("trust proxy", 1)
 app.use(requestLogger)
+app.use(sentryRequestHandler)
 app.use(
 	helmet({
 		contentSecurityPolicy: {
@@ -170,13 +184,14 @@ app.use(globalLimiter)
 // Routes
 app.use("/api", healthRouter)
 app.use("/api/auth", createAuthRouter(authService))
-app.use("/api", createMeRouter(jwtService))
+app.use("/api", createMeRouter(jwtService, authService))
 app.use("/api", coursesRouter)
 app.use("/api", createCredentialsRouter(jwtService))
 app.use("/api", validatorRouter)
 app.use("/api", eventsRouter)
 app.use("/api/community", communityRouter)
 app.use("/api", createCommentsRouter(jwtService))
+app.use("/api", createPeerReviewRouter(jwtService))
 app.use("/api", leaderboardRouter)
 app.use("/api", governanceRouter)
 app.use("/api", scholarsRouter)
@@ -188,6 +203,7 @@ app.use("/api", createUploadRouter(jwtService))
 app.use("/api", enrollmentsRouter)
 app.use("/api", scholarshipsRouter)
 app.use("/api", treasuryRouter)
+app.use("/api", notificationsRouter)
 app.use("/api/wiki", wikiRouter)
 
 // Start event poller (non-prod only for now)

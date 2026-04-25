@@ -503,6 +503,9 @@ impl ScholarshipTreasury {
             .unwrap_or(0)
     }
 
+    /// Sets the minimum LRN (governance token) balance an applicant must hold to submit
+    /// a proposal. The value must be **strictly positive**; use [`clear_min_lrn_to_propose`]
+    /// to remove the requirement (same effect as the default: no minimum).
     pub fn set_min_lrn_to_propose(env: Env, admin: Address, min_lrn: i128) {
         Self::assert_initialized(&env);
 
@@ -510,13 +513,26 @@ impl ScholarshipTreasury {
         if admin != Self::admin(&env) {
             panic_with_error!(&env, Error::Unauthorized);
         }
-        if min_lrn < 0 {
+        if min_lrn <= 0 {
             panic_with_error!(&env, Error::InvalidAmount);
         }
 
         env.storage()
             .instance()
             .set(&MIN_LRN_TO_PROPOSE_KEY, &min_lrn);
+    }
+
+    /// Removes the minimum LRN requirement so any holder can submit (subject to other
+    /// proposal rules). This is the explicit admin path to "no minimum"; `set_min_lrn_to_propose(0)` is rejected.
+    pub fn clear_min_lrn_to_propose(env: Env, admin: Address) {
+        Self::assert_initialized(&env);
+
+        admin.require_auth();
+        if admin != Self::admin(&env) {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
+
+        env.storage().instance().remove(&MIN_LRN_TO_PROPOSE_KEY);
     }
 
     pub fn get_min_lrn_to_propose(env: Env) -> i128 {

@@ -1,7 +1,10 @@
 import { Router, type Response } from "express"
 import sanitizeHtml from "sanitize-html"
 import { pool } from "../db/index"
-import { createCommentBodySchema } from "../lib/zod-schemas"
+import {
+	createCommentBodySchema,
+	updateCommentBodySchema,
+} from "../lib/zod-schemas"
 import {
 	createRequireAuth,
 	type AuthRequest,
@@ -147,6 +150,52 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 				res.status(201).json(result.rows[0])
 			} catch (err) {
 				res.status(500).json({ error: "Failed to post comment" })
+			}
+		},
+	)
+
+	/**
+	 * @openapi
+	 * /api/comments/{id}:
+	 *   patch:
+	 *     summary: Edit own comment
+	 *     tags: [Comments]
+	 *     security: [{ bearerAuth: [] }]
+	 */
+	router.patch(
+		"/comments/:id",
+		requireAuth,
+		validate({
+			body: updateCommentBodySchema,
+		}),
+		async (req: AuthRequest, res: Response) => {
+			const { id } = req.params
+			const authorAddress = req.user?.address
+			const { content } = req.body as { content: string }
+			const safeContent = sanitizeHtml(content, {
+				allowedTags: [],
+				allowedAttributes: {},
+			})
+
+			if (content.length > maxCommentLength) {
+				return res.status(400).json({
+					error: "Comment must be 2,000 characters or fewer",
+				})
+			}
+
+			try {
+				const result = await pool.query(
+					`UPDATE comments SET content = $1 WHERE id = $2 AND author_address = $3 AND deleted_at IS NULL RETURNING *`,
+					[safeContent, id, authorAddress],
+				)
+				if (result.rows.length === 0) {
+					return res
+						.status(404)
+						.json({ error: "Comment not found or unauthorized" })
+				}
+				res.json(result.rows[0])
+			} catch (err) {
+				res.status(500).json({ error: "Failed to update comment" })
 			}
 		},
 	)

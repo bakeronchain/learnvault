@@ -108,6 +108,7 @@ describe("GET /api/courses", () => {
 			1,
 			expect.stringContaining("c.title ILIKE $1 OR c.description ILIKE $1"),
 			["%stellar%", 12, 0],
+			["%stellar%"],
 		)
 		expect(mockedQuery).toHaveBeenNthCalledWith(
 			2,

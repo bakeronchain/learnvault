@@ -2,6 +2,14 @@ import { useQuery } from "@tanstack/react-query"
 import React, { useEffect, useMemo, useState } from "react"
 import ReactMarkdown from "react-markdown"
 import { useNavigate } from "react-router-dom"
+import {
+	RadialBarChart,
+	RadialBar,
+	Legend,
+	ResponsiveContainer,
+	Tooltip,
+} from "recharts"
+import AddressDisplay from "../components/AddressDisplay"
 import TxHashLink from "../components/TxHashLink"
 import {
 	useAdminStats,
@@ -24,7 +32,8 @@ import {
 import { apiFetchJson } from "../lib/api"
 import { getAuthToken } from "../util/auth"
 import { shortenContractId } from "../util/contract"
-import AddressDisplay from "../components/AddressDisplay"
+
+const API_BASE = import.meta.env.VITE_SERVER_URL || "http://localhost:4000"
 
 type AdminSection =
 	| "courses"
@@ -32,6 +41,7 @@ type AdminSection =
 	| "users"
 	| "wiki"
 	| "treasury"
+	| "scholarships"
 	| "contracts"
 type CourseStatus = "draft" | "published"
 
@@ -75,9 +85,30 @@ const sectionDescriptions: Record<AdminSection, string> = {
 	milestones: "Review milestone reports and approvals.",
 	users: "Lookup learner profiles by wallet address.",
 	wiki: "Create and edit platform documentation and guides.",
-	treasury: "Monitor and manage live treasury controls.",
-	contracts: "Inspect deployed contract addresses and on-chain state.",
+	treasury: "Monitor and manage treasury controls.",
+	scholarships: "View scholarship program health metrics.",
+	contracts: "Inspect deployed on-chain contract records.",
 }
+
+const initialCourses: AdminCourse[] = [
+	{ id: 1, title: "Soroban Basics", status: "published", students: 84 },
+	{ id: 2, title: "Stellar Security", status: "draft", students: 0 },
+]
+
+const contractRecords: ContractRecord[] = [
+	{
+		name: "Scholarship Treasury",
+		tag: "prod",
+		address: "CXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+		updated: "2026-03-20",
+	},
+	{
+		name: "Governance Token",
+		tag: "prod",
+		address: "CYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY",
+		updated: "2026-03-20",
+	},
+]
 
 const STATUSES = ["pending", "approved", "rejected"] as const
 
@@ -146,7 +177,10 @@ const ConfirmDialog: React.FC<{
 			<p className="text-sm text-white/60 mb-1">
 				Learner:{" "}
 				<span className="font-mono text-white/90">
-					<AddressDisplay address={milestone.learnerAddress} showExplorerLink={false} />
+					<AddressDisplay
+						address={milestone.learnerAddress}
+						showExplorerLink={false}
+					/>
 				</span>
 			</p>
 			<p className="text-sm text-white/60 mb-4">
@@ -283,6 +317,7 @@ const Admin: React.FC = () => {
 							"users",
 							"wiki",
 							"treasury",
+							"scholarships",
 							"contracts",
 						] as const
 					).map((section) => (
@@ -311,6 +346,8 @@ const Admin: React.FC = () => {
 				{activeSection === "users" && <UserLookup />}
 				{activeSection === "wiki" && <WikiManagement />}
 				{activeSection === "treasury" && <TreasuryControls />}
+				{activeSection === "wiki" && <WikiManagement />}
+				{activeSection === "scholarships" && <ScholarshipMetrics />}
 				{activeSection === "contracts" && <ContractInfo />}
 			</main>
 		</div>
@@ -614,6 +651,7 @@ const MilestoneQueue: React.FC = () => {
 							<th className="py-3 px-4 font-medium">Course</th>
 							<th className="py-3 px-4 font-medium">Submitted</th>
 							<th className="py-3 px-4 font-medium">Evidence</th>
+							<th className="py-3 px-4 font-medium">Peer signals</th>
 							<th className="py-3 px-4 font-medium">Status</th>
 							<th className="py-3 px-4 font-medium">Actions</th>
 						</tr>
@@ -622,7 +660,7 @@ const MilestoneQueue: React.FC = () => {
 						{loading && (
 							<tr>
 								<td
-									colSpan={6}
+									colSpan={7}
 									className="py-12 text-center text-sm text-white/40 animate-pulse"
 								>
 									Loading milestones…
@@ -632,7 +670,7 @@ const MilestoneQueue: React.FC = () => {
 
 						{!loading && milestones.length === 0 && (
 							<tr>
-								<td colSpan={6} className="py-12 text-center">
+								<td colSpan={7} className="py-12 text-center">
 									<p className="text-white/40 text-sm">
 										No milestone submissions found.
 									</p>
@@ -662,10 +700,10 @@ const MilestoneQueue: React.FC = () => {
 										className="border-b border-white/5 hover:bg-white/3 transition-colors"
 									>
 										<td className="py-3 px-4">
-											<AddressDisplay 
-												address={milestone.learnerAddress} 
-												prefixLength={8} 
-												suffixLength={4} 
+											<AddressDisplay
+												address={milestone.learnerAddress}
+												prefixLength={8}
+												suffixLength={4}
 												showExplorerLink={false}
 												addressClassName="text-xs text-white/50"
 											/>
@@ -678,6 +716,10 @@ const MilestoneQueue: React.FC = () => {
 										</td>
 										<td className="py-3 px-4">
 											<EvidenceLink value={milestone.evidenceLink} />
+										</td>
+										<td className="py-3 px-4 text-xs font-mono text-white/55 whitespace-nowrap">
+											+{milestone.peerApprovalCount} / −
+											{milestone.peerRejectionCount}
 										</td>
 										<td className="py-3 px-4">
 											<span
@@ -760,6 +802,8 @@ const MilestoneQueue: React.FC = () => {
 		</section>
 	)
 }
+
+export default Admin
 
 const UserLookup: React.FC = () => {
 	const [search, setSearch] = useState("")
@@ -1416,4 +1460,124 @@ const WikiManagement: React.FC = () => {
 	)
 }
 
-export default Admin
+interface ScholarshipMetricsData {
+	active_scholarships: number
+	total_scholars: number
+	completion_rate: number
+	avg_milestones_per_scholar: number
+	dropout_rate: number
+	total_usdc_disbursed: number
+}
+
+const ScholarshipMetrics: React.FC = () => {
+	const [metrics, setMetrics] = useState<ScholarshipMetricsData | null>(null)
+	const [loading, setLoading] = useState(true)
+	const [error, setError] = useState<string | null>(null)
+
+	useEffect(() => {
+		const fetchMetrics = async () => {
+			try {
+				const res = await fetch(`${API_BASE}/api/scholarships/metrics`)
+				if (!res.ok) throw new Error(`HTTP ${res.status}`)
+				const data = await res.json()
+				setMetrics(data)
+			} catch (err) {
+				setError("Failed to load metrics")
+			} finally {
+				setLoading(false)
+			}
+		}
+		void fetchMetrics()
+	}, [])
+
+	const chartData = metrics
+		? [
+				{
+					name: "Completion Rate",
+					value: metrics.completion_rate,
+					fill: "#00d2ff",
+				},
+				{
+					name: "Dropout Rate",
+					value: metrics.dropout_rate,
+					fill: "#ff4d4d",
+				},
+			]
+		: []
+
+	return (
+		<section aria-busy={loading}>
+			<h2 className="text-2xl font-black mb-6">Scholarship Program Health</h2>
+
+			{loading && (
+				<div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+					{Array.from({ length: 6 }).map((_, i) => (
+						<div
+							key={i}
+							className="h-24 rounded-2xl bg-white/5 animate-pulse"
+						/>
+					))}
+				</div>
+			)}
+
+			{error && <p className="text-red-400 mb-6">{error}</p>}
+
+			{metrics && (
+				<>
+					<div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+						{[
+							{
+								label: "Active Scholarships",
+								value: metrics.active_scholarships,
+							},
+							{ label: "Total Scholars", value: metrics.total_scholars },
+							{
+								label: "Completion Rate",
+								value: `${metrics.completion_rate}%`,
+							},
+							{
+								label: "Avg Milestones / Scholar",
+								value: metrics.avg_milestones_per_scholar,
+							},
+							{ label: "Dropout Rate", value: `${metrics.dropout_rate}%` },
+							{
+								label: "Total USDC Disbursed",
+								value: `$${(metrics.total_usdc_disbursed / 1e7).toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
+							},
+						].map(({ label, value }) => (
+							<div
+								key={label}
+								className="glass-card p-5 rounded-2xl border border-white/5"
+							>
+								<p className="text-xs uppercase tracking-widest text-white/40 mb-1">
+									{label}
+								</p>
+								<p className="text-2xl font-black text-brand-cyan">{value}</p>
+							</div>
+						))}
+					</div>
+
+					<div className="glass-card p-6 rounded-2xl border border-white/5">
+						<h3 className="text-lg font-bold mb-4">Completion vs Dropout</h3>
+						<ResponsiveContainer width="100%" height={260}>
+							<RadialBarChart
+								cx="50%"
+								cy="50%"
+								innerRadius="30%"
+								outerRadius="80%"
+								data={chartData}
+							>
+								<RadialBar
+									dataKey="value"
+									label={{ position: "insideStart", fill: "#fff" }}
+								/>
+								<Legend />
+								<Tooltip formatter={(value: number) => `${value}%`} />
+							</RadialBarChart>
+						</ResponsiveContainer>
+					</div>
+				</>
+			)}
+		</section>
+	)
+}

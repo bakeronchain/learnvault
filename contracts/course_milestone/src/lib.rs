@@ -340,7 +340,7 @@ impl CourseMilestone {
             .get::<_, MilestoneStatus>(&state_key)
             .unwrap_or(MilestoneStatus::NotStarted);
 
-        if current_state != MilestoneStatus::NotStarted {
+        if current_state == MilestoneStatus::Pending || current_state == MilestoneStatus::Approved {
             panic_with_error!(&env, Error::DuplicateSubmission);
         }
 

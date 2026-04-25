@@ -44,16 +44,29 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 	 */
 	router.get("/proposals/:proposalId/comments", async (req, res) => {
 		const { proposalId } = req.params
+		const pageParam = parseInt(req.query.page as string) || 1
 		const limit = Math.min(parseInt(req.query.limit as string) || 50, 100)
-		const offset = Math.max(parseInt(req.query.offset as string) || 0, 0)
+		const offsetParam = parseInt(req.query.offset as string)
+		const offset = !isNaN(offsetParam) && offsetParam >= 0 ? offsetParam : (pageParam - 1) * limit
+		const page = !isNaN(offsetParam) && offsetParam >= 0 ? Math.floor(offset / limit) + 1 : pageParam
+
 		try {
+			const countResult = await pool.query(
+				`SELECT COUNT(*)::int as count FROM comments WHERE proposal_id = $1 AND deleted_at IS NULL`,
+				[proposalId],
+			)
+			const total = countResult.rows[0]?.count || 0
+
 			const result = await pool.query(
 				`SELECT * FROM comments WHERE proposal_id = $1 AND deleted_at IS NULL 
 				 AND id NOT IN (SELECT content_id FROM flagged_content WHERE content_type = 'comment' AND is_hidden = TRUE)
 				 ORDER BY is_pinned DESC, created_at ASC LIMIT $2 OFFSET $3`,
 				[proposalId, limit, offset],
 			)
-			res.json(result.rows)
+			res.json({
+				data: result.rows,
+				pagination: { page, limit, total },
+			})
 		} catch (err) {
 			res.status(500).json({ error: "Failed to fetch comments" })
 		}

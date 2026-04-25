@@ -41,7 +41,6 @@ import { coursesRouter } from "./routes/courses.routes"
 import { createCredentialsRouter } from "./routes/credentials.routes"
 import { enrollmentsRouter } from "./routes/enrollments.routes"
 import { eventsRouter } from "./routes/events.routes"
-import { createForumRouter } from "./routes/forum.routes"
 import { governanceRouter } from "./routes/governance.routes"
 import { healthRouter } from "./routes/health.routes"
 import { leaderboardRouter } from "./routes/leaderboard.routes"
@@ -82,22 +81,8 @@ setupConsoleRequestTracing()
 
 const isProduction = env.NODE_ENV === "production"
 
-// Configure allowed CORS origins
-const allowedOrigins = [
-	env.FRONTEND_URL || env.CORS_ORIGIN || "http://localhost:5173",
-	"https://learnvault.app",
-	"https://www.learnvault.app",
-]
+import { allowedOrigins } from "./config/cors-config"
 
-// In development, also allow common local dev ports
-if (!isProduction) {
-	allowedOrigins.push(
-		"http://localhost:5173",
-		"http://localhost:3000",
-		"http://localhost:5174",
-		"http://127.0.0.1:5173",
-	)
-}
 
 let jwtPrivateKey = env.JWT_PRIVATE_KEY
 let jwtPublicKey = env.JWT_PUBLIC_KEY
@@ -188,7 +173,6 @@ app.use("/api", healthRouter)
 app.use("/api/auth", createAuthRouter(authService))
 app.use("/api", createMeRouter(jwtService, authService))
 app.use("/api", coursesRouter)
-app.use("/api", createForumRouter(jwtService))
 app.use("/api", createCredentialsRouter(jwtService))
 app.use("/api", validatorRouter)
 app.use("/api", eventsRouter)
@@ -205,6 +189,7 @@ app.use("/api", scholarsRouter)
 app.use("/api", createUserProfileRouter(jwtService))
 app.use("/api", createUploadRouter(jwtService))
 app.use("/api", enrollmentsRouter)
+app.use("/api", profilesRouter)
 app.use("/api", scholarshipsRouter)
 app.use("/api", treasuryRouter)
 app.use("/api", notificationsRouter)

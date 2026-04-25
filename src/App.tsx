@@ -112,7 +112,7 @@ const AppLayout = () => (
 		<NetworkPreconnect />
 		<TestnetBanner />
 		<NavBar />
-		<main className="flex-1 relative z-10">
+		<main id="main-content" className="flex-1 relative z-10" tabIndex={-1}>
 			<Outlet />
 		</main>
 		<Footer />

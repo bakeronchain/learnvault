@@ -139,10 +139,7 @@ export const getCourses = async (
 			if (!difficultyValues.has(difficulty)) {
 				res.status(200).json({
 					data: [],
-					page,
-					limit,
-					total: 0,
-					totalPages: 0,
+					pagination: { page, limit, total: 0 },
 				})
 				return
 			}
@@ -188,10 +185,7 @@ export const getCourses = async (
 
 		res.status(200).json({
 			data: rowsResult.rows.map(toCourse),
-			page,
-			limit,
-			total,
-			totalPages,
+			pagination: { page, limit, total },
 		})
 	} catch {
 		res.status(500).json({ error: "Internal server error" })

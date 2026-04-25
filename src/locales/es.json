@@ -1,0 +1,138 @@
+{
+	"nav": {
+		"contractExplorer": "Explorador de Contratos",
+		"txExplorer": "Explorador de Transacciones",
+		"github": "GitHub",
+		"tutorial": "Tutorial",
+		"viewDocs": "Ver Documentación",
+		"debug": "Depurar Contratos",
+		"learn": "Aprender",
+		"dao": "DAO",
+		"leaderboard": "Clasificación",
+		"profile": "Mi Perfil",
+		"courses": "Cursos",
+		"treasury": "Tesorería",
+		"discord": "Discord",
+		"twitter": "Twitter",
+		"docs": "Documentación"
+	},
+	"home": {
+		"heroTitle": "¡Yay! Estás en Stellar",
+		"heroDesc": "Una plantilla de desarrollo local diseñada para ayudarte a crear dApps en la red Stellar. Este entorno te permite probar fácilmente conexiones de billetera, interacciones con contratos inteligentes, verificaciones de transacciones, etc.",
+		"courseProgress": {
+			"title": "Progreso del Curso (Prueba del Issue 55)",
+			"desc": "Sigue tu viaje de aprendizaje y gana recompensas LRN completando hitos en la cadena."
+		},
+		"milestones": {
+			"1": "Completar Lección 1",
+			"2": "Aprobar Cuestionario 1",
+			"3": "Construir tu primer contrato",
+			"locked": "Completa los hitos anteriores para desbloquear.",
+			"inProgress": "Actualmente trabajando en este hito.",
+			"submittingText": "Enviando TX...",
+			"markComplete": "Marcar como Completado",
+			"completedText": "¡Completado exitosamente!",
+			"tx": "TX",
+			"lrnReward": "+{{amount}} LRN"
+		},
+		"sampleContracts": {
+			"title": "Contratos de Ejemplo",
+			"guess": "Adivina el Número:",
+			"guessDesc1": "Interactúa con el contrato de ejemplo del ",
+			"guessLink": "Tutorial de LearnVault",
+			"guessDesc2": " usando un cliente de contrato generado automáticamente.",
+			"other": "O echa un vistazo a otros contratos de ejemplo para empezar:",
+			"oz": "Contratos de ejemplo de OpenZeppelin",
+			"soroban": "Contratos de ejemplo de Soroban"
+		},
+		"startBuilding": {
+			"title": "Empieza a Construir",
+			"step1": "Agrega tu contrato bajo ",
+			"step2": "Los contratos se compilan por LearnVault cuando ejecutas ",
+			"step3": "Los cambios se recompilan automáticamente por ",
+			"step4": "Interactúa con tu contrato inmediatamente en el Explorador de Contratos",
+			"watch": "Mira el proceso completo en nuestro ",
+			"youtube": "tutorial de YouTube",
+			"inspired": "Inspírate con nuestra vitrina de ",
+			"examples": "frontends de ejemplo",
+			"deploy": "¿Listo para desplegar? ",
+			"mainnet": "Lee la guía de despliegue en mainnet"
+		},
+		"footer": {
+			"invoke": "Invoca tu contrato inteligente usando el ",
+			"contractLink": "Explorador de Contratos",
+			"browse": "Navega tus transacciones locales con el ",
+			"txLink": "Explorador de Transacciones"
+		}
+	},
+	"connect": {
+		"connectWallet": "Conectar Billetera",
+		"fund": "Fondear Cuenta",
+		"faucetLoading": "Fondeando...",
+		"funded": "¡Cuenta fondeada exitosamente!",
+		"fundErrorDetail": "Error al fondear la cuenta: {{detail}}",
+		"fundErrorUnknown": "Error al fondear la cuenta: Error desconocido",
+		"fundErrorRetry": "Error al fondear la cuenta. Por favor, inténtalo de nuevo.",
+		"alreadyFunded": "La cuenta ya está fondeada",
+		"local": "Local",
+		"networkConnect": "Conecta tu billetera usando esta red.",
+		"networkMismatch": "La billetera está en {{wallet}}, conéctate a {{app}} en su lugar."
+	},
+	"network": {
+		"testnetWarning": "Estás en Stellar Testnet — los tokens no tienen valor real",
+		"futurenetWarning": "Estás en Stellar Futurenet — red experimental para pruebas",
+		"localWarning": "Estás en Red Local — solo para desarrollo"
+	},
+	"usdc": {
+		"getTestUSDC": "Obtener USDC de Prueba",
+		"minting": "Acuñando...",
+		"mintSuccess": "{{amount}} USDC acuñados exitosamente a {{address}}...",
+		"mintError": "Error al acuñar USDC: {{error}}",
+		"tooltip": "Obtén {{amount}} tokens USDC de prueba para probar donaciones y operaciones de tesorería"
+	},
+	"wallet": {
+		"loading": "Cargando...",
+		"connect": "Conectar Billetera",
+		"balance": "Saldo de Billetera: {{amount}} LRN",
+		"connectedAs": "Conectado como ",
+		"disconnectPrompt": ". ¿Quieres desconectarte?",
+		"disconnect": "Desconectar",
+		"cancel": "Cancelar"
+	},
+	"pages": {
+		"learn": {
+			"title": "Aprender",
+			"desc": "Esta es la página de Aprender."
+		},
+		"dao": {
+			"title": "DAO",
+			"desc": "Esta es la página de DAO.",
+			"lastUpdated": "Última actualización: {{time}}"
+		},
+		"leaderboard": {
+			"title": "Clasificación",
+			"desc": "Los mejores estudiantes clasificados por saldo de tokens LRN. Gana tu lugar.",
+			"rank": "Clasificación",
+			"learner": "Estudiante",
+			"lrnBalance": "Saldo LRN",
+			"courses": "Cursos",
+			"joined": "Unido",
+			"searchPlaceholder": "Buscar por dirección de billetera...",
+			"filterAll": "Todos los Tiempos",
+			"filterMonth": "Este Mes",
+			"filterWeek": "Esta Semana",
+			"myRank": "Mi Clasificación",
+			"loadMore": "Cargar Más",
+			"prev": "Anterior",
+			"next": "Siguiente",
+			"noResults": "No se encontraron estudiantes que coincidan con tu búsqueda.",
+			"connectPrompt": "Conecta tu billetera para ver tu clasificación.",
+			"notRanked": "Aún no clasificado",
+			"page": "Página {{current}} de {{total}}"
+		},
+		"profile": {
+			"title": "Mi Perfil",
+			"desc": "Esta es la página de Mi Perfil."
+		}
+	}
+}

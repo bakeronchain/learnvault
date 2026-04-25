@@ -1,43 +1,9 @@
 import { Router } from "express"
 
-import {
-	applyForScholarship,
-	getScholarshipMetrics,
-} from "../controllers/scholarships.controller"
+import { applyForScholarship } from "../controllers/scholarships.controller"
 import { scholarshipApplyLimiter } from "../middleware/rate-limit.middleware"
 
 export const scholarshipsRouter = Router()
-
-/**
- * @openapi
- * /api/scholarships/metrics:
- *   get:
- *     summary: Scholarship program health metrics
- *     tags: [Scholarships]
- *     responses:
- *       200:
- *         description: Aggregated scholarship metrics
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 active_scholarships:
- *                   type: integer
- *                 total_scholars:
- *                   type: integer
- *                 completion_rate:
- *                   type: number
- *                 avg_milestones_per_scholar:
- *                   type: number
- *                 dropout_rate:
- *                   type: number
- *                 total_usdc_disbursed:
- *                   type: number
- */
-scholarshipsRouter.get("/scholarships/metrics", (req, res) => {
-	void getScholarshipMetrics(req, res)
-})
 
 /**
  * @openapi

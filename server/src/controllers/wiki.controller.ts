@@ -61,7 +61,7 @@ export const getWikiPageBySlug = async (req: Request, res: Response): Promise<vo
 			[slug]
 		)
 
-		if ((result as any).rowCount === 0) {
+		if (result.rowCount === 0) {
 			res.status(404).json({ error: "Wiki page not found" })
 			return
 		}
@@ -118,7 +118,7 @@ export const updateWikiPage = async (req: Request, res: Response): Promise<void>
 			[title, slug, content, category, isPublished, id]
 		)
 
-		if ((result as any).rowCount === 0) {
+		if (result.rowCount === 0) {
 			res.status(404).json({ error: "Wiki page not found" })
 			return
 		}
@@ -139,7 +139,7 @@ export const deleteWikiPage = async (req: Request, res: Response): Promise<void>
 		const { id } = req.params
 		const result = await pool.query("DELETE FROM wiki_pages WHERE id = $1", [id])
 
-		if ((result as any).rowCount === 0) {
+		if (result.rowCount === 0) {
 			res.status(404).json({ error: "Wiki page not found" })
 			return
 		}

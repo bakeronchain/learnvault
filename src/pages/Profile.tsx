@@ -91,7 +91,7 @@ const Profile: React.FC = () => {
 		} finally {
 			setIsLoading(false)
 		}
-	}, [walletAddress])
+	}, [displayAddress])
 
 	useEffect(() => {
 		void fetchCredentials()

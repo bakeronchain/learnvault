@@ -5,7 +5,6 @@ import { type MilestoneReportFormValues } from "../types/milestone"
 type MilestoneReportFormProps = {
 	isSubmitting: boolean
 	onSubmit: (values: MilestoneReportFormValues) => Promise<void>
-	initialValues?: Partial<MilestoneReportFormValues>
 }
 
 const emptyValues: MilestoneReportFormValues = {
@@ -20,12 +19,8 @@ const emptyValues: MilestoneReportFormValues = {
 export default function MilestoneReportForm({
 	isSubmitting,
 	onSubmit,
-	initialValues,
 }: MilestoneReportFormProps) {
-	const [values, setValues] = useState<MilestoneReportFormValues>({
-		...emptyValues,
-		...initialValues,
-	})
+	const [values, setValues] = useState<MilestoneReportFormValues>(emptyValues)
 	const [error, setError] = useState<string | null>(null)
 
 	const updateValue = <K extends keyof MilestoneReportFormValues>(
@@ -68,9 +63,7 @@ export default function MilestoneReportForm({
 
 		try {
 			await onSubmit(values)
-			if (!initialValues) {
-				setValues(emptyValues)
-			}
+			setValues(emptyValues)
 		} catch (error) {
 			setError(
 				error instanceof Error

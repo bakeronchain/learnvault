@@ -1,5 +1,4 @@
 import { getAuthToken } from "../util/auth"
-import { generateRequestId } from "../utils/errors"
 
 const readEnv = (...keys: string[]): string => {
 	for (const key of keys) {
@@ -43,25 +42,16 @@ export async function apiFetchJson<T>(
 	options: RequestInit & { auth?: boolean } = {},
 ): Promise<T> {
 	const { auth = false, headers, ...init } = options
-	const requestId = generateRequestId()
-	const baseHeaders = auth
-		? createAuthHeaders(headers)
-		: new Headers(headers as HeadersInit)
-	baseHeaders.set("X-Request-ID", requestId)
-
 	const response = await fetch(buildApiUrl(path), {
 		...init,
-		headers: baseHeaders,
+		headers: auth ? createAuthHeaders(headers) : headers,
 	})
 	const payload = (await response.json().catch(() => ({}))) as T & {
 		error?: string
 	}
 
 	if (!response.ok) {
-		const serverMessage = payload.error || `Request failed for ${path}`
-		const err = new Error(`${serverMessage} (ref: ${requestId})`)
-		;(err as Error & { requestId: string }).requestId = requestId
-		throw err
+		throw new Error(payload.error || `Request failed for ${path}`)
 	}
 
 	return payload

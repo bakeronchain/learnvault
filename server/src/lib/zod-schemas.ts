@@ -109,9 +109,49 @@ export const approveMilestoneBodySchema = z
 	})
 	.strict()
 
+const milestoneIdsSchema = z
+	.array(requiredInteger("milestoneIds"))
+	.min(1, "milestoneIds must include at least one milestone id")
+	.superRefine((ids, ctx) => {
+		const seen = new Set<number>()
+		ids.forEach((id, index) => {
+			if (id <= 0) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					path: [index],
+					message: "milestoneIds entries must be positive integers",
+				})
+			}
+
+			if (seen.has(id)) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					path: [index],
+					message: "milestoneIds must not contain duplicates",
+				})
+				return
+			}
+
+			seen.add(id)
+		})
+	})
+
+export const batchApproveMilestonesBodySchema = z
+	.object({
+		milestoneIds: milestoneIdsSchema,
+	})
+	.strict()
+
 export const rejectMilestoneBodySchema = z
 	.object({
 		reason: requiredString("reason"),
+	})
+	.strict()
+
+export const batchRejectMilestonesBodySchema = z
+	.object({
+		milestoneIds: milestoneIdsSchema,
+		reason: optionalTrimmedString("reason"),
 	})
 	.strict()
 
@@ -210,45 +250,3 @@ export const enrollmentBodySchema = z
 		tx_hash: requiredString("tx_hash"),
 	})
 	.strict()
-
-const difficultyValues = ["beginner", "intermediate", "advanced"] as const
-
-const courseImportRowSchema = z
-	.object({
-		title: requiredString("title"),
-		slug: requiredString("slug").regex(
-			/^[a-zA-Z0-9-_]+$/,
-			"slug may contain only letters, numbers, hyphens, and underscores",
-		),
-		track: requiredString("track"),
-		difficulty: z
-			.string()
-			.trim()
-			.transform((value) => value.toLowerCase())
-			.refine(
-				(value) => difficultyValues.includes(value as typeof difficultyValues[number]),
-				`difficulty must be one of: ${difficultyValues.join(", ")}`,
-			),
-		description: z.string().optional(),
-		coverImage: z
-			.string()
-			.trim()
-			.min(1)
-			.optional()
-			.nullable(),
-		published: z.boolean().optional(),
-	})
-	.strict()
-
-export const courseBulkImportBodySchema = z.union([
-	z.object({
-		courses: z.array(courseImportRowSchema).min(1, "courses are required"),
-		preview: z.boolean().optional(),
-	}).strict(),
-	z.object({
-		csv: z.string().min(1, "csv is required"),
-		preview: z.boolean().optional(),
-	}).strict(),
-])
-
-export { difficultyValues }

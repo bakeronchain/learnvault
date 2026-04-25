@@ -1,9 +1,6 @@
 import { type Request, type Response } from "express"
 
-import { logger } from "../lib/logger"
 import { pool } from "../db/index"
-
-const log = logger.child({ module: "scholars" })
 import { milestoneStore } from "../db/milestone-store"
 import { socialStore } from "../db/social-store"
 import { listEscrowTimeoutsForScholar } from "../services/escrow-timeout.service"
@@ -81,7 +78,7 @@ export async function getScholarMilestones(
 				[reportIds],
 			)
 			lastDecisionByReportId = Object.fromEntries(
-				(auditResult?.rows ?? []).map((row) => [
+				auditResult.rows.map((row) => [
 					Number(row.report_id),
 					{
 						decided_at: row.decided_at,
@@ -116,7 +113,7 @@ export async function getScholarMilestones(
 
 		res.status(200).json({ milestones })
 	} catch (err) {
-		log.error({ err }, "getScholarMilestones error")
+		console.error("[scholars] getScholarMilestones error:", err)
 		res.status(500).json({ error: "Failed to fetch scholar milestones" })
 	}
 }
@@ -151,7 +148,7 @@ export async function getScholarsLeaderboard(
 		const rankingsValues = [...whereValues, limit, offset]
 		const rankingsResult = await pool.query(
 			`SELECT
-				ROW_NUMBER() OVER (ORDER BY lrn_balance DESC, address ASC) AS rank,
+				ROW_NUMBER() OVER (ORDER BY lrn_balance DESC, address ASC) + $${whereValues.length + 2} AS rank,
 				address,
 				lrn_balance,
 				courses_completed
@@ -249,7 +246,7 @@ export async function getScholarProfile(
 			is_following: isFollowing,
 		})
 	} catch (error) {
-		log.error({ err: error }, "Error fetching scholar profile")
+		console.error("[scholars] Error fetching scholar profile:", error)
 		res.status(500).json({ error: "Failed to fetch scholar profile" })
 	}
 }
@@ -270,7 +267,7 @@ export async function getScholarCredentials(
 			await stellarContractService.getScholarCredentials(address)
 		res.status(200).json({ credentials })
 	} catch (error) {
-		log.error({ err: error }, "Error fetching scholar credentials")
+		console.error("[scholars] Error fetching scholar credentials:", error)
 		res.status(500).json({ error: "Failed to fetch scholar credentials" })
 	}
 }

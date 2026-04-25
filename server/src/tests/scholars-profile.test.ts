@@ -4,28 +4,51 @@ import request from "supertest"
 // Mock internal modules
 jest.mock("../db/index", () => ({
 	pool: {
-		query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+		query: jest.fn().mockResolvedValue({ rows: [] }),
+	},
+}))
+
+jest.mock("../db/social-store", () => ({
+	socialStore: {
+		getFollowCounts: jest
+			.fn()
+			.mockResolvedValue({ followerCount: 0, followingCount: 0 }),
+		isFollowing: jest.fn().mockResolvedValue(false),
 	},
 }))
 
 jest.mock("../services/stellar-contract.service", () => ({
 	stellarContractService: {
 		getLearnTokenBalance: jest.fn().mockResolvedValue("10000000000"),
-		getEnrolledCourses: jest.fn().mockResolvedValue(["stellar-basics", "defi-101"]),
-		getScholarCredentials: jest.fn().mockResolvedValue([{ token_id: 1, course_id: "stellar-basics", issued_at: "2026-03-26T15:00:00Z" }]),
+		getEnrolledCourses: jest
+			.fn()
+			.mockResolvedValue(["stellar-basics", "defi-101"]),
+		getScholarCredentials: jest.fn().mockResolvedValue([
+			{
+				token_id: 1,
+				course_id: "stellar-basics",
+				issued_at: "2026-03-26T15:00:00Z",
+			},
+		]),
 	},
 }))
 
 import { pool } from "../db/index"
-import { scholarsRouter } from "../routes/scholars.routes"
-
 const mockedQuery = pool.query as jest.Mock
 
 // We need a helper to build the app with mocked dependencies
-const buildApp = (): Express => {
+import { createScholarsRouter } from "../routes/scholars.routes"
+import { type JwtService } from "../services/jwt.service"
+
+const testJwtService: JwtService = {
+	signWalletToken: () => "mock-token",
+	verifyWalletToken: (token: string) => ({ sub: "GSCHOLAR1" }),
+}
+
+const buildApp = (): express.Express => {
 	const app = express()
 	app.use(express.json())
-	app.use("/api", scholarsRouter)
+	app.use("/api", createScholarsRouter(testJwtService))
 	return app
 }
 
@@ -55,7 +78,16 @@ describe("GET /api/scholars/:address", () => {
 			enrolled_courses: ["stellar-basics", "defi-101"],
 			completed_milestones: 1,
 			pending_milestones: 1,
-			credentials: [{ token_id: 1, course_id: "stellar-basics", issued_at: "2026-03-26T15:00:00Z" }],
+			credentials: [
+				{
+					token_id: 1,
+					course_id: "stellar-basics",
+					issued_at: "2026-03-26T15:00:00Z",
+				},
+			],
+			follower_count: 0,
+			following_count: 0,
+			is_following: false,
 			joined_at: "2026-01-15T10:00:00.000Z",
 		})
 	})

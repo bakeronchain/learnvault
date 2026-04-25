@@ -32,7 +32,7 @@ const ALLOWED_ORIGINS = [ALLOWED_ORIGIN]
 
 const testJwtService = {
 	signWalletToken: (addr: string) => jwt.sign({ sub: addr }, JWT_SECRET),
-	verifyWalletToken: async (token: string) => {
+	verifyWalletToken: (token: string) => {
 		const d = jwt.verify(token, JWT_SECRET) as {
 			sub?: string
 			address?: string
@@ -41,7 +41,6 @@ const testJwtService = {
 		if (!sub) throw new Error("Invalid token")
 		return { sub }
 	},
-	revokeToken: jest.fn().mockResolvedValue(undefined),
 }
 
 function validToken(address = "GUSER123") {
@@ -206,9 +205,8 @@ describe("CSRF posture — bearer-only auth model", () => {
 		it("does not gate GETs on Referer (reads are not state-changing)", async () => {
 			// Even with an untrusted Referer, a GET passes — the middleware
 			// short-circuits on non-state-changing methods.
-			const { createRequireTrustedOrigin: make } = await import(
-				"../middleware/csrf.middleware"
-			)
+			const { createRequireTrustedOrigin: make } =
+				await import("../middleware/csrf.middleware")
 			const mw = make(ALLOWED_ORIGINS)
 			const req = {
 				method: "GET",

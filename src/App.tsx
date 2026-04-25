@@ -6,6 +6,7 @@ import NavBar from "./components/NavBar"
 import NetworkPreconnect from "./components/NetworkPreconnect"
 import { ToastProvider } from "./components/Toast/ToastProvider"
 import { WalletToastWatcher } from "./components/WalletToastWatcher"
+import { useLocalizeDocumentAttributes } from "./hooks/useLocalizeDocumentAttributes"
 
 const Admin = lazy(() => import("./pages/Admin"))
 const Community = lazy(() => import("./pages/Community"))
@@ -36,6 +37,8 @@ const renderRoute = (element: ReactNode) => (
 )
 
 function App() {
+	useLocalizeDocumentAttributes()
+
 	return (
 		<ToastProvider>
 			<WalletToastWatcher />

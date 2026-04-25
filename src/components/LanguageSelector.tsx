@@ -42,6 +42,9 @@ export const LanguageSelector: React.FC = () => {
 				<option value="en" style={{ color: "#000" }}>
 					🇺🇸 English
 				</option>
+				<option value="es" style={{ color: "#000" }}>
+					🇪🇸 Español
+				</option>
 				<option value="fr" style={{ color: "#000" }}>
 					🇫🇷 Français
 				</option>

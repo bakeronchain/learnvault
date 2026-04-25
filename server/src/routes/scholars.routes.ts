@@ -12,12 +12,16 @@ import {
 	unfollowScholar,
 	getFollowStatus,
 } from "../controllers/social.controller"
-import { createRequireAuth } from "../middleware/auth.middleware"
+import {
+	createRequireAuth,
+	createOptionalAuth,
+} from "../middleware/auth.middleware"
 import { type JwtService } from "../services/jwt.service"
 
 export function createScholarsRouter(jwtService: JwtService): Router {
 	const router = Router()
 	const requireAuth = createRequireAuth(jwtService)
+	const optionalAuth = createOptionalAuth(jwtService)
 
 	/**
 	 * @openapi
@@ -39,7 +43,7 @@ export function createScholarsRouter(jwtService: JwtService): Router {
 	 *     summary: Get scholar profile
 	 *     description: Returns a scholar's on-chain balances, enrolled courses, milestone stats, credentials, and join date.
 	 */
-	router.get("/scholars/:address", (req, res) => {
+	router.get("/scholars/:address", optionalAuth, (req, res) => {
 		void getScholarProfile(req, res)
 	})
 

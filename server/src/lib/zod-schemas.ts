@@ -1,22 +1,35 @@
 import { z } from "zod"
 
-const requiredString = (field: string) =>
-	z
+const requiredString = (field: string, maxLength?: number) => {
+	const schema = z
 		.string({
 			required_error: `${field} is required`,
 			invalid_type_error: `${field} must be a string`,
 		})
 		.trim()
 		.min(1, `${field} is required`)
+	
+	if (maxLength) {
+		return schema.max(maxLength, `${field} must be ${maxLength} characters or fewer`)
+	}
+	
+	return schema
+}
 
-const optionalTrimmedString = (field: string) =>
-	z
+const optionalTrimmedString = (field: string, maxLength?: number) => {
+	const schema = z
 		.string({
 			invalid_type_error: `${field} must be a string`,
 		})
 		.trim()
 		.min(1, `${field} cannot be empty`)
-		.optional()
+	
+	if (maxLength) {
+		return schema.max(maxLength, `${field} must be ${maxLength} characters or fewer`).optional()
+	}
+	
+	return schema.optional()
+}
 
 const requiredInteger = (field: string) =>
 	z
@@ -44,6 +57,19 @@ export const milestoneReportIdParamSchema = z
 	})
 	.strict()
 
+export const peerReviewSubmitBodySchema = z
+	.object({
+		verdict: z.enum(["approve", "reject"], {
+			required_error: "verdict is required",
+			invalid_type_error: "verdict must be approve or reject",
+		}),
+		comment: z
+			.string()
+			.max(500, "comment must be 500 characters or fewer")
+			.optional(),
+	})
+	.strict()
+
 export const validateMilestoneSchema = z.object({
 	courseId: z.string().cuid({ message: "Invalid course ID format" }),
 	learnerAddress: z.string().min(1),
@@ -52,17 +78,18 @@ export const validateMilestoneSchema = z.object({
 
 export const legacyMilestoneSubmitBodySchema = z
 	.object({
-		scholarAddress: requiredString("scholarAddress"),
-		courseId: requiredString("courseId"),
+		scholarAddress: requiredString("scholarAddress").max(100),
+		courseId: requiredString("courseId").max(100),
 		milestoneId: requiredInteger("milestoneId"),
 		evidenceGithub: z
 			.string({
 				invalid_type_error: "evidenceGithub must be a string",
 			})
 			.url("evidenceGithub must be a valid URL")
+			.max(500, "evidenceGithub must be 500 characters or fewer")
 			.optional(),
-		evidenceIpfsCid: optionalTrimmedString("evidenceIpfsCid"),
-		evidenceDescription: optionalTrimmedString("evidenceDescription"),
+		evidenceIpfsCid: optionalTrimmedString("evidenceIpfsCid", 100),
+		evidenceDescription: optionalTrimmedString("evidenceDescription", 2000),
 	})
 	.strict()
 	.superRefine((data, ctx) => {
@@ -90,8 +117,8 @@ export const legacyMilestoneSubmitBodySchema = z
 
 export const milestoneSubmitBodySchema = z
 	.object({
-		learner_address: requiredString("learner_address"),
-		course_id: requiredString("course_id"),
+		learner_address: requiredString("learner_address", 100),
+		course_id: requiredString("course_id", 100),
 		milestone_id: requiredInteger("milestone_id"),
 		evidence_url: z
 			.string({
@@ -99,13 +126,14 @@ export const milestoneSubmitBodySchema = z
 				invalid_type_error: "evidence_url must be a string",
 			})
 			.trim()
-			.url("evidence_url must be a valid URL"),
+			.url("evidence_url must be a valid URL")
+			.max(500, "evidence_url must be 500 characters or fewer"),
 	})
 	.strict()
 
 export const approveMilestoneBodySchema = z
 	.object({
-		note: optionalTrimmedString("note"),
+		note: optionalTrimmedString("note", 1000),
 	})
 	.strict()
 
@@ -144,7 +172,7 @@ export const batchApproveMilestonesBodySchema = z
 
 export const rejectMilestoneBodySchema = z
 	.object({
-		reason: requiredString("reason"),
+		reason: requiredString("reason", 1000),
 	})
 	.strict()
 
@@ -155,13 +183,19 @@ export const batchRejectMilestonesBodySchema = z
 	})
 	.strict()
 
+export const updateCommentBodySchema = z
+	.object({
+		content: requiredString("content", 2000),
+	})
+	.strict()
+
 export const createCommentBodySchema = z
 	.object({
-		proposalId: optionalTrimmedString("proposalId"),
-		proposal_id: optionalTrimmedString("proposal_id"),
+		proposalId: optionalTrimmedString("proposalId", 100),
+		proposal_id: optionalTrimmedString("proposal_id", 100),
 		content: optionalTrimmedString("content"),
 		body: optionalTrimmedString("body"),
-		author_address: optionalTrimmedString("author_address"),
+		author_address: optionalTrimmedString("author_address", 100),
 		parentId: z
 			.number({
 				invalid_type_error: "parentId must be a number",
@@ -232,8 +266,8 @@ export const createCommentBodySchema = z
 
 export const createCredentialMetadataBodySchema = z
 	.object({
-		course_id: requiredString("course_id"),
-		learner_address: requiredString("learner_address"),
+		course_id: requiredString("course_id", 100),
+		learner_address: requiredString("learner_address", 100),
 		completed_at: z
 			.string({
 				required_error: "completed_at is required",
@@ -245,8 +279,50 @@ export const createCredentialMetadataBodySchema = z
 
 export const enrollmentBodySchema = z
 	.object({
-		learner_address: requiredString("learner_address"),
-		course_id: requiredString("course_id"),
-		tx_hash: requiredString("tx_hash"),
+		learner_address: requiredString("learner_address", 100),
+		course_id: requiredString("course_id", 100),
+		tx_hash: requiredString("tx_hash", 200),
 	})
 	.strict()
+
+export const userProfileSchema = z
+	.object({
+		display_name: z
+			.string()
+			.trim()
+			.min(3, "Display name must be at least 3 characters")
+			.max(50, "Display name cannot exceed 50 characters")
+			.optional()
+			.nullable(),
+		bio: z
+			.string()
+			.max(2000, "Bio cannot exceed 2000 characters")
+			.optional()
+			.nullable(),
+		avatar_url: z
+			.string()
+			.url("Avatar must be a valid URL")
+			.max(2048, "URL is too long")
+			.optional()
+			.nullable(),
+		twitter: z
+			.string()
+			.trim()
+			.max(255, "Twitter handle/URL is too long")
+			.optional()
+			.nullable(),
+		github: z
+			.string()
+			.trim()
+			.max(255, "GitHub username/URL is too long")
+			.optional()
+			.nullable(),
+		website: z
+			.string()
+			.url("Website must be a valid URL")
+			.max(2048, "URL is too long")
+			.optional()
+			.nullable(),
+	})
+	.strict()
+

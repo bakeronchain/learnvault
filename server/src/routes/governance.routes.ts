@@ -4,6 +4,7 @@ import {
 	cancelProposal,
 	castVote,
 	createGovernanceProposal,
+	getDelegation,
 	getProposalStatus,
 	getGovernanceProposalById,
 	getGovernanceProposals,
@@ -147,6 +148,10 @@ governanceRouter.get("/proposals/:id", (req, res) => {
  */
 governanceRouter.get("/governance/voting-power/:address", (req, res) => {
 	void getVotingPower(req, res)
+})
+
+governanceRouter.get("/governance/delegation/:address", (req, res) => {
+	void getDelegation(req, res)
 })
 
 governanceRouter.post("/governance/vote", (req, res) => {

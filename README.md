@@ -9,6 +9,8 @@
 [![Contracts CI](https://github.com/robertocarlous/learnvault/actions/workflows/contracts-ci.yml/badge.svg)](https://github.com/robertocarlous/learnvault/actions/workflows/contracts-ci.yml)
 [![Frontend CI](https://github.com/bakeronchain/learnvault/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/bakeronchain/learnvault/actions/workflows/frontend-ci.yml)
 [![Build](https://github.com/bakeronchain/learnvault/actions/workflows/build.yml/badge.svg)](https://github.com/bakeronchain/learnvault/actions/workflows/build.yml)
+[![Frontend Coverage](https://codecov.io/gh/bakeronchain/learnvault/branch/main/graph/badge.svg?flag=frontend)](https://codecov.io/gh/bakeronchain/learnvault)
+[![Backend Coverage](https://codecov.io/gh/bakeronchain/learnvault/branch/main/graph/badge.svg?flag=backend)](https://codecov.io/gh/bakeronchain/learnvault)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Built on Stellar](https://img.shields.io/badge/Built%20on-Stellar-purple)](https://stellar.org)
 [![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](https://github.com/bakeronchain/learnvault/issues)

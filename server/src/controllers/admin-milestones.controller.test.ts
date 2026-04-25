@@ -19,11 +19,21 @@
 
 // Must be declared before any imports so Jest hoisting works correctly.
 jest.mock("../db/index", () => ({
-	pool: { query: jest.fn(), connect: jest.fn() },
+	pool: { query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }), connect: jest.fn() },
 }))
 jest.mock("../db/milestone-store")
 jest.mock("../services/stellar-contract.service")
 jest.mock("../services/credential.service")
+
+jest.mock("../services/email.service", () => ({
+	createEmailService: jest.fn().mockReturnValue({
+		sendNotification: jest.fn().mockResolvedValue(undefined),
+	}),
+}))
+
+jest.mock("../services/escrow-timeout.service", () => ({
+	markEscrowActivity: jest.fn().mockResolvedValue(undefined),
+}))
 
 import express from "express"
 import jwt from "jsonwebtoken"
@@ -58,7 +68,15 @@ const pendingReport = {
 	evidence_ipfs_cid: null,
 	evidence_description: "Completed all exercises",
 	status: "pending" as const,
+	resubmission_count: 0,
 	submitted_at: new Date().toISOString(),
+	resubmission_count: 0,
+	scholar_email: "scholar@example.com",
+	scholar_name: "Test Scholar",
+	course_title: "Test Course",
+	milestone_title: "Test Milestone",
+	milestone_number: 1,
+	lrn_reward: 100,
 }
 
 const approvedAuditEntry = {
@@ -108,11 +126,13 @@ beforeEach(() => {
 	// default. The 503 test removes them explicitly.
 	process.env.STELLAR_SECRET_KEY = "FAKE_TEST_SECRET"
 	process.env.COURSE_MILESTONE_CONTRACT_ID = "FAKE_CONTRACT_ID"
+	process.env.FRONTEND_URL = "http://localhost:3000"
 })
 
 afterEach(() => {
 	delete process.env.STELLAR_SECRET_KEY
 	delete process.env.COURSE_MILESTONE_CONTRACT_ID
+	delete process.env.FRONTEND_URL
 })
 
 // ── GET /api/admin/milestones/pending ────────────────────────────────────────

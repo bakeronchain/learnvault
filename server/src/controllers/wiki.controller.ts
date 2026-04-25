@@ -12,7 +12,18 @@ type WikiPageRow = {
 	updated_at: string
 }
 
-const toWikiPage = (row: WikiPageRow) => ({
+interface WikiPage {
+	id: number
+	slug: string
+	title: string
+	content: string
+	category: string
+	isPublished: boolean
+	createdAt: string
+	updatedAt: string
+}
+
+const toWikiPage = (row: WikiPageRow): WikiPage => ({
 	id: row.id,
 	slug: row.slug,
 	title: row.title,
@@ -69,7 +80,7 @@ export const getWikiPageBySlug = async (
 			[slug],
 		)
 
-		if (result.rowCount === 0) {
+		if ((result as any).rowCount === 0) {
 			res.status(404).json({ error: "Wiki page not found" })
 			return
 		}
@@ -132,7 +143,7 @@ export const updateWikiPage = async (
 			[title, slug, content, category, isPublished, id],
 		)
 
-		if (result.rowCount === 0) {
+		if ((result as any).rowCount === 0) {
 			res.status(404).json({ error: "Wiki page not found" })
 			return
 		}
@@ -158,7 +169,7 @@ export const deleteWikiPage = async (
 			id,
 		])
 
-		if (result.rowCount === 0) {
+		if ((result as any).rowCount === 0) {
 			res.status(404).json({ error: "Wiki page not found" })
 			return
 		}

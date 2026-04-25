@@ -7,7 +7,7 @@ import { type AuthService } from "../services/auth.service"
 
 export function createAuthRouter(authService: AuthService): Router {
 	const router = Router()
-	const { getNonce, postVerify, getChallenge, postChallengeVerify } =
+	const { getNonce, postVerify, getChallenge, postChallengeVerify, postLogout } =
 		createAuthControllers(authService)
 
 	router.get("/challenge", nonceRateLimiter, (req, res) => {
@@ -25,6 +25,11 @@ export function createAuthRouter(authService: AuthService): Router {
 	router.post("/verify", authVerifyLimiter, (req, res) => {
 		void postVerify(req, res)
 	})
+
+	router.post("/logout", (req, res) => {
+		void postLogout(req, res)
+	})
+
 
 	return router
 }

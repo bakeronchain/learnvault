@@ -9,7 +9,7 @@ const JWT_SECRET = "learnvault-secret"
 
 const testJwtService = {
 	signWalletToken: (addr: string) => jwt.sign({ sub: addr }, JWT_SECRET),
-	verifyWalletToken: (token: string) => {
+	verifyWalletToken: async (token: string) => {
 		const d = jwt.verify(token, JWT_SECRET) as {
 			sub?: string
 			address?: string
@@ -18,6 +18,7 @@ const testJwtService = {
 		if (!sub) throw new Error("Invalid token")
 		return { sub }
 	},
+	revokeToken: async () => {},
 }
 
 function makeToken(address = "GUSER123") {
@@ -32,7 +33,7 @@ function buildApp() {
 	return app
 }
 
-describe("POST /api/comments", () => {
+describe("Comments API", () => {
 	const querySpy = jest.spyOn(pool, "query")
 
 	beforeEach(() => {
@@ -176,5 +177,65 @@ describe("POST /api/comments", () => {
 		} else {
 			process.env.MAX_COMMENTS_PER_DAY = previousMax
 		}
+	})
+
+	it("PATCH updates content when called by the author", async () => {
+		querySpy.mockResolvedValueOnce({
+			rows: [
+				{
+					id: 4,
+					proposal_id: "1",
+					author_address: "GUSER123",
+					content: "Updated text",
+					parent_id: null,
+					upvotes: 0,
+					downvotes: 0,
+					is_pinned: false,
+					created_at: new Date().toISOString(),
+				},
+			],
+			rowCount: 1,
+		} as never)
+
+		const res = await request(buildApp())
+			.patch("/api/comments/4")
+			.set("Authorization", `Bearer ${makeToken()}`)
+			.send({ content: "Updated text" })
+
+		expect(res.status).toBe(200)
+		expect(res.body.content).toBe("Updated text")
+	})
+
+	it("PATCH returns 404 when comment does not exist or belongs to another user", async () => {
+		querySpy.mockResolvedValueOnce({ rows: [], rowCount: 0 } as never)
+
+		const res = await request(buildApp())
+			.patch("/api/comments/4")
+			.set(
+				"Authorization",
+				`Bearer ${jwt.sign({ address: "GOTHERUSER" }, JWT_SECRET, { expiresIn: "1h" })}`,
+			)
+			.send({ content: "Hijack" })
+
+		expect(res.status).toBe(404)
+		expect(res.body.error).toMatch(/not found|unauthorized/i)
+	})
+
+	it("PATCH returns 401 without auth token", async () => {
+		const res = await request(buildApp())
+			.patch("/api/comments/4")
+			.send({ content: "No auth" })
+
+		expect(res.status).toBe(401)
+	})
+
+	it("PATCH returns 400 when content is empty", async () => {
+		const res = await request(buildApp())
+			.patch("/api/comments/4")
+			.set("Authorization", `Bearer ${makeToken()}`)
+			.send({ content: "   " })
+
+		expect(res.status).toBe(400)
+		expect(res.body.error).toBe("Validation failed")
 	})
 })

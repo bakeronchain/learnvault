@@ -25,6 +25,8 @@ jest.mock("../services/stellar-contract.service", () => ({
 			simulated: false,
 		}),
 		getGovernanceTokenBalance: jest.fn().mockResolvedValue("1250000000"),
+		getGovernanceVotingPower: jest.fn().mockResolvedValue("1250000000"),
+		getGovernanceDelegation: jest.fn().mockResolvedValue("0"),
 		castVote: jest.fn().mockResolvedValue({
 			txHash: "mock_vote_tx_hash",
 			simulated: false,
@@ -193,7 +195,7 @@ describe("GET /api/governance/voting-power/:address", () => {
 		const { stellarContractService } =
 			await import("../services/stellar-contract.service")
 		;(
-			stellarContractService.getGovernanceTokenBalance as jest.Mock
+			stellarContractService.getGovernanceVotingPower as jest.Mock
 		).mockResolvedValueOnce("0")
 
 		const response = await request(app).get(
@@ -312,7 +314,7 @@ describe("POST /api/governance/vote", () => {
 			.mockResolvedValueOnce({
 				rows: [{ votes_for: "1250000000", votes_against: "0" }],
 			}) // fetch updated counts
-		stellarContractService.getGovernanceTokenBalance.mockResolvedValue(
+		stellarContractService.getGovernanceVotingPower.mockResolvedValue(
 			"1250000000",
 		)
 		stellarContractService.castVote.mockResolvedValue({
@@ -431,7 +433,7 @@ describe("POST /api/governance/vote", () => {
 				],
 			})
 			.mockResolvedValueOnce({ rows: [] })
-		stellarContractService.getGovernanceTokenBalance.mockResolvedValueOnce("0")
+		stellarContractService.getGovernanceVotingPower.mockResolvedValueOnce("0")
 
 		const response = await request(app).post("/api/governance/vote").send({
 			proposal_id: 1,

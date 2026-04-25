@@ -6,6 +6,7 @@ import { type AuthService } from "../services/auth.service"
 const mockAuthService: jest.Mocked<AuthService> = {
 	getOrCreateNonce: jest.fn(),
 	verifyAndIssueToken: jest.fn(),
+	verifyLinkSignature: jest.fn(),
 	createChallenge: jest.fn(),
 	verifySignedTransaction: jest.fn(),
 	logout: jest.fn(),

@@ -108,8 +108,10 @@ npm ci --legacy-peer-deps
 npm run typecheck
 ```
 
-3. Fix strict type errors before build (do not suppress with `any` unless justified).
-4. Ensure generated clients/packages are up to date if contract interfaces changed.
+3. Fix strict type errors before build (do not suppress with `any` unless
+   justified).
+4. Ensure generated clients/packages are up to date if contract interfaces
+   changed.
 
 ## 7) Soroban Contract Compilation Errors
 
@@ -162,7 +164,8 @@ cd server && npm test
 ```
 
 4. If DB-related CI job fails, run migrations locally before tests.
-5. If contract CI fails, run `cargo test --workspace` and `cargo build --target wasm32v1-none --release`.
+5. If contract CI fails, run `cargo test --workspace` and
+   `cargo build --target wasm32v1-none --release`.
 
 ## Fast Diagnostic Checklist
 

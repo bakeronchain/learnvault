@@ -1,6 +1,9 @@
 import { Router } from "express"
 
-import { applyForScholarship, contributeToScholarship } from "../controllers/scholarships.controller"
+import {
+	applyForScholarship,
+	contributeToScholarship,
+} from "../controllers/scholarships.controller"
 import { scholarshipApplyLimiter } from "../middleware/rate-limit.middleware"
 
 export const scholarshipsRouter = Router()
@@ -86,9 +89,6 @@ scholarshipsRouter.post(
  * amount: { type: number }
  * tx_hash: { type: string }
  */
-scholarshipsRouter.post(
-    "/scholarships/contribute",
-    (req, res) => {
-        void contributeToScholarship(req, res)
-    }
-)
+scholarshipsRouter.post("/scholarships/contribute", (req, res) => {
+	void contributeToScholarship(req, res)
+})

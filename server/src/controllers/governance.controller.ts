@@ -245,17 +245,17 @@ export async function createGovernanceProposal(
 
 	const { author_address, title, description, requested_amount, evidence_url } =
 		validation.data
-	
+
 	// Sanitize HTML content
 	const sanitizedTitle = sanitizeHtml(title, {
 		allowedTags: [],
 		allowedAttributes: {},
 	})
 	const sanitizedDescription = sanitizeHtml(description, {
-		allowedTags: ['p', 'br', 'strong', 'em', 'ul', 'ol', 'li'],
+		allowedTags: ["p", "br", "strong", "em", "ul", "ol", "li"],
 		allowedAttributes: {},
 	})
-	
+
 	const programUrl = evidence_url ?? "https://learnvault.app/dao/proposals"
 
 	try {

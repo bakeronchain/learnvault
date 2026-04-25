@@ -188,9 +188,9 @@ const History: React.FC = () => {
 					Activity History
 				</h1>
 				<p className="text-white/50 mt-2 flex items-center gap-2">
-					Recent on-chain actions for 
-					<AddressDisplay 
-						address={address} 
+					Recent on-chain actions for
+					<AddressDisplay
+						address={address}
 						addressClassName="text-brand-cyan font-bold"
 						showCopyButton={false}
 						showExplorerLink={false}

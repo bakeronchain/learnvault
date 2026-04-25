@@ -14,7 +14,7 @@ export const WalletButton = () => {
 	const [showModal, setShowModal] = useState(false)
 	const { address, isPending, isReconnecting, balances } = useWallet()
 	const { t } = useTranslation()
-	
+
 	const buttonLabel =
 		isPending || isReconnecting ? t("wallet.loading") : t("wallet.connect")
 
@@ -67,20 +67,20 @@ export const WalletButton = () => {
 						{balances?.lrn?.balance ?? "0"} LRN
 					</span>
 				</div>
-				
+
 				<div className="w-9 h-9 rounded-xl overflow-hidden border border-white/10 shadow-2xl bg-slate-800 relative z-10">
-					<img 
-						src={`https://id.lobstr.co/${address}.png`} 
-						alt="Wallet Avatar" 
+					<img
+						src={`https://id.lobstr.co/${address}.png`}
+						alt="Wallet Avatar"
 						className="w-full h-full object-cover"
 					/>
 				</div>
 			</motion.button>
 
-			<WalletInfoModal 
-				isOpen={showModal} 
-				onClose={() => setShowModal(false)} 
-				onDisconnect={() => void handleDisconnect()} 
+			<WalletInfoModal
+				isOpen={showModal}
+				onClose={() => setShowModal(false)}
+				onDisconnect={() => void handleDisconnect()}
 			/>
 		</>
 	)

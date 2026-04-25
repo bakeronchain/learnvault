@@ -7,7 +7,11 @@ import compression from "compression"
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
 
 import cors from "cors"
-import express, { type Request, type Response, type NextFunction } from "express"
+import express, {
+	type Request,
+	type Response,
+	type NextFunction,
+} from "express"
 import helmet from "helmet"
 import morgan from "morgan"
 import swaggerUi from "swagger-ui-express"

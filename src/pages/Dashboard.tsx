@@ -124,7 +124,13 @@ const Dashboard: React.FC = () => {
 				{/* ── Header ── */}
 				<header className="space-y-1">
 					<h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter text-gradient leading-tight flex flex-wrap items-center gap-x-3">
-						Welcome back, <AddressDisplay address={profile?.address || address} showCopyButton={false} showExplorerLink={false} addressClassName="text-gradient" />
+						Welcome back,{" "}
+						<AddressDisplay
+							address={profile?.address || address}
+							showCopyButton={false}
+							showExplorerLink={false}
+							addressClassName="text-gradient"
+						/>
 					</h1>
 					<p className="text-white/50 text-sm sm:text-base md:text-lg font-medium">
 						Your learning dashboard and on-chain reputation.

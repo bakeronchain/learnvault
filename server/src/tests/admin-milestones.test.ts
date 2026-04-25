@@ -37,9 +37,7 @@ jest.mock("../services/escrow-timeout.service", () => ({
 
 jest.mock("../services/credential.service", () => ({
 	credentialService: {
-		mintCertificateIfComplete: jest
-			.fn()
-			.mockResolvedValue({ minted: false }),
+		mintCertificateIfComplete: jest.fn().mockResolvedValue({ minted: false }),
 	},
 }))
 

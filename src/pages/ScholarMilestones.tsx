@@ -4,7 +4,10 @@ import { Link } from "react-router-dom"
 import ConnectWalletGuard from "../components/ConnectWalletGuard"
 import MilestoneReportForm from "../components/MilestoneReportForm"
 import { useWallet } from "../hooks/useWallet"
-import { useScholarMilestones, type ScholarMilestone } from "../hooks/useScholarMilestones"
+import {
+	useScholarMilestones,
+	type ScholarMilestone,
+} from "../hooks/useScholarMilestones"
 import { getIpfsUrl, isCid, normaliseCid } from "../lib/ipfs"
 import {
 	type MilestoneReportFormValues,
@@ -21,9 +24,11 @@ export default function ScholarMilestones() {
 	const [submitError, setSubmitError] = useState<string | null>(null)
 	const [submittedReport, setSubmittedReport] =
 		useState<SubmittedMilestoneReport | null>(null)
-	const [resubmitMilestone, setResubmitMilestone] = useState<ScholarMilestone | null>(null)
+	const [resubmitMilestone, setResubmitMilestone] =
+		useState<ScholarMilestone | null>(null)
 
-	const { data: milestones = [], isLoading: isLoadingMilestones } = useScholarMilestones()
+	const { data: milestones = [], isLoading: isLoadingMilestones } =
+		useScholarMilestones()
 
 	const ipfsUrl = useMemo(() => {
 		if (!submittedReport?.evidence_ipfs_cid) return null
@@ -43,22 +48,24 @@ export default function ScholarMilestones() {
 		setSubmitError(null)
 
 		try {
-			const endpoint = resubmitMilestone ? `${API_BASE}/milestones/resubmit` : `${API_BASE}/milestones/submit`
+			const endpoint = resubmitMilestone
+				? `${API_BASE}/milestones/resubmit`
+				: `${API_BASE}/milestones/submit`
 			const body = resubmitMilestone
 				? {
-					id: resubmitMilestone.id,
-					evidenceGithub: values.evidenceGithub.trim() || undefined,
-					evidenceIpfsCid: values.evidenceIpfsCid.trim() || undefined,
-					evidenceDescription: values.evidenceDescription.trim() || undefined,
-				}
+						id: resubmitMilestone.id,
+						evidenceGithub: values.evidenceGithub.trim() || undefined,
+						evidenceIpfsCid: values.evidenceIpfsCid.trim() || undefined,
+						evidenceDescription: values.evidenceDescription.trim() || undefined,
+					}
 				: {
-					scholarAddress: address,
-					courseId: values.courseId.trim(),
-					milestoneId: Number(values.milestoneId),
-					evidenceGithub: values.evidenceGithub.trim() || undefined,
-					evidenceIpfsCid: values.evidenceIpfsCid.trim() || undefined,
-					evidenceDescription: values.evidenceDescription.trim() || undefined,
-				}
+						scholarAddress: address,
+						courseId: values.courseId.trim(),
+						milestoneId: Number(values.milestoneId),
+						evidenceGithub: values.evidenceGithub.trim() || undefined,
+						evidenceIpfsCid: values.evidenceIpfsCid.trim() || undefined,
+						evidenceDescription: values.evidenceDescription.trim() || undefined,
+					}
 
 			const response = await fetch(endpoint, {
 				method: "POST",
@@ -121,14 +128,20 @@ export default function ScholarMilestones() {
 						<MilestoneReportForm
 							isSubmitting={isSubmitting}
 							onSubmit={handleSubmit}
-							initialValues={resubmitMilestone ? {
-								courseId: resubmitMilestone.course_id,
-								milestoneId: resubmitMilestone.milestone_id.toString(),
-								evidenceGithub: resubmitMilestone.evidence_github || "",
-								evidenceIpfsCid: resubmitMilestone.evidence_ipfs_cid || "",
-								evidenceDescription: resubmitMilestone.evidence_description || "",
-								acceptedTerms: false,
-							} : undefined}
+							initialValues={
+								resubmitMilestone
+									? {
+											courseId: resubmitMilestone.course_id,
+											milestoneId: resubmitMilestone.milestone_id.toString(),
+											evidenceGithub: resubmitMilestone.evidence_github || "",
+											evidenceIpfsCid:
+												resubmitMilestone.evidence_ipfs_cid || "",
+											evidenceDescription:
+												resubmitMilestone.evidence_description || "",
+											acceptedTerms: false,
+										}
+									: undefined
+							}
 						/>
 
 						<div className="space-y-6">
@@ -224,22 +237,31 @@ export default function ScholarMilestones() {
 
 							<div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-xl">
 								<Card>
-									<h2 className="text-xl font-black text-white">Your Milestones</h2>
+									<h2 className="text-xl font-black text-white">
+										Your Milestones
+									</h2>
 									{isLoadingMilestones ? (
 										<p className="mt-4 text-sm text-white/60">Loading...</p>
 									) : milestones.length === 0 ? (
-										<p className="mt-4 text-sm text-white/60">No milestones submitted yet.</p>
+										<p className="mt-4 text-sm text-white/60">
+											No milestones submitted yet.
+										</p>
 									) : (
 										<div className="mt-4 space-y-3">
 											{milestones.map((milestone) => (
-												<div key={milestone.id} className="rounded-lg border border-white/10 p-3">
+												<div
+													key={milestone.id}
+													className="rounded-lg border border-white/10 p-3"
+												>
 													<div className="flex items-center justify-between">
 														<div>
 															<p className="text-sm font-semibold text-white">
-																Course: {milestone.course_id}, Milestone: {milestone.milestone_id}
+																Course: {milestone.course_id}, Milestone:{" "}
+																{milestone.milestone_id}
 															</p>
 															<p className="text-xs text-white/70">
-																Status: {milestone.status} | Resubmissions: {milestone.resubmission_count}
+																Status: {milestone.status} | Resubmissions:{" "}
+																{milestone.resubmission_count}
 															</p>
 														</div>
 														{milestone.status === "rejected" && (

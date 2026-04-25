@@ -65,8 +65,8 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({
 					<div className="flex justify-between items-start gap-4">
 						<div>
 							<h3 className="text-xl font-bold text-white mb-1">{title}</h3>
-							<AddressDisplay 
-								address={proposerAddress} 
+							<AddressDisplay
+								address={proposerAddress}
 								addressClassName="text-sm text-white/50 font-mono"
 								showCopyButton={false}
 							/>

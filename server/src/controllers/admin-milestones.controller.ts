@@ -242,7 +242,9 @@ export async function rejectMilestone(
 		return
 	}
 	if (reason.length > 1000) {
-		res.status(400).json({ error: "Rejection reason must be 1000 characters or fewer" })
+		res
+			.status(400)
+			.json({ error: "Rejection reason must be 1000 characters or fewer" })
 		return
 	}
 	const sanitizedReason = sanitizeHtml(reason, {

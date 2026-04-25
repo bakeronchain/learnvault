@@ -399,21 +399,24 @@ two-step build process:
 
 2. **Generate the PDF:** Once the diagrams are compiled and embedded as standard
    markdown image links, generate the final PDF using `md-to-pdf`:
+
    ```bash
    npx md-to-pdf docs/whitepaper.md
    ```
 
-
-   ---
+   ***
 
 ## Performance
 
-- Response compression enabled using Express `compression` middleware (gzip/brotli); images, video, audio, binary, and IPFS routes are excluded
-- `Cache-Control: no-store` is set on all `/api/*` routes to prevent caching of API responses
-- Static assets are not served by the Express backend — caching is handled at the CDN/proxy layer (Nginx, Cloudflare, Vercel, etc.)
-- HTTP/2 is handled via reverse proxy (Nginx/Cloudflare/Vercel) — Express runs HTTP/1.1 internally
+- Response compression enabled using Express `compression` middleware
+  (gzip/brotli); images, video, audio, binary, and IPFS routes are excluded
+- `Cache-Control: no-store` is set on all `/api/*` routes to prevent caching of
+  API responses
+- Static assets are not served by the Express backend — caching is handled at
+  the CDN/proxy layer (Nginx, Cloudflare, Vercel, etc.)
+- HTTP/2 is handled via reverse proxy (Nginx/Cloudflare/Vercel) — Express runs
+  HTTP/1.1 internally
 - Request latency logging middleware logs `METHOD URL - Xms` for every request
-
 
 ````
 

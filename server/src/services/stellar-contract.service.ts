@@ -982,7 +982,6 @@ async function getScholarCredentials(address: string): Promise<any[]> {
 	}
 }
 
-
 export const stellarContractService = {
 	callVerifyMilestone,
 	emitRejectionEvent,

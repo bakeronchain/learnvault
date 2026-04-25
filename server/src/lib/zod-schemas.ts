@@ -8,11 +8,14 @@ const requiredString = (field: string, maxLength?: number) => {
 		})
 		.trim()
 		.min(1, `${field} is required`)
-	
+
 	if (maxLength) {
-		return schema.max(maxLength, `${field} must be ${maxLength} characters or fewer`)
+		return schema.max(
+			maxLength,
+			`${field} must be ${maxLength} characters or fewer`,
+		)
 	}
-	
+
 	return schema
 }
 
@@ -23,11 +26,13 @@ const optionalTrimmedString = (field: string, maxLength?: number) => {
 		})
 		.trim()
 		.min(1, `${field} cannot be empty`)
-	
+
 	if (maxLength) {
-		return schema.max(maxLength, `${field} must be ${maxLength} characters or fewer`).optional()
+		return schema
+			.max(maxLength, `${field} must be ${maxLength} characters or fewer`)
+			.optional()
 	}
-	
+
 	return schema.optional()
 }
 

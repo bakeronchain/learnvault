@@ -717,9 +717,7 @@ const DaoPropose: React.FC = () => {
 							<button
 								type="submit"
 								data-testid="submit-proposal"
-								disabled={
-									isSubmittingProposal
-								}
+								disabled={isSubmittingProposal}
 								className="px-8 py-3 bg-brand-cyan/10 border border-brand-cyan/30 text-brand-cyan font-black uppercase tracking-widest rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3"
 							>
 								{isSubmittingProposal ? (

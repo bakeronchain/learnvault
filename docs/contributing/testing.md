@@ -1,6 +1,7 @@
 # Testing Strategy
 
-This document defines LearnVault's testing pyramid, tooling, and CI expectations.
+This document defines LearnVault's testing pyramid, tooling, and CI
+expectations.
 
 ## Testing Pyramid
 
@@ -66,20 +67,22 @@ Set minimum targets per layer:
 - Contracts (Rust): >= 90% on critical contract modules.
 - Server/API: >= 80% branch coverage on controllers/middleware/services.
 - Frontend: >= 75% branch coverage on core user flows.
-- E2E: 100% of critical path scenarios (connect wallet, submit milestone, review, treasury/governance actions).
+- E2E: 100% of critical path scenarios (connect wallet, submit milestone,
+  review, treasury/governance actions).
 
-PRs that reduce critical-path coverage should include justification and follow-up.
+PRs that reduce critical-path coverage should include justification and
+follow-up.
 
 ## Mocking Strategy for Stellar Contracts
 
 Use a layered strategy:
 
 - **Unit level**: mock contract client wrappers and RPC adapters.
-- **Server integration**: stub transaction submission at service boundaries while
-  preserving payload validation and auth checks.
+- **Server integration**: stub transaction submission at service boundaries
+  while preserving payload validation and auth checks.
 - **Contract level**: prefer real Rust contract tests for business invariants.
-- **E2E level**: avoid deep chain mocks; run against stable test network fixtures
-  or deterministic local network where possible.
+- **E2E level**: avoid deep chain mocks; run against stable test network
+  fixtures or deterministic local network where possible.
 
 Guidelines:
 
@@ -113,7 +116,8 @@ Use local or testnet config depending on test scope:
 
 1. Set network env (`STELLAR_NETWORK`, `SOROBAN_RPC_URL`).
 2. Provide contract IDs in `.env` and `server/.env`.
-3. Ensure backend signer key (`STELLAR_SECRET_KEY`) is available for write-path tests.
+3. Ensure backend signer key (`STELLAR_SECRET_KEY`) is available for write-path
+   tests.
 4. Run DB services and migrations before API integration tests.
 5. Seed deterministic test data if scenario requires historical state.
 
@@ -132,7 +136,8 @@ Current workflows execute tests by concern:
 
 - `build.yml`: lint, format, build, workspace tests.
 - `contracts-ci.yml` and `contracts.yml`: contract build/test/clippy/fmt paths.
-- `server-ci.yml` and `backend-tests.yml`: Postgres-backed server tests + migrations.
+- `server-ci.yml` and `backend-tests.yml`: Postgres-backed server tests +
+  migrations.
 - `frontend-ci.yml`: typecheck, lint, frontend tests, build.
 - `e2e.yml`: Playwright journey tests on pull requests.
 

@@ -170,7 +170,10 @@ export async function createCredentialMetadata(
 
 		// Upload to IPFS via Pinata
 		const metadataName = `${course_id}-${learner_address}-${Date.now()}`
-		const cid = await pinJsonToIPFS(metadata as unknown as Record<string, unknown>, metadataName)
+		const cid = await pinJsonToIPFS(
+			metadata as unknown as Record<string, unknown>,
+			metadataName,
+		)
 
 		// Build response
 		const metadataUri = `ipfs://${cid}`

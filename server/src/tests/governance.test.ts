@@ -68,7 +68,11 @@ import { governanceRouter } from "../routes/governance.routes"
 
 const app = express()
 app.use(express.json())
-app.use(require("../middleware/request-logger.middleware").createRequestLogger({ enabled: false }))
+app.use(
+	require("../middleware/request-logger.middleware").createRequestLogger({
+		enabled: false,
+	}),
+)
 app.use("/api", governanceRouter)
 
 const JWT_SECRET = "learnvault-secret"

@@ -32,9 +32,6 @@ const API_URL = (
 	""
 ).replace(/\/$/, "")
 
-
-
-
 const CommentCard: React.FC<CommentCardProps> = ({
 	comment,
 	isAuthor,
@@ -204,8 +201,8 @@ const CommentCard: React.FC<CommentCardProps> = ({
 					</div>
 					<div>
 						<div className="flex items-center gap-2">
-							<AddressDisplay 
-								address={comment.author_address} 
+							<AddressDisplay
+								address={comment.author_address}
 								addressClassName="text-sm font-black text-white"
 								showCopyButton={false}
 							/>
@@ -350,7 +347,8 @@ const CommentCard: React.FC<CommentCardProps> = ({
 						Report Comment
 					</label>
 					<p className="mb-3 text-sm text-white/70">
-						Please describe why you're reporting this comment (minimum 10 characters).
+						Please describe why you're reporting this comment (minimum 10
+						characters).
 					</p>
 					<textarea
 						id={`flag-reason-${comment.id}`}

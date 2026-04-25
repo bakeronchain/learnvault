@@ -36,7 +36,9 @@ export const getTreasuryStats = async (
 
 		// Fetch events from the ScholarshipTreasury contract
 		const response = await server.getEvents({
-			filters: [{ type: "contract", contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] }],
+			filters: [
+				{ type: "contract", contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] },
+			],
 			startLedger: Number(process.env.STARTING_LEDGER ?? "460000000"),
 			limit: 1000,
 		})
@@ -114,7 +116,9 @@ export const getTreasuryActivity = async (
 
 		// Fetch events from the ScholarshipTreasury contract
 		const response = await server.getEvents({
-			filters: [{ type: "contract", contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] }],
+			filters: [
+				{ type: "contract", contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] },
+			],
 			startLedger: Number(process.env.STARTING_LEDGER ?? "460000000"),
 			limit: 1000,
 		})

@@ -23,6 +23,7 @@ const Leaderboard = lazy(() => import("./pages/Leaderboard"))
 const Learn = lazy(() => import("./pages/Learn"))
 const LessonView = lazy(() => import("./pages/LessonView"))
 const NotFound = lazy(() => import("./pages/NotFound"))
+const PeerReview = lazy(() => import("./pages/PeerReview"))
 const Profile = lazy(() => import("./pages/Profile"))
 const ScholarshipApply = lazy(() => import("./pages/ScholarshipApply"))
 const Treasury = lazy(() => import("./pages/Treasury"))
@@ -55,6 +56,7 @@ function App() {
 					/>
 					<Route path="/dao/propose" element={renderRoute(<DaoPropose />)} />
 					<Route path="/leaderboard" element={renderRoute(<Leaderboard />)} />
+					<Route path="/peer-review" element={renderRoute(<PeerReview />)} />
 					<Route path="/community" element={renderRoute(<Community />)} />
 					<Route path="/history" element={renderRoute(<History />)} />
 					<Route path="/profile" element={renderRoute(<Profile />)} />
@@ -107,7 +109,7 @@ const AppLayout = () => (
 	<div className="min-h-screen flex flex-col pt-24 overflow-x-hidden w-full max-w-full bg-[var(--color-app-bg)] text-[var(--color-app-text)] transition-colors duration-300">
 		<NetworkPreconnect />
 		<NavBar />
-		<main className="flex-1 relative z-10">
+		<main id="main-content" className="flex-1 relative z-10" tabIndex={-1}>
 			<Outlet />
 		</main>
 		<Footer />

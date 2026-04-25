@@ -139,10 +139,7 @@ export const getCourses = async (
 			if (!difficultyValues.has(difficulty)) {
 				res.status(200).json({
 					data: [],
-					page,
-					limit,
-					total: 0,
-					totalPages: 0,
+					pagination: { page, limit, total: 0 },
 				})
 				return
 			}
@@ -153,9 +150,11 @@ export const getCourses = async (
 		const whereClause =
 			conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
 
+		// Snapshot filter params so COUNT is not affected when LIMIT/OFFSET are appended.
+		const countParams = [...params]
 		const totalResult = (await pool.query(
 			`SELECT COUNT(*) AS count FROM courses c ${whereClause}`,
-			params,
+			countParams,
 		)) as { rows: Array<{ count: string }> }
 		const total = Number.parseInt(totalResult.rows[0]?.count ?? "0", 10)
 		const totalPages = total === 0 ? 0 : Math.ceil(total / limit)
@@ -186,10 +185,7 @@ export const getCourses = async (
 
 		res.status(200).json({
 			data: rowsResult.rows.map(toCourse),
-			page,
-			limit,
-			total,
-			totalPages,
+			pagination: { page, limit, total },
 		})
 	} catch {
 		res.status(500).json({ error: "Internal server error" })

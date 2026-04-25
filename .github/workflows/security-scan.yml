@@ -36,4 +36,5 @@ jobs:
       - name: Update Cargo.lock to latest compatible versions
         run: cargo update
       - name: Run cargo audit
-        run: cargo audit --config .cargo/audit.toml
+        # .cargo/audit.toml is auto-detected by cargo-audit from workspace root
+        run: cargo audit

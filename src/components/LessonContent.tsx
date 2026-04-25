@@ -1,5 +1,5 @@
 import { Button } from "@stellar/design-system"
-import React from "react"
+import React, { useEffect, useRef } from "react"
 import ReactMarkdown from "react-markdown"
 import { Link } from "react-router-dom"
 import { type CourseLesson as Lesson } from "../types/courses"
@@ -29,6 +29,7 @@ interface LessonContentProps {
 	isCompleting: boolean
 	timeSpentLabel?: string | null
 	onMarkComplete: () => void
+	onScrolledToBottom?: () => void
 	prevLessonId: number | null
 	nextLessonId: number | null
 	isNextLocked: boolean
@@ -41,10 +42,38 @@ const LessonContent: React.FC<LessonContentProps> = ({
 	isCompleting,
 	timeSpentLabel,
 	onMarkComplete,
+	onScrolledToBottom,
 	prevLessonId,
 	nextLessonId,
 	isNextLocked,
 }) => {
+	const sentinelRef = useRef<HTMLDivElement>(null)
+	const firedRef = useRef(false)
+
+	// Reset the fired flag whenever the lesson changes
+	useEffect(() => {
+		firedRef.current = false
+	}, [lesson.id])
+
+	// Fire onScrolledToBottom once when the bottom sentinel comes into view
+	useEffect(() => {
+		if (!onScrolledToBottom || isLoading) return
+		const el = sentinelRef.current
+		if (!el) return
+
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0]?.isIntersecting && !firedRef.current) {
+					firedRef.current = true
+					onScrolledToBottom()
+				}
+			},
+			{ threshold: 0.1 },
+		)
+		observer.observe(el)
+		return () => observer.disconnect()
+	}, [onScrolledToBottom, isLoading, lesson.id])
+
 	if (isLoading) {
 		return (
 			<section className="glass-card p-8 md:p-12 rounded-[2.5rem] border border-white/10">
@@ -68,6 +97,9 @@ const LessonContent: React.FC<LessonContentProps> = ({
 			<div className="flex-1 prose prose-invert prose-brand max-w-none">
 				<ReactMarkdown>{lesson.content}</ReactMarkdown>
 			</div>
+
+			{/* Sentinel: when visible, lesson has been scrolled to the bottom */}
+			<div ref={sentinelRef} aria-hidden="true" />
 
 			<div className="mt-16 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-6">
 				<div className="flex gap-4">

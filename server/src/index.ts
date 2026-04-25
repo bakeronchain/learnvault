@@ -41,6 +41,7 @@ import { scholarsRouter } from "./routes/scholars.routes"
 import { scholarshipsRouter } from "./routes/scholarships.routes"
 import { treasuryRouter } from "./routes/treasury.routes"
 import { createUploadRouter } from "./routes/upload.routes"
+import { createUserProfileRouter } from "./routes/user-profile.routes"
 import { validatorRouter } from "./routes/validator.routes"
 import { wikiRouter } from "./routes/wiki.routes"
 import { createAuthService } from "./services/auth.service"
@@ -187,6 +188,7 @@ app.use("/api", adminRouter)
 app.use("/api", adminMilestonesRouter)
 app.use("/api", moderationRouter)
 app.use("/api", scholarsRouter)
+app.use("/api", createUserProfileRouter(jwtService))
 app.use("/api", createUploadRouter(jwtService))
 app.use("/api", enrollmentsRouter)
 app.use("/api", scholarshipsRouter)

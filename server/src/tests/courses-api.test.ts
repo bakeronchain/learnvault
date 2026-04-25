@@ -106,12 +106,12 @@ describe("GET /api/courses", () => {
 		expect(res.body.total).toBe(1)
 		expect(mockedQuery).toHaveBeenNthCalledWith(
 			1,
-			expect.stringContaining("c.title ILIKE $2 OR c.description ILIKE $2"),
+			expect.stringContaining("c.title ILIKE $1 OR c.description ILIKE $1"),
 			["%stellar%"],
 		)
 		expect(mockedQuery).toHaveBeenNthCalledWith(
 			2,
-			expect.stringContaining("c.title ILIKE $2 OR c.description ILIKE $2"),
+			expect.stringContaining("c.title ILIKE $1 OR c.description ILIKE $1"),
 			["%stellar%", 12, 0],
 		)
 	})

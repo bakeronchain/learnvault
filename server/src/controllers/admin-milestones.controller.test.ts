@@ -69,6 +69,7 @@ const pendingReport = {
 	evidence_description: "Completed all exercises",
 	status: "pending" as const,
 	submitted_at: new Date().toISOString(),
+	resubmission_count: 0,
 	scholar_email: "scholar@example.com",
 	scholar_name: "Test Scholar",
 	course_title: "Test Course",

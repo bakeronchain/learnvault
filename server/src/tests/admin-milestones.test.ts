@@ -67,6 +67,7 @@ function buildApp() {
 
 // Reset in-memory store before each test
 beforeEach(() => {
+	jest.clearAllMocks()
 	// @ts-ignore – reset private fields for test isolation
 	inMemoryMilestoneStore["reports"] = []
 	// @ts-ignore

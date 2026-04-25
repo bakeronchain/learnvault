@@ -17,7 +17,6 @@ import {
 	stopLessonSession,
 } from "../util/learningTime"
 import { connectWallet } from "../util/wallet"
-import NotFound from "./NotFound"
 
 const loadingLesson = {
 	id: 0,
@@ -102,7 +101,13 @@ const LessonView: React.FC = () => {
 	}, [lessonId])
 
 	if (!isLoadingCourse && (courseError || !course || !lesson)) {
-		return <NotFound />
+		// Let the route-level ErrorBoundary render so invalid courses surface a
+		// consistent recovery UI (distinct from the static 404 catch-all route).
+		throw new Error(
+			courseError
+				? `Course could not be loaded: ${courseError}`
+				: "This course or lesson could not be found.",
+		)
 	}
 
 	if (!address) {

@@ -404,7 +404,12 @@ export async function batchApproveMilestones(
 				rejection_reason: null,
 				contract_tx_hash: contractResult.txHash,
 			})
-			results.push({ reportId: id, success: true, status: "approved", contractTxHash: contractResult.txHash })
+			results.push({
+				reportId: id,
+				success: true,
+				status: "approved",
+				contractTxHash: contractResult.txHash,
+			})
 			succeeded++
 		} catch {
 			results.push({ reportId: id, success: false, status: "failed" })
@@ -489,7 +494,13 @@ export async function batchRejectMilestones(
 				rejection_reason: reason,
 				contract_tx_hash: contractResult.txHash,
 			})
-			results.push({ reportId: id, success: true, status: "rejected", contractTxHash: contractResult.txHash })
+			results.push({
+				reportId: id,
+				success: true,
+				status: "rejected",
+				reason,
+				contractTxHash: contractResult.txHash,
+			})
 			succeeded++
 		} catch {
 			results.push({ reportId: id, success: false, status: "failed" })

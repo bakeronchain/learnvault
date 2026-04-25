@@ -120,7 +120,8 @@ export const getCourses = async (
 		const params: unknown[] = []
 
 		if (!includeUnpublished) {
-			params.push(new Date().toISOString()); conditions.push(`c.published_at <= $${params.length}`)
+			params.push(true)
+			conditions.push("c.published_at IS NOT NULL")
 		}
 
 		if (track) {

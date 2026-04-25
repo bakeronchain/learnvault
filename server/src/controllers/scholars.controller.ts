@@ -77,7 +77,7 @@ export async function getScholarMilestones(
 				[reportIds],
 			)
 			lastDecisionByReportId = Object.fromEntries(
-				auditResult.rows.map((row) => [
+				(auditResult?.rows ?? []).map((row) => [
 					Number(row.report_id),
 					{
 						decided_at: row.decided_at,

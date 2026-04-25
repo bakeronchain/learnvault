@@ -11,6 +11,12 @@ import {
 	useProposal,
 	useProposals,
 } from "../hooks/useProposals"
+import {
+	hasProposalDraft,
+	getDraftTimestamp,
+	clearProposalDraft,
+} from "../util/proposalDraft"
+import { useToast } from "../components/Toast/ToastProvider"
 
 type FilterType =
 	| "Voting Open"
@@ -64,6 +70,44 @@ const DaoProposals: React.FC = () => {
 		cancelProposal,
 		isCancelling,
 	} = useProposals()
+	const { showSuccess } = useToast()
+
+	const [hasDraft, setHasDraft] = useState(false)
+	const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null)
+
+	useEffect(() => {
+		const existingDraft = hasProposalDraft()
+		setHasDraft(existingDraft)
+		if (existingDraft) {
+			setDraftTimestamp(getDraftTimestamp())
+		}
+	}, [])
+
+	const handleDeleteDraft = () => {
+		if (
+			window.confirm(
+				"Are you sure you want to delete your proposal draft? This action cannot be undone.",
+			)
+		) {
+			clearProposalDraft()
+			setHasDraft(false)
+			setDraftTimestamp(null)
+			showSuccess("Draft deleted")
+		}
+	}
+
+	const formatDraftTime = (timestamp: number | null): string => {
+		if (!timestamp) return ""
+		const date = new Date(timestamp)
+		const now = new Date()
+		const diffMs = now.getTime() - date.getTime()
+		const diffMins = Math.floor(diffMs / 60000)
+
+		if (diffMins < 1) return "just now"
+		if (diffMins < 60) return `${diffMins}m ago`
+		if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`
+		return date.toLocaleDateString()
+	}
 
 	const [showCancelConfirm, setShowCancelConfirm] = useState(false)
 
@@ -258,6 +302,39 @@ const DaoProposals: React.FC = () => {
 					discussion in real time.
 				</p>
 			</header>
+
+			{hasDraft && (
+				<div className="mb-12 glass-card p-6 rounded-[2rem] border border-brand-amber/30 bg-brand-amber/5 animate-in fade-in slide-in-from-top-4 duration-700 flex flex-col md:flex-row items-center justify-between gap-4">
+					<div className="flex items-center gap-4">
+						<div className="w-12 h-12 rounded-2xl bg-brand-amber/20 flex items-center justify-center text-2xl">
+							📝
+						</div>
+						<div>
+							<h3 className="font-black text-lg text-brand-amber">
+								Unfinished Proposal Draft
+							</h3>
+							<p className="text-white/50 text-sm">
+								You have a draft saved {formatDraftTime(draftTimestamp)}.
+							</p>
+						</div>
+					</div>
+					<div className="flex items-center gap-3">
+						<button
+							type="button"
+							onClick={handleDeleteDraft}
+							className="px-6 py-2 text-xs font-black uppercase tracking-widest text-white/40 hover:text-red-400 transition-colors"
+						>
+							Discard
+						</button>
+						<a
+							href="/dao/propose"
+							className="px-8 py-2.5 bg-brand-amber/20 border border-brand-amber/40 text-brand-amber text-xs font-black uppercase tracking-widest rounded-full hover:bg-brand-amber/30 transition-all"
+						>
+							Continue Editing
+						</a>
+					</div>
+				</div>
+			)}
 
 			<div className="flex flex-wrap gap-3 mb-8 justify-center">
 				{(

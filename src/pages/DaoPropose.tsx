@@ -89,7 +89,6 @@ const DaoPropose: React.FC = () => {
 	const [hasDraft, setHasDraft] = useState(false)
 	const [showRestorePrompt, setShowRestorePrompt] = useState(false)
 	const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null)
-	const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
 	// Check for existing draft on mount
 	useEffect(() => {
@@ -103,18 +102,6 @@ const DaoPropose: React.FC = () => {
 	}, [])
 
 	// Auto-save draft with debounce
-	const debouncedSaveDraft = useCallback(() => {
-		if (saveTimeoutRef.current) {
-			clearTimeout(saveTimeoutRef.current)
-		}
-		saveTimeoutRef.current = setTimeout(() => {
-			saveProposalDraft(formData)
-			setHasDraft(true)
-			setDraftTimestamp(Date.now())
-		}, 500)
-	}, [formData])
-
-	// Trigger auto-save when formData changes
 	useEffect(() => {
 		// Only save if there's actual content
 		const hasContent =
@@ -126,16 +113,16 @@ const DaoPropose: React.FC = () => {
 			formData.parameterValue.trim() ||
 			formData.courseTitle.trim()
 
-		if (hasContent) {
-			debouncedSaveDraft()
-		}
+		if (!hasContent) return
 
-		return () => {
-			if (saveTimeoutRef.current) {
-				clearTimeout(saveTimeoutRef.current)
-			}
-		}
-	}, [formData, debouncedSaveDraft])
+		const timeout = setTimeout(() => {
+			saveProposalDraft(formData)
+			setHasDraft(true)
+			setDraftTimestamp(Date.now())
+		}, 500)
+
+		return () => clearTimeout(timeout)
+	}, [formData])
 
 	// Handle restore draft
 	const handleRestoreDraft = () => {

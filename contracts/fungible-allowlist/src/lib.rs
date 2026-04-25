@@ -28,6 +28,7 @@ impl FungibleAllowlist {
         if env.storage().instance().has(&DataKey::Admin) {
             panic_with_error!(&env, AllowlistError::AlreadyInitialized);
         }
+        admin.require_auth();
         env.storage().instance().set(&DataKey::Admin, &admin);
     }
 
@@ -108,11 +109,10 @@ mod test {
         let contract_id = env.register_contract(None, FungibleAllowlist);
         let client = FungibleAllowlistClient::new(&env, &contract_id);
 
+        env.mock_all_auths();
         client.initialize(&admin);
         assert_eq!(client.is_allowed(&alice), false);
         assert_eq!(client.get_allowlist().len(), 0);
-
-        env.mock_all_auths();
 
         client.add_to_allowlist(&admin, &alice);
         assert_eq!(client.is_allowed(&alice), true);

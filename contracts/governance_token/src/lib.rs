@@ -54,6 +54,10 @@ pub enum GOVError {
     AllowanceExpired = 6,
     /// Contract is paused; all state-mutating calls are blocked.
     ContractPaused = 7,
+    /// Amount is outside the supported range for this operation.
+    InvalidAmount = 8,
+    /// Arithmetic overflow or underflow was detected.
+    ArithmeticOverflow = 9,
 }
 
 // ---------------------------------------------------------------------------
@@ -147,6 +151,7 @@ impl GovernanceToken {
         if env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(&env, GOVError::Unauthorized);
         }
+        admin.require_auth();
         env.storage().instance().set(&ADMIN_KEY, &admin);
         upgrade::init(&env);
         env.storage()
@@ -181,16 +186,16 @@ impl GovernanceToken {
 
         let key = DataKey::Balance(to.clone());
         let bal: i128 = env.storage().persistent().get(&key).unwrap_or(0);
-        env.storage().persistent().set(&key, &(bal + amount));
+        let new_balance = Self::checked_add_amount(&env, bal, amount);
+        env.storage().persistent().set(&key, &new_balance);
         Self::extend_persistent(&env, &key);
 
         // Update delegated amount for 'to's delegate
         if let Some(delegate) = Self::get_delegate(env.clone(), to.clone()) {
             let del_key = DataKey::DelegatedAmount(delegate.clone());
             let del_bal: i128 = env.storage().persistent().get(&del_key).unwrap_or(0);
-            env.storage()
-                .persistent()
-                .set(&del_key, &(del_bal + amount));
+            let new_delegated = Self::checked_add_amount(&env, del_bal, amount);
+            env.storage().persistent().set(&del_key, &new_delegated);
         }
 
         let supply: i128 = env
@@ -198,9 +203,10 @@ impl GovernanceToken {
             .instance()
             .get(&DataKey::TotalSupply)
             .unwrap_or(0);
+        let new_supply = Self::checked_add_amount(&env, supply, amount);
         env.storage()
             .instance()
-            .set(&DataKey::TotalSupply, &(supply + amount));
+            .set(&DataKey::TotalSupply, &new_supply);
 
         GOVMinted { to, amount }.publish(&env);
     }
@@ -220,9 +226,10 @@ impl GovernanceToken {
             .instance()
             .get(&DataKey::TotalSupply)
             .unwrap_or(0);
+        let new_supply = Self::checked_sub_amount(&env, supply, amount);
         env.storage()
             .instance()
-            .set(&DataKey::TotalSupply, &(supply - amount));
+            .set(&DataKey::TotalSupply, &new_supply);
         GOVBurned { from, amount }.publish(&env);
     }
 
@@ -246,9 +253,10 @@ impl GovernanceToken {
             .instance()
             .get(&DataKey::TotalSupply)
             .unwrap_or(0);
+        let new_supply = Self::checked_sub_amount(&env, supply, amount);
         env.storage()
             .instance()
-            .set(&DataKey::TotalSupply, &(supply - amount));
+            .set(&DataKey::TotalSupply, &new_supply);
         GOVBurned { from, amount }.publish(&env);
     }
 
@@ -347,6 +355,9 @@ impl GovernanceToken {
     ) {
         Self::assert_not_paused(&env);
         owner.require_auth();
+        if amount < 0 {
+            panic_with_error!(&env, GOVError::InvalidAmount);
+        }
         let current_ledger = env.ledger().sequence();
         if expiration_ledger < current_ledger {
             panic_with_error!(&env, GOVError::InvalidExpiration);
@@ -368,6 +379,8 @@ impl GovernanceToken {
 
     /// Transfer `amount` from `from` to `to` using `spender`'s allowance.
     pub fn transfer_from(env: Env, spender: Address, from: Address, to: Address, amount: i128) {
+        Self::assert_not_paused(&env);
+        Self::extend_instance(&env);
         spender.require_auth();
         if amount <= 0 {
             panic_with_error!(&env, GOVError::ZeroAmount);
@@ -386,7 +399,7 @@ impl GovernanceToken {
             panic_with_error!(&env, GOVError::InsufficientFunds);
         }
 
-        let remaining = allowance - amount;
+        let remaining = Self::checked_sub_amount(&env, allowance, amount);
         if remaining == 0 {
             env.storage().persistent().remove(&allow_key);
         } else {
@@ -407,6 +420,7 @@ impl GovernanceToken {
     // -----------------------------------------------------------------------
 
     pub fn delegate(env: Env, delegator: Address, delegatee: Address) {
+        Self::assert_not_paused(&env);
         delegator.require_auth();
 
         let old_delegate = Self::get_delegate(env.clone(), delegator.clone());
@@ -420,14 +434,16 @@ impl GovernanceToken {
         if let Some(old) = old_delegate {
             let key = DataKey::DelegatedAmount(old);
             let current: i128 = env.storage().persistent().get(&key).unwrap_or(0);
-            env.storage().persistent().set(&key, &(current - bal));
+            let new_amount = Self::checked_sub_amount(&env, current, bal);
+            env.storage().persistent().set(&key, &new_amount);
         }
 
         // Add to new delegate
         if delegator != delegatee {
             let key = DataKey::DelegatedAmount(delegatee.clone());
             let current: i128 = env.storage().persistent().get(&key).unwrap_or(0);
-            env.storage().persistent().set(&key, &(current + bal));
+            let new_amount = Self::checked_add_amount(&env, current, bal);
+            env.storage().persistent().set(&key, &new_amount);
             env.storage()
                 .persistent()
                 .set(&DataKey::Delegate(delegator.clone()), &delegatee.clone());
@@ -446,6 +462,7 @@ impl GovernanceToken {
     }
 
     pub fn undelegate(env: Env, delegator: Address) {
+        Self::assert_not_paused(&env);
         delegator.require_auth();
 
         let old_delegate = Self::get_delegate(env.clone(), delegator.clone());
@@ -453,7 +470,8 @@ impl GovernanceToken {
             let bal = Self::balance(env.clone(), delegator.clone());
             let key = DataKey::DelegatedAmount(old);
             let current: i128 = env.storage().persistent().get(&key).unwrap_or(0);
-            env.storage().persistent().set(&key, &(current - bal));
+            let new_amount = Self::checked_sub_amount(&env, current, bal);
+            env.storage().persistent().set(&key, &new_amount);
 
             env.storage()
                 .persistent()
@@ -482,7 +500,7 @@ impl GovernanceToken {
             .persistent()
             .get(&DataKey::DelegatedAmount(address))
             .unwrap_or(0);
-        bal + delegated
+        Self::checked_add_amount(&env, bal, delegated)
     }
 
     pub fn balance(env: Env, account: Address) -> i128 {
@@ -547,16 +565,16 @@ impl GovernanceToken {
         if bal < amount {
             panic_with_error!(env, GOVError::InsufficientFunds);
         }
-        env.storage().persistent().set(&key, &(bal - amount));
+        let new_balance = Self::checked_sub_amount(env, bal, amount);
+        env.storage().persistent().set(&key, &new_balance);
         Self::extend_persistent(env, &key);
 
         // Update delegated amount for 'from's delegate
         if let Some(delegate) = Self::get_delegate(env.clone(), from.clone()) {
             let del_key = DataKey::DelegatedAmount(delegate.clone());
             let del_bal: i128 = env.storage().persistent().get(&del_key).unwrap_or(0);
-            env.storage()
-                .persistent()
-                .set(&del_key, &(del_bal - amount));
+            let new_delegated = Self::checked_sub_amount(env, del_bal, amount);
+            env.storage().persistent().set(&del_key, &new_delegated);
             Self::extend_persistent(env, &del_key);
         }
     }
@@ -564,16 +582,16 @@ impl GovernanceToken {
     fn _credit(env: &Env, to: &Address, amount: i128) {
         let key = DataKey::Balance(to.clone());
         let bal: i128 = env.storage().persistent().get(&key).unwrap_or(0);
-        env.storage().persistent().set(&key, &(bal + amount));
+        let new_balance = Self::checked_add_amount(env, bal, amount);
+        env.storage().persistent().set(&key, &new_balance);
         Self::extend_persistent(env, &key);
 
         // Update delegated amount for 'to's delegate
         if let Some(delegate) = Self::get_delegate(env.clone(), to.clone()) {
             let del_key = DataKey::DelegatedAmount(delegate.clone());
             let del_bal: i128 = env.storage().persistent().get(&del_key).unwrap_or(0);
-            env.storage()
-                .persistent()
-                .set(&del_key, &(del_bal + amount));
+            let new_delegated = Self::checked_add_amount(env, del_bal, amount);
+            env.storage().persistent().set(&del_key, &new_delegated);
             Self::extend_persistent(env, &del_key);
         }
     }
@@ -595,6 +613,16 @@ impl GovernanceToken {
         env.storage()
             .persistent()
             .extend_ttl(key, PERSISTENT_BUMP_THRESHOLD, PERSISTENT_EXTEND_TO);
+    }
+
+    fn checked_add_amount(env: &Env, left: i128, right: i128) -> i128 {
+        left.checked_add(right)
+            .unwrap_or_else(|| panic_with_error!(env, GOVError::ArithmeticOverflow))
+    }
+
+    fn checked_sub_amount(env: &Env, left: i128, right: i128) -> i128 {
+        left.checked_sub(right)
+            .unwrap_or_else(|| panic_with_error!(env, GOVError::ArithmeticOverflow))
     }
 }
 

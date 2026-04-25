@@ -2,7 +2,7 @@ process.env.JWT_SECRET = "learnvault-secret"
 
 jest.mock("../db/index", () => ({
 	pool: {
-		query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+		query: jest.fn(),
 	},
 }))
 
@@ -107,7 +107,7 @@ describe("GET /api/courses", () => {
 		expect(mockedQuery).toHaveBeenNthCalledWith(
 			1,
 			expect.stringContaining("c.title ILIKE $1 OR c.description ILIKE $1"),
-			["%stellar%", 12, 0],
+			["%stellar%"],
 		)
 		expect(mockedQuery).toHaveBeenNthCalledWith(
 			2,

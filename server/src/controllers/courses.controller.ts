@@ -153,9 +153,11 @@ export const getCourses = async (
 		const whereClause =
 			conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
 
+		// Snapshot filter params so COUNT is not affected when LIMIT/OFFSET are appended.
+		const countParams = [...params]
 		const totalResult = (await pool.query(
 			`SELECT COUNT(*) AS count FROM courses c ${whereClause}`,
-			params,
+			countParams,
 		)) as { rows: Array<{ count: string }> }
 		const total = Number.parseInt(totalResult.rows[0]?.count ?? "0", 10)
 		const totalPages = total === 0 ? 0 : Math.ceil(total / limit)

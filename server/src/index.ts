@@ -5,6 +5,14 @@ import dotenv from "dotenv"
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
 
 // Initialize Sentry FIRST before any other imports that might throw
+import express from "express"
+import helmet from "helmet"
+import morgan from "morgan"
+import swaggerUi from "swagger-ui-express"
+import YAML from "yaml"
+import { z } from "zod"
+import { allowedOrigins } from "./config/cors-config"
+import { initDb } from "./db/index"
 import { initSentry, sentryRequestHandler } from "./lib/sentry"
 
 initSentry({
@@ -16,14 +24,7 @@ initSentry({
 })
 
 import cors from "cors"
-import express from "express"
-import helmet from "helmet"
-import morgan from "morgan"
-import swaggerUi from "swagger-ui-express"
-import YAML from "yaml"
-import { z } from "zod"
 
-import { initDb } from "./db/index"
 import { createNonceStore } from "./db/nonce-store"
 import { createTokenStore } from "./db/token-store"
 import { setupConsoleRequestTracing } from "./lib/request-context"
@@ -36,6 +37,7 @@ import { adminMilestonesRouter } from "./routes/admin-milestones.routes"
 import { adminRouter } from "./routes/admin.routes"
 import { createAuthRouter } from "./routes/auth.routes"
 import { createBookmarksRouter } from "./routes/bookmarks.routes"
+
 import { createCommentsRouter } from "./routes/comments.routes"
 import { communityRouter } from "./routes/community.routes"
 import { coursesRouter } from "./routes/courses.routes"
@@ -46,9 +48,9 @@ import { governanceRouter } from "./routes/governance.routes"
 import { healthRouter } from "./routes/health.routes"
 import { leaderboardRouter } from "./routes/leaderboard.routes"
 import { createMeRouter } from "./routes/me.routes"
-import { createPeerReviewRouter } from "./routes/peer-review.routes"
 import { moderationRouter } from "./routes/moderation.routes"
 import { notificationsRouter } from "./routes/notifications.routes"
+import { createPeerReviewRouter } from "./routes/peer-review.routes"
 import { scholarsRouter } from "./routes/scholars.routes"
 import { scholarshipsRouter } from "./routes/scholarships.routes"
 import { treasuryRouter } from "./routes/treasury.routes"
@@ -80,9 +82,6 @@ const env = envSchema.parse(process.env)
 setupConsoleRequestTracing()
 
 const isProduction = env.NODE_ENV === "production"
-
-import { allowedOrigins } from "./config/cors-config"
-
 
 let jwtPrivateKey = env.JWT_PRIVATE_KEY
 let jwtPublicKey = env.JWT_PUBLIC_KEY

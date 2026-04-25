@@ -8,11 +8,14 @@ const requiredString = (field: string, maxLength?: number) => {
 		})
 		.trim()
 		.min(1, `${field} is required`)
-	
+
 	if (maxLength) {
-		return schema.max(maxLength, `${field} must be ${maxLength} characters or fewer`)
+		return schema.max(
+			maxLength,
+			`${field} must be ${maxLength} characters or fewer`,
+		)
 	}
-	
+
 	return schema
 }
 
@@ -23,11 +26,13 @@ const optionalTrimmedString = (field: string, maxLength?: number) => {
 		})
 		.trim()
 		.min(1, `${field} cannot be empty`)
-	
+
 	if (maxLength) {
-		return schema.max(maxLength, `${field} must be ${maxLength} characters or fewer`).optional()
+		return schema
+			.max(maxLength, `${field} must be ${maxLength} characters or fewer`)
+			.optional()
 	}
-	
+
 	return schema.optional()
 }
 
@@ -282,6 +287,18 @@ export const enrollmentBodySchema = z
 		learner_address: requiredString("learner_address"),
 		course_id: requiredString("course_id"),
 		tx_hash: requiredString("tx_hash"),
+	})
+	.strict()
+
+export const bookmarkBodySchema = z
+	.object({
+		course_id: requiredString("course_id", 100),
+	})
+	.strict()
+
+export const bookmarkCourseIdParamSchema = z
+	.object({
+		courseId: requiredString("courseId", 100),
 	})
 	.strict()
 

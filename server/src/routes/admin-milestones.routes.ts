@@ -7,11 +7,15 @@ import {
 	getMilestoneById,
 	approveMilestone,
 	rejectMilestone,
+	batchApproveMilestones,
+	batchRejectMilestones,
 } from "../controllers/admin-milestones.controller"
 import { submitMilestoneReport } from "../controllers/milestone-submit.controller"
 import { resubmitMilestoneReport } from "../controllers/milestone-resubmit.controller"
 import {
 	approveMilestoneBodySchema,
+	batchApproveMilestonesBodySchema,
+	batchRejectMilestonesBodySchema,
 	legacyMilestoneSubmitBodySchema,
 	milestoneReportIdParamSchema,
 	milestoneSubmitBodySchema,
@@ -216,4 +220,18 @@ adminMilestonesRouter.post(
 	"/milestones/resubmit",
 	milestoneSubmissionLimiter,
 	resubmitMilestoneReport,
+)
+
+adminMilestonesRouter.post(
+	"/admin/milestones/batch-approve",
+	requireAdmin,
+	validate({ body: batchApproveMilestonesBodySchema }),
+	batchApproveMilestones,
+)
+
+adminMilestonesRouter.post(
+	"/admin/milestones/batch-reject",
+	requireAdmin,
+	validate({ body: batchRejectMilestonesBodySchema }),
+	batchRejectMilestones,
 )

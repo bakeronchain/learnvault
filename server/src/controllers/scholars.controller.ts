@@ -147,7 +147,7 @@ export async function getScholarsLeaderboard(
 		const rankingsValues = [...whereValues, limit, offset]
 		const rankingsResult = await pool.query(
 			`SELECT
-				ROW_NUMBER() OVER (ORDER BY lrn_balance DESC, address ASC) + $${whereValues.length + 2} AS rank,
+				ROW_NUMBER() OVER (ORDER BY lrn_balance DESC, address ASC) AS rank,
 				address,
 				lrn_balance,
 				courses_completed

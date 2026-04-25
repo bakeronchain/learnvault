@@ -5,7 +5,7 @@
 
 jest.mock("../db/index", () => ({
 	pool: {
-		query: jest.fn(),
+		query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
 		connect: jest.fn(),
 	},
 }))
@@ -122,6 +122,14 @@ describe("GET /api/scholars/:address/milestones", () => {
 		)
 
 		const app = buildApp()
+		const mockedQuery = (require("../db/index").pool.query as jest.Mock)
+		mockedQuery.mockResolvedValueOnce({
+			rows: [
+				{ report_id: 1, decided_at: new Date().toISOString(), contract_tx_hash: "abc123" },
+				{ report_id: 3, decided_at: new Date().toISOString(), contract_tx_hash: "tx_reject_1" }
+			],
+			rowCount: 2
+		})
 		const res = await request(app).get("/api/scholars/GSCHOLAR1/milestones")
 
 		expect(res.status).toBe(200)

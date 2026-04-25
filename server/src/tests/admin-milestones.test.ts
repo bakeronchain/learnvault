@@ -5,7 +5,7 @@
 
 jest.mock("../db/index", () => ({
 	pool: {
-		query: jest.fn(),
+		query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
 		connect: jest.fn(),
 	},
 }))
@@ -69,6 +69,7 @@ function buildApp() {
 // Reset in-memory store before each test
 beforeEach(() => {
 	jest.clearAllMocks()
+
 	// @ts-ignore – reset private fields for test isolation
 	inMemoryMilestoneStore["reports"] = []
 	// @ts-ignore

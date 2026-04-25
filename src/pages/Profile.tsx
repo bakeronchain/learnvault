@@ -12,7 +12,7 @@ import {
 	ProfileSkeleton,
 } from "../components/SkeletonLoader"
 import { ErrorState } from "../components/states/errorState"
-import { ProfileLinkedWallets } from "../components/ProfileLinkedWallets"
+import { useScholarCredentials } from "../hooks/useScholarCredentials"
 import { useScholarProfile } from "../hooks/useScholarProfile"
 import { WalletContext } from "../providers/WalletProvider"
 import { formatDuration, getLearningTimeSummary } from "../util/learningTime"
@@ -52,57 +52,37 @@ const Profile: React.FC = () => {
 			return
 		}
 
-		// Use displayAddress as the primary, and link additional ones if available
-		const addresses =
-			profile?.wallets && profile.wallets.length > 0
-				? profile.wallets.map((w) => w.address)
-				: [displayAddress]
-
 		try {
 			setIsLoading(true)
 			setError(null)
 
-			const responses = await Promise.all(
-				addresses.map((addr) =>
-					fetch(`/api/credentials/${addr}`, { method: "GET" }),
-				),
-			)
-			for (const response of responses) {
-				if (!response.ok) {
-					const payload = await response.json().catch(() => ({}))
-					throw new Error(
-						payload.message || payload.error || "Unable to load credentials",
-					)
-				}
+			const response = await fetch(`/api/credentials/${displayAddress}`, {
+				method: "GET",
+			})
+
+			if (!response.ok) {
+				const payload = await response.json().catch(() => ({}))
+				throw new Error(
+					payload.message || payload.error || "Unable to load credentials",
+				)
 			}
-			const payloads = await Promise.all(
-				responses.map((r) => r.json() as Promise<{ data?: unknown[] }>),
+
+			const data = await response.json()
+			setNfts(
+				Array.isArray(data.data)
+					? data.data.map((item: any) => ({
+							id: String(item.token_id ?? item.course_id ?? Math.random()),
+							course_id: item.course_id,
+							program: item.course_id ?? "Unknown course",
+							date: item.minted_at
+								? new Date(item.minted_at).toLocaleDateString()
+								: "Unknown",
+							artwork: item.metadata_uri
+								? `https://gateway.pinata.cloud/ipfs/${item.metadata_uri.replace("ipfs://", "")}`
+								: undefined,
+						}))
+					: [],
 			)
-			const byId = new Map<string, UserNft>()
-			for (const data of payloads) {
-				if (!Array.isArray(data.data)) continue
-				for (const item of data.data) {
-					const anyItem = item as any
-					const id = String(
-						anyItem.token_id ?? anyItem.course_id ?? crypto.randomUUID(),
-					)
-					if (byId.has(id)) continue
-					byId.set(id, {
-						id,
-						course_id: anyItem.course_id,
-						program: anyItem.course_id ?? "Unknown course",
-						date: anyItem.minted_at
-							? new Date(anyItem.minted_at).toLocaleDateString()
-							: "Unknown",
-						artwork: anyItem.metadata_uri
-							? `https://gateway.pinata.cloud/ipfs/${String(
-									anyItem.metadata_uri,
-								).replace("ipfs://", "")}`
-							: undefined,
-					})
-				}
-			}
-			setNfts([...byId.values()])
 		} catch (err) {
 			console.error("[profile] error loading credentials", err)
 			setError(
@@ -111,7 +91,8 @@ const Profile: React.FC = () => {
 		} finally {
 			setIsLoading(false)
 		}
-	}, [displayAddress, profile])
+	}, [displayAddress])
+
 	useEffect(() => {
 		void fetchCredentials()
 	}, [fetchCredentials])
@@ -230,8 +211,6 @@ const Profile: React.FC = () => {
 					</div>
 				</div>
 			</header>
-
-			<ProfileLinkedWallets />
 
 			<section>
 				<div className="flex items-center gap-4 mb-12">

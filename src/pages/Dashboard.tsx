@@ -3,13 +3,15 @@ import { Link, useNavigate } from "react-router-dom"
 import ActivityFeed from "../components/ActivityFeed"
 import CourseCard from "../components/CourseCard"
 import LRNBalanceWidget from "../components/LRNBalanceWidget"
-import { DashboardStatsSkeleton } from "../components/SkeletonLoader"
 import { useCourse } from "../hooks/useCourse"
 import { useLearnerProfile } from "../hooks/useLearnerProfile"
 import { useLearnToken } from "../hooks/useLearnToken"
 import { WalletContext } from "../providers/WalletProvider"
 
-import AddressDisplay from "../components/AddressDisplay"
+const shortenAddress = (addr: string) => {
+	if (!addr) return ""
+	return `${addr.slice(0, 5)}...${addr.slice(-4)}`
+}
 
 const Dashboard: React.FC = () => {
 	const { address } = useContext(WalletContext)
@@ -58,8 +60,10 @@ const Dashboard: React.FC = () => {
 
 	if (isInitializing && !address) {
 		return (
-			<div aria-busy="true" className="min-h-screen p-6 md:p-12 max-w-7xl mx-auto">
-				<DashboardStatsSkeleton />
+			<div className="min-h-screen flex items-center justify-center">
+				<div className="animate-pulse text-white/50 tracking-widest uppercase font-black text-sm">
+					Verifying Wallet...
+				</div>
 			</div>
 		)
 	}
@@ -122,8 +126,8 @@ const Dashboard: React.FC = () => {
 			<div className="max-w-6xl mx-auto space-y-10 sm:space-y-12 relative z-10 w-full pb-20 sm:pb-24">
 				{/* ── Header ── */}
 				<header className="space-y-1">
-					<h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter text-gradient leading-tight flex flex-wrap items-center gap-x-3">
-						Welcome back, <AddressDisplay address={profile?.address || address} showCopyButton={false} showExplorerLink={false} addressClassName="text-gradient" />
+					<h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter text-gradient leading-tight break-all sm:break-words">
+						Welcome back, {shortenAddress(profile?.address || address)}
 					</h1>
 					<p className="text-white/50 text-sm sm:text-base md:text-lg font-medium">
 						Your learning dashboard and on-chain reputation.

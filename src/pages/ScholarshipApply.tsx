@@ -17,7 +17,6 @@ import {
 	type ScholarshipApplicationFormValues,
 	type StoredScholarshipProposal,
 } from "../util/scholarshipApplications"
-import AddressDisplay from "../components/AddressDisplay"
 import styles from "./ScholarshipApply.module.css"
 
 const steps = [
@@ -273,8 +272,8 @@ export default function ScholarshipApply() {
 					<span>
 						Estimated network fee: {ESTIMATED_NETWORK_FEE_XLM.toFixed(2)} XLM
 					</span>
-					<span className="flex items-center gap-1">
-						Wallet: {address ? <AddressDisplay address={address} showCopyButton={false} showExplorerLink={false} /> : "Connect to begin"}
+					<span>
+						Wallet: {address ? shortenAddress(address) : "Connect to begin"}
 					</span>
 				</div>
 			</section>
@@ -334,7 +333,7 @@ export default function ScholarshipApply() {
 									<div className={styles.StatCard}>
 										<span className={styles.StatLabel}>Connected wallet</span>
 										<strong>
-											{address ? <AddressDisplay address={address} /> : "Not connected"}
+											{address ? shortenAddress(address) : "Not connected"}
 										</strong>
 									</div>
 									<div className={styles.StatCard}>
@@ -709,7 +708,7 @@ export default function ScholarshipApply() {
 									/>
 									<span className={styles.CheckboxText}>
 										I confirm that{" "}
-										{address ? <AddressDisplay address={address} showCopyButton={false} showExplorerLink={false} /> : "the connected wallet"}
+										{address ? shortenAddress(address) : "the connected wallet"}
 										should receive scholarship disbursements.
 									</span>
 								</label>

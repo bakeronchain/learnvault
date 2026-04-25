@@ -36,9 +36,9 @@ export const getTreasuryStats = async (
 
 		// Fetch events from the ScholarshipTreasury contract
 		const response = await server.getEvents({
-			filters: [{ contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] }],
-			startLedger: parseInt(process.env.STARTING_LEDGER || "460000000", 10),
-			limit: 1000,
+			filters: [{ contract: SCHOLARSHIP_TREASURY_CONTRACT_ID }],
+			startLedger: process.env.STARTING_LEDGER || "460000000",
+			pagination: { maxPageSize: 1000 },
 		})
 
 		let totalDeposited = BigInt(0)
@@ -48,24 +48,26 @@ export const getTreasuryStats = async (
 		let activeProposals = 0
 
 		// Parse events to calculate stats
-		for (const event of response.events) {
-			const { scValToNative } = await import("@stellar/stellar-sdk")
-			const eventData = scValToNative(event.value)
+		for (const page of response.events) {
+			for (const event of page) {
+				const { scValToNative } = await import("@stellar/stellar-sdk")
+				const eventData = scValToNative(event.value)
 
-			// Identify event type from topics
-			const topics = event.topic.map((t: any) => scValToNative(t))
-			const eventType = topics[0]
+				// Identify event type from topics
+				const topics = event.topic.map((t: any) => scValToNative(t))
+				const eventType = topics[0]
 
-			if (eventType === "deposit" || eventType === "Deposit") {
-				const amount = BigInt(eventData.amount || 0)
-				totalDeposited += amount
-				if (eventData.donor) donors.add(eventData.donor)
-			} else if (eventType === "disburse" || eventType === "Disburse") {
-				const amount = BigInt(eventData.amount || 0)
-				totalDisbursed += amount
-				if (eventData.scholar) scholars.add(eventData.scholar)
-			} else if (eventType === "proposal_submitted") {
-				activeProposals++
+				if (eventType === "deposit" || eventType === "Deposit") {
+					const amount = BigInt(eventData.amount || 0)
+					totalDeposited += amount
+					if (eventData.donor) donors.add(eventData.donor)
+				} else if (eventType === "disburse" || eventType === "Disburse") {
+					const amount = BigInt(eventData.amount || 0)
+					totalDisbursed += amount
+					if (eventData.scholar) scholars.add(eventData.scholar)
+				} else if (eventType === "proposal_submitted") {
+					activeProposals++
+				}
 			}
 		}
 
@@ -103,10 +105,7 @@ export const getTreasuryActivity = async (
 		1,
 		Math.min(parsePositiveInt(req.query.limit, 20), 100),
 	)
-	const pageParam = parsePositiveInt(req.query.page, 1)
-	const offsetParam = parsePositiveInt(req.query.offset, -1)
-	const offset = offsetParam >= 0 ? offsetParam : (pageParam - 1) * limit
-	const page = offsetParam >= 0 ? Math.floor(offset / limit) + 1 : pageParam
+	const offset = Math.max(0, parsePositiveInt(req.query.offset, 0))
 
 	try {
 		const server = new rpc.Server(
@@ -117,9 +116,9 @@ export const getTreasuryActivity = async (
 
 		// Fetch events from the ScholarshipTreasury contract
 		const response = await server.getEvents({
-			filters: [{ contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] }],
-			startLedger: parseInt(process.env.STARTING_LEDGER || "460000000", 10),
-			limit: 1000,
+			filters: [{ contract: SCHOLARSHIP_TREASURY_CONTRACT_ID }],
+			startLedger: process.env.STARTING_LEDGER || "460000000",
+			pagination: { maxPageSize: 1000 },
 		})
 
 		const events: Array<{
@@ -132,30 +131,32 @@ export const getTreasuryActivity = async (
 		}> = []
 
 		// Parse and format events
-		for (const event of response.events) {
-			const { scValToNative } = await import("@stellar/stellar-sdk")
-			const eventData = scValToNative(event.value)
+		for (const page of response.events) {
+			for (const event of page) {
+				const { scValToNative } = await import("@stellar/stellar-sdk")
+				const eventData = scValToNative(event.value)
 
-			// Identify event type from topics
-			const topics = event.topic.map((t: any) => scValToNative(t))
-			const eventType = topics[0]
+				// Identify event type from topics
+				const topics = event.topic.map((t: any) => scValToNative(t))
+				const eventType = topics[0]
 
-			if (eventType === "deposit" || eventType === "Deposit") {
-				events.push({
-					type: "deposit",
-					amount: eventData.amount?.toString() || "0",
-					address: eventData.donor || "unknown",
-					tx_hash: event.txHash || "",
-					created_at: event.ledgerClosedAt || new Date().toISOString(),
-				})
-			} else if (eventType === "disburse" || eventType === "Disburse") {
-				events.push({
-					type: "disburse",
-					scholar: eventData.scholar || "unknown",
-					amount: eventData.amount?.toString() || "0",
-					tx_hash: event.txHash || "",
-					created_at: event.ledgerClosedAt || new Date().toISOString(),
-				})
+				if (eventType === "deposit" || eventType === "Deposit") {
+					events.push({
+						type: "deposit",
+						amount: eventData.amount?.toString() || "0",
+						address: eventData.donor || "unknown",
+						tx_hash: event.txHash || "",
+						created_at: event.ledgerClosedAt || new Date().toISOString(),
+					})
+				} else if (eventType === "disburse" || eventType === "Disburse") {
+					events.push({
+						type: "disburse",
+						scholar: eventData.scholar || "unknown",
+						amount: eventData.amount?.toString() || "0",
+						tx_hash: event.txHash || "",
+						created_at: event.ledgerClosedAt || new Date().toISOString(),
+					})
+				}
 			}
 		}
 
@@ -167,11 +168,9 @@ export const getTreasuryActivity = async (
 
 		// Apply pagination
 		const paginatedEvents = events.slice(offset, offset + limit)
-		const total = events.length
 
 		res.status(200).json({
-			data: paginatedEvents,
-			pagination: { page, limit, total },
+			events: paginatedEvents,
 		})
 	} catch (err) {
 		console.error("[treasury] Failed to fetch activity:", err)

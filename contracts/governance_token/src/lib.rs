@@ -116,21 +116,6 @@ pub struct GOVApproved {
     pub amount: i128,
 }
 
-/// Emitted when a token holder changes their delegation to a new address.
-#[contractevent]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DelegateChanged {
-    pub delegator: Address,
-    pub delegatee: Address,
-}
-
-/// Emitted when a token holder removes their delegation entirely.
-#[contractevent]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DelegateRemoved {
-    pub delegator: Address,
-}
-
 // ---------------------------------------------------------------------------
 // Contract
 // ---------------------------------------------------------------------------
@@ -430,18 +415,12 @@ impl GovernanceToken {
             env.storage().persistent().set(&key, &(current + bal));
             env.storage()
                 .persistent()
-                .set(&DataKey::Delegate(delegator.clone()), &delegatee.clone());
-            DelegateChanged {
-                delegator,
-                delegatee,
-            }
-            .publish(&env);
+                .set(&DataKey::Delegate(delegator), &delegatee);
         } else {
             // Delegating to self is same as undelegating
             env.storage()
                 .persistent()
-                .remove(&DataKey::Delegate(delegator.clone()));
-            DelegateRemoved { delegator }.publish(&env);
+                .remove(&DataKey::Delegate(delegator));
         }
     }
 
@@ -457,8 +436,7 @@ impl GovernanceToken {
 
             env.storage()
                 .persistent()
-                .remove(&DataKey::Delegate(delegator.clone()));
-            DelegateRemoved { delegator }.publish(&env);
+                .remove(&DataKey::Delegate(delegator));
         }
     }
 

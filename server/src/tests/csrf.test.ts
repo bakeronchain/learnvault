@@ -32,7 +32,7 @@ const ALLOWED_ORIGINS = [ALLOWED_ORIGIN]
 
 const testJwtService = {
 	signWalletToken: (addr: string) => jwt.sign({ sub: addr }, JWT_SECRET),
-	verifyWalletToken: async (token: string) => {
+	verifyWalletToken: (token: string) => {
 		const d = jwt.verify(token, JWT_SECRET) as {
 			sub?: string
 			address?: string
@@ -41,7 +41,6 @@ const testJwtService = {
 		if (!sub) throw new Error("Invalid token")
 		return { sub }
 	},
-	revokeToken: async () => {},
 }
 
 function validToken(address = "GUSER123") {

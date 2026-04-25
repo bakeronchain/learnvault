@@ -2,8 +2,6 @@ import crypto from "node:crypto"
 
 import jwt from "jsonwebtoken"
 
-import { type TokenStore } from "../db/token-store"
-
 const JWT_EXPIRY = "24h"
 
 function normalizePem(pem: string): string {
@@ -25,14 +23,12 @@ export function generateEphemeralDevJwtKeys(): {
 
 export type JwtService = {
 	signWalletToken(stellarAddress: string): string
-	verifyWalletToken(token: string): Promise<{ sub: string }>
-	revokeToken(token: string): Promise<void>
+	verifyWalletToken(token: string): { sub: string }
 }
 
 export function createJwtService(
 	privateKeyPem: string,
 	publicKeyPem: string,
-	tokenStore: TokenStore,
 ): JwtService {
 	const privateKey = normalizePem(privateKeyPem)
 	const publicKey = normalizePem(publicKeyPem)
@@ -45,12 +41,7 @@ export function createJwtService(
 			})
 		},
 
-		async verifyWalletToken(token: string): Promise<{ sub: string }> {
-			const isRevoked = await tokenStore.isRevoked(token)
-			if (isRevoked) {
-				throw new Error("Token has been revoked")
-			}
-
+		verifyWalletToken(token: string): { sub: string } {
 			const decoded = jwt.verify(token, publicKey, {
 				algorithms: ["RS256"],
 			}) as { sub?: string }
@@ -61,16 +52,5 @@ export function createJwtService(
 
 			return { sub: decoded.sub }
 		},
-
-		async revokeToken(token: string): Promise<void> {
-			const decoded = jwt.decode(token) as { exp?: number }
-			const nowSeconds = Math.floor(Date.now() / 1000)
-			const ttl = (decoded?.exp ?? nowSeconds + 86400) - nowSeconds
-
-			if (ttl > 0) {
-				await tokenStore.revoke(token, ttl)
-			}
-		},
 	}
 }
-

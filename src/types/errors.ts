@@ -10,7 +10,6 @@ export enum ErrorCode {
 export interface AppError {
 	code: ErrorCode
 	message: string
-	requestId?: string
 	context?: Record<string, unknown>
 	originalError?: unknown
 }
@@ -37,12 +36,10 @@ export function createAppError(
 	message: string,
 	context?: ErrorContext,
 	originalError?: unknown,
-	requestId?: string,
 ): AppError {
 	return {
 		code,
 		message,
-		requestId,
 		context,
 		originalError,
 	}

@@ -13,12 +13,12 @@ export async function startEventPoller(): Promise<void> {
 	// Get global latest ledger
 	const network = new rpc.Server(process.env.SOROBAN_RPC_URL!)
 	const info = await network.getNetwork()
-	let currentLedger = Number(await network.getLatestLedger())
+	let currentLedger = Number(info.ledger)
 
 	pollInterval = setInterval(async () => {
 		try {
 			const newInfo = await network.getNetwork()
-			const latestLedger = Number(await network.getLatestLedger())
+			const latestLedger = Number(newInfo.ledger)
 
 			if (currentLedger >= latestLedger) return
 

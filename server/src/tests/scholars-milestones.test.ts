@@ -5,7 +5,25 @@
 
 jest.mock("../db/index", () => ({
 	pool: {
-		query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+		query: jest.fn().mockImplementation((sql: string) => {
+			if (sql.includes("milestone_audit_log")) {
+				return Promise.resolve({
+					rows: [
+						{
+							report_id: 1,
+							contract_tx_hash: "abc123",
+							decided_at: new Date().toISOString(),
+						},
+						{
+							report_id: 3,
+							contract_tx_hash: "tx_reject_1",
+							decided_at: new Date().toISOString(),
+						},
+					],
+				})
+			}
+			return Promise.resolve({ rows: [] })
+		}),
 		connect: jest.fn(),
 	},
 }))
@@ -13,22 +31,25 @@ jest.mock("../db/index", () => ({
 import express from "express"
 import request from "supertest"
 
-import { pool } from "../db/index"
 import { inMemoryMilestoneStore } from "../db/milestone-store"
 import { errorHandler } from "../middleware/error.middleware"
-import { scholarsRouter } from "../routes/scholars.routes"
+import { createScholarsRouter } from "../routes/scholars.routes"
+import { type JwtService } from "../services/jwt.service"
 
-function buildApp() {
+const testJwtService: JwtService = {
+	signWalletToken: () => "mock-token",
+	verifyWalletToken: (token: string) => ({ sub: "GSCHOLAR1" }),
+}
+
+const buildApp = (): express.Express => {
 	const app = express()
 	app.use(express.json())
-	app.use("/api", scholarsRouter)
+	app.use("/api", createScholarsRouter(testJwtService))
 	app.use(errorHandler)
 	return app
 }
 
 beforeEach(() => {
-	;(pool.query as jest.Mock).mockReset()
-	;(pool.query as jest.Mock).mockResolvedValue({ rows: [] })
 	// @ts-ignore – reset private fields for test isolation
 	inMemoryMilestoneStore["reports"] = []
 	// @ts-ignore
@@ -92,44 +113,7 @@ describe("GET /api/scholars/:address/milestones", () => {
 			contract_tx_hash: "tx_reject_1",
 		})
 
-		;(pool.query as jest.Mock).mockImplementation(
-			(sql: string, params?: unknown[]) => {
-				if (String(sql).includes("milestone_audit_log")) {
-					const ids = (params?.[0] as number[]) ?? []
-					const rows: Array<{
-						report_id: number
-						decided_at: string
-						contract_tx_hash: string | null
-					}> = []
-					if (ids.includes(approvedReport.id)) {
-						rows.push({
-							report_id: approvedReport.id,
-							decided_at: new Date().toISOString(),
-							contract_tx_hash: "abc123",
-						})
-					}
-					if (ids.includes(rejectedReport.id)) {
-						rows.push({
-							report_id: rejectedReport.id,
-							decided_at: new Date().toISOString(),
-							contract_tx_hash: "tx_reject_1",
-						})
-					}
-					return Promise.resolve({ rows })
-				}
-				return Promise.resolve({ rows: [] })
-			},
-		)
-
 		const app = buildApp()
-		const mockedQuery = (require("../db/index").pool.query as jest.Mock)
-		mockedQuery.mockResolvedValueOnce({
-			rows: [
-				{ report_id: 1, decided_at: new Date().toISOString(), contract_tx_hash: "abc123" },
-				{ report_id: 3, decided_at: new Date().toISOString(), contract_tx_hash: "tx_reject_1" }
-			],
-			rowCount: 2
-		})
 		const res = await request(app).get("/api/scholars/GSCHOLAR1/milestones")
 
 		expect(res.status).toBe(200)
@@ -179,27 +163,6 @@ describe("GET /api/scholars/:address/milestones", () => {
 			evidence_ipfs_cid: null,
 			evidence_description: null,
 		})
-
-		;(pool.query as jest.Mock).mockImplementation(
-			(sql: string, params?: unknown[]) => {
-				if (String(sql).includes("milestone_audit_log")) {
-					const ids = (params?.[0] as number[]) ?? []
-					if (ids.includes(report1.id)) {
-						return Promise.resolve({
-							rows: [
-								{
-									report_id: report1.id,
-									decided_at: new Date().toISOString(),
-									contract_tx_hash: "tx1",
-								},
-							],
-						})
-					}
-					return Promise.resolve({ rows: [] })
-				}
-				return Promise.resolve({ rows: [] })
-			},
-		)
 
 		const app = buildApp()
 		const res = await request(app).get(

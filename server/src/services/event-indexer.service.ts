@@ -5,7 +5,6 @@ import {
 	INDEXER_CONFIG,
 	getPollingTargets,
 } from "../lib/event-config"
-import { leaderboardEmitter } from "../lib/leaderboard-emitter"
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL! })
 
@@ -67,11 +66,6 @@ export async function indexEventsBatch(
 						[contractId, topic, data, ledger],
 					)
 					inserted++
-
-					// Notify leaderboard of potential balance changes
-					if (topic === "LearnToken_Mint" || topic === "ScholarNFT::minted") {
-						leaderboardEmitter.emitUpdate()
-					}
 				}
 			} catch (err) {
 				console.error(`[indexer:${contractId}:${topic}] Error:`, err)

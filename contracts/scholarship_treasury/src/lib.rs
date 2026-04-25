@@ -116,6 +116,7 @@ pub enum Error {
     ProposalRejected = 15,
     ProposalCancelled = 16,
     Unauthorized = 17,
+    ArithmeticOverflow = 18,
 }
 
 #[contract]
@@ -294,9 +295,8 @@ impl ScholarshipTreasury {
             .instance()
             .get::<_, i128>(&TOTAL_GOV_KEY)
             .unwrap_or(0);
-        env.storage()
-            .instance()
-            .set(&TOTAL_GOV_KEY, &(total_gov + gov_amount));
+        let new_total_gov = Self::checked_add_i128(&env, total_gov, gov_amount);
+        env.storage().instance().set(&TOTAL_GOV_KEY, &new_total_gov);
 
         let donor_key = DataKey::Donor(donor.clone());
         let current = env
@@ -311,14 +311,12 @@ impl ScholarshipTreasury {
                 .instance()
                 .get::<_, u32>(&DONORS_KEY)
                 .unwrap_or(0);
-            env.storage()
-                .instance()
-                .set(&DONORS_KEY, &(donors_count + 1));
+            let new_donors_count = Self::checked_add_u32(&env, donors_count, 1);
+            env.storage().instance().set(&DONORS_KEY, &new_donors_count);
         }
 
-        env.storage()
-            .persistent()
-            .set(&donor_key, &(current + amount));
+        let new_donor_total = Self::checked_add_i128(&env, current, amount);
+        env.storage().persistent().set(&donor_key, &new_donor_total);
 
         Self::extend_persistent(&env, &donor_key);
 
@@ -327,7 +325,8 @@ impl ScholarshipTreasury {
             .instance()
             .get::<_, i128>(&TOTAL_KEY)
             .unwrap_or(0);
-        env.storage().instance().set(&TOTAL_KEY, &(total + amount));
+        let new_total = Self::checked_add_i128(&env, total, amount);
+        env.storage().instance().set(&TOTAL_KEY, &new_total);
 
         DepositRecorded { donor, amount }.publish(&env);
     }
@@ -351,17 +350,16 @@ impl ScholarshipTreasury {
             panic_with_error!(&env, Error::InsufficientFunds);
         }
 
-        token::client(&env).transfer(&env.current_contract_address(), &recipient, &amount);
-        env.storage().instance().set(&TOTAL_KEY, &(total - amount));
+        let new_total = Self::checked_sub_i128(&env, total, amount);
+        env.storage().instance().set(&TOTAL_KEY, &new_total);
 
         let disbursed = env
             .storage()
             .instance()
             .get::<_, i128>(&DISBURSED_KEY)
             .unwrap_or(0);
-        env.storage()
-            .instance()
-            .set(&DISBURSED_KEY, &(disbursed + amount));
+        let new_disbursed = Self::checked_add_i128(&env, disbursed, amount);
+        env.storage().instance().set(&DISBURSED_KEY, &new_disbursed);
 
         let scholar_key = DataKey::Scholar(recipient.clone());
         if !env.storage().persistent().has(&scholar_key) {
@@ -370,12 +368,15 @@ impl ScholarshipTreasury {
                 .instance()
                 .get::<_, u32>(&SCHOLARS_KEY)
                 .unwrap_or(0);
+            let new_scholars_count = Self::checked_add_u32(&env, scholars_count, 1);
             env.storage()
                 .instance()
-                .set(&SCHOLARS_KEY, &(scholars_count + 1));
+                .set(&SCHOLARS_KEY, &new_scholars_count);
             env.storage().persistent().set(&scholar_key, &true);
             Self::extend_persistent(&env, &scholar_key);
         }
+
+        token::client(&env).transfer(&env.current_contract_address(), &recipient, &amount);
 
         DisbursementRecorded { recipient, amount }.publish(&env);
     }
@@ -402,7 +403,7 @@ impl ScholarshipTreasury {
             panic_with_error!(&env, Error::ProposalAlreadyExecuted);
         }
 
-        let total_votes = proposal.yes_votes + proposal.no_votes;
+        let total_votes = Self::checked_add_i128(&env, proposal.yes_votes, proposal.no_votes);
         let quorum_threshold = Self::get_quorum(env.clone());
         let approval_bps = Self::get_approval_bps(env.clone());
 
@@ -414,15 +415,15 @@ impl ScholarshipTreasury {
                 .map(|v| (v / total_votes) as u32 > approval_bps)
                 .unwrap_or(false);
 
-        if passed {
-            Self::disburse_internal(&env, &proposal.applicant, proposal.amount);
-        }
-
         proposal.executed = true;
         env.storage()
             .persistent()
             .set(&DataKey::Proposal(proposal_id), &proposal);
         Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
+
+        if passed {
+            Self::disburse_internal(&env, &proposal.applicant, proposal.amount);
+        }
 
         ProposalExecuted {
             proposal_id,
@@ -589,7 +590,11 @@ impl ScholarshipTreasury {
             submitted_at: env.ledger().timestamp(),
             yes_votes: 0,
             no_votes: 0,
-            deadline_ledger: env.ledger().sequence() + PROPOSAL_DEADLINE_LEDGERS,
+            deadline_ledger: Self::checked_add_u32(
+                &env,
+                env.ledger().sequence(),
+                PROPOSAL_DEADLINE_LEDGERS,
+            ),
             executed: false,
             cancelled: false,
         };
@@ -612,9 +617,10 @@ impl ScholarshipTreasury {
             .set(&applicant_key, &proposal_ids);
 
         Self::extend_persistent(&env, &applicant_key);
+        let next_proposal_id = Self::checked_add_u32(&env, proposal_id, 1);
         env.storage()
             .instance()
-            .set(&NEXT_PROPOSAL_KEY, &(proposal_id + 1));
+            .set(&NEXT_PROPOSAL_KEY, &next_proposal_id);
 
         ProposalSubmitted {
             applicant,
@@ -658,7 +664,10 @@ impl ScholarshipTreasury {
             {
                 proposals.push_back(proposal);
             }
-            proposal_id += 1;
+            if proposal_id == proposal_count {
+                break;
+            }
+            proposal_id = Self::checked_add_u32(&env, proposal_id, 1);
         }
 
         proposals
@@ -677,6 +686,9 @@ impl ScholarshipTreasury {
     }
 
     pub fn vote(env: Env, voter: Address, proposal_id: u32, support: bool) {
+        Self::assert_initialized(&env);
+        Self::assert_not_paused(&env);
+
         // 1. Require auth
         voter.require_auth();
 
@@ -715,13 +727,16 @@ impl ScholarshipTreasury {
         let gov_contract = Self::governance_contract(&env);
         let gov_client = governance::client(&env, &gov_contract);
         let weight = gov_client.get_voting_power(&voter);
+        if weight < 0 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
         // Weight of 0 is permitted; vote is recorded but has no numerical effect on outcome
 
         // 6. Add weight to yes_votes or no_votes
         if support {
-            proposal.yes_votes += weight;
+            proposal.yes_votes = Self::checked_add_i128(&env, proposal.yes_votes, weight);
         } else {
-            proposal.no_votes += weight;
+            proposal.no_votes = Self::checked_add_i128(&env, proposal.no_votes, weight);
         }
 
         // 7. Mark VoteCast = true
@@ -772,7 +787,7 @@ impl ScholarshipTreasury {
             panic_with_error!(&env, Error::VotingNotClosed);
         }
 
-        let total_votes = proposal.yes_votes + proposal.no_votes;
+        let total_votes = Self::checked_add_i128(&env, proposal.yes_votes, proposal.no_votes);
         let quorum_threshold = Self::get_quorum(env.clone());
         let approval_bps = Self::get_approval_bps(env.clone());
 
@@ -863,17 +878,16 @@ impl ScholarshipTreasury {
             panic_with_error!(env, Error::InsufficientFunds);
         }
 
-        token::client(env).transfer(&env.current_contract_address(), recipient, &amount);
-        env.storage().instance().set(&TOTAL_KEY, &(total - amount));
+        let new_total = Self::checked_sub_i128(env, total, amount);
+        env.storage().instance().set(&TOTAL_KEY, &new_total);
 
         let disbursed = env
             .storage()
             .instance()
             .get::<_, i128>(&DISBURSED_KEY)
             .unwrap_or(0);
-        env.storage()
-            .instance()
-            .set(&DISBURSED_KEY, &(disbursed + amount));
+        let new_disbursed = Self::checked_add_i128(env, disbursed, amount);
+        env.storage().instance().set(&DISBURSED_KEY, &new_disbursed);
 
         let scholar_key = DataKey::Scholar(recipient.clone());
         if !env.storage().persistent().has(&scholar_key) {
@@ -882,12 +896,15 @@ impl ScholarshipTreasury {
                 .instance()
                 .get::<_, u32>(&SCHOLARS_KEY)
                 .unwrap_or(0);
+            let new_scholars_count = Self::checked_add_u32(env, scholars_count, 1);
             env.storage()
                 .instance()
-                .set(&SCHOLARS_KEY, &(scholars_count + 1));
+                .set(&SCHOLARS_KEY, &new_scholars_count);
             env.storage().persistent().set(&scholar_key, &true);
             Self::extend_persistent(env, &scholar_key);
         }
+
+        token::client(env).transfer(&env.current_contract_address(), recipient, &amount);
 
         DisbursementRecorded {
             recipient: recipient.clone(),
@@ -933,6 +950,21 @@ impl ScholarshipTreasury {
         env.storage()
             .persistent()
             .extend_ttl(key, PERSISTENT_BUMP_THRESHOLD, PERSISTENT_EXTEND_TO);
+    }
+
+    fn checked_add_i128(env: &Env, left: i128, right: i128) -> i128 {
+        left.checked_add(right)
+            .unwrap_or_else(|| panic_with_error!(env, Error::ArithmeticOverflow))
+    }
+
+    fn checked_sub_i128(env: &Env, left: i128, right: i128) -> i128 {
+        left.checked_sub(right)
+            .unwrap_or_else(|| panic_with_error!(env, Error::ArithmeticOverflow))
+    }
+
+    fn checked_add_u32(env: &Env, left: u32, right: u32) -> u32 {
+        left.checked_add(right)
+            .unwrap_or_else(|| panic_with_error!(env, Error::ArithmeticOverflow))
     }
 }
 

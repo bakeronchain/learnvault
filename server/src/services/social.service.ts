@@ -46,32 +46,31 @@ export const socialService = {
 		followingAddress: string,
 	): Promise<void> {
 		// Try to find email for followingAddress
-		// Since we don't have a users table, we look in milestone_reports
+		// Since we don't have a users table, we look in escrow_timeouts where email is stored
 		const result = await pool.query(
-			`SELECT scholar_email, scholar_name 
-			 FROM milestone_reports 
+			`SELECT scholar_email
+			 FROM escrow_timeouts 
 			 WHERE scholar_address = $1 
-			 ORDER BY submitted_at DESC LIMIT 1`,
+			 ORDER BY created_at DESC LIMIT 1`,
 			[followingAddress],
 		)
 
 		const target = result.rows[0]
 		if (!target || !target.scholar_email) return
 
-		// Also try to get follower's name
-		const followerResult = await pool.query(
-			`SELECT scholar_name 
-			 FROM milestone_reports 
-			 WHERE scholar_address = $1 
-			 ORDER BY submitted_at DESC LIMIT 1`,
-			[followerAddress],
-		)
-		const followerName = followerResult.rows[0]?.scholar_name || followerAddress
+		// Use address as name if we don't have a name field
+		const targetName = "Scholar"
+		const followerName = followerAddress
 
-		await emailService.sendNotification(
-			target.scholar_email,
-			"You have a new follower!",
-			`Hi ${target.scholar_name || "Scholar"},\n\n${followerName} is now following you on LearnVault!`,
-		)
+		await emailService.sendNotification({
+			to: target.scholar_email,
+			subject: "You have a new follower!",
+			template: "new-follower",
+			data: {
+				name: targetName,
+				followerName: followerName,
+				profileUrl: `${process.env.FRONTEND_URL || "http://localhost:3000"}/scholars/${followingAddress}`,
+			},
+		})
 	},
 }

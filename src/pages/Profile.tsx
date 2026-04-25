@@ -1,9 +1,10 @@
 import React, { useCallback, useContext, useEffect, useState } from "react"
 import { Helmet } from "react-helmet"
 import { useTranslation } from "react-i18next"
-import { Link } from "react-router-dom"
+import { Link, useParams } from "react-router-dom"
 import { ActivityFeed } from "../components/ActivityFeed"
 import AddressDisplay from "../components/AddressDisplay"
+import { FollowButton } from "../components/FollowButton"
 import LRNHistoryChart from "../components/LRNHistoryChart"
 import { ReputationBadge } from "../components/ReputationBadge"
 import {
@@ -12,6 +13,7 @@ import {
 } from "../components/SkeletonLoader"
 import { ErrorState } from "../components/states/errorState"
 import { useScholarCredentials } from "../hooks/useScholarCredentials"
+import { useScholarProfile } from "../hooks/useScholarProfile"
 import { WalletContext } from "../providers/WalletProvider"
 import { formatDuration, getLearningTimeSummary } from "../util/learningTime"
 import { shortenAddress } from "../util/scholarshipApplications"
@@ -26,14 +28,25 @@ type UserNft = {
 
 const Profile: React.FC = () => {
 	const { t } = useTranslation()
-	const { address: walletAddress } = useContext(WalletContext)
+	const { walletAddress: paramAddress } = useParams<{ walletAddress: string }>()
+	const { address: contextAddress } = useContext(WalletContext)
+
+	const displayAddress = paramAddress || contextAddress
+	const isOwnProfile = !paramAddress || paramAddress === contextAddress
+
+	const {
+		data: profile,
+		isLoading: isProfileLoading,
+		error: profileError,
+	} = useScholarProfile(displayAddress)
+
 	const [isLoading, setIsLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 	const [nfts, setNfts] = useState<UserNft[]>([])
 	const [learningTimeLabel, setLearningTimeLabel] = useState("0m")
 
 	const fetchCredentials = useCallback(async () => {
-		if (!walletAddress) {
+		if (!displayAddress) {
 			setNfts([])
 			setIsLoading(false)
 			return
@@ -43,7 +56,7 @@ const Profile: React.FC = () => {
 			setIsLoading(true)
 			setError(null)
 
-			const response = await fetch(`/api/credentials/${walletAddress}`, {
+			const response = await fetch(`/api/credentials/${displayAddress}`, {
 				method: "GET",
 			})
 
@@ -90,8 +103,8 @@ const Profile: React.FC = () => {
 	}, [])
 
 	const siteUrl = "https://learnvault.app"
-	const userName = walletAddress ? shortenAddress(walletAddress) : "Learner"
-	const lrnBalance = "100,000"
+	const userName = displayAddress ? shortenAddress(displayAddress) : "Learner"
+	const lrnBalance = profile?.lrn_balance || "0"
 	const coursesCompleted = nfts.length
 	const title = `${userName} — ${lrnBalance} · ${coursesCompleted} Course${
 		coursesCompleted !== 1 ? "s" : ""
@@ -100,7 +113,7 @@ const Profile: React.FC = () => {
 		coursesCompleted !== 1 ? "s" : ""
 	} and earned ${lrnBalance} on LearnVault.`
 
-	if (isLoading) {
+	if (isProfileLoading || isLoading) {
 		return (
 			<div className="p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
 				<ProfileSkeleton />
@@ -108,10 +121,13 @@ const Profile: React.FC = () => {
 		)
 	}
 
-	if (error) {
+	if (profileError || error) {
 		return (
 			<div className="p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
-				<ErrorState message={error} onRetry={fetchCredentials} />
+				<ErrorState
+					message={(profileError as any)?.message || error}
+					onRetry={fetchCredentials}
+				/>
 			</div>
 		)
 	}
@@ -125,7 +141,7 @@ const Profile: React.FC = () => {
 				<meta property="og:image" content={`${siteUrl}/og-image.png`} />
 				<meta
 					property="og:url"
-					content={`${siteUrl}/profile/${walletAddress ?? ""}`}
+					content={`${siteUrl}/profile/${displayAddress ?? ""}`}
 				/>
 				<meta name="twitter:card" content="summary_large_image" />
 			</Helmet>
@@ -141,21 +157,48 @@ const Profile: React.FC = () => {
 					<h1 className="text-4xl font-black mb-3 tracking-tighter">
 						{t("pages.profile.title")}
 					</h1>
-					<div className="mb-6">
-						{walletAddress ? (
-							<AddressDisplay
-								address={walletAddress}
-								addressClassName="text-white/30 text-sm tracking-widest"
-								buttonClassName="h-6 w-6"
-							/>
+					<div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mb-6">
+						{displayAddress ? (
+							<div className="flex items-center gap-6">
+								<AddressDisplay
+									address={displayAddress}
+									addressClassName="text-white/30 text-sm tracking-widest"
+									buttonClassName="h-6 w-6"
+								/>
+								{!isOwnProfile && (
+									<FollowButton
+										targetAddress={displayAddress}
+										isFollowingInitial={profile?.is_following}
+									/>
+								)}
+							</div>
 						) : (
 							<code className="text-white/30 text-sm block font-mono tracking-widest">
 								{t("wallet.connect")}
 							</code>
 						)}
 					</div>
-					<div className="flex flex-wrap justify-center md:justify-start gap-4">
-						{walletAddress ? (
+					<div className="flex flex-wrap justify-center md:justify-start gap-6">
+						<div className="flex gap-4">
+							<div className="text-center md:text-left">
+								<div className="text-xl font-black text-white">
+									{profile?.follower_count || 0}
+								</div>
+								<div className="text-[10px] uppercase font-black tracking-widest text-white/30">
+									Followers
+								</div>
+							</div>
+							<div className="text-center md:text-left">
+								<div className="text-xl font-black text-white">
+									{profile?.following_count || 0}
+								</div>
+								<div className="text-[10px] uppercase font-black tracking-widest text-white/30">
+									Following
+								</div>
+							</div>
+						</div>
+						<div className="w-px h-10 bg-white/10 hidden md:block" />
+						{displayAddress ? (
 							<ReputationBadge size="md" showBalance />
 						) : (
 							<div className="px-5 py-2 glass rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-white/40">
@@ -236,10 +279,10 @@ const Profile: React.FC = () => {
 					<h2 className="text-2xl font-black tracking-tight">LRN History</h2>
 					<div className="h-px flex-1 bg-linear-to-r from-white/10 to-transparent" />
 				</div>
-				<LRNHistoryChart address={walletAddress} />
+				<LRNHistoryChart address={displayAddress} />
 			</section>
 
-			<ActivityFeed address={walletAddress} limit={10} />
+			<ActivityFeed address={displayAddress} limit={10} />
 		</div>
 	)
 }

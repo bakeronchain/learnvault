@@ -109,7 +109,7 @@ const AppLayout = () => (
 	<div className="min-h-screen flex flex-col pt-24 overflow-x-hidden w-full max-w-full bg-[var(--color-app-bg)] text-[var(--color-app-text)] transition-colors duration-300">
 		<NetworkPreconnect />
 		<NavBar />
-		<main className="flex-1 relative z-10">
+		<main id="main-content" className="flex-1 relative z-10" tabIndex={-1}>
 			<Outlet />
 		</main>
 		<Footer />

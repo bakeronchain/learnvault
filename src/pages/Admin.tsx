@@ -128,6 +128,18 @@ const formatDate = (value: string | undefined): string => {
 const formatCount = (value: number): string =>
 	value.toLocaleString("en-US", { maximumFractionDigits: 0 })
 
+const formatPercent = (value: number): string => {
+	if (!Number.isFinite(value)) return "0.0%"
+	return `${value.toFixed(1)}%`
+}
+
+const formatReviewTime = (seconds: number): string => {
+	if (!Number.isFinite(seconds) || seconds < 0) return "-"
+	if (seconds < 60) return `${Math.round(seconds)}s`
+	if (seconds < 3600) return `${(seconds / 60).toFixed(1)}m`
+	return `${(seconds / 3600).toFixed(1)}h`
+}
+
 const renderAddress = (value: string | undefined) =>
 	value ? shortenContractId(value, 6, 6) : "Not available"
 
@@ -454,6 +466,13 @@ const MilestoneQueue: React.FC = () => {
 	const { data: courseOptionsData = [], error: courseOptionsError } =
 		useAdminCoursesList()
 	const {
+		analytics,
+		reviewQueue,
+		loading: analyticsLoading,
+		error: analyticsError,
+		fetchAnalytics,
+	} = useValidatorAnalytics()
+	const {
 		milestones,
 		total,
 		page,
@@ -483,6 +502,10 @@ const MilestoneQueue: React.FC = () => {
 		})
 	}, [courseFilter, statusFilter, fetchMilestones])
 
+	useEffect(() => {
+		void fetchAnalytics()
+	}, [fetchAnalytics])
+
 	const handlePageChange = (newPage: number) => {
 		void fetchMilestones(newPage, {
 			course: courseFilter !== "All" ? courseFilter : undefined,
@@ -499,6 +522,7 @@ const MilestoneQueue: React.FC = () => {
 		} else {
 			await rejectMilestone(milestone.id)
 		}
+		await fetchAnalytics()
 	}
 
 	const pendingMilestones = milestones.filter(
@@ -585,6 +609,85 @@ const MilestoneQueue: React.FC = () => {
 		<section>
 			<MilestoneStatsBar />
 
+			{reviewQueue?.exceeded && (
+				<div className="mb-4 rounded-xl border border-yellow-500/40 bg-yellow-500/10 px-4 py-3">
+					<p className="text-sm font-medium text-yellow-300">
+						Validator review queue is above threshold
+					</p>
+					<p className="mt-1 text-xs text-yellow-100/80">
+						Pending: {formatCount(reviewQueue.pendingReviews)} | Threshold: {formatCount(reviewQueue.threshold)}
+					</p>
+				</div>
+			)}
+
+			<div className="mb-6 overflow-x-auto rounded-2xl border border-white/5 glass">
+				<div className="flex items-center justify-between px-4 pt-4">
+					<h2 className="text-sm font-medium uppercase tracking-widest text-white/50">
+						Validator Performance
+					</h2>
+				</div>
+				{analyticsError && (
+					<p className="px-4 py-2 text-xs text-red-400">
+						Failed to load validator analytics: {analyticsError}
+					</p>
+				)}
+				<table className="w-full text-left">
+					<thead>
+						<tr className="border-b border-white/5 text-xs uppercase tracking-widest text-white/40">
+							<th className="py-3 px-4 font-medium">Validator</th>
+							<th className="py-3 px-4 font-medium">Reviewed</th>
+							<th className="py-3 px-4 font-medium">Avg Review Time</th>
+							<th className="py-3 px-4 font-medium">Approval Rate</th>
+							<th className="py-3 px-4 font-medium">Appeal Reversal Rate</th>
+						</tr>
+					</thead>
+					<tbody>
+						{analyticsLoading && (
+							<tr>
+								<td
+									colSpan={5}
+									className="py-8 text-center text-sm text-white/40 animate-pulse"
+								>
+									Loading validator analytics...
+								</td>
+							</tr>
+						)}
+
+						{!analyticsLoading && analytics.length === 0 && (
+							<tr>
+								<td colSpan={5} className="py-8 text-center text-sm text-white/40">
+									No validator analytics available.
+								</td>
+							</tr>
+						)}
+
+						{!analyticsLoading &&
+							analytics.map((row) => (
+								<tr
+									key={row.validatorAddress}
+									className="border-b border-white/5 hover:bg-white/3 transition-colors"
+								>
+									<td className="py-3 px-4 font-mono text-xs text-white/60">
+										{shortenContractId(row.validatorAddress, 8, 4)}
+									</td>
+									<td className="py-3 px-4 text-sm text-white/80">
+										{formatCount(row.milestonesReviewed)}
+									</td>
+									<td className="py-3 px-4 text-sm text-white/80">
+										{formatReviewTime(row.averageReviewTimeSeconds)}
+									</td>
+									<td className="py-3 px-4 text-sm text-emerald-300">
+										{formatPercent(row.approvalRate)}
+									</td>
+									<td className="py-3 px-4 text-sm text-amber-200">
+										{formatPercent(row.appealReversalRate)}
+									</td>
+								</tr>
+							))}
+					</tbody>
+				</table>
+			</div>
+
 			<div className="flex flex-wrap gap-3 mb-4 items-center">
 				<div className="flex items-center gap-2">
 					<label
@@ -651,6 +754,7 @@ const MilestoneQueue: React.FC = () => {
 							<th className="py-3 px-4 font-medium">Course</th>
 							<th className="py-3 px-4 font-medium">Submitted</th>
 							<th className="py-3 px-4 font-medium">Evidence</th>
+							<th className="py-3 px-4 font-medium">Peer signals</th>
 							<th className="py-3 px-4 font-medium">Status</th>
 							<th className="py-3 px-4 font-medium">Actions</th>
 						</tr>
@@ -659,7 +763,7 @@ const MilestoneQueue: React.FC = () => {
 						{loading && (
 							<tr>
 								<td
-									colSpan={6}
+									colSpan={7}
 									className="py-12 text-center text-sm text-white/40 animate-pulse"
 								>
 									Loading milestones…
@@ -669,7 +773,7 @@ const MilestoneQueue: React.FC = () => {
 
 						{!loading && milestones.length === 0 && (
 							<tr>
-								<td colSpan={6} className="py-12 text-center">
+								<td colSpan={7} className="py-12 text-center">
 									<p className="text-white/40 text-sm">
 										No milestone submissions found.
 									</p>
@@ -715,6 +819,10 @@ const MilestoneQueue: React.FC = () => {
 										</td>
 										<td className="py-3 px-4">
 											<EvidenceLink value={milestone.evidenceLink} />
+										</td>
+										<td className="py-3 px-4 text-xs font-mono text-white/55 whitespace-nowrap">
+											+{milestone.peerApprovalCount} / −
+											{milestone.peerRejectionCount}
 										</td>
 										<td className="py-3 px-4">
 											<span

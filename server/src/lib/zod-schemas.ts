@@ -57,6 +57,19 @@ export const milestoneReportIdParamSchema = z
 	})
 	.strict()
 
+export const peerReviewSubmitBodySchema = z
+	.object({
+		verdict: z.enum(["approve", "reject"], {
+			required_error: "verdict is required",
+			invalid_type_error: "verdict must be approve or reject",
+		}),
+		comment: z
+			.string()
+			.max(500, "comment must be 500 characters or fewer")
+			.optional(),
+	})
+	.strict()
+
 export const validateMilestoneSchema = z.object({
 	courseId: z.string().cuid({ message: "Invalid course ID format" }),
 	learnerAddress: z.string().min(1),
@@ -170,6 +183,12 @@ export const batchRejectMilestonesBodySchema = z
 	})
 	.strict()
 
+export const updateCommentBodySchema = z
+	.object({
+		content: requiredString("content", 2000),
+	})
+	.strict()
+
 export const createCommentBodySchema = z
 	.object({
 		proposalId: optionalTrimmedString("proposalId", 100),
@@ -265,3 +284,45 @@ export const enrollmentBodySchema = z
 		tx_hash: requiredString("tx_hash", 200),
 	})
 	.strict()
+
+export const userProfileSchema = z
+	.object({
+		display_name: z
+			.string()
+			.trim()
+			.min(3, "Display name must be at least 3 characters")
+			.max(50, "Display name cannot exceed 50 characters")
+			.optional()
+			.nullable(),
+		bio: z
+			.string()
+			.max(2000, "Bio cannot exceed 2000 characters")
+			.optional()
+			.nullable(),
+		avatar_url: z
+			.string()
+			.url("Avatar must be a valid URL")
+			.max(2048, "URL is too long")
+			.optional()
+			.nullable(),
+		twitter: z
+			.string()
+			.trim()
+			.max(255, "Twitter handle/URL is too long")
+			.optional()
+			.nullable(),
+		github: z
+			.string()
+			.trim()
+			.max(255, "GitHub username/URL is too long")
+			.optional()
+			.nullable(),
+		website: z
+			.string()
+			.url("Website must be a valid URL")
+			.max(2048, "URL is too long")
+			.optional()
+			.nullable(),
+	})
+	.strict()
+

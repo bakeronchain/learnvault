@@ -1,6 +1,7 @@
 import { formatDistanceToNow } from "date-fns"
 import React, { useId, useState } from "react"
 import ReactMarkdown from "react-markdown"
+import { useWallet } from "../hooks/useWallet"
 import { getAuthToken } from "../util/auth"
 import AddressDisplay from "./AddressDisplay"
 
@@ -42,17 +43,77 @@ const CommentCard: React.FC<CommentCardProps> = ({
 	canPin,
 	onUpdate,
 }) => {
+	const { address } = useWallet()
 	const [isReplying, setIsReplying] = useState(false)
 	const [replyText, setReplyText] = useState("")
 	const [replyError, setReplyError] = useState<string | null>(null)
 	const [isFlagging, setIsFlagging] = useState(false)
 	const [flagReason, setFlagReason] = useState("")
 	const [flagError, setFlagError] = useState<string | null>(null)
+	const [isEditing, setIsEditing] = useState(false)
+	const [editText, setEditText] = useState(comment.content)
+	const [editError, setEditError] = useState<string | null>(null)
 	const replyFieldId = useId()
 	const replyHintId = `${replyFieldId}-hint`
 	const replyErrorId = `${replyFieldId}-error`
 	const replySectionId = `${replyFieldId}-section`
 	const authorId = `comment-${comment.id}-author`
+
+	const isOwnComment =
+		!!address &&
+		comment.author_address.toLowerCase() === address.toLowerCase()
+
+	const handleSaveEdit = async () => {
+		if (!editText.trim()) {
+			setEditError("Comment cannot be empty.")
+			return
+		}
+		const token = getAuthToken()
+		if (!token) {
+			setEditError("Sign in to edit a comment.")
+			return
+		}
+		setEditError(null)
+		try {
+			const res = await fetch(`${API_URL}/api/comments/${comment.id}`, {
+				method: "PATCH",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
+				},
+				body: JSON.stringify({ content: editText }),
+			})
+			if (res.ok) {
+				setIsEditing(false)
+				onUpdate?.()
+			} else {
+				const err = await res.json().catch(() => ({}))
+				setEditError(err.error || "Failed to update comment.")
+			}
+		} catch (err) {
+			console.error("Edit failed", err)
+			setEditError("Failed to update comment.")
+		}
+	}
+
+	const handleDelete = async () => {
+		if (!window.confirm("Delete this comment? This cannot be undone.")) {
+			return
+		}
+		const token = getAuthToken()
+		if (!token) return
+		try {
+			const res = await fetch(`${API_URL}/api/comments/${comment.id}`, {
+				method: "DELETE",
+				headers: {
+					Authorization: `Bearer ${token}`,
+				},
+			})
+			if (res.ok) onUpdate?.()
+		} catch (err) {
+			console.error("Delete failed", err)
+		}
+	}
 
 	const handleVote = async (type: "upvote" | "downvote") => {
 		const token = getAuthToken()
@@ -188,6 +249,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 
 	return (
 		<article
+			data-testid={`comment-card-${comment.id}`}
 			className={`glass-card p-6 rounded-3xl border border-white/5 relative ${comment.is_pinned ? "border-brand-cyan/30 bg-brand-cyan/5" : ""}`}
 			aria-labelledby={authorId}
 		>
@@ -222,6 +284,30 @@ const CommentCard: React.FC<CommentCardProps> = ({
 				</div>
 
 				<div className="flex gap-2">
+					{isOwnComment && (
+						<>
+							<button
+								type="button"
+								data-testid="comment-edit"
+								onClick={() => {
+									setIsEditing((v) => !v)
+									setEditText(comment.content)
+									setEditError(null)
+								}}
+								className="text-[10px] font-black uppercase text-white/70 hover:text-brand-cyan transition-colors"
+							>
+								{isEditing ? "Close" : "Edit"}
+							</button>
+							<button
+								type="button"
+								data-testid="comment-delete"
+								onClick={() => void handleDelete()}
+								className="text-[10px] font-black uppercase text-white/70 hover:text-red-400 transition-colors"
+							>
+								Delete
+							</button>
+						</>
+					)}
 					{canPin && !comment.is_pinned && (
 						<button
 							type="button"
@@ -252,9 +338,50 @@ const CommentCard: React.FC<CommentCardProps> = ({
 				</div>
 			</header>
 
-			<div className="prose prose-invert prose-sm max-w-none text-white/80 leading-relaxed font-medium mb-8">
-				<ReactMarkdown>{comment.content}</ReactMarkdown>
-			</div>
+			{isEditing ? (
+				<div className="mb-8">
+					<textarea
+						value={editText}
+						onChange={(e) => {
+							setEditText(e.target.value)
+							if (editError) setEditError(null)
+						}}
+						data-testid="comment-edit-field"
+						className="w-full h-32 bg-black/40 border border-white/10 rounded-2xl p-4 text-sm text-white focus:outline-none focus:border-brand-cyan/40"
+					/>
+					{editError && (
+						<p className="mt-2 text-sm text-red-400" role="alert">
+							{editError}
+						</p>
+					)}
+					<div className="flex justify-end gap-3 mt-4">
+						<button
+							type="button"
+							onClick={() => {
+								setIsEditing(false)
+								setEditText(comment.content)
+								setEditError(null)
+							}}
+							className="px-5 py-2 text-[10px] font-black uppercase text-white/70 border border-white/10 rounded-full hover:bg-white/5 transition-colors"
+						>
+							Cancel
+						</button>
+						<button
+							type="button"
+							data-testid="comment-save-edit"
+							onClick={() => void handleSaveEdit()}
+							disabled={!editText.trim()}
+							className="px-5 py-2 bg-brand-cyan text-black text-[10px] font-black uppercase tracking-widest rounded-full hover:scale-105 transition-all disabled:opacity-50"
+						>
+							Save
+						</button>
+					</div>
+				</div>
+			) : (
+				<div className="prose prose-invert prose-sm max-w-none text-white/80 leading-relaxed font-medium mb-8">
+					<ReactMarkdown>{comment.content}</ReactMarkdown>
+				</div>
+			)}
 
 			<footer className="flex items-center gap-6">
 				<div className="flex items-center bg-white/5 rounded-full p-1 border border-white/5">

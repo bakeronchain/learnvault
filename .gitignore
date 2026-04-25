@@ -1,6 +1,5 @@
 # stellar/soroban/Rust output
 target
-target_local
 .soroban
 
 # project identity and alias files will be in .config/stellar

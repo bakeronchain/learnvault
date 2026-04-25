@@ -325,7 +325,6 @@ name = "course_milestone"
 version = "0.0.1"
 dependencies = [
  "learnvault-shared",
- "proptest",
  "soroban-sdk",
  "stellar-registry",
 ]

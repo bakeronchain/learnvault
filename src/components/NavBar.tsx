@@ -34,6 +34,7 @@ export default function NavBar() {
 
 	const navLinks = [
 		{ to: "/courses", label: t("nav.learn") },
+		{ to: "/peer-review", label: "Peer review" },
 		{ to: "/dao", label: t("nav.dao") },
 		{ to: "/community", label: "Community" },
 		{ to: "/leaderboard", label: t("nav.leaderboard") },
@@ -44,6 +45,19 @@ export default function NavBar() {
 	]
 
 	const closeMenu = () => setMenuOpen(false)
+
+	// Close mobile menu on Escape key
+	useEffect(() => {
+		if (!menuOpen) return
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === "Escape") {
+				e.preventDefault()
+				closeMenu()
+			}
+		}
+		document.addEventListener("keydown", handleKeyDown)
+		return () => document.removeEventListener("keydown", handleKeyDown)
+	}, [menuOpen])
 
 	const queryClient = useQueryClient()
 	const { address } = useWallet()

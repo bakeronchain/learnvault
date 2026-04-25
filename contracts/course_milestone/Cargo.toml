@@ -21,5 +21,4 @@ stellar-registry = "0.0.4"
 
 [dev-dependencies]
 learnvault-shared = { workspace = true, features = ["testutils"] }
-proptest = { workspace = true }
 soroban-sdk = { workspace = true, features = ["testutils"] }

@@ -30,6 +30,8 @@
   ],
   "dependencies": {
     "@creit.tech/stellar-wallets-kit": "^2.0.1",
+    "@sentry/browser": "^9.0.0",
+    "@sentry/react": "^9.0.0",
     "@stellar/design-system": "^3.2.7",
     "@stellar/stellar-sdk": "^14.4.3",
     "@stellar/stellar-xdr-json": "^23.0.0",

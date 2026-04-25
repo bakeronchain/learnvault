@@ -3,6 +3,9 @@
   "type": "module",
   "version": "0.0.1",
   "private": true,
+  "overrides": {
+    "protobufjs": ">=7.5.5"
+  },
   "scripts": {
     "dev": "npm start",
     "dev:server": "npm run dev --prefix server",

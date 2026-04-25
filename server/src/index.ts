@@ -154,6 +154,12 @@ app.use((req, res, next) => {
 	next()
 })
 
+// Cache-Control: API responses must never be cached
+app.use("/api", (_req, res, next) => {
+	res.setHeader("Cache-Control", "no-store")
+	next()
+})
+
 app.use(requestLogger)
 
 app.use(

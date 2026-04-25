@@ -408,10 +408,10 @@ two-step build process:
 
 ## Performance
 
-- Response compression enabled using Express `compression` middleware (gzip enabled)
+- Response compression enabled using Express `compression` middleware (gzip/brotli); images, video, audio, binary, and IPFS routes are excluded
+- `Cache-Control: no-store` is set on all `/api/*` routes to prevent caching of API responses
 - Static assets are not served by the Express backend — caching is handled at the CDN/proxy layer (Nginx, Cloudflare, Vercel, etc.)
-- HTTP/2 is handled via reverse proxy (Nginx/Cloudflare/Vercel)
-- Express server runs HTTP/1.1 internally
+- HTTP/2 is handled via reverse proxy (Nginx/Cloudflare/Vercel) — Express runs HTTP/1.1 internally
 - Request latency logging middleware logs `METHOD URL - Xms` for every request
 
 

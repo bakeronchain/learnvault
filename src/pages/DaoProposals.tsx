@@ -83,17 +83,14 @@ const DaoProposals: React.FC = () => {
 		}
 	}, [])
 
+	const [showDeleteDraftConfirm, setShowDeleteDraftConfirm] = useState(false)
+
 	const handleDeleteDraft = () => {
-		if (
-			window.confirm(
-				"Are you sure you want to delete your proposal draft? This action cannot be undone.",
-			)
-		) {
-			clearProposalDraft()
-			setHasDraft(false)
-			setDraftTimestamp(null)
-			showSuccess("Draft deleted")
-		}
+		clearProposalDraft()
+		setHasDraft(false)
+		setDraftTimestamp(null)
+		setShowDeleteDraftConfirm(false)
+		showSuccess("Draft deleted")
 	}
 
 	const formatDraftTime = (timestamp: number | null): string => {
@@ -321,7 +318,7 @@ const DaoProposals: React.FC = () => {
 					<div className="flex items-center gap-3">
 						<button
 							type="button"
-							onClick={handleDeleteDraft}
+							onClick={() => setShowDeleteDraftConfirm(true)}
 							className="px-6 py-2 text-xs font-black uppercase tracking-widest text-white/40 hover:text-red-400 transition-colors"
 						>
 							Discard
@@ -369,6 +366,18 @@ const DaoProposals: React.FC = () => {
 					cancelLabel="Keep Proposal"
 					onConfirm={() => void handleCancelProposal()}
 					onCancel={() => setShowCancelConfirm(false)}
+					isDestructive
+				/>
+			)}
+
+			{showDeleteDraftConfirm && (
+				<ConfirmDialog
+					title="Delete Draft"
+					description="Are you sure you want to delete your proposal draft? All your progress will be permanently lost. This action cannot be undone."
+					confirmLabel="Delete Draft"
+					cancelLabel="Keep Draft"
+					onConfirm={handleDeleteDraft}
+					onCancel={() => setShowDeleteDraftConfirm(false)}
 					isDestructive
 				/>
 			)}

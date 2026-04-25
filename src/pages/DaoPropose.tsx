@@ -136,14 +136,15 @@ const DaoPropose: React.FC = () => {
 	}
 
 	// Handle delete draft
+	const [showDeleteDraftConfirm, setShowDeleteDraftConfirm] = useState(false)
+
 	const handleDeleteDraft = () => {
-		if (window.confirm("Are you sure you want to delete this draft? All unsaved changes will be lost.")) {
-			clearProposalDraft()
-			setHasDraft(false)
-			setDraftTimestamp(null)
-			setShowRestorePrompt(false)
-			showSuccess("Draft deleted")
-		}
+		clearProposalDraft()
+		setHasDraft(false)
+		setDraftTimestamp(null)
+		setShowRestorePrompt(false)
+		setShowDeleteDraftConfirm(false)
+		showSuccess("Draft deleted")
 	}
 
 	// Format draft timestamp for display
@@ -603,6 +604,17 @@ const DaoPropose: React.FC = () => {
 
 	return (
 		<div className="min-h-screen text-white">
+			{showDeleteDraftConfirm && (
+				<ConfirmDialog
+					title="Delete Draft"
+					description="Are you sure you want to delete your proposal draft? All your progress will be permanently lost. This action cannot be undone."
+					confirmLabel="Delete Draft"
+					cancelLabel="Keep Draft"
+					onConfirm={handleDeleteDraft}
+					onCancel={() => setShowDeleteDraftConfirm(false)}
+					isDestructive
+				/>
+			)}
 			<div className="p-12 max-w-4xl mx-auto">
 				<header className="mb-12">
 				<div className="flex items-center gap-4 mb-4">
@@ -628,7 +640,7 @@ const DaoPropose: React.FC = () => {
 				{hasDraft && !showRestorePrompt && (
 					<button
 						type="button"
-						onClick={handleDeleteDraft}
+						onClick={() => setShowDeleteDraftConfirm(true)}
 						className="mt-4 text-sm text-white/40 hover:text-red-400 transition-colors"
 					>
 						✕ Delete draft
@@ -654,7 +666,7 @@ const DaoPropose: React.FC = () => {
 							</button>
 							<button
 								type="button"
-								onClick={handleDeleteDraft}
+								onClick={() => setShowDeleteDraftConfirm(true)}
 								className="px-4 py-2 bg-white/5 border border-white/10 text-white/60 font-black uppercase tracking-widest text-sm rounded-lg hover:bg-white/10 transition-all"
 							>
 								Discard

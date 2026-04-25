@@ -71,14 +71,14 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 					{description}
 				</p>
 
-				<div className="flex flex-row-reverse gap-3">
+				<div className="flex flex-row gap-3">
 					<button
 						type="button"
 						onClick={onConfirm}
 						className={`flex-1 px-6 py-3 font-black uppercase tracking-widest rounded-xl hover:scale-105 active:scale-95 transition-all ${
 							isDestructive
-								? "bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20"
-								: "bg-brand-cyan/10 border border-brand-cyan/30 text-brand-cyan hover:bg-brand-cyan/20"
+								? "text-red-400 border border-red-500/20 hover:bg-red-500/5"
+								: "text-brand-cyan border border-brand-cyan/20 hover:bg-brand-cyan/5"
 						}`}
 					>
 						{confirmLabel}
@@ -87,7 +87,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 						type="button"
 						onClick={onCancel}
 						autoFocus
-						className="flex-1 px-6 py-3 bg-white/5 border border-white/10 text-white font-black uppercase tracking-widest rounded-xl hover:bg-white/10 transition-all"
+						className="flex-1 px-6 py-3 bg-brand-cyan/10 border border-brand-cyan/30 text-brand-cyan font-black uppercase tracking-widest rounded-xl hover:bg-brand-cyan/20 hover:scale-105 active:scale-95 transition-all shadow-[0_0_20px_rgba(0,210,255,0.1)]"
 					>
 						{cancelLabel}
 					</button>

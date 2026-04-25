@@ -12,6 +12,7 @@ import {
 import { useWallet } from "../hooks/useWallet"
 import { fetchHistory } from "../pages/History"
 import GlobalSearch from "./GlobalSearch"
+import NetworkIndicator from "./NetworkIndicator"
 import { NotificationBell } from "./NotificationBell"
 import { ReputationBadge } from "./ReputationBadge"
 import { ThemeToggle } from "./ThemeToggle"
@@ -133,6 +134,9 @@ export default function NavBar() {
 						<GlobalSearch />
 					</div>
 					<ThemeToggle />
+					<div className="hidden xl:block">
+						<NetworkIndicator />
+					</div>
 
 					<ReputationBadge
 						className="hidden lg:inline-flex shrink-0"
@@ -204,6 +208,9 @@ export default function NavBar() {
 					<ReputationBadge className="w-full" size="sm" showBalance />
 					<div className="w-full [&_button]:dark:text-black [&_button]:dark:bg-white">
 						<WalletButton />
+					</div>
+					<div className="w-full flex justify-center py-2">
+						<NetworkIndicator showLabel />
 					</div>
 
 					<div className="h-px bg-slate-200 dark:bg-white/10 my-1" />

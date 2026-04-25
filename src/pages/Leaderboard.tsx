@@ -4,13 +4,21 @@ import { useTranslation } from "react-i18next"
 import AddressDisplay from "../components/AddressDisplay"
 import { EmptyState } from "../components/states/emptyState"
 import { ErrorState } from "../components/states/errorState"
-import { useLeaderboard } from "../hooks/useLeaderboard"
+import {
+	type LeaderboardApiEntry,
+	useLeaderboard,
+} from "../hooks/useLeaderboard"
 import { useWallet } from "../hooks/useWallet"
+import { API_URL } from "../lib/api"
 import { type LeaderboardEntry } from "../util/mockLeaderboardData"
 
 const Leaderboard: React.FC = () => {
 	const { t } = useTranslation()
 	const { address: currentUserAddress } = useWallet()
+	const [leaders, setLeaders] = useState<LeaderboardEntry[]>([])
+	const [isLoading, setIsLoading] = useState(false)
+	const [error, setError] = useState<string | null>(null)
+	const [myRank, setMyRank] = useState<number | null>(null)
 
 	const fetchLeaderboard = useCallback(async () => {
 		setIsLoading(true)

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import React, { useEffect, useMemo, useState } from "react"
 import ReactMarkdown from "react-markdown"
 import { useNavigate } from "react-router-dom"
+import AddressDisplay from "../components/AddressDisplay"
 import TxHashLink from "../components/TxHashLink"
 import {
 	useAdminStats,
@@ -24,7 +25,6 @@ import {
 import { apiFetchJson } from "../lib/api"
 import { getAuthToken } from "../util/auth"
 import { shortenContractId } from "../util/contract"
-import AddressDisplay from "../components/AddressDisplay"
 
 type AdminSection =
 	| "courses"
@@ -146,7 +146,10 @@ const ConfirmDialog: React.FC<{
 			<p className="text-sm text-white/60 mb-1">
 				Learner:{" "}
 				<span className="font-mono text-white/90">
-					<AddressDisplay address={milestone.learnerAddress} showExplorerLink={false} />
+					<AddressDisplay
+						address={milestone.learnerAddress}
+						showExplorerLink={false}
+					/>
 				</span>
 			</p>
 			<p className="text-sm text-white/60 mb-4">
@@ -426,6 +429,8 @@ const MilestoneQueue: React.FC = () => {
 		fetchMilestones,
 		approveMilestone,
 		rejectMilestone,
+		batchApproveMilestones,
+		batchRejectMilestones,
 	} = useAdminMilestones()
 	const courseOptions = useMemo(
 		() => ["All", ...courseOptionsData.map((course) => course.slug)],
@@ -437,6 +442,13 @@ const MilestoneQueue: React.FC = () => {
 	const [dialog, setDialog] = useState<{
 		action: "approve" | "reject"
 		milestone: MilestoneSubmission
+	} | null>(null)
+	const [selectedMilestoneIds, setSelectedMilestoneIds] = useState<string[]>([])
+	const [batchState, setBatchState] = useState<{
+		action: "approve" | "reject"
+		total: number
+		inProgress: boolean
+		results: BatchMilestoneResponse | null
 	} | null>(null)
 
 	useEffect(() => {
@@ -662,10 +674,10 @@ const MilestoneQueue: React.FC = () => {
 										className="border-b border-white/5 hover:bg-white/3 transition-colors"
 									>
 										<td className="py-3 px-4">
-											<AddressDisplay 
-												address={milestone.learnerAddress} 
-												prefixLength={8} 
-												suffixLength={4} 
+											<AddressDisplay
+												address={milestone.learnerAddress}
+												prefixLength={8}
+												suffixLength={4}
 												showExplorerLink={false}
 												addressClassName="text-xs text-white/50"
 											/>

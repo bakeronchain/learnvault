@@ -35,7 +35,10 @@ export async function flagContent(
 		return
 	}
 
+	const reporterAddress = (req as any).user?.address || (req as any).walletAddress
+
 	const reporterAddress = req.user?.address
+ main
 
 	if (!reporterAddress) {
 		res.status(401).json({ error: "Authentication required" })

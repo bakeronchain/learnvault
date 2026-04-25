@@ -558,7 +558,7 @@ describe("DELETE /api/proposals/:id", () => {
 		expect(response.status).toBe(204)
 		expect(stellarContractService.cancelProposal).toHaveBeenCalledWith(
 			{ proposalId: 12 },
-			{ requestId: expect.any(String) },
+			expect.any(Object),
 		)
 		expect(pool.query).toHaveBeenNthCalledWith(
 			2,

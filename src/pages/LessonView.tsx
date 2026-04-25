@@ -230,13 +230,18 @@ const LessonView: React.FC = () => {
 
 	return (
 		<div className="container mx-auto px-4 py-8 lg:py-12 max-w-7xl animate-in fade-in slide-in-from-bottom-8 duration-700">
-			<header className="mb-4 md:mb-6">
+			<header className="mb-8 md:mb-12">
 				<div className="flex items-center gap-3 mb-4">
 					<span className="px-3 py-1 rounded-full text-xs font-semibold bg-brand-blue/20 text-brand-cyan border border-brand-cyan/20">
 						{course.track}
 					</span>
 					<span className="text-white/40 text-sm">{course.title}</span>
 				</div>
+				<h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
+					{lesson.title}
+				</h1>
+			</header>
+
 				<div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
 					<h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
 						{currentTab === "forum" ? "Community Forum" : lesson.title}
@@ -379,6 +384,18 @@ const LessonView: React.FC = () => {
 				</div>
 
 				<div>
+					<LessonContent
+						lesson={lesson ?? loadingLesson}
+						isLoading={isLoadingCourse || isLoadingContent}
+						isCompleted={isCompleted}
+						isCompleting={isCompletingMilestone}
+						timeSpentLabel={timeSpentLabel}
+						onMarkComplete={handleMarkComplete}
+						prevLessonId={prevLessonId}
+						nextLessonId={nextLessonId}
+						isNextLocked={isNextLocked}
+					/>
+
 					{currentTab === "forum" ? (
 						<div className="animate-in fade-in">
 							<CourseForum courseId={course.slug} />
@@ -398,15 +415,13 @@ const LessonView: React.FC = () => {
 								isNextLocked={isNextLocked}
 							/>
 
-							{lesson?.isMilestone && !isLoadingCourse && !isLoadingContent && (
-								<div className="mt-12 animate-in fade-in slide-in-from-top-4 duration-1000">
-									<MilestoneSubmitPanel
-										courseId={course.slug}
-										milestoneId={lesson.id}
-									/>
-								</div>
-							)}
-						</>
+					{lesson?.isMilestone && !isLoadingCourse && !isLoadingContent && (
+						<div className="mt-12 animate-in fade-in slide-in-from-top-4 duration-1000">
+							<MilestoneSubmitPanel
+								courseId={course.slug}
+								milestoneId={lesson.id}
+							/>
+						</div>
 					)}
 				</div>
 			</div>

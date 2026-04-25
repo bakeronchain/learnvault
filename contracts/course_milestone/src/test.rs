@@ -437,6 +437,53 @@ fn reject_milestone_marks_rejected_and_clears_submission() {
 }
 
 #[test]
+fn rejected_milestone_can_be_resubmitted() {
+    let (env, contract_id, admin, _token_id, client, _token_client) = setup();
+    let learner = Address::generate(&env);
+    let course_id = sid(&env, "rust-101");
+    let first_evidence_uri = sid(&env, "ipfs://proof-1");
+    let second_evidence_uri = sid(&env, "ipfs://proof-2");
+
+    add_course(&env, &contract_id, &admin, &client, &course_id, 3);
+    enroll(&env, &contract_id, &learner, &client, &course_id);
+    submit_milestone(
+        &env,
+        &contract_id,
+        &learner,
+        &client,
+        &course_id,
+        1,
+        &first_evidence_uri,
+    );
+
+    authorize(
+        &env,
+        &admin,
+        &contract_id,
+        "reject_milestone",
+        (admin.clone(), learner.clone(), course_id.clone(), 1_u32),
+    );
+    client.reject_milestone(&admin, &learner, &course_id, &1);
+
+    submit_milestone(
+        &env,
+        &contract_id,
+        &learner,
+        &client,
+        &course_id,
+        1,
+        &second_evidence_uri,
+    );
+
+    assert_eq!(client.get_milestone_state(&learner, &course_id, &1), MilestoneStatus::Pending);
+
+    let submission = client
+        .get_milestone_submission(&learner, &course_id, &1)
+        .expect("submission should exist after resubmission");
+    assert_eq!(submission.evidence_uri, second_evidence_uri);
+}
+
+#[test]
 fn set_milestone_reward_stores_config() {
     let (env, contract_id, admin, _token_id, client, _token_client) = setup();
     let course_id = sid(&env, "rust-101");

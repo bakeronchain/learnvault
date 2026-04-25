@@ -17,6 +17,9 @@ export interface MilestoneReport {
 	milestone_title?: string
 	milestone_number?: number
 	lrn_reward?: number
+	/** Counts from milestone_peer_reviews (informational for admins). */
+	peer_approval_count?: number
+	peer_rejection_count?: number
 }
 
 export interface MilestoneAuditEntry {

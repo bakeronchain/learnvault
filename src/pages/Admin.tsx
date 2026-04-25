@@ -651,6 +651,7 @@ const MilestoneQueue: React.FC = () => {
 							<th className="py-3 px-4 font-medium">Course</th>
 							<th className="py-3 px-4 font-medium">Submitted</th>
 							<th className="py-3 px-4 font-medium">Evidence</th>
+							<th className="py-3 px-4 font-medium">Peer signals</th>
 							<th className="py-3 px-4 font-medium">Status</th>
 							<th className="py-3 px-4 font-medium">Actions</th>
 						</tr>
@@ -659,7 +660,7 @@ const MilestoneQueue: React.FC = () => {
 						{loading && (
 							<tr>
 								<td
-									colSpan={6}
+									colSpan={7}
 									className="py-12 text-center text-sm text-white/40 animate-pulse"
 								>
 									Loading milestones…
@@ -669,7 +670,7 @@ const MilestoneQueue: React.FC = () => {
 
 						{!loading && milestones.length === 0 && (
 							<tr>
-								<td colSpan={6} className="py-12 text-center">
+								<td colSpan={7} className="py-12 text-center">
 									<p className="text-white/40 text-sm">
 										No milestone submissions found.
 									</p>
@@ -715,6 +716,10 @@ const MilestoneQueue: React.FC = () => {
 										</td>
 										<td className="py-3 px-4">
 											<EvidenceLink value={milestone.evidenceLink} />
+										</td>
+										<td className="py-3 px-4 text-xs font-mono text-white/55 whitespace-nowrap">
+											+{milestone.peerApprovalCount} / −
+											{milestone.peerRejectionCount}
 										</td>
 										<td className="py-3 px-4">
 											<span

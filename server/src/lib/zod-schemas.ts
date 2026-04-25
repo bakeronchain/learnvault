@@ -57,6 +57,19 @@ export const milestoneReportIdParamSchema = z
 	})
 	.strict()
 
+export const peerReviewSubmitBodySchema = z
+	.object({
+		verdict: z.enum(["approve", "reject"], {
+			required_error: "verdict is required",
+			invalid_type_error: "verdict must be approve or reject",
+		}),
+		comment: z
+			.string()
+			.max(500, "comment must be 500 characters or fewer")
+			.optional(),
+	})
+	.strict()
+
 export const validateMilestoneSchema = z.object({
 	courseId: z.string().cuid({ message: "Invalid course ID format" }),
 	learnerAddress: z.string().min(1),

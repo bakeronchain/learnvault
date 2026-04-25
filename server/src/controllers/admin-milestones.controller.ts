@@ -1,6 +1,10 @@
 import { type Request, type Response } from "express"
 import sanitizeHtml from "sanitize-html"
 import { milestoneStore, type MilestoneReport } from "../db/milestone-store"
+import {
+	attachPeerSummariesToReports,
+	listRecentPeerReviewsForReport,
+} from "../db/peer-review-store"
 import { type AdminRequest } from "../middleware/admin.middleware"
 import { credentialService } from "../services/credential.service"
 import { createEmailService } from "../services/email.service"
@@ -62,8 +66,10 @@ export async function listMilestones(
 			safePageSize,
 		)
 
+		const dataWithPeers = await attachPeerSummariesToReports(result.data)
+
 		res.status(200).json({
-			data: result.data,
+			data: dataWithPeers,
 			total: result.total,
 			page: safePage,
 			pageSize: safePageSize,
@@ -80,7 +86,8 @@ export async function getPendingMilestones(
 ): Promise<void> {
 	try {
 		const reports = await milestoneStore.getPendingReports()
-		res.status(200).json({ data: reports })
+		const withPeers = await attachPeerSummariesToReports(reports)
+		res.status(200).json({ data: withPeers })
 	} catch (err) {
 		console.error("[admin] getPendingMilestones error:", err)
 		res.status(500).json({ error: "Failed to fetch pending milestones" })
@@ -104,7 +111,11 @@ export async function getMilestoneById(
 			return
 		}
 		const auditLog = await milestoneStore.getAuditForReport(id)
-		res.status(200).json({ data: { ...report, auditLog } })
+		const [withPeers] = await attachPeerSummariesToReports([report])
+		const peer_reviews = await listRecentPeerReviewsForReport(id, 20)
+		res.status(200).json({
+			data: { ...(withPeers ?? report), auditLog, peer_reviews },
+		})
 	} catch (err) {
 		console.error("[admin] getMilestoneById error:", err)
 		res.status(500).json({ error: "Failed to fetch milestone report" })

@@ -47,6 +47,7 @@ import express from "express"
 import jwt from "jsonwebtoken"
 import request from "supertest"
 import { inMemoryMilestoneStore } from "../db/milestone-store"
+import { resetPeerReviewMemoryForTests } from "../db/peer-review-store"
 import { errorHandler } from "../middleware/error.middleware"
 import { adminMilestonesRouter } from "../routes/admin-milestones.routes"
 import { stellarContractService } from "../services/stellar-contract.service"
@@ -76,6 +77,7 @@ beforeEach(() => {
 	inMemoryMilestoneStore["reportSeq"] = 1
 	// @ts-ignore
 	inMemoryMilestoneStore["auditSeq"] = 1
+	resetPeerReviewMemoryForTests()
 
 	// Provide fake Stellar credentials so the approve/reject credential guard
 	// passes — the pool mock ensures no real SDK call is made.
@@ -199,6 +201,8 @@ describe("GET /api/admin/milestones/pending", () => {
 		expect(res.status).toBe(200)
 		expect(res.body.data).toHaveLength(1)
 		expect(res.body.data[0].status).toBe("pending")
+		expect(res.body.data[0].peer_approval_count).toBe(0)
+		expect(res.body.data[0].peer_rejection_count).toBe(0)
 	})
 })
 
@@ -230,6 +234,9 @@ describe("GET /api/admin/milestones/:id", () => {
 		expect(res.status).toBe(200)
 		expect(res.body.data.id).toBe(report.id)
 		expect(Array.isArray(res.body.data.auditLog)).toBe(true)
+		expect(Array.isArray(res.body.data.peer_reviews)).toBe(true)
+		expect(res.body.data.peer_approval_count).toBe(0)
+		expect(res.body.data.peer_rejection_count).toBe(0)
 	})
 })
 

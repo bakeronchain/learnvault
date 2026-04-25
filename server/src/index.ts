@@ -46,6 +46,7 @@ import { governanceRouter } from "./routes/governance.routes"
 import { healthRouter } from "./routes/health.routes"
 import { leaderboardRouter } from "./routes/leaderboard.routes"
 import { createMeRouter } from "./routes/me.routes"
+import { createPeerReviewRouter } from "./routes/peer-review.routes"
 import { moderationRouter } from "./routes/moderation.routes"
 import { notificationsRouter } from "./routes/notifications.routes"
 import { scholarsRouter } from "./routes/scholars.routes"
@@ -192,6 +193,7 @@ app.use("/api", validatorRouter)
 app.use("/api", eventsRouter)
 app.use("/api/community", communityRouter)
 app.use("/api", createCommentsRouter(jwtService))
+app.use("/api", createPeerReviewRouter(jwtService))
 app.use("/api", leaderboardRouter)
 app.use("/api", governanceRouter)
 app.use("/api", scholarsRouter)

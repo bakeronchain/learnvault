@@ -22,6 +22,9 @@ export interface MilestoneSubmission {
 	evidenceLink: string
 	submittedAt: string
 	status: "pending" | "approved" | "rejected"
+	/** Non-binding peer review counts (inform admin decisions). */
+	peerApprovalCount: number
+	peerRejectionCount: number
 }
 
 export interface PaginatedMilestones {
@@ -68,6 +71,8 @@ type MilestoneSubmissionApi = {
 	evidence_description?: string | null
 	submitted_at: string
 	status: "pending" | "approved" | "rejected"
+	peer_approval_count?: number
+	peer_rejection_count?: number
 }
 
 type PaginatedMilestonesApi = {
@@ -111,6 +116,8 @@ const mapMilestoneSubmission = (
 		"",
 	submittedAt: milestone.submitted_at,
 	status: milestone.status,
+	peerApprovalCount: milestone.peer_approval_count ?? 0,
+	peerRejectionCount: milestone.peer_rejection_count ?? 0,
 })
 
 const mapBatchMilestoneResult = (

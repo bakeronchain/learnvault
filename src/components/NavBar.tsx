@@ -46,6 +46,19 @@ export default function NavBar() {
 
 	const closeMenu = () => setMenuOpen(false)
 
+	// Close mobile menu on Escape key
+	useEffect(() => {
+		if (!menuOpen) return
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === "Escape") {
+				e.preventDefault()
+				closeMenu()
+			}
+		}
+		document.addEventListener("keydown", handleKeyDown)
+		return () => document.removeEventListener("keydown", handleKeyDown)
+	}, [menuOpen])
+
 	const queryClient = useQueryClient()
 	const { address } = useWallet()
 

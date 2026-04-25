@@ -167,6 +167,38 @@ body {
 	}
 }
 
+/* ── Skip-to-content link ─────────────────────────────────────────────────── */
+.skip-to-content {
+	position: absolute;
+	top: -100%;
+	left: 1rem;
+	z-index: 9999;
+	padding: 0.5rem 1rem;
+	background: #00d2ff;
+	color: #000;
+	font-weight: 700;
+	font-size: 0.875rem;
+	border-radius: 0 0 0.5rem 0.5rem;
+	text-decoration: none;
+	transition: top 0.15s ease;
+}
+
+.skip-to-content:focus {
+	top: 0;
+}
+
+/* ── Global focus-visible styles ──────────────────────────────────────────── */
+:focus-visible {
+	outline: 2px solid #00d2ff;
+	outline-offset: 2px;
+	border-radius: 4px;
+}
+
+/* Remove outline for mouse/touch interactions; keep only for keyboard */
+:focus:not(:focus-visible) {
+	outline: none;
+}
+
 /* ── Light mode body background ───────────────────────────────────────────── */
 .sds-theme-light body,
 .light body {

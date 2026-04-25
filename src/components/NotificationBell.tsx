@@ -19,10 +19,19 @@ export function NotificationBell({ token }: NotificationBellProps) {
 	const { notifications, unreadCount, markAllRead, markOneRead } =
 		useNotifications(token)
 
-	// Close on outside click
+	// Close on outside click or Escape key; trap focus while open
 	useEffect(() => {
 		if (!open) return
-		function handleClick(e: MouseEvent) {
+
+		// Move focus into panel on open
+		setTimeout(() => {
+			const firstFocusable = panelRef.current?.querySelector<HTMLElement>(
+				"button, [href], input, [tabindex]:not([tabindex='-1'])",
+			)
+			firstFocusable?.focus()
+		}, 0)
+
+		function handlePointerDown(e: MouseEvent) {
 			if (
 				panelRef.current &&
 				!panelRef.current.contains(e.target as Node) &&
@@ -32,8 +41,44 @@ export function NotificationBell({ token }: NotificationBellProps) {
 				setOpen(false)
 			}
 		}
-		document.addEventListener("mousedown", handleClick)
-		return () => document.removeEventListener("mousedown", handleClick)
+
+		function handleKeyDown(e: KeyboardEvent) {
+			if (e.key === "Escape") {
+				e.preventDefault()
+				setOpen(false)
+				buttonRef.current?.focus()
+				return
+			}
+
+			if (e.key !== "Tab") return
+			const focusableSelectors =
+				"button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex='-1'])"
+			const focusable = Array.from(
+				panelRef.current?.querySelectorAll<HTMLElement>(focusableSelectors) ??
+					[],
+			)
+			if (focusable.length === 0) return
+			const first = focusable[0]
+			const last = focusable[focusable.length - 1]
+			if (e.shiftKey) {
+				if (document.activeElement === first) {
+					e.preventDefault()
+					last.focus()
+				}
+			} else {
+				if (document.activeElement === last) {
+					e.preventDefault()
+					first.focus()
+				}
+			}
+		}
+
+		document.addEventListener("mousedown", handlePointerDown)
+		document.addEventListener("keydown", handleKeyDown)
+		return () => {
+			document.removeEventListener("mousedown", handlePointerDown)
+			document.removeEventListener("keydown", handleKeyDown)
+		}
 	}, [open])
 
 	const handleNotificationClick = async (notification: AppNotification) => {
@@ -58,7 +103,7 @@ export function NotificationBell({ token }: NotificationBellProps) {
 				ref={buttonRef}
 				type="button"
 				aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
-				aria-haspopup="true"
+				aria-haspopup="dialog"
 				aria-expanded={open}
 				onClick={() => setOpen((o) => !o)}
 				className="relative w-9 h-9 flex items-center justify-center rounded-xl glass border border-white/10 text-white/70 hover:text-white transition-colors"
@@ -94,6 +139,7 @@ export function NotificationBell({ token }: NotificationBellProps) {
 					ref={panelRef}
 					role="dialog"
 					aria-label="Notifications"
+					aria-modal="true"
 					className="absolute right-0 top-full mt-3 w-80 glass border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2"
 				>
 					<div className="flex items-center justify-between px-5 py-4 border-b border-white/5">

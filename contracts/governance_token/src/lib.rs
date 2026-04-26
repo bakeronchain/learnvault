@@ -116,6 +116,21 @@ pub struct GOVApproved {
     pub amount: i128,
 }
 
+/// Emitted when a token holder changes their delegation to a new address.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DelegateChanged {
+    pub delegator: Address,
+    pub delegatee: Address,
+}
+
+/// Emitted when a token holder removes their delegation entirely.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DelegateRemoved {
+    pub delegator: Address,
+}
+
 // ---------------------------------------------------------------------------
 // Contract
 // ---------------------------------------------------------------------------
@@ -415,12 +430,18 @@ impl GovernanceToken {
             env.storage().persistent().set(&key, &(current + bal));
             env.storage()
                 .persistent()
-                .set(&DataKey::Delegate(delegator), &delegatee);
+                .set(&DataKey::Delegate(delegator.clone()), &delegatee.clone());
+            DelegateChanged {
+                delegator,
+                delegatee,
+            }
+            .publish(&env);
         } else {
             // Delegating to self is same as undelegating
             env.storage()
                 .persistent()
-                .remove(&DataKey::Delegate(delegator));
+                .remove(&DataKey::Delegate(delegator.clone()));
+            DelegateRemoved { delegator }.publish(&env);
         }
     }
 
@@ -436,7 +457,8 @@ impl GovernanceToken {
 
             env.storage()
                 .persistent()
-                .remove(&DataKey::Delegate(delegator));
+                .remove(&DataKey::Delegate(delegator.clone()));
+            DelegateRemoved { delegator }.publish(&env);
         }
     }
 
@@ -1337,5 +1359,40 @@ mod test {
                 GOVError::Unauthorized as u32
             )))
         );
+    }
+
+    #[test]
+    fn benchmark_costs() {
+        let e = Env::default();
+        let (_, admin, client) = setup(&e);
+        let donor = Address::generate(&e);
+
+        // 1. Benchmark initialize (already done in setup, but let's do it fresh)
+        let fresh_admin = Address::generate(&e);
+        let id = e.register(GovernanceToken, ());
+        let fresh_client = GovernanceTokenClient::new(&e, &id);
+        e.cost_estimate().budget().reset_unlimited();
+        fresh_client.initialize(&fresh_admin);
+        let init_instr = e.cost_estimate().budget().cpu_instruction_cost();
+        let init_mem = e.cost_estimate().budget().memory_bytes_cost();
+
+        // 2. Benchmark mint
+        e.cost_estimate().budget().reset_unlimited();
+        client.mint(&donor, &1000);
+        let mint_instr = e.cost_estimate().budget().cpu_instruction_cost();
+        let mint_mem = e.cost_estimate().budget().memory_bytes_cost();
+
+        // 3. Benchmark transfer
+        let receiver = Address::generate(&e);
+        e.cost_estimate().budget().reset_unlimited();
+        client.transfer(&donor, &receiver, &500);
+        let xfer_instr = e.cost_estimate().budget().cpu_instruction_cost();
+        let xfer_mem = e.cost_estimate().budget().memory_bytes_cost();
+
+        extern crate std;
+        std::println!("BENCHMARK_RESULTS: governance_token");
+        std::println!("initialize: instr={}, mem={}", init_instr, init_mem);
+        std::println!("mint: instr={}, mem={}", mint_instr, mint_mem);
+        std::println!("transfer: instr={}, mem={}", xfer_instr, xfer_mem);
     }
 }

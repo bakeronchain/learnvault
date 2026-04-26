@@ -39,6 +39,7 @@ pub enum DataKey {
     EnrolledCourses(Address),
     Course(String),
     CourseIds,
+    CompletedCount(Address, String),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -339,7 +340,7 @@ impl CourseMilestone {
             .get::<_, MilestoneStatus>(&state_key)
             .unwrap_or(MilestoneStatus::NotStarted);
 
-        if current_state != MilestoneStatus::NotStarted {
+        if current_state == MilestoneStatus::Pending || current_state == MilestoneStatus::Approved {
             panic_with_error!(&env, Error::DuplicateSubmission);
         }
 
@@ -459,6 +460,12 @@ impl CourseMilestone {
             Self::extend_persistent(&env, &reward_key);
         }
 
+        // Increment completion count
+        let count_key = DataKey::CompletedCount(learner.clone(), course_id.clone());
+        let count: u32 = env.storage().persistent().get(&count_key).unwrap_or(0);
+        env.storage().persistent().set(&count_key, &(count + 1));
+        Self::extend_persistent(&env, &count_key);
+
         env.events().publish(
             (symbol_short!("ms_done"),),
             MilestoneCompleted {
@@ -546,6 +553,12 @@ impl CourseMilestone {
         Self::extend_persistent(&env, &state_key);
         Self::extend_persistent(&env, &completed_key);
 
+        // Increment completion count
+        let count_key = DataKey::CompletedCount(learner.clone(), course_id.clone());
+        let count: u32 = env.storage().persistent().get(&count_key).unwrap_or(0);
+        env.storage().persistent().set(&count_key, &(count + 1));
+        Self::extend_persistent(&env, &count_key);
+
         env.events().publish(
             (symbol_short!("ms_done"),),
             MilestoneCompleted {
@@ -627,6 +640,14 @@ impl CourseMilestone {
                     lrn_reward: entry.lrn_reward,
                 },
             );
+
+            // Increment completion count
+            let count_key = DataKey::CompletedCount(entry.learner.clone(), entry.course_id.clone());
+            let count: u32 = env.storage().persistent().get(&count_key).unwrap_or(0);
+            env.storage().persistent().set(&count_key, &(count + 1));
+            Self::extend_persistent(&env, &count_key);
+
+            Self::emit_course_completed_if_ready(&env, &entry.learner, &entry.course_id);
 
             i += 1;
         }
@@ -724,29 +745,18 @@ impl CourseMilestone {
         };
         Self::extend_persistent(env, &course_key);
 
-        let mut milestone_id = 1_u32;
-        while milestone_id <= config.milestone_count {
-            let state_key =
-                DataKey::MilestoneState(learner.clone(), course_id.clone(), milestone_id);
-            let state = env
-                .storage()
-                .persistent()
-                .get::<_, MilestoneStatus>(&state_key)
-                .unwrap_or(MilestoneStatus::NotStarted);
-            if state != MilestoneStatus::Approved {
-                return;
-            }
-            Self::extend_persistent(env, &state_key);
-            milestone_id += 1;
-        }
+        let count_key = DataKey::CompletedCount(learner.clone(), course_id.clone());
+        let count: u32 = env.storage().persistent().get(&count_key).unwrap_or(0);
 
-        env.events().publish(
-            (Symbol::new(env, "course_done"),),
-            CourseCompleted {
-                learner: learner.clone(),
-                course_id: course_id.clone(),
-            },
-        );
+        if count == config.milestone_count {
+            env.events().publish(
+                (Symbol::new(env, "course_done"),),
+                CourseCompleted {
+                    learner: learner.clone(),
+                    course_id: course_id.clone(),
+                },
+            );
+        }
     }
 
     fn extend_instance(env: &Env) {

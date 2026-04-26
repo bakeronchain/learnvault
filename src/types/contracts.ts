@@ -33,6 +33,13 @@ export interface DonorStats {
 	scholars_funded: number
 }
 
+export interface DonorImpact {
+	total_donated_usdc: string
+	scholars_funded: number
+	milestones_completed: number
+	average_completion_rate: number
+}
+
 export interface LearnTokenInfo {
 	balance: bigint
 	reputation_score: bigint
@@ -81,6 +88,7 @@ export interface Scholar {
 
 export interface DonorData {
 	stats: DonorStats
+	impact: DonorImpact | null
 	contributions: DonorContribution[]
 	votes: Vote[]
 	scholars: Scholar[]

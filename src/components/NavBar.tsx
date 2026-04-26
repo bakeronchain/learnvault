@@ -13,6 +13,8 @@ import { useWallet } from "../hooks/useWallet"
 import { fetchHistory } from "../pages/History"
 import GlobalSearch from "./GlobalSearch"
 import { LanguageSelector } from "./LanguageSelector"
+import NetworkIndicator from "./NetworkIndicator"
+import { NotificationBell } from "./NotificationBell"
 import { ReputationBadge } from "./ReputationBadge"
 import { ThemeToggle } from "./ThemeToggle"
 import { WalletButton } from "./WalletButton"
@@ -21,6 +23,7 @@ export default function NavBar() {
 	const [menuOpen, setMenuOpen] = useState(false)
 	const mobileMenuId = useId()
 	const { t } = useTranslation()
+	const token = localStorage.getItem("auth_token") ?? undefined
 
 	useEffect(() => {
 		if (typeof document === "undefined") return
@@ -33,6 +36,7 @@ export default function NavBar() {
 
 	const navLinks = [
 		{ to: "/courses", label: t("nav.learn") },
+		{ to: "/peer-review", label: "Peer review" },
 		{ to: "/dao", label: t("nav.dao") },
 		{ to: "/community", label: "Community" },
 		{ to: "/leaderboard", label: t("nav.leaderboard") },
@@ -43,6 +47,19 @@ export default function NavBar() {
 	]
 
 	const closeMenu = () => setMenuOpen(false)
+
+	// Close mobile menu on Escape key
+	useEffect(() => {
+		if (!menuOpen) return
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === "Escape") {
+				e.preventDefault()
+				closeMenu()
+			}
+		}
+		document.addEventListener("keydown", handleKeyDown)
+		return () => document.removeEventListener("keydown", handleKeyDown)
+	}, [menuOpen])
 
 	const queryClient = useQueryClient()
 	const { address } = useWallet()
@@ -135,12 +152,16 @@ export default function NavBar() {
 						<LanguageSelector />
 					</div>
 					<ThemeToggle />
+					<div className="hidden xl:block">
+						<NetworkIndicator />
+					</div>
 
 					<ReputationBadge
 						className="hidden lg:inline-flex shrink-0"
 						size="sm"
 						showBalance
 					/>
+					<NotificationBell token={token} />
 					<div className="hidden md:block scale-90 [&_button]:dark:text-black [&_button]:dark:bg-white">
 						<WalletButton />
 					</div>
@@ -184,7 +205,7 @@ export default function NavBar() {
 				<nav
 					id={mobileMenuId}
 					aria-label="Mobile primary"
-					className={`fixed top-0 right-0 z-50 h-full w-[min(20rem,85vw)] glass border-l border-white/10 shadow-2xl p-6 flex flex-col gap-4 transition-transform duration-300 ${
+					className={`fixed top-0 right-0 z-50 h-full w-[min(24rem,92vw)] glass border-l border-white/10 shadow-2xl p-8 flex flex-col gap-6 transition-transform duration-500 ease-out ${
 						menuOpen ? "translate-x-0" : "translate-x-full"
 					}`}
 				>
@@ -206,6 +227,9 @@ export default function NavBar() {
 					<div className="w-full [&_button]:dark:text-black [&_button]:dark:bg-white">
 						<WalletButton />
 					</div>
+					<div className="w-full flex justify-center py-2">
+						<NetworkIndicator showLabel />
+					</div>
 
 					<div className="h-px bg-slate-200 dark:bg-white/10 my-1" />
 
@@ -225,10 +249,10 @@ export default function NavBar() {
 							onClick={closeMenu}
 							onMouseEnter={() => handlePrefetch(to)}
 							className={({ isActive }) =>
-								`block w-full px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+								`block w-full px-6 py-4 rounded-2xl text-sm font-black uppercase tracking-widest transition-all ${
 									isActive
-										? "text-brand-cyan bg-brand-cyan/5 border border-brand-cyan/20"
-										: "text-slate-700 dark:text-white/70 border border-slate-200 dark:border-white/10 hover:text-black dark:hover:text-white"
+										? "text-brand-cyan bg-brand-cyan/10 border border-brand-cyan/20 shadow-[0_0_20px_rgba(0,210,255,0.1)]"
+										: "text-slate-700 dark:text-white/70 border border-slate-200 dark:border-white/10 hover:text-black dark:hover:text-white hover:bg-white/5"
 								}`
 							}
 						>

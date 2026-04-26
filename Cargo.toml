@@ -1,6 +1,6 @@
 [workspace]
 members = ["contracts/*"]
-exclude = ["contracts/testdata"]
+exclude = ["contracts/testdata", "contracts/scripts"]
 resolver = "2"
 
 [workspace.package]

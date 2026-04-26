@@ -1,11 +1,16 @@
 import { type Api } from "@stellar/stellar-sdk/rpc"
-import type { LearnTokenInfo } from "../types/contracts"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+	useMutation,
+	useQueries,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query"
 import { useCallback } from "react"
 import { useToast } from "../components/Toast/ToastProvider"
+import { type LearnTokenInfo } from "../types/contracts"
 import { ErrorCode, createAppError } from "../types/errors"
-import { logger } from "../utils/logger"
 import { parseError, isUserRejection } from "../utils/errors"
+import { logger } from "../utils/logger"
 import { useContractIds } from "./useContractIds"
 import { useSubscription } from "./useSubscription"
 import { useWallet } from "./useWallet"
@@ -95,7 +100,7 @@ const toBigInt = (value: unknown): bigint => {
 // Prefix used to invalidate all balance entries at once (e.g. after any mint).
 const BALANCE_QUERY_KEY_PREFIX = ["learnToken", "balance"] as const
 
-const BALANCE_STALE_TIME = 5 * 60 * 1000 // 5 minutes
+const BALANCE_STALE_TIME = 30 * 1000 // 30 seconds
 
 // The expected contract version this client was generated against.
 const EXPECTED_CONTRACT_VERSION = "1.0.0"
@@ -304,4 +309,46 @@ export function useLearnToken(address?: string): UseLearnTokenResult {
 		mint,
 		isMinting,
 	}
+}
+
+/**
+ * Sum of LRN across several Stellar addresses. Uses the same query keys as
+ * {@link useLearnToken} so the balance cache is shared.
+ */
+export function useLrnTotalForLinkedWallets(addresses: string[]) {
+	const { learnToken: contractId, isDeployed } = useContractIds()
+	const contractReady = isDeployed(contractId)
+
+	const results = useQueries({
+		queries: addresses.map((targetAddress) => ({
+			queryKey: [...BALANCE_QUERY_KEY_PREFIX, targetAddress] as const,
+			queryFn: async (): Promise<bigint> => {
+				const client = await loadLearnTokenClient()
+				if (!client || !contractReady) return 0n
+
+				const fn = toMethod(client, "balance")
+				if (!fn) return 0n
+
+				const raw = await fn({ account: targetAddress, id: targetAddress })
+				const resolved = unwrapResult(raw)
+				if (
+					resolved !== null &&
+					typeof resolved === "object" &&
+					typeof (resolved as ContractRecord).isErr === "function" &&
+					((resolved as ContractRecord).isErr as () => boolean)()
+				) {
+					return 0n
+				}
+
+				return toBigInt(resolved)
+			},
+			enabled: contractReady && targetAddress.length > 0,
+			staleTime: BALANCE_STALE_TIME,
+		})),
+	})
+
+	const isLoading = results.some((r) => r.isLoading)
+	const total = results.reduce((acc, r) => acc + toBigInt(r.data), 0n)
+
+	return { total, isLoading }
 }

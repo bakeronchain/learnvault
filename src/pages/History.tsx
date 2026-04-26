@@ -5,6 +5,7 @@ import { Link } from "react-router-dom"
 import { stellarNetwork } from "../contracts/util"
 import { useWallet } from "../hooks/useWallet"
 import { API_URL } from "../lib/api"
+import AddressDisplay from "../components/AddressDisplay"
 
 type ApiEvent = {
 	id: number
@@ -103,7 +104,7 @@ function formatDate(date: string): string {
 	}
 }
 
-async function fetchHistory(address: string): Promise<ApiEvent[]> {
+export async function fetchHistory(address: string): Promise<ApiEvent[]> {
 	const endpoint = `${API_URL}/api/events?address=${encodeURIComponent(address)}&limit=${HISTORY_LIMIT}`
 	const response = await fetch(endpoint)
 	if (!response.ok) {
@@ -186,9 +187,14 @@ const History: React.FC = () => {
 				<h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-gradient">
 					Activity History
 				</h1>
-				<p className="text-white/50 mt-2">
-					Recent on-chain actions for {address.slice(0, 6)}...
-					{address.slice(-4)}
+				<p className="text-white/50 mt-2 flex items-center gap-2">
+					Recent on-chain actions for 
+					<AddressDisplay 
+						address={address} 
+						addressClassName="text-brand-cyan font-bold"
+						showCopyButton={false}
+						showExplorerLink={false}
+					/>
 				</p>
 			</header>
 

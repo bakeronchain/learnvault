@@ -182,9 +182,7 @@ impl ScholarshipTreasury {
         }
         admin.require_auth();
 
-        if quorum_threshold < 0 {
-            panic_with_error!(&env, Error::InvalidAmount);
-        }
+        Self::validate_quorum_threshold(&env, quorum_threshold);
         if approval_bps > 10_000 {
             panic_with_error!(&env, Error::InvalidAmount);
         }
@@ -211,6 +209,10 @@ impl ScholarshipTreasury {
         Self::extend_instance(&env);
     }
 
+    /// Returns the configured quorum as an absolute minimum vote count.
+    ///
+    /// This is a hard threshold (not basis points), so proposals require
+    /// `yes_votes + no_votes >= quorum_threshold` to be eligible to pass.
     pub fn get_quorum(env: Env) -> i128 {
         Self::extend_instance(&env);
         env.storage()
@@ -230,9 +232,7 @@ impl ScholarshipTreasury {
     pub fn set_quorum(env: Env, new_quorum: i128) {
         let admin = Self::admin(&env);
         admin.require_auth();
-        if new_quorum < 0 {
-            panic_with_error!(&env, Error::InvalidAmount);
-        }
+        Self::validate_quorum_threshold(&env, new_quorum);
         env.storage().instance().set(&QUORUM_KEY, &new_quorum);
     }
 
@@ -503,6 +503,9 @@ impl ScholarshipTreasury {
             .unwrap_or(0)
     }
 
+    /// Sets the minimum LRN (governance token) balance an applicant must hold to submit
+    /// a proposal. The value must be **strictly positive**; use [`clear_min_lrn_to_propose`]
+    /// to remove the requirement (same effect as the default: no minimum).
     pub fn set_min_lrn_to_propose(env: Env, admin: Address, min_lrn: i128) {
         Self::assert_initialized(&env);
 
@@ -510,13 +513,26 @@ impl ScholarshipTreasury {
         if admin != Self::admin(&env) {
             panic_with_error!(&env, Error::Unauthorized);
         }
-        if min_lrn < 0 {
+        if min_lrn <= 0 {
             panic_with_error!(&env, Error::InvalidAmount);
         }
 
         env.storage()
             .instance()
             .set(&MIN_LRN_TO_PROPOSE_KEY, &min_lrn);
+    }
+
+    /// Removes the minimum LRN requirement so any holder can submit (subject to other
+    /// proposal rules). This is the explicit admin path to "no minimum"; `set_min_lrn_to_propose(0)` is rejected.
+    pub fn clear_min_lrn_to_propose(env: Env, admin: Address) {
+        Self::assert_initialized(&env);
+
+        admin.require_auth();
+        if admin != Self::admin(&env) {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
+
+        env.storage().instance().remove(&MIN_LRN_TO_PROPOSE_KEY);
     }
 
     pub fn get_min_lrn_to_propose(env: Env) -> i128 {
@@ -885,6 +901,13 @@ impl ScholarshipTreasury {
             .instance()
             .get(&ADMIN_KEY)
             .unwrap_or_else(|| panic_with_error!(env, Error::NotInitialized))
+    }
+
+    fn validate_quorum_threshold(env: &Env, quorum_threshold: i128) {
+        // Quorum is an absolute vote-count floor, so it must be strictly positive.
+        if quorum_threshold <= 0 {
+            panic_with_error!(env, Error::InvalidAmount);
+        }
     }
 
     /// Replace the current contract WASM with a new uploaded hash. Admin only.

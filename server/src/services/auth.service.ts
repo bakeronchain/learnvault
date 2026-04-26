@@ -36,11 +36,14 @@ function randomNoncePayload(): string {
 export type AuthService = {
 	getOrCreateNonce(address: string): Promise<{ nonce: string }>
 	verifyAndIssueToken(address: string, signatureBase64: string): Promise<string>
+	/** Verifies a wallet signature and consumes the nonce (e.g. linking a second Stellar key). */
+	verifyLinkSignature(address: string, signatureBase64: string): Promise<void>
 	createChallenge(address: string): Promise<{
 		transaction: string
 		networkPassphrase: string
 	}>
 	verifySignedTransaction(signedTransactionXdr: string): Promise<string>
+	logout(token: string): Promise<void>
 }
 
 export function createAuthService(
@@ -48,6 +51,10 @@ export function createAuthService(
 	jwtService: JwtService,
 ): AuthService {
 	return {
+		async logout(token: string): Promise<void> {
+			await jwtService.revokeToken(token)
+		},
+
 		async createChallenge(address: string): Promise<{
 			transaction: string
 			networkPassphrase: string
@@ -162,6 +169,35 @@ export function createAuthService(
 
 			await nonceStore.deleteNonce(address)
 			return jwtService.signWalletToken(address)
+		},
+
+		async verifyLinkSignature(
+			address: string,
+			signatureBase64: string,
+		): Promise<void> {
+			if (!isValidStellarPublicKey(address)) {
+				throw new Error("Invalid Stellar public key")
+			}
+
+			const stored = await nonceStore.getNonce(address)
+			if (stored === null) {
+				throw new Error("Nonce expired or missing; request a new nonce")
+			}
+
+			const keypair = Keypair.fromPublicKey(address)
+			const messageBytes = Buffer.from(stored, "utf8")
+			let signatureBytes: Buffer
+			try {
+				signatureBytes = Buffer.from(signatureBase64, "base64")
+			} catch {
+				throw new Error("Invalid signature encoding")
+			}
+
+			if (!keypair.verify(messageBytes, signatureBytes)) {
+				throw new Error("Invalid signature")
+			}
+
+			await nonceStore.deleteNonce(address)
 		},
 	}
 }

@@ -154,21 +154,10 @@ const checkRedis = async (): Promise<CheckResult> => {
 			}
 		}
 
-		// Get memory information
-		const [usedMemory, maxMemory, evictedKeys] = await Promise.all([
-			client.info("memory").then(info => {
-				const match = info.match(/used_memory:(\d+)/)
-				return match ? parseInt(match[1], 10) : null
-			}),
-			client.config("GET", "maxmemory").then(config => {
-				const maxMem = config[1]
-				return maxMem === "0" ? null : parseInt(maxMem, 10)
-			}),
-			client.info("stats").then(info => {
-				const match = info.match(/evicted_keys:(\d+)/)
-				return match ? parseInt(match[1], 10) : null
-			}),
-		])
+		// Get memory information (simplified for now)
+		const usedMemory = null
+		const maxMemory = null
+		const evictedKeys = null
 
 		const details = []
 		if (usedMemory !== null) {

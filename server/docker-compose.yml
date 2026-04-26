@@ -46,8 +46,7 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-      - ./redis.conf:/etc/redis/redis.conf
-    command: redis-server /etc/redis/redis.conf
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --protected-mode no
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

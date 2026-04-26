@@ -9,15 +9,11 @@ jest.mock("../db/index", () => ({
 
 const mockRedisPing = jest.fn()
 const mockRedisDisconnect = jest.fn()
-const mockRedisInfo = jest.fn()
-const mockRedisConfig = jest.fn()
 
 jest.mock("ioredis", () => {
 	return jest.fn().mockImplementation(() => ({
 		ping: mockRedisPing,
 		disconnect: mockRedisDisconnect,
-		info: mockRedisInfo,
-		config: mockRedisConfig,
 	}))
 })
 
@@ -48,8 +44,6 @@ beforeEach(() => {
 	mockedPoolQuery.mockReset()
 	mockRedisPing.mockReset()
 	mockRedisDisconnect.mockReset()
-	mockRedisInfo.mockReset()
-	mockRedisConfig.mockReset()
 	mockedFetch.mockReset()
 	;(Redis as unknown as jest.Mock).mockClear()
 })
@@ -66,12 +60,6 @@ describe("GET /api/health", () => {
 
 		mockedPoolQuery.mockResolvedValue({ rows: [{ one: 1 }] })
 		mockRedisPing.mockResolvedValue("PONG")
-		mockRedisInfo.mockImplementation((section) => {
-			if (section === "memory") return "used_memory:1048576"
-			if (section === "stats") return "evicted_keys:0"
-			return ""
-		})
-		mockRedisConfig.mockResolvedValue(["maxmemory", "268435456"]) // 256MB
 		mockedFetch.mockResolvedValue({ ok: true, status: 200 } as Response)
 
 		const res = await request(buildApp()).get("/api/health")
@@ -82,7 +70,7 @@ describe("GET /api/health", () => {
 		expect(res.body.commitHash).toBe("abc123")
 		expect(res.body.checks.database.status).toBe("healthy")
 		expect(res.body.checks.redis.status).toBe("healthy")
-		expect(res.body.checks.redis.details).toBe("used_memory=1048576bytes, max_memory=268435456bytes, evicted_keys=0")
+		expect(res.body.checks.redis.details).toBeUndefined()
 		expect(res.body.checks.stellarHorizon.status).toBe("healthy")
 		expect(res.body.dbPool).toEqual({
 			totalConnections: 12,

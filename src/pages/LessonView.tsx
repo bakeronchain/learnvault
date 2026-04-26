@@ -237,11 +237,6 @@ const LessonView: React.FC = () => {
 					</span>
 					<span className="text-white/40 text-sm">{course.title}</span>
 				</div>
-				<h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
-					{lesson.title}
-				</h1>
-			</header>
-
 				<div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
 					<h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
 						{currentTab === "forum" ? "Community Forum" : lesson.title}
@@ -384,36 +379,24 @@ const LessonView: React.FC = () => {
 				</div>
 
 				<div>
-					<LessonContent
-						lesson={lesson ?? loadingLesson}
-						isLoading={isLoadingCourse || isLoadingContent}
-						isCompleted={isCompleted}
-						isCompleting={isCompletingMilestone}
-						timeSpentLabel={timeSpentLabel}
-						onMarkComplete={handleMarkComplete}
-						prevLessonId={prevLessonId}
-						nextLessonId={nextLessonId}
-						isNextLocked={isNextLocked}
-					/>
-
 					{currentTab === "forum" ? (
 						<div className="animate-in fade-in">
 							<CourseForum courseId={course.slug} />
 						</div>
 					) : (
-						<>
-							<LessonContent
-								lesson={lesson ?? loadingLesson}
-								isLoading={isLoadingCourse || isLoadingContent}
-								isCompleted={isCompleted}
-								isCompleting={isCompletingMilestone}
-								timeSpentLabel={timeSpentLabel}
-								onMarkComplete={handleMarkComplete}
-								onScrolledToBottom={() => markLessonRead(lessonId)}
-								prevLessonId={prevLessonId}
-								nextLessonId={nextLessonId}
-								isNextLocked={isNextLocked}
-							/>
+						<LessonContent
+							lesson={lesson ?? loadingLesson}
+							isLoading={isLoadingCourse || isLoadingContent}
+							isCompleted={isCompleted}
+							isCompleting={isCompletingMilestone}
+							timeSpentLabel={timeSpentLabel}
+							onMarkComplete={handleMarkComplete}
+							onScrolledToBottom={() => markLessonRead(lessonId)}
+							prevLessonId={prevLessonId}
+							nextLessonId={nextLessonId}
+							isNextLocked={isNextLocked}
+						/>
+					)}
 
 					{lesson?.isMilestone && !isLoadingCourse && !isLoadingContent && (
 						<div className="mt-12 animate-in fade-in slide-in-from-top-4 duration-1000">

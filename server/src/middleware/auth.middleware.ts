@@ -1,9 +1,7 @@
-import jwt from "jsonwebtoken"
 import { type NextFunction, type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
 
 import { type JwtService } from "../services/jwt.service"
-
 
 // ---------------------------------------------------------------------------
 // Factory-based auth (used by routes that receive jwtService via DI)
@@ -53,7 +51,6 @@ export interface AuthRequest extends Request {
 	}
 	walletAddress?: string
 }
-
 
 export const authMiddleware = (
 	req: AuthRequest,

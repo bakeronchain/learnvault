@@ -259,7 +259,9 @@ export async function rejectMilestone(
 		return
 	}
 	if (reason.length > 1000) {
-		res.status(400).json({ error: "Rejection reason must be 1000 characters or fewer" })
+		res
+			.status(400)
+			.json({ error: "Rejection reason must be 1000 characters or fewer" })
 		return
 	}
 	const sanitizedReason = sanitizeHtml(reason, {
@@ -455,9 +457,7 @@ export async function batchApproveMilestones(
 								milestoneTitle:
 									r.milestone_title ||
 									`Milestone ${r.milestone_number ?? r.milestone_id}`,
-								milestoneNumber: String(
-									r.milestone_number ?? r.milestone_id,
-								),
+								milestoneNumber: String(r.milestone_number ?? r.milestone_id),
 								reward: String(r.lrn_reward ?? 0),
 								dashboardUrl: `${process.env.FRONTEND_URL || ""}/dashboard`,
 								unsubscribeUrl: "#",
@@ -519,7 +519,9 @@ export async function batchRejectMilestones(
 			? rawReason.trim()
 			: "Batch rejection"
 	if (reasonInput.length > 1000) {
-		res.status(400).json({ error: "Rejection reason must be 1000 characters or fewer" })
+		res
+			.status(400)
+			.json({ error: "Rejection reason must be 1000 characters or fewer" })
 		return
 	}
 	const sanitizedReason = sanitizeHtml(reasonInput, {
@@ -607,9 +609,7 @@ export async function batchRejectMilestones(
 								milestoneTitle:
 									r.milestone_title ||
 									`Milestone ${r.milestone_number ?? r.milestone_id}`,
-								milestoneNumber: String(
-									r.milestone_number ?? r.milestone_id,
-								),
+								milestoneNumber: String(r.milestone_number ?? r.milestone_id),
 								rejectionReason: sanitizedReason,
 								milestoneUrl: `${process.env.FRONTEND_URL || ""}/milestones`,
 								unsubscribeUrl: "#",
@@ -647,127 +647,4 @@ export async function batchRejectMilestones(
 		console.error("[admin] batchRejectMilestones error:", err)
 		res.status(500).json({ error: "Failed to batch reject milestones" })
 	}
-}
-
-export async function batchApproveMilestones(
-	req: AdminRequest,
-	res: Response,
-): Promise<void> {
-	const { milestoneIds } = req.body as { milestoneIds: number[] }
-	if (!Array.isArray(milestoneIds) || milestoneIds.length === 0) {
-		res.status(400).json({ error: "No milestone report IDs provided" })
-		return
-	}
-
-	const results = []
-	let succeeded = 0
-	let failed = 0
-
-	// Pre-validation: ensure all reports exist and are pending
-	for (const id of milestoneIds) {
-		const report = await milestoneStore.getReportById(id)
-		if (!report) {
-			res.status(404).json({
-				error: "One or more milestone reports were not found",
-				data: { results: [{ reportId: id, success: false, status: "not_found" }] }
-			})
-			return
-		}
-		if (report.status !== "pending") {
-			res.status(409).json({
-				error: "All milestone reports must be pending before batch processing",
-				data: { results: [{ reportId: id, success: false, status: report.status }] }
-			})
-			return
-		}
-	}
-
-	for (const id of milestoneIds) {
-		try {
-			const report = (await milestoneStore.getReportById(id))!
-			const contractResult = await stellarContractService.callVerifyMilestone(
-				report.scholar_address,
-				report.course_id,
-				report.milestone_id,
-				{ requestId: req.requestId },
-			)
-			await milestoneStore.updateReportStatus(id, "approved")
-			await milestoneStore.addAuditEntry({
-				report_id: id,
-				validator_address: req.adminAddress ?? "unknown",
-				decision: "approved",
-				rejection_reason: null,
-				contract_tx_hash: contractResult.txHash,
-			})
-			results.push({ reportId: id, success: true, status: "approved", txHash: contractResult.txHash })
-			succeeded++
-		} catch (err) {
-			results.push({ reportId: id, success: false, status: "failed", error: err instanceof Error ? err.message : String(err) })
-			failed++
-		}
-	}
-
-	res.status(200).json({ data: { succeeded, failed, results } })
-}
-
-export async function batchRejectMilestones(
-	req: AdminRequest,
-	res: Response,
-): Promise<void> {
-	const { milestoneIds, reason } = req.body as { milestoneIds: number[]; reason: string }
-	if (!Array.isArray(milestoneIds) || milestoneIds.length === 0) {
-		res.status(400).json({ error: "No milestone report IDs provided" })
-		return
-	}
-
-	const results = []
-	let succeeded = 0
-	let failed = 0
-
-	// Pre-validation: ensure all reports exist and are pending
-	for (const id of milestoneIds) {
-		const report = await milestoneStore.getReportById(id)
-		if (!report) {
-			res.status(404).json({
-				error: "One or more milestone reports were not found",
-				data: { results: [{ reportId: id, success: false, status: "not_found" }] }
-			})
-			return
-		}
-		if (report.status !== "pending") {
-			res.status(409).json({
-				error: "All milestone reports must be pending before batch processing",
-				data: { results: [{ reportId: id, success: false, status: report.status }] }
-			})
-			return
-		}
-	}
-
-	for (const id of milestoneIds) {
-		try {
-			const report = (await milestoneStore.getReportById(id))!
-			const contractResult = await stellarContractService.emitRejectionEvent(
-				report.scholar_address,
-				report.course_id,
-				report.milestone_id,
-				reason,
-				{ requestId: req.requestId },
-			)
-			await milestoneStore.updateReportStatus(id, "rejected")
-			await milestoneStore.addAuditEntry({
-				report_id: id,
-				validator_address: req.adminAddress ?? "unknown",
-				decision: "rejected",
-				rejection_reason: reason,
-				contract_tx_hash: contractResult.txHash,
-			})
-			results.push({ reportId: id, success: true, status: "rejected", txHash: contractResult.txHash, reason })
-			succeeded++
-		} catch (err) {
-			results.push({ reportId: id, success: false, status: "failed", error: err instanceof Error ? err.message : String(err) })
-			failed++
-		}
-	}
-
-	res.status(200).json({ data: { succeeded, failed, results } })
 }

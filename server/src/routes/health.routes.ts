@@ -4,7 +4,12 @@ import path from "node:path"
 import { Router } from "express"
 import Redis from "ioredis"
 
-import { getPgStatStatementsSnapshot, pool } from "../db/index"
+import { getHealth } from "../controllers/health.controller"
+import {
+	getPoolMetrics,
+	resetPoolAlerts,
+} from "../controllers/metrics.controller"
+import { pool } from "../db"
 
 export const healthRouter = Router()
 
@@ -239,56 +244,89 @@ const deriveOverallStatus = (
  *             schema:
  *               $ref: '#/components/schemas/HealthResponse'
  */
-healthRouter.get("/health", async (_req, res) => {
-	const uptime = process.uptime()
-	const timestamp = new Date().toISOString()
-
+healthRouter.get("/health", async (req, res) => {
 	const [database, redis, stellarHorizon] = await Promise.all([
 		checkDatabase(),
 		checkRedis(),
 		checkHorizon(),
 	])
 
-	const status = deriveOverallStatus(
+	const overallStatus = deriveOverallStatus(
 		database.status,
 		redis.status,
 		stellarHorizon.status,
 	)
-	const dbConnectionState: DbConnectionState =
-		database.status === "healthy" ? "connected" : "disconnected"
 
-	const payload = {
-		status,
-		db: dbConnectionState,
-		uptime,
-		timestamp,
+	const statusCode = overallStatus === "unhealthy" ? 503 : 200
+
+	res.status(statusCode).json({
+		status: overallStatus,
 		version: appVersion,
 		commitHash: resolveGitCommitHash(),
+		timestamp: new Date().toISOString(),
+		db: database.status === "healthy" ? "connected" : "disconnected",
 		dbPool: getDbPoolStats(),
 		checks: {
 			database,
 			redis,
 			stellarHorizon,
 		},
-	}
-
-	if (status === "unhealthy") {
-		res.status(503).json(payload)
-		return
-	}
-
-	res.status(200).json(payload)
+	})
 })
 
-healthRouter.get("/health/db/performance", async (_req, res) => {
-	try {
-		const snapshot = await getPgStatStatementsSnapshot(10)
-		res.status(200).json(snapshot)
-	} catch {
-		res.status(500).json({
-			enabled: false,
-			rows: [],
-			error: "Failed to fetch database performance stats",
-		})
-	}
-})
+/**
+ * @openapi
+ * /api/metrics/pool:
+ *   get:
+ *     tags: [Monitoring]
+ *     summary: Get database pool metrics for monitoring dashboard
+ *     responses:
+ *       200:
+ *         description: Pool metrics retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *                 metrics:
+ *                   type: object
+ *                   properties:
+ *                     pool:
+ *                       type: object
+ *                       properties:
+ *                         total:
+ *                           type: number
+ *                         active:
+ *                           type: number
+ *                         idle:
+ *                           type: number
+ *                         waiting:
+ *                           type: number
+ *                         capacityUsagePercent:
+ *                           type: number
+ *                         isNearCapacity:
+ *                           type: boolean
+ *                     lastAlert:
+ *                       type: object
+ *                       nullable: true
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+healthRouter.get("/metrics/pool", getPoolMetrics)
+
+/**
+ * @openapi
+ * /api/metrics/pool/alerts/reset:
+ *   post:
+ *     tags: [Monitoring]
+ *     summary: Reset pool alerts
+ *     responses:
+ *       200:
+ *         description: Alerts reset successfully
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+healthRouter.post("/metrics/pool/alerts/reset", resetPoolAlerts)

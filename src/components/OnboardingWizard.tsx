@@ -49,8 +49,8 @@ const isFreighterInstalled = () => {
 	}
 	return Boolean(
 		candidate.freighter ||
-			candidate.freighterApi ||
-			(candidate.stellar && "isConnected" in candidate.stellar),
+		candidate.freighterApi ||
+		(candidate.stellar && "isConnected" in candidate.stellar),
 	)
 }
 
@@ -86,7 +86,8 @@ export default function OnboardingWizard({
 	const xlmBalance = parseBalance(balances.xlm?.balance)
 	const hasFunds = xlmBalance > 0
 	const isReturningUser = Boolean(
-		storage.getItem("walletId", "safe") || storage.getItem("walletAddress", "safe"),
+		storage.getItem("walletId", "safe") ||
+		storage.getItem("walletAddress", "safe"),
 	)
 	const hasCompletedOnboarding = Boolean(
 		storage.getItem(ONBOARDING_COMPLETE_KEY, "safe"),
@@ -275,13 +276,15 @@ export default function OnboardingWizard({
 					>
 						{/* Background Line */}
 						<div className="absolute left-[calc(1rem)] right-[calc(1rem)] md:left-[calc(2.5rem)] md:right-[calc(2.5rem)] top-4 h-1 bg-white/10 rounded-full" />
-						
+
 						{/* Active Line Fill */}
 						<div
 							className="absolute left-[calc(1rem)] md:left-[calc(2.5rem)] top-4 h-1 bg-brand-cyan rounded-full transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
-							style={{ width: `calc(${(stepIndex / (steps.length - 1)) * 100}% - ${(stepIndex / (steps.length - 1)) * 2}rem)` }}
+							style={{
+								width: `calc(${(stepIndex / (steps.length - 1)) * 100}% - ${(stepIndex / (steps.length - 1)) * 2}rem)`,
+							}}
 						/>
-						
+
 						{steps.map((step, index) => {
 							const state =
 								index < stepIndex
@@ -305,11 +308,23 @@ export default function OnboardingWizard({
 										}`}
 									>
 										{state === "completed" ? (
-											<svg className="w-4 h-4 md:w-5 md:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-												<path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+											<svg
+												className="w-4 h-4 md:w-5 md:h-5"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+												strokeWidth={3}
+											>
+												<path
+													strokeLinecap="round"
+													strokeLinejoin="round"
+													d="M5 13l4 4L19 7"
+												/>
 											</svg>
 										) : (
-											<span className="text-xs md:text-sm font-bold">{index + 1}</span>
+											<span className="text-xs md:text-sm font-bold">
+												{index + 1}
+											</span>
 										)}
 									</div>
 									<div className="absolute top-12 whitespace-nowrap text-center opacity-0 transition-opacity duration-300 group-hover:opacity-100 xl:opacity-100 pointer-events-none">
@@ -360,7 +375,11 @@ export default function OnboardingWizard({
 											<Button size="lg" variant="primary" onClick={goNext}>
 												Get Started
 											</Button>
-											<Button size="lg" variant="tertiary" onClick={() => setIsHidden(true)}>
+											<Button
+												size="lg"
+												variant="tertiary"
+												onClick={() => setIsHidden(true)}
+											>
 												Explore app first
 											</Button>
 										</div>
@@ -410,7 +429,11 @@ export default function OnboardingWizard({
 											>
 												Continue
 											</Button>
-											<Button size="lg" variant="tertiary" onClick={handleWalletBypass}>
+											<Button
+												size="lg"
+												variant="tertiary"
+												onClick={handleWalletBypass}
+											>
 												I already have a wallet
 											</Button>
 										</div>
@@ -441,7 +464,8 @@ export default function OnboardingWizard({
 											</p>
 											{walletBypass ? (
 												<p className="mt-2 text-sm text-white/50">
-													Bypass enabled, so any supported Stellar wallet is fine.
+													Bypass enabled, so any supported Stellar wallet is
+													fine.
 												</p>
 											) : null}
 										</div>
@@ -471,8 +495,8 @@ export default function OnboardingWizard({
 											Fund your wallet for testnet actions.
 										</h3>
 										<p className="mt-4 text-white/65 leading-relaxed">
-											This step runs automatically when your XLM balance is zero,
-											so new learners don&apos;t need to hunt for faucets.
+											This step runs automatically when your XLM balance is
+											zero, so new learners don&apos;t need to hunt for faucets.
 										</p>
 										<div className="mt-6 grid gap-4 md:grid-cols-2">
 											<div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-5">
@@ -497,7 +521,9 @@ export default function OnboardingWizard({
 												size="lg"
 												variant="primary"
 												onClick={() => void handleRetryFunding()}
-												disabled={stellarNetwork === "PUBLIC" || hasFunds || isFunding}
+												disabled={
+													stellarNetwork === "PUBLIC" || hasFunds || isFunding
+												}
 											>
 												{isFunding
 													? "Requesting funds..."
@@ -516,8 +542,8 @@ export default function OnboardingWizard({
 										</div>
 										{stellarNetwork === "PUBLIC" && !hasFunds ? (
 											<p className="mt-4 text-sm text-amber-200">
-												Public network wallets are not auto-funded. Add XLM in your
-												wallet, then continue.
+												Public network wallets are not auto-funded. Add XLM in
+												your wallet, then continue.
 											</p>
 										) : null}
 									</>
@@ -533,11 +559,14 @@ export default function OnboardingWizard({
 											Pick the beginner path that matches your goal.
 										</h3>
 										<p className="mt-4 text-white/65 leading-relaxed">
-											Every track starts practical and low-friction, so your first
-											lesson feels like momentum instead of theory overload.
+											Every track starts practical and low-friction, so your
+											first lesson feels like momentum instead of theory
+											overload.
 										</p>
 										<fieldset className="mt-8">
-											<legend className="sr-only">Choose your learning track</legend>
+											<legend className="sr-only">
+												Choose your learning track
+											</legend>
 											<div className="grid gap-4 md:grid-cols-2">
 												{beginnerTracks.map((course) => {
 													const checked = course.id === selectedTrack?.id
@@ -566,7 +595,9 @@ export default function OnboardingWizard({
 																	<p className="text-xs uppercase tracking-[0.25em] text-white/45">
 																		{course.track}
 																	</p>
-																	<h4 className="mt-2 text-xl font-bold">{course.title}</h4>
+																	<h4 className="mt-2 text-xl font-bold">
+																		{course.title}
+																	</h4>
 																</div>
 																{checked ? (
 																	<span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-cyan/20 text-brand-cyan font-bold">
@@ -603,15 +634,19 @@ export default function OnboardingWizard({
 											One click and you&apos;re enrolled.
 										</h3>
 										<p className="mt-4 text-white/65 leading-relaxed">
-											We use the existing contract flow here, so this step maps to
-											the real enrollment path the product already supports.
+											We use the existing contract flow here, so this step maps
+											to the real enrollment path the product already supports.
 										</p>
 										<div className="mt-6 rounded-[1.5rem] border border-white/10 bg-black/20 p-5">
 											<p className="text-sm uppercase tracking-[0.25em] text-white/40">
 												Selected course
 											</p>
-											<h4 className="mt-2 text-2xl font-bold">{selectedTrack?.title}</h4>
-											<p className="mt-3 text-white/60">{selectedTrack?.description}</p>
+											<h4 className="mt-2 text-2xl font-bold">
+												{selectedTrack?.title}
+											</h4>
+											<p className="mt-3 text-white/60">
+												{selectedTrack?.description}
+											</p>
 										</div>
 										<div className="mt-8 flex flex-wrap gap-4">
 											<Button
@@ -643,8 +678,8 @@ export default function OnboardingWizard({
 											Your first lesson is ready.
 										</h3>
 										<p className="mt-4 text-white/65 leading-relaxed">
-											We&apos;ll hand you off to the learn experience with your track
-											preselected so you can start immediately.
+											We&apos;ll hand you off to the learn experience with your
+											track preselected so you can start immediately.
 										</p>
 										<div className="mt-6 rounded-[1.5rem] border border-white/10 bg-black/20 p-5">
 											<p className="text-sm uppercase tracking-[0.25em] text-white/40">
@@ -655,7 +690,11 @@ export default function OnboardingWizard({
 											</h4>
 										</div>
 										<div className="mt-8 flex flex-wrap gap-4">
-											<Button size="lg" variant="primary" onClick={handleStartLearning}>
+											<Button
+												size="lg"
+												variant="primary"
+												onClick={handleStartLearning}
+											>
 												Start learning
 											</Button>
 											<Button size="lg" variant="tertiary" onClick={goBack}>
@@ -674,22 +713,27 @@ export default function OnboardingWizard({
 									<li className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
 										<p className="font-semibold text-white">Validation first</p>
 										<p className="mt-2 text-sm leading-relaxed text-white/55">
-											Each step is either completed automatically or gated until the
-											required action is done.
+											Each step is either completed automatically or gated until
+											the required action is done.
 										</p>
 									</li>
 									<li className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-										<p className="font-semibold text-white">Low setup friction</p>
+										<p className="font-semibold text-white">
+											Low setup friction
+										</p>
 										<p className="mt-2 text-sm leading-relaxed text-white/55">
-											New users get funding help and returning users skip the wizard
-											when prior wallet connection is already stored.
+											New users get funding help and returning users skip the
+											wizard when prior wallet connection is already stored.
 										</p>
 									</li>
 									<li className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-										<p className="font-semibold text-white">Professional handoff</p>
+										<p className="font-semibold text-white">
+											Professional handoff
+										</p>
 										<p className="mt-2 text-sm leading-relaxed text-white/55">
-											Track selection, enrollment, and lesson launch all reuse the
-											existing app stack instead of inventing parallel logic.
+											Track selection, enrollment, and lesson launch all reuse
+											the existing app stack instead of inventing parallel
+											logic.
 										</p>
 									</li>
 								</ul>

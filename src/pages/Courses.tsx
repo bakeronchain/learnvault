@@ -19,8 +19,8 @@ const Courses: React.FC = () => {
 					Choose a path and start with a focused first lesson.
 				</h1>
 				<p className="text-gray-400 text-lg max-w-3xl mx-auto leading-relaxed">
-					Every LearnVault track is designed to move new learners from setup
-					to hands-on progress with a clear first milestone.
+					Every LearnVault track is designed to move new learners from setup to
+					hands-on progress with a clear first milestone.
 				</p>
 			</header>
 
@@ -63,7 +63,10 @@ const Courses: React.FC = () => {
 
 							<ul className="space-y-2 text-sm text-white/60 mb-6">
 								{course.outcomes.map((outcome) => (
-									<li key={outcome} className="rounded-xl bg-white/[0.03] px-3 py-2">
+									<li
+										key={outcome}
+										className="rounded-xl bg-white/[0.03] px-3 py-2"
+									>
 										{outcome}
 									</li>
 								))}

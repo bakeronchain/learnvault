@@ -31,10 +31,7 @@ const GetTestUSDCButton: React.FC<GetTestUSDCButtonProps> = ({
 			} catch (error) {
 				const errorMessage =
 					error instanceof Error ? error.message : "Unknown error"
-				addNotification(
-					t("usdc.mintError", { error: errorMessage }),
-					"error",
-				)
+				addNotification(t("usdc.mintError", { error: errorMessage }), "error")
 			}
 		})
 	}
@@ -60,9 +57,7 @@ const GetTestUSDCButton: React.FC<GetTestUSDCButtonProps> = ({
 					</Button>
 				}
 			>
-				<div style={{ width: "15em" }}>
-					{t("usdc.tooltip", { amount })}
-				</div>
+				<div style={{ width: "15em" }}>{t("usdc.tooltip", { amount })}</div>
 			</Tooltip>
 		</div>
 	)

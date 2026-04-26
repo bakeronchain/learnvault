@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react"
-import { useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
-import { courses } from "../data/courses"
+import { useSearchParams } from "react-router-dom"
 import {
 	CourseCardSkeleton,
 	NoCoursesEmptyState,
 } from "../components/SkeletonLoader"
+import { courses } from "../data/courses"
 import storage from "../util/storage"
 
 const ONBOARDING_TRACK_KEY = "learnvault:onboarding-track"
@@ -37,9 +37,7 @@ const Learn: React.FC = () => {
 					{selectedCourse ? selectedCourse.title : t("pages.learn.title")}
 				</h1>
 				<p className="text-white/40 text-lg font-medium max-w-3xl mx-auto leading-relaxed">
-					{selectedCourse
-						? selectedCourse.description
-						: t("pages.learn.desc")}
+					{selectedCourse ? selectedCourse.description : t("pages.learn.desc")}
 				</p>
 			</header>
 

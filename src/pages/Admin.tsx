@@ -292,7 +292,9 @@ const MilestoneQueue: React.FC = () => {
 	const [notice, setNotice] = useState<string | null>(null)
 
 	const handleAction = (id: number, action: "approve" | "reject") => {
-		setSubmissions((current) => current.filter((submission) => submission.id !== id))
+		setSubmissions((current) =>
+			current.filter((submission) => submission.id !== id),
+		)
 		setNotice(
 			action === "approve"
 				? `Milestone #${id} approved and queued for payout.`

@@ -10,6 +10,7 @@ export default [
 		"target/packages",
 		"src/contracts/*",
 		"!src/contracts/util.ts",
+		"server/scripts/**/*.ts",
 	]),
 	...config,
 	{

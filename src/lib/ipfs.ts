@@ -1,4 +1,4 @@
-const DEFAULT_GATEWAY = "https://gateway.pinata.cloud/ipfs";
+const DEFAULT_GATEWAY = "https://gateway.pinata.cloud/ipfs"
 
 /**
  * Build a public HTTP URL for an IPFS CID.
@@ -7,12 +7,12 @@ const DEFAULT_GATEWAY = "https://gateway.pinata.cloud/ipfs";
  * Pinata gateway can swap it in without changing component code.
  */
 export function getIpfsUrl(cid: string): string {
-  const base =
-    (import.meta.env.VITE_IPFS_GATEWAY_URL as string | undefined)?.replace(
-      /\/$/,
-      "",
-    ) ?? DEFAULT_GATEWAY;
-  return `${base}/${cid}`;
+	const base =
+		(import.meta.env.VITE_IPFS_GATEWAY_URL as string | undefined)?.replace(
+			/\/$/,
+			"",
+		) ?? DEFAULT_GATEWAY
+	return `${base}/${cid}`
 }
 
 /**
@@ -20,7 +20,7 @@ export function getIpfsUrl(cid: string): string {
  * Useful for conditional rendering of IPFS previews.
  */
 export function isCid(value: string): boolean {
-  return /^(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[a-z2-7]{52,})/.test(value);
+	return /^(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[a-z2-7]{52,})/.test(value)
 }
 
 /**
@@ -28,6 +28,6 @@ export function isCid(value: string): boolean {
  * through unchanged if it is already a bare CID or a gateway URL.
  */
 export function normaliseCid(value: string): string {
-  if (value.startsWith("ipfs://")) return value.slice("ipfs://".length);
-  return value;
+	if (value.startsWith("ipfs://")) return value.slice("ipfs://".length)
+	return value
 }

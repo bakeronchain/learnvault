@@ -2,7 +2,7 @@
  * Utility functions for USDC token operations on Stellar
  */
 
-import { Contract, SorobanRpc } from "@stellar/stellar-sdk"
+import { Contract, rpc } from "@stellar/stellar-sdk"
 
 /**
  * Get the USDC contract ID from environment variables
@@ -45,7 +45,7 @@ export async function mintTestUSDC(
 			import.meta.env.PUBLIC_STELLAR_RPC_URL || "http://localhost:8000/rpc"
 
 		// Create RPC server instance
-		const server = new SorobanRpc.Server(rpcUrl)
+		const server = new rpc.Server(rpcUrl)
 
 		// Create contract instance
 		const contract = new Contract(contractId)
@@ -91,7 +91,7 @@ export async function getUSDCBalance(address: string): Promise<number> {
 		const rpcUrl =
 			import.meta.env.PUBLIC_STELLAR_RPC_URL || "http://localhost:8000/rpc"
 
-		const server = new SorobanRpc.Server(rpcUrl)
+		const server = new rpc.Server(rpcUrl)
 		const contract = new Contract(contractId)
 
 		// TODO: Implement balance checking once contract clients are available

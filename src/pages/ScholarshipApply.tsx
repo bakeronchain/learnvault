@@ -1,6 +1,7 @@
 import { Button, Card } from "@stellar/design-system"
 import { useEffect, useRef, useState } from "react"
 import { Link } from "react-router-dom"
+import AddressDisplay from "../components/AddressDisplay"
 import { useScholarshipApplication } from "../hooks/useScholarshipApplication"
 import { useWallet } from "../hooks/useWallet"
 import {
@@ -272,8 +273,17 @@ export default function ScholarshipApply() {
 					<span>
 						Estimated network fee: {ESTIMATED_NETWORK_FEE_XLM.toFixed(2)} XLM
 					</span>
-					<span>
-						Wallet: {address ? shortenAddress(address) : "Connect to begin"}
+					<span className="flex items-center gap-1">
+						Wallet:{" "}
+						{address ? (
+							<AddressDisplay
+								address={address}
+								showCopyButton={false}
+								showExplorerLink={false}
+							/>
+						) : (
+							"Connect to begin"
+						)}
 					</span>
 				</div>
 			</section>
@@ -333,7 +343,11 @@ export default function ScholarshipApply() {
 									<div className={styles.StatCard}>
 										<span className={styles.StatLabel}>Connected wallet</span>
 										<strong>
-											{address ? shortenAddress(address) : "Not connected"}
+											{address ? (
+												<AddressDisplay address={address} />
+											) : (
+												"Not connected"
+											)}
 										</strong>
 									</div>
 									<div className={styles.StatCard}>
@@ -708,7 +722,15 @@ export default function ScholarshipApply() {
 									/>
 									<span className={styles.CheckboxText}>
 										I confirm that{" "}
-										{address ? shortenAddress(address) : "the connected wallet"}
+										{address ? (
+											<AddressDisplay
+												address={address}
+												showCopyButton={false}
+												showExplorerLink={false}
+											/>
+										) : (
+											"the connected wallet"
+										)}
 										should receive scholarship disbursements.
 									</span>
 								</label>

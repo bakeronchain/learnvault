@@ -13,7 +13,56 @@ class TypedStorage<T> {
 	private readonly storage: Storage
 
 	constructor() {
-		this.storage = localStorage
+		// In some test environments `localStorage` may be a plain object or missing
+		// methods. Prefer using the real `localStorage` when it provides the
+		// standard Storage API (getItem/setItem/key/removeItem/clear). Otherwise
+		// provide a lightweight in-memory replacement that matches the Storage
+		// surface so the rest of the code (and unit tests) can rely on it.
+		const maybeStorage = (
+			typeof globalThis !== "undefined"
+				? (globalThis as any).localStorage
+				: undefined
+		) as Storage | undefined
+
+		if (
+			maybeStorage &&
+			typeof maybeStorage.getItem === "function" &&
+			typeof maybeStorage.setItem === "function" &&
+			typeof maybeStorage.key === "function" &&
+			typeof maybeStorage.removeItem === "function" &&
+			typeof maybeStorage.clear === "function"
+		) {
+			this.storage = maybeStorage
+			return
+		}
+
+		// Minimal in-memory Storage implementation used for tests or environments
+		// without a proper `localStorage`.
+		const mem = (() => {
+			const map = new Map<string, string>()
+			return {
+				getItem(key: string) {
+					return map.has(key) ? (map.get(key) as string) : null
+				},
+				setItem(key: string, value: string) {
+					map.set(key, String(value))
+				},
+				removeItem(key: string) {
+					map.delete(key)
+				},
+				clear() {
+					map.clear()
+				},
+				key(index: number) {
+					return Array.from(map.keys())[index] ?? null
+				},
+				get length() {
+					return map.size
+				},
+			}
+		})()
+
+		this.storage = mem as unknown as Storage
 	}
 
 	public get length(): number {

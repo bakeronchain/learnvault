@@ -2,8 +2,8 @@
 
 use proptest::prelude::*;
 use soroban_sdk::{
-    Address, Env,
-    testutils::Address as _,
+    Address, BytesN, Env,
+    testutils::{Address as _, MockAuth, MockAuthInvoke},
     token::{StellarAssetClient, TokenClient},
 };
 
@@ -42,12 +42,9 @@ proptest! {
 
 extern crate std;
 
-use soroban_sdk::{
-    IntoVal,
-    testutils::Events as _,
-};
+use soroban_sdk::{IntoVal, testutils::Events as _};
 
-use crate::{LRNError, LearnToken, LearnTokenClient};
+use crate::{DataKey, LRNError, LearnToken, LearnTokenClient};
 
 fn setup(e: &Env) -> (Address, Address, LearnTokenClient) {
     let admin = Address::generate(e);
@@ -56,6 +53,18 @@ fn setup(e: &Env) -> (Address, Address, LearnTokenClient) {
     let client = LearnTokenClient::new(e, &id);
     client.initialize(&admin);
     (id, admin, client)
+}
+
+fn authorize_upgrade(e: &Env, contract_id: &Address, signer: &Address, wasm_hash: &BytesN<32>) {
+    e.mock_auths(&[MockAuth {
+        address: signer,
+        invoke: &MockAuthInvoke {
+            contract: contract_id,
+            fn_name: "upgrade",
+            args: (wasm_hash.clone(),).into_val(e),
+            sub_invokes: &[],
+        },
+    }]);
 }
 
 // --- mint: happy path ---
@@ -201,6 +210,41 @@ fn total_supply_starts_at_zero() {
     assert_eq!(client.total_supply(), 0);
 }
 
+// --- fuzz tests ---
+
+use proptest::prelude::*;
+
+proptest! {
+    #[test]
+    #[ignore]
+    fn fuzz_mint(amount in any::<u128>()) {
+        let e = Env::default();
+        let (_, _, client) = setup(&e);
+        let learner = Address::generate(&e);
+
+        // The contract expects i128. Let's safely cast u128 to i128 or trap.
+        // If it's outside i128 max, it might cast to a negative number or we can just cap it / wrap it.
+        let amount_i128 = amount as i128;
+
+        let result = client.try_mint(&learner, &amount_i128);
+
+        if amount_i128 <= 0 {
+            // Must return ZeroAmount error
+            assert_eq!(
+                result.err(),
+                Some(Ok(soroban_sdk::Error::from_contract_error(
+                    crate::LRNError::ZeroAmount as u32
+                )))
+            );
+        } else {
+            // Valid mint amount, should succeed
+            assert!(result.is_ok());
+            assert_eq!(client.balance(&learner), amount_i128);
+            assert_eq!(client.total_supply(), amount_i128);
+        }
+    }
+}
+
 #[test]
 fn get_version_returns_semver() {
     let e = Env::default();
@@ -219,7 +263,7 @@ fn initialize_sets_admin_correctly() {
     e.mock_all_auths();
     let client = LearnTokenClient::new(&e, &id);
     client.initialize(&admin);
-    
+
     // Verify admin can mint (only admin can mint)
     let learner = Address::generate(&e);
     client.mint(&learner, &100);
@@ -230,9 +274,12 @@ fn initialize_sets_admin_correctly() {
 fn initialize_sets_name_symbol_decimals() {
     let e = Env::default();
     let (_, _, client) = setup(&e);
-    
+
     use soroban_sdk::String;
-    assert_eq!(client.name(), String::from_str(&e, "LearnVault Learn Token"));
+    assert_eq!(
+        client.name(),
+        String::from_str(&e, "LearnVault Learn Token")
+    );
     assert_eq!(client.symbol(), String::from_str(&e, "LRN"));
     assert_eq!(client.decimals(), 7);
 }
@@ -244,13 +291,13 @@ fn double_initialize_rejected() {
     let id = e.register(LearnToken, ());
     e.mock_all_auths();
     let client = LearnTokenClient::new(&e, &id);
-    
+
     client.initialize(&admin);
-    
+
     // Try to initialize again
     let new_admin = Address::generate(&e);
     let result = client.try_initialize(&new_admin);
-    
+
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
@@ -267,18 +314,18 @@ fn transfer_panics_with_soulbound_error() {
     let (_, _, client) = setup(&e);
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
-    
+
     client.mint(&alice, &100);
-    
+
     let result = client.try_transfer(&alice, &bob, &50);
-    
+
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
             LRNError::Soulbound as u32
         )))
     );
-    
+
     // Verify balance unchanged
     assert_eq!(client.balance(&alice), 100);
     assert_eq!(client.balance(&bob), 0);
@@ -290,9 +337,9 @@ fn transfer_always_panics_even_with_zero_amount() {
     let (_, _, client) = setup(&e);
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
-    
+
     let result = client.try_transfer(&alice, &bob, &0);
-    
+
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
@@ -308,22 +355,22 @@ fn reputation_score_increases_with_balance() {
     let e = Env::default();
     let (_, _, client) = setup(&e);
     let learner = Address::generate(&e);
-    
+
     // No balance = 0 reputation
     assert_eq!(client.reputation_score(&learner), 0);
-    
+
     // 100 LRN = 1 reputation
     client.mint(&learner, &100);
     assert_eq!(client.reputation_score(&learner), 1);
-    
+
     // 500 LRN = 5 reputation
     client.mint(&learner, &400);
     assert_eq!(client.reputation_score(&learner), 5);
-    
+
     // 999 LRN = 9 reputation (integer division)
     client.mint(&learner, &499);
     assert_eq!(client.reputation_score(&learner), 9);
-    
+
     // 1000 LRN = 10 reputation
     client.mint(&learner, &1);
     assert_eq!(client.reputation_score(&learner), 10);
@@ -334,7 +381,7 @@ fn reputation_score_proportional_to_balance() {
     let e = Env::default();
     let (_, _, client) = setup(&e);
     let learner = Address::generate(&e);
-    
+
     client.mint(&learner, &12345);
     assert_eq!(client.reputation_score(&learner), 123);
 }
@@ -344,7 +391,7 @@ fn reputation_score_zero_for_unknown_address() {
     let e = Env::default();
     let (_, _, client) = setup(&e);
     let unknown = Address::generate(&e);
-    
+
     assert_eq!(client.reputation_score(&unknown), 0);
 }
 
@@ -357,13 +404,13 @@ fn set_admin_transfers_admin_rights() {
     let new_admin = Address::generate(&e);
     let id = e.register(LearnToken, ());
     e.mock_all_auths();
-    
+
     let client = LearnTokenClient::new(&e, &id);
     client.initialize(&old_admin);
-    
+
     // Transfer admin
     client.set_admin(&new_admin);
-    
+
     // New admin can mint
     let learner = Address::generate(&e);
     client.mint(&learner, &100);
@@ -376,7 +423,7 @@ fn set_admin_only_callable_by_current_admin() {
     let admin = Address::generate(&e);
     let attacker = Address::generate(&e);
     let id = e.register(LearnToken, ());
-    
+
     // Only mock auth for initialize
     e.mock_auths(&[soroban_sdk::testutils::MockAuth {
         address: &admin,
@@ -387,10 +434,10 @@ fn set_admin_only_callable_by_current_admin() {
             sub_invokes: &[],
         },
     }]);
-    
+
     let client = LearnTokenClient::new(&e, &id);
     client.initialize(&admin);
-    
+
     // Attacker tries to set themselves as admin
     let result = client.try_set_admin(&attacker);
     assert!(result.is_err());
@@ -401,14 +448,13 @@ fn set_admin_emits_event() {
     let e = Env::default();
     let (contract_id, _, client) = setup(&e);
     let new_admin = Address::generate(&e);
-    
+
     client.set_admin(&new_admin);
-    
+
     let events = e.events().all();
     use soroban_sdk::{symbol_short, vec};
     let found = events.iter().any(|(cid, topics, _data)| {
-        cid == contract_id
-            && topics == vec![&e, symbol_short!("set_admin").into_val(&e)]
+        cid == contract_id && topics == vec![&e, symbol_short!("set_admin").into_val(&e)]
     });
     assert!(found, "set_admin event not found");
 }
@@ -421,14 +467,342 @@ fn mint_before_initialize_panics() {
     let id = e.register(LearnToken, ());
     e.mock_all_auths();
     let client = LearnTokenClient::new(&e, &id);
-    
+
     let learner = Address::generate(&e);
     let result = client.try_mint(&learner, &100);
-    
+
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
             LRNError::NotInitialized as u32
         )))
     );
+}
+
+// --- transfer_from: soulbound tests ---
+
+#[test]
+fn transfer_from_panics_with_soulbound_error() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+
+    client.mint(&alice, &100);
+
+    // Even with proper authorization, transfer_from should fail
+    let result = client.try_transfer_from(&alice, &alice, &bob, &50);
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            LRNError::Soulbound as u32
+        )))
+    );
+
+    // Verify balance unchanged
+    assert_eq!(client.balance(&alice), 100);
+    assert_eq!(client.balance(&bob), 0);
+}
+
+#[test]
+fn transfer_from_always_panics_even_with_zero_amount() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+
+    let result = client.try_transfer_from(&alice, &alice, &bob, &0);
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            LRNError::Soulbound as u32
+        )))
+    );
+}
+
+#[test]
+fn transfer_from_panics_regardless_of_spender() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    let charlie = Address::generate(&e);
+
+    client.mint(&alice, &100);
+
+    // charlie (spender) tries to transfer from alice to bob
+    let result = client.try_transfer_from(&charlie, &alice, &bob, &50);
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            LRNError::Soulbound as u32
+        )))
+    );
+}
+
+// --- approve: soulbound tests ---
+
+#[test]
+fn approve_panics_with_soulbound_error() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+
+    client.mint(&alice, &100);
+
+    let result = client.try_approve(&alice, &bob, &50);
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            LRNError::Soulbound as u32
+        )))
+    );
+}
+
+#[test]
+fn approve_always_panics_even_with_zero_amount() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+
+    let result = client.try_approve(&alice, &bob, &0);
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            LRNError::Soulbound as u32
+        )))
+    );
+}
+
+#[test]
+fn approve_panics_even_for_non_existent_balance() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+
+    // alice has no LRN balance
+    let result = client.try_approve(&alice, &bob, &50);
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            LRNError::Soulbound as u32
+        )))
+    );
+}
+
+// --- allowance: soulbound tests ---
+
+#[test]
+fn allowance_returns_zero() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+
+    let allowance = client.allowance(&alice, &bob);
+    assert_eq!(allowance, 0);
+}
+
+#[test]
+fn allowance_always_returns_zero_regardless_of_accounts() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    let charlie = Address::generate(&e);
+
+    // Mint some tokens to alice
+    client.mint(&alice, &1000);
+
+    // Allowance should still be 0 for any pair
+    assert_eq!(client.allowance(&alice, &bob), 0);
+    assert_eq!(client.allowance(&alice, &charlie), 0);
+    assert_eq!(client.allowance(&bob, &charlie), 0);
+    assert_eq!(client.allowance(&charlie, &alice), 0);
+}
+
+#[test]
+fn allowance_returns_zero_for_same_address() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let alice = Address::generate(&e);
+
+    client.mint(&alice, &500);
+
+    // Even allowance from alice to herself should be 0
+    assert_eq!(client.allowance(&alice, &alice), 0);
+}
+
+// --- admin transfer (set_admin tests) ---
+
+#[test]
+fn admin_transfers_always_succeed() {
+    let e = Env::default();
+    let admin1 = Address::generate(&e);
+    let admin2 = Address::generate(&e);
+    let admin3 = Address::generate(&e);
+    let id = e.register(LearnToken, ());
+    e.mock_all_auths();
+
+    let client = LearnTokenClient::new(&e, &id);
+    client.initialize(&admin1);
+
+    // First transfer
+    client.set_admin(&admin2);
+
+    // Second transfer (new admin can transfer admin)
+    client.set_admin(&admin3);
+
+    // Verify final admin is admin3
+    assert_eq!(client.total_supply(), 0);
+
+    // admin3 should be able to mint (verifies admin transfer worked)
+    let learner = Address::generate(&e);
+    client.mint(&learner, &100);
+    assert_eq!(client.balance(&learner), 100);
+}
+
+// --- initialization completeness tests ---
+
+#[test]
+fn initialized_contract_has_all_metadata() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+
+    use soroban_sdk::String;
+
+    // All metadata should be set
+    assert_eq!(
+        client.name(),
+        String::from_str(&e, "LearnVault Learn Token")
+    );
+    assert_eq!(client.symbol(), String::from_str(&e, "LRN"));
+    assert_eq!(client.decimals(), 7);
+    assert_eq!(client.get_version(), String::from_str(&e, "1.0.0"));
+    assert_eq!(client.total_supply(), 0);
+}
+
+// --- comprehensive mint/supply tracking ---
+
+#[test]
+fn large_mint_amounts_tracked_correctly() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let learner = Address::generate(&e);
+
+    // Test with large amounts
+    let large_amount: i128 = 1_000_000_000;
+    client.mint(&learner, &large_amount);
+
+    assert_eq!(client.balance(&learner), large_amount);
+    assert_eq!(client.total_supply(), large_amount);
+}
+
+#[test]
+fn multiple_small_mints_vs_single_large_mint() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+
+    // Alice receives 10 mints of 100 each
+    for _ in 0..10 {
+        client.mint(&alice, &100);
+    }
+
+    // Bob receives a single mint of 1000
+    client.mint(&bob, &1000);
+
+    assert_eq!(client.balance(&alice), 1000);
+    assert_eq!(client.balance(&bob), 1000);
+    assert_eq!(client.total_supply(), 2000);
+}
+
+// --- reputation score edge cases ---
+
+#[test]
+fn reputation_score_matches_balance_division() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let learner = Address::generate(&e);
+
+    for _amount in [1, 10, 99, 100, 101, 999, 1000, 9999, 10000] {
+        client.mint(&learner, &1); // Increment balance one at a time
+        let balance = client.balance(&learner);
+        let reputation = client.reputation_score(&learner);
+
+        assert_eq!(
+            reputation,
+            balance / 100,
+            "Reputation should match balance / 100 at balance = {}",
+            balance
+        );
+    }
+}
+
+#[test]
+fn upgrade_requires_admin_auth() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let attacker = Address::generate(&e);
+    let id = e.register(LearnToken, ());
+
+    e.mock_auths(&[MockAuth {
+        address: &admin,
+        invoke: &MockAuthInvoke {
+            contract: &id,
+            fn_name: "initialize",
+            args: (admin.clone(),).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+
+    let client = LearnTokenClient::new(&e, &id);
+    client.initialize(&admin);
+
+    let wasm_hash = crate::upgrade::testutils::upload_upgrade_target(&e);
+    authorize_upgrade(&e, &id, &attacker, &wasm_hash);
+
+    assert!(client.try_upgrade(&wasm_hash).is_err());
+}
+
+#[test]
+fn state_persists_after_upgrade() {
+    let e = Env::default();
+    let (id, admin, client) = setup(&e);
+    let learner = Address::generate(&e);
+
+    client.mint(&learner, &100);
+
+    e.set_auths(&[]);
+    let wasm_hash = crate::upgrade::testutils::upload_upgrade_target(&e);
+    authorize_upgrade(&e, &id, &admin, &wasm_hash);
+    client.upgrade(&wasm_hash);
+
+    let balance = e.as_contract(&id, || {
+        e.storage()
+            .persistent()
+            .get::<_, i128>(&DataKey::Balance(learner.clone()))
+            .unwrap_or(0)
+    });
+    let supply = e.as_contract(&id, || {
+        e.storage()
+            .persistent()
+            .get::<_, i128>(&DataKey::TotalSupply)
+            .unwrap_or(0)
+    });
+    let stored_hash = e.as_contract(&id, || crate::upgrade::current_hash(&e));
+
+    assert_eq!(balance, 100);
+    assert_eq!(supply, 100);
+    assert_eq!(stored_hash, wasm_hash);
 }

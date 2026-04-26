@@ -38,6 +38,7 @@ export const createEnrollment = async (
 				const isEnrolledOnChain = await stellarContractService.isEnrolled(
 					learner_address,
 					courseIdNum,
+					{ requestId: req.requestId },
 				)
 
 				if (!isEnrolledOnChain) {

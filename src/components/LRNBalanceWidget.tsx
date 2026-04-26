@@ -14,6 +14,7 @@
 "use client"
 
 import React, { useEffect, useRef, useState, useCallback } from "react"
+import { useLearnToken } from "../hooks/useLearnToken"
 import { formatLRN } from "../util/tokenFormat"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -39,66 +40,8 @@ interface LearnTokenData {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Mock hook — replace with your real contract hook
+// Helper for percentile calculation (mock for now - can be replaced with real data)
 // ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * useLearnToken
- *
- * Drop-in replacement target: wire this to your actual LearnToken contract
- * using wagmi / ethers / stellar-sdk as appropriate.
- *
- * The hook exposes:
- *   data     — current token data (null while loading)
- *   isLoading — true on first fetch
- *   error    — any fetch error
- */
-function useLearnToken(address: string): {
-	data: LearnTokenData | null
-	isLoading: boolean
-	error: string | null
-} {
-	const [data, setData] = useState<LearnTokenData | null>(null)
-	const [isLoading, setIsLoading] = useState(true)
-	const [error, setError] = useState<string | null>(null)
-
-	useEffect(() => {
-		if (!address) {
-			setError("No wallet address provided.")
-			setIsLoading(false)
-			return
-		}
-
-		setIsLoading(true)
-		setError(null)
-
-		// ── Simulate async contract call ──────────────────────────────────────
-		const timer = setTimeout(() => {
-			try {
-				// In production, replace with:
-				//   const balance = await learnTokenContract.balanceOf(address);
-				const mockBalance = 1420000000
-				const mockPrev = 1220000000
-				const mockPercentile = 8 // top 8%
-
-				setData({
-					balance: mockBalance,
-					previousBalance: mockPrev,
-					percentile: mockPercentile,
-					rankLabel: getRankLabel(mockPercentile),
-				})
-			} catch (e) {
-				setError("Failed to fetch LRN balance.")
-			} finally {
-				setIsLoading(false)
-			}
-		}, 1200)
-
-		return () => clearTimeout(timer)
-	}, [address])
-
-	return { data, isLoading, error }
-}
 
 function getRankLabel(percentile: number): string {
 	if (percentile <= 1) return " Legend"
@@ -107,6 +50,68 @@ function getRankLabel(percentile: number): string {
 	if (percentile <= 25) return " Rising Star"
 	if (percentile <= 50) return " Committed"
 	return " Getting Started"
+}
+
+// Simple percentile calculation based on balance - this is a placeholder
+// In a real implementation, you'd fetch leaderboard data from the backend
+function calculatePercentile(balance: bigint): number {
+	// Mock calculation: higher balance = better percentile (lower number)
+	// This is just for demonstration - replace with real leaderboard logic
+	const balanceNum = Number(balance)
+	if (balanceNum >= 10000000000) return 1 // Top 1%
+	if (balanceNum >= 5000000000) return 5 // Top 5%
+	if (balanceNum >= 2000000000) return 10 // Top 10%
+	if (balanceNum >= 1000000000) return 25 // Top 25%
+	if (balanceNum >= 500000000) return 50 // Top 50%
+	return 75 // Default
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Hook to handle previous balance tracking
+// ─────────────────────────────────────────────────────────────────────────────
+
+function useLearnTokenWithHistory(address: string): {
+	data: LearnTokenData | null
+	isLoading: boolean
+	error: string | null
+} {
+	const { balance, isLoading } = useLearnToken(address)
+	const [data, setData] = useState<LearnTokenData | null>(null)
+	const [error, setError] = useState<string | null>(null)
+
+	// Store previous balance in localStorage for persistence across sessions
+	useEffect(() => {
+		if (balance !== undefined) {
+			try {
+				const storageKey = `lrn-previous-balance-${address}`
+				const storedPrevious = localStorage.getItem(storageKey)
+				const previousBalance = storedPrevious
+					? BigInt(storedPrevious)
+					: balance
+
+				// Only update previous balance if current balance is different
+				if (balance !== previousBalance) {
+					localStorage.setItem(storageKey, balance.toString())
+				}
+
+				const percentile = calculatePercentile(balance)
+
+				setData({
+					balance: Number(balance),
+					previousBalance: Number(previousBalance),
+					percentile,
+					rankLabel: getRankLabel(percentile),
+				})
+				setError(null)
+			} catch (e) {
+				setError("Failed to process balance data.")
+			}
+		} else if (!isLoading) {
+			setError("No balance data available.")
+		}
+	}, [balance, address, isLoading])
+
+	return { data, isLoading, error }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -379,7 +384,7 @@ export function LRNBalanceWidget({
 	size = "md",
 	className = "",
 }: LRNBalanceWidgetProps) {
-	const { data, isLoading, error } = useLearnToken(address)
+	const { data, isLoading, error } = useLearnTokenWithHistory(address)
 	const animatedBalance = useCountUp(data?.balance ?? 0)
 
 	if (isLoading) return <Skeleton size={size} />

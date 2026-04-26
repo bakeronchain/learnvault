@@ -2,23 +2,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCallback } from "react"
 import { useToast } from "../components/Toast/ToastProvider"
 import { ErrorCode, createAppError } from "../types/errors"
-import { type Proposal, type RawContractProposal } from "../types/governance"
+import { type RawContractProposal, type Proposal } from "../types/governance"
 import { isUserRejection, parseError } from "../utils/errors"
+import { logger } from "../utils/logger"
+import { useContractIds } from "./useContractIds"
 import { useWallet } from "./useWallet"
 
+// expose the canonical Proposal type for consumers of this module
 export type { Proposal }
 
 type ContractRecord = Record<string, unknown>
-
-const readEnv = (key: string): string | undefined => {
-	const value = (import.meta.env as Record<string, unknown>)[key]
-	return typeof value === "string" && value.length ? value : undefined
-}
-
-const SCHOLARSHIP_TREASURY_CONTRACT = readEnv(
-	"PUBLIC_SCHOLARSHIP_TREASURY_CONTRACT",
-)
-const GOVERNANCE_TOKEN_CONTRACT = readEnv("PUBLIC_GOVERNANCE_TOKEN_CONTRACT")
 
 // The expected contract version this client was generated against.
 const EXPECTED_CONTRACT_VERSION = "1.0.0"
@@ -28,6 +21,7 @@ const EXPECTED_CONTRACT_VERSION = "1.0.0"
  */
 export function useGovernance() {
 	const { address, signTransaction } = useWallet()
+	const { scholarshipTreasury, governanceToken } = useContractIds()
 	const queryClient = useQueryClient()
 	const { showSuccess, showError, showInfo } = useToast()
 
@@ -82,7 +76,7 @@ export function useGovernance() {
 
 	const toProposalStatus = useCallback(
 		(status: unknown): Proposal["status"] => {
-			const normalized = String(status ?? "Pending").toLowerCase()
+			const normalized = String(status ?? "pending").toLowerCase()
 			if (normalized === "approved" || normalized === "passed") return "Passed"
 			if (normalized === "rejected") return "Rejected"
 			return "Active"
@@ -96,7 +90,7 @@ export function useGovernance() {
 			fallbackStatus: Proposal["status"],
 		): Proposal => ({
 			id: Number(rawProposal.id ?? 0),
-			title: String(rawProposal.program_name ?? rawProposal.title ?? ""),
+			title: String(rawProposal.title ?? rawProposal.program_name ?? ""),
 			description: String(
 				rawProposal.program_description ?? rawProposal.description ?? "",
 			),
@@ -120,9 +114,9 @@ export function useGovernance() {
 					0,
 			),
 			endDate: Number(
-				rawProposal.deadline_ledger ??
+				rawProposal.endDate ??
 					rawProposal.end_date ??
-					rawProposal.endDate ??
+					rawProposal.deadline_ledger ??
 					0,
 			),
 		}),
@@ -222,7 +216,7 @@ export function useGovernance() {
 			>
 			return (mod.default as Record<string, unknown>) ?? mod
 		} catch (err) {
-			console.warn(
+			logger.warn(
 				createAppError(
 					ErrorCode.CONTRACT_NOT_DEPLOYED,
 					"Contract not available",
@@ -238,7 +232,7 @@ export function useGovernance() {
 	useQuery({
 		queryKey: ["governance", "version", "governance_token"],
 		queryFn: async (): Promise<string | null> => {
-			if (!GOVERNANCE_TOKEN_CONTRACT) return null
+			if (!governanceToken) return null
 			const client = await loadClient("../contracts/governance_token")
 			if (!client) return null
 			const fn = asMethod(client, "get_version")
@@ -253,7 +247,7 @@ export function useGovernance() {
 						: raw) ?? "",
 				)
 				if (version && version !== EXPECTED_CONTRACT_VERSION) {
-					console.warn(
+					logger.warn(
 						`[GovernanceToken] Version mismatch: expected ${EXPECTED_CONTRACT_VERSION}, got ${version}. ` +
 							"Client bindings may be out of date.",
 					)
@@ -269,7 +263,7 @@ export function useGovernance() {
 	useQuery({
 		queryKey: ["governance", "version", "scholarship_treasury"],
 		queryFn: async (): Promise<string | null> => {
-			if (!SCHOLARSHIP_TREASURY_CONTRACT) return null
+			if (!scholarshipTreasury) return null
 			const client = await loadClient("../contracts/scholarship_treasury")
 			if (!client) return null
 			const fn = asMethod(client, "get_version")
@@ -284,7 +278,7 @@ export function useGovernance() {
 						: raw) ?? "",
 				)
 				if (version && version !== EXPECTED_CONTRACT_VERSION) {
-					console.warn(
+					logger.warn(
 						`[ScholarshipTreasury] Version mismatch: expected ${EXPECTED_CONTRACT_VERSION}, got ${version}. ` +
 							"Client bindings may be out of date.",
 					)
@@ -301,7 +295,7 @@ export function useGovernance() {
 	const { data: votingPower = 0n } = useQuery({
 		queryKey: ["governance", "votingPower", address],
 		queryFn: async () => {
-			if (!address || !GOVERNANCE_TOKEN_CONTRACT) return 0n
+			if (!address || !governanceToken) return 0n
 			const client = await loadClient("../contracts/governance_token")
 			if (!client) return 0n
 
@@ -326,6 +320,7 @@ export function useGovernance() {
 			return 0n
 		},
 		enabled: !!address,
+		staleTime: 60 * 1000,
 	})
 
 	// Fetch all proposals
@@ -334,7 +329,7 @@ export function useGovernance() {
 	>({
 		queryKey: ["governance", "proposals"],
 		queryFn: async () => {
-			if (!SCHOLARSHIP_TREASURY_CONTRACT) return []
+			if (!scholarshipTreasury) return []
 			const client = await loadClient("../contracts/scholarship_treasury")
 			if (!client) return []
 
@@ -355,13 +350,13 @@ export function useGovernance() {
 			)
 
 			const grouped = [
-				...pending.map((proposal) =>
+				...pending.map((proposal: unknown) =>
 					mapProposal(proposal as RawContractProposal, "Active"),
 				),
-				...approved.map((proposal) =>
+				...approved.map((proposal: unknown) =>
 					mapProposal(proposal as RawContractProposal, "Passed"),
 				),
-				...rejected.map((proposal) =>
+				...rejected.map((proposal: unknown) =>
 					mapProposal(proposal as RawContractProposal, "Rejected"),
 				),
 			]
@@ -373,10 +368,11 @@ export function useGovernance() {
 				["get_proposals", "getProposals"],
 				[[]],
 			)
-			return fallback.map((proposal) =>
+			return fallback.map((proposal: unknown) =>
 				mapProposal(proposal as RawContractProposal, "Active"),
 			)
 		},
+		staleTime: 60 * 1000,
 	})
 
 	// Check if voter has already voted on a specific proposal
@@ -413,8 +409,7 @@ export function useGovernance() {
 	useQuery({
 		queryKey: ["governance", "voted", address],
 		queryFn: async () => {
-			if (!address || !SCHOLARSHIP_TREASURY_CONTRACT || proposals.length === 0)
-				return {}
+			if (!address || !scholarshipTreasury || proposals.length === 0) return {}
 			const client = await loadClient("../contracts/scholarship_treasury")
 			if (!client) return {}
 
@@ -430,7 +425,7 @@ export function useGovernance() {
 
 			const results: Record<number, boolean> = {}
 			await Promise.all(
-				proposals.map(async (p) => {
+				proposals.map(async (p: Proposal) => {
 					try {
 						const voted = await hasVotedFn({
 							voter: address,
@@ -468,6 +463,7 @@ export function useGovernance() {
 			return results
 		},
 		enabled: !!address && proposals.length > 0,
+		staleTime: 60 * 1000,
 	})
 
 	// Mutation for casting a vote
@@ -480,8 +476,7 @@ export function useGovernance() {
 			support: boolean
 		}) => {
 			if (!address) throw new Error("Wallet not connected")
-			if (!SCHOLARSHIP_TREASURY_CONTRACT)
-				throw new Error("Contract not configured")
+			if (!scholarshipTreasury) throw new Error("Contract not configured")
 
 			const client = await loadClient("../contracts/scholarship_treasury")
 			if (!client) throw new Error("Contract client not found")
@@ -498,10 +493,14 @@ export function useGovernance() {
 				{ publicKey: address },
 			)
 
+			showInfo("Waiting for wallet approval…")
 			const sendResult = await sendTxIfNeeded(tx)
 			unwrapSendResult(sendResult)
 		},
-		onSuccess: (_, { proposalId, support }) => {
+		onSuccess: (
+			_: void,
+			{ proposalId, support }: { proposalId: number; support: boolean },
+		) => {
 			showSuccess("Vote submitted successfully!")
 			// Invalidate queries to refresh UI
 			void queryClient.invalidateQueries({

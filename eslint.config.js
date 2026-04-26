@@ -8,8 +8,9 @@ export default [
 		"dist",
 		"packages",
 		"target/packages",
-		"src/contracts/*",
+		"**/contracts/*",
 		"!src/contracts/util.ts",
+		"**/*.yml",
 	]),
 	...config,
 	{

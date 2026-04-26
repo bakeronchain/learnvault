@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query"
-import { useEffect, useId, useState, useCallback } from "react"
+import { useCallback, useEffect, useId, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { NavLink } from "react-router-dom"
 import { fetchCourses } from "../hooks/useCourses"
@@ -12,6 +12,7 @@ import {
 import { useWallet } from "../hooks/useWallet"
 import { fetchHistory } from "../pages/History"
 import GlobalSearch from "./GlobalSearch"
+import { LanguageSelector } from "./LanguageSelector"
 import NetworkIndicator from "./NetworkIndicator"
 import { NotificationBell } from "./NotificationBell"
 import { ReputationBadge } from "./ReputationBadge"
@@ -147,6 +148,9 @@ export default function NavBar() {
 					<div className="hidden lg:block">
 						<GlobalSearch />
 					</div>
+					<div className="hidden md:flex items-center">
+						<LanguageSelector />
+					</div>
 					<ThemeToggle />
 					<div className="hidden xl:block">
 						<NetworkIndicator />
@@ -225,6 +229,15 @@ export default function NavBar() {
 					</div>
 					<div className="w-full flex justify-center py-2">
 						<NetworkIndicator showLabel />
+					</div>
+
+					<div className="h-px bg-slate-200 dark:bg-white/10 my-1" />
+
+					<div className="flex items-center justify-between">
+						<span className="text-xs font-black uppercase tracking-[0.25em] text-slate-500 dark:text-white/40">
+							Language
+						</span>
+						<LanguageSelector />
 					</div>
 
 					<div className="h-px bg-slate-200 dark:bg-white/10 my-1" />

@@ -1,5 +1,5 @@
 import { Button } from "@stellar/design-system"
-import React from "react"
+import React, { useEffect, useRef } from "react"
 import ReactMarkdown from "react-markdown"
 import { Link } from "react-router-dom"
 import { type CourseLesson as Lesson } from "../types/courses"
@@ -27,7 +27,9 @@ interface LessonContentProps {
 	isLoading: boolean
 	isCompleted: boolean
 	isCompleting: boolean
+	timeSpentLabel?: string | null
 	onMarkComplete: () => void
+	onScrolledToBottom?: () => void
 	prevLessonId: number | null
 	nextLessonId: number | null
 	isNextLocked: boolean
@@ -38,11 +40,40 @@ const LessonContent: React.FC<LessonContentProps> = ({
 	isLoading,
 	isCompleted,
 	isCompleting,
+	timeSpentLabel,
 	onMarkComplete,
+	onScrolledToBottom,
 	prevLessonId,
 	nextLessonId,
 	isNextLocked,
 }) => {
+	const sentinelRef = useRef<HTMLDivElement>(null)
+	const firedRef = useRef(false)
+
+	// Reset the fired flag whenever the lesson changes
+	useEffect(() => {
+		firedRef.current = false
+	}, [lesson.id])
+
+	// Fire onScrolledToBottom once when the bottom sentinel comes into view
+	useEffect(() => {
+		if (!onScrolledToBottom || isLoading) return
+		const el = sentinelRef.current
+		if (!el) return
+
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0]?.isIntersecting && !firedRef.current) {
+					firedRef.current = true
+					onScrolledToBottom()
+				}
+			},
+			{ threshold: 0.1 },
+		)
+		observer.observe(el)
+		return () => observer.disconnect()
+	}, [onScrolledToBottom, isLoading, lesson.id])
+
 	if (isLoading) {
 		return (
 			<section className="glass-card p-8 md:p-12 rounded-[2.5rem] border border-white/10">
@@ -53,9 +84,22 @@ const LessonContent: React.FC<LessonContentProps> = ({
 
 	return (
 		<section className="glass-card p-8 md:p-12 rounded-[2.5rem] border border-white/10 flex flex-col h-full">
+			<div className="mb-6 flex flex-wrap items-center gap-3">
+				<span className="rounded-full border border-brand-cyan/20 bg-brand-cyan/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.15em] text-brand-cyan">
+					Estimated: {Math.max(1, lesson.estimatedMinutes)}m
+				</span>
+				{timeSpentLabel ? (
+					<span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-bold uppercase tracking-[0.15em] text-white/80">
+						Spent: {timeSpentLabel}
+					</span>
+				) : null}
+			</div>
 			<div className="flex-1 prose prose-invert prose-brand max-w-none">
 				<ReactMarkdown>{lesson.content}</ReactMarkdown>
 			</div>
+
+			{/* Sentinel: when visible, lesson has been scrolled to the bottom */}
+			<div ref={sentinelRef} aria-hidden="true" />
 
 			<div className="mt-16 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-6">
 				<div className="flex gap-4">
@@ -105,7 +149,7 @@ const LessonContent: React.FC<LessonContentProps> = ({
 					}
 				>
 					{isCompleted
-						? "Lesson Completed ✓"
+						? `Lesson Completed ✓${timeSpentLabel ? ` (${timeSpentLabel})` : ""}`
 						: isCompleting
 							? "Confirming..."
 							: "Mark as Complete"}

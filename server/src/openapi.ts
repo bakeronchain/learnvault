@@ -65,10 +65,78 @@ export const buildOpenApiSpec = () => {
 					HealthResponse: {
 						type: "object",
 						properties: {
-							status: { type: "string", example: "ok" },
+							status: {
+								type: "string",
+								enum: ["healthy", "degraded", "unhealthy"],
+								example: "healthy",
+							},
+							db: {
+								type: "string",
+								enum: ["connected", "disconnected"],
+							},
+							uptime: { type: "number", format: "float" },
 							timestamp: { type: "string", format: "date-time" },
+							version: { type: "string" },
+							commitHash: { type: "string" },
+							dbPool: {
+								type: "object",
+								properties: {
+									totalConnections: { type: "integer", nullable: true },
+									idleConnections: { type: "integer", nullable: true },
+									waitingClients: { type: "integer", nullable: true },
+								},
+								required: [
+									"totalConnections",
+									"idleConnections",
+									"waitingClients",
+								],
+							},
+							checks: {
+								type: "object",
+								properties: {
+									database: {
+										type: "object",
+										properties: {
+											status: { type: "string" },
+											responseTimeMs: { type: "integer", nullable: true },
+											error: { type: "string" },
+										},
+										required: ["status", "responseTimeMs"],
+									},
+									redis: {
+										type: "object",
+										properties: {
+											status: { type: "string" },
+											responseTimeMs: { type: "integer", nullable: true },
+											error: { type: "string" },
+											details: { type: "string" },
+										},
+										required: ["status", "responseTimeMs"],
+									},
+									stellarHorizon: {
+										type: "object",
+										properties: {
+											status: { type: "string" },
+											responseTimeMs: { type: "integer", nullable: true },
+											url: { type: "string" },
+											error: { type: "string" },
+										},
+										required: ["status", "responseTimeMs", "url"],
+									},
+								},
+								required: ["database", "redis", "stellarHorizon"],
+							},
 						},
-						required: ["status", "timestamp"],
+						required: [
+							"status",
+							"db",
+							"uptime",
+							"timestamp",
+							"version",
+							"commitHash",
+							"dbPool",
+							"checks",
+						],
 					},
 					Course: {
 						type: "object",

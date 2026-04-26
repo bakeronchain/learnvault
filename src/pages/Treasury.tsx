@@ -5,13 +5,17 @@ import {
 	DashboardStatsSkeleton,
 } from "../components/SkeletonLoader"
 import { ErrorState } from "../components/states/errorState"
+import { useToast } from "../components/Toast/ToastProvider"
 import TreasuryHealthChart, {
 	type TreasuryPoint,
 } from "../components/treasury/TreasuryHealthChart"
 import TxHashLink from "../components/TxHashLink"
+import { ActivityFeedSkeleton } from "../components/SkeletonLoader"
 import { useContractIds } from "../hooks/useContractIds"
 import { useTreasury } from "../hooks/useTreasury"
 import { useUSDC } from "../hooks/useUSDC"
+import { useWallet } from "../hooks/useWallet"
+import { connectWallet } from "../util/wallet"
 
 const API_BASE = import.meta.env.VITE_SERVER_URL || "http://localhost:4000"
 const CHART_WINDOW_DAYS = 7
@@ -84,11 +88,22 @@ const buildTreasuryChartData = (events: TreasuryEvent[]): TreasuryPoint[] => {
 }
 
 const Treasury: React.FC = () => {
+	const { address } = useWallet()
+	const { showInfo } = useToast()
 	const { scholarshipTreasury } = useContractIds()
 	const { balance: treasuryUSDC, isLoading: treasuryLoading } =
 		useUSDC(scholarshipTreasury)
 
-	const { stats, activity, isLoading, isError, refetch } = useTreasury()
+	const {
+		stats,
+		activity,
+		isLoading,
+		isError,
+		refetch,
+		hasMoreActivity,
+		isLoadingMoreActivity,
+		loadMoreActivity,
+	} = useTreasury()
 
 	const activityLoading = isLoading
 	const statsLoading = isLoading
@@ -173,11 +188,20 @@ const Treasury: React.FC = () => {
 		.filter((e) => e.type === "disburse")
 		.slice(0, 5)
 
+	const handleDonateClick = () => {
+		if (!address) {
+			showInfo("Connect your wallet to donate to the treasury")
+			void connectWallet()
+			return
+		}
+		showInfo("Treasury donation flow will be available in the next update")
+	}
+
 	const title = `Treasury - ${displayStats.totalTreasury} - ${displayStats.scholarsFunded} Scholars Funded - LearnVault`
 	const description = `LearnVault's decentralized scholarship treasury holds ${displayStats.totalTreasury} and has funded ${displayStats.scholarsFunded} scholars. View real-time inflows and disbursements.`
 
 	return (
-		<div className="p-12 max-w-7xl mx-auto min-h-screen text-white animate-in fade-in duration-1000">
+		<div aria-busy={isLoading} className="p-12 max-w-7xl mx-auto min-h-screen text-white animate-in fade-in duration-1000">
 			<Helmet>
 				<title>{title}</title>
 				<meta property="og:title" content={title} />
@@ -201,8 +225,12 @@ const Treasury: React.FC = () => {
 			{isLoading ? (
 				<DashboardStatsSkeleton />
 			) : isError ? (
-				<div className="glass-card p-8 rounded-[3rem] border border-white/5 text-center text-red-400">
-					Failed to load treasury stats.
+				<div className="glass-card p-8 rounded-[3rem] border border-white/5">
+					<ErrorState
+						message="Failed to load treasury stats. The data service may be temporarily unavailable."
+						onRetry={() => void refetch()}
+						showContactSupport
+					/>
 				</div>
 			) : (
 				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-20">
@@ -296,6 +324,9 @@ const Treasury: React.FC = () => {
 								type: "deposit" as const,
 								txHash: event.tx_hash,
 							}))}
+							showLoadMore={hasMoreActivity}
+							loadingMore={isLoadingMoreActivity}
+							onLoadMore={() => loadMoreActivity()}
 						/>
 						<ActivityFeed
 							title="Latest Disbursements"
@@ -306,16 +337,49 @@ const Treasury: React.FC = () => {
 								type: "disburse" as const,
 								txHash: event.tx_hash,
 							}))}
+							showLoadMore={hasMoreActivity}
+							loadingMore={isLoadingMoreActivity}
+							onLoadMore={() => loadMoreActivity()}
 						/>
 					</>
 				)}
 			</div>
 
 			<div className="mt-20 text-center">
-				<button className="iridescent-border px-12 py-5 rounded-2xl font-black text-lg uppercase tracking-widest hover:scale-105 active:scale-95 transition-all group overflow-hidden shadow-2xl shadow-brand-cyan/20">
+				<button
+					onClick={handleDonateClick}
+					className="iridescent-border px-12 py-5 rounded-2xl font-black text-lg uppercase tracking-widest hover:scale-105 active:scale-95 transition-all group overflow-hidden shadow-2xl shadow-brand-cyan/20"
+				>
 					<span className="relative z-10">Donate to Treasury</span>
 				</button>
 			</div>
+
+			{/* Scholarship Program Metrics */}
+			<section aria-busy={isLoading} className="mt-20">
+				<h2 className="text-4xl font-black mb-2 tracking-tighter">
+					Scholarship Program
+				</h2>
+				<p className="text-white/40 text-sm mb-10">
+					Real-time health metrics for the active scholarship cohort.
+				</p>
+
+				{isLoading && (
+					<div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+						{Array.from({ length: 6 }).map((_, i) => (
+							<div
+								key={i}
+								className="h-28 rounded-3xl bg-white/5 animate-pulse"
+							/>
+						))}
+					</div>
+				)}
+
+				{!isLoading && (
+					<p className="text-white/40 text-center py-10">
+						Scholarship metrics unavailable
+					</p>
+				)}
+			</section>
 		</div>
 	)
 }
@@ -396,12 +460,18 @@ const ActivityFeed: React.FC<{
 	loading?: boolean
 	error?: string
 	emptyMessage?: string
+	showLoadMore?: boolean
+	loadingMore?: boolean
+	onLoadMore?: () => void
 }> = ({
 	title,
 	items,
 	loading = false,
 	error,
 	emptyMessage = "No activity yet",
+	showLoadMore = false,
+	loadingMore = false,
+	onLoadMore,
 }) => (
 	<div className="glass p-8 rounded-[2.5rem] border border-white/5">
 		<h3 className="text-xl font-black mb-8 border-l-4 border-brand-cyan pl-4">
@@ -409,50 +479,51 @@ const ActivityFeed: React.FC<{
 		</h3>
 		<div className="flex flex-col gap-4">
 			{loading ? (
-				<div className="space-y-4 py-2">
-					{Array.from({ length: 3 }).map((_, index) => (
-						<div
-							key={index}
-							className="rounded-2xl border border-white/5 bg-white/5 p-5 animate-pulse"
-						>
-							<div className="h-4 w-24 rounded-full bg-white/10" />
-							<div className="mt-3 h-3 w-16 rounded-full bg-white/5" />
-							<div className="mt-4 h-4 w-28 rounded-full bg-white/10" />
-						</div>
-					))}
-				</div>
+				<ActivityFeedSkeleton rows={2} />
 			) : error ? (
 				<div className="text-center text-white/40 py-8">{error}</div>
 			) : items.length === 0 ? (
 				<div className="text-center text-white/40 py-8">{emptyMessage}</div>
 			) : (
-				items.map((item, i) => (
-					<div
-						key={`${item.txHash}-${i}`}
-						className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-colors group"
-					>
-						<div className="flex items-center gap-4">
-							<div
-								className={`w-2 h-2 rounded-full ${item.type === "deposit" ? "bg-brand-emerald animate-pulse" : "bg-brand-purple"}`}
-							/>
-							<div>
-								<p className="font-bold text-sm">{item.user}</p>
-								<p className="text-[10px] text-white/30 uppercase font-black tracking-widest">
-									{item.time}
-								</p>
-								<TxHashLink
-									hash={item.txHash}
-									className="mt-2 inline-flex text-[10px] font-black uppercase tracking-widest text-brand-cyan hover:underline"
-								/>
-							</div>
-						</div>
-						<p
-							className={`font-black ${item.type === "deposit" ? "text-brand-emerald" : "text-white/80"}`}
+				<>
+					{items.map((item, i) => (
+						<div
+							key={`${item.txHash}-${i}`}
+							className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-colors group"
 						>
-							{item.amount}
-						</p>
-					</div>
-				))
+							<div className="flex items-center gap-4">
+								<div
+									className={`w-2 h-2 rounded-full ${item.type === "deposit" ? "bg-brand-emerald animate-pulse" : "bg-brand-purple"}`}
+								/>
+								<div>
+									<p className="font-bold text-sm">{item.user}</p>
+									<p className="text-[10px] text-white/30 uppercase font-black tracking-widest">
+										{item.time}
+									</p>
+									<TxHashLink
+										hash={item.txHash}
+										className="mt-2 inline-flex text-[10px] font-black uppercase tracking-widest text-brand-cyan hover:underline"
+									/>
+								</div>
+							</div>
+							<p
+								className={`font-black ${item.type === "deposit" ? "text-brand-emerald" : "text-white/80"}`}
+							>
+								{item.amount}
+							</p>
+						</div>
+					))}
+					{showLoadMore && onLoadMore ? (
+						<button
+							type="button"
+							onClick={onLoadMore}
+							disabled={loadingMore}
+							className="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black uppercase tracking-[0.2em] text-white/80 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							{loadingMore ? "Loading..." : "Load More"}
+						</button>
+					) : null}
+				</>
 			)}
 		</div>
 	</div>

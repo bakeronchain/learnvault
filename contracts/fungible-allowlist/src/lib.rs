@@ -17,7 +17,6 @@ pub enum AllowlistError {
 pub enum DataKey {
     Admin,
     IsAllowed(Address),
-    Allowlist,
 }
 
 #[contract]
@@ -30,10 +29,6 @@ impl FungibleAllowlist {
             panic_with_error!(&env, AllowlistError::AlreadyInitialized);
         }
         env.storage().instance().set(&DataKey::Admin, &admin);
-        let empty_list: Vec<Address> = Vec::new(&env);
-        env.storage()
-            .instance()
-            .set(&DataKey::Allowlist, &empty_list);
     }
 
     pub fn add_to_allowlist(env: Env, admin: Address, account: Address) {
@@ -51,9 +46,6 @@ impl FungibleAllowlist {
             env.storage()
                 .persistent()
                 .set(&DataKey::IsAllowed(account.clone()), &true);
-            let mut list: Vec<Address> = env.storage().instance().get(&DataKey::Allowlist).unwrap();
-            list.push_back(account);
-            env.storage().instance().set(&DataKey::Allowlist, &list);
         }
     }
 
@@ -88,10 +80,8 @@ impl FungibleAllowlist {
     }
 
     pub fn get_allowlist(env: Env) -> Vec<Address> {
-        env.storage()
-            .instance()
-            .get(&DataKey::Allowlist)
-            .unwrap_or_else(|| Vec::new(&env))
+        // Enumeration should be rebuilt off-chain from events or indexers.
+        Vec::new(&env)
     }
 
     pub fn set_admin(env: Env, admin: Address, new_admin: Address) {
@@ -131,17 +121,15 @@ mod test {
 
         client.add_to_allowlist(&admin, &alice);
         assert_eq!(client.is_allowed(&alice), true);
-        assert_eq!(client.get_allowlist().len(), 1);
-        assert_eq!(client.get_allowlist().get(0).unwrap(), alice);
+        assert_eq!(client.get_allowlist().len(), 0);
 
         client.add_to_allowlist(&admin, &bob);
         assert_eq!(client.is_allowed(&bob), true);
-        assert_eq!(client.get_allowlist().len(), 2);
+        assert_eq!(client.get_allowlist().len(), 0);
 
         client.remove_from_allowlist(&admin, &alice);
         assert_eq!(client.is_allowed(&alice), false);
-        assert_eq!(client.get_allowlist().len(), 1);
-        assert_eq!(client.get_allowlist().get(0).unwrap(), bob);
+        assert_eq!(client.get_allowlist().len(), 0);
 
         let new_admin = Address::generate(&env);
         client.set_admin(&admin, &new_admin);

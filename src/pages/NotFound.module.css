@@ -57,9 +57,17 @@
 	font-weight: 500;
 }
 
+.actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+	justify-content: center;
+	align-items: center;
+	margin-top: 0.5rem;
+}
+
 .buttonLink {
 	text-decoration: none;
-	margin-top: 0.5rem;
 }
 
 @keyframes fadeInUp {

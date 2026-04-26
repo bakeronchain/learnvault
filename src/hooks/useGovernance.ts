@@ -320,6 +320,7 @@ export function useGovernance() {
 			return 0n
 		},
 		enabled: !!address,
+		staleTime: 60 * 1000,
 	})
 
 	// Fetch all proposals
@@ -371,6 +372,7 @@ export function useGovernance() {
 				mapProposal(proposal as RawContractProposal, "Active"),
 			)
 		},
+		staleTime: 60 * 1000,
 	})
 
 	// Check if voter has already voted on a specific proposal
@@ -461,6 +463,7 @@ export function useGovernance() {
 			return results
 		},
 		enabled: !!address && proposals.length > 0,
+		staleTime: 60 * 1000,
 	})
 
 	// Mutation for casting a vote

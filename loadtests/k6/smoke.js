@@ -1,5 +1,6 @@
-import http from "k6/http"
+/* global __ENV */
 import { check, group, sleep } from "k6"
+import http from "k6/http"
 import { Rate, Trend } from "k6/metrics"
 
 // Baseline: p95 < 500ms for these routes under light load (tune in CI)
@@ -44,7 +45,9 @@ export default function () {
 	group("courses list", function () {
 		const res = req("GET", "/api/courses?limit=5&page=1")
 		coursesDur.add(res.timings.duration)
-		const ok = check(res, { "courses 2xx": (r) => r.status >= 200 && r.status < 300 })
+		const ok = check(res, {
+			"courses 2xx": (r) => r.status >= 200 && r.status < 300,
+		})
 		if (!ok) errorRate.add(1)
 		else errorRate.add(0)
 	})

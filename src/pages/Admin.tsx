@@ -21,6 +21,7 @@ import {
 	useDeleteWikiPage,
 	type WikiPage,
 } from "../hooks/useWiki"
+import i18n from "../i18n"
 import { apiFetchJson } from "../lib/api"
 import { getAuthToken } from "../util/auth"
 import { shortenContractId } from "../util/contract"
@@ -86,7 +87,7 @@ const formatDate = (value: string | undefined): string => {
 	const date = new Date(value)
 	if (Number.isNaN(date.getTime())) return value
 
-	return date.toLocaleDateString("en-GB", {
+	return date.toLocaleDateString(i18n.resolvedLanguage, {
 		day: "2-digit",
 		month: "short",
 		year: "numeric",
@@ -94,7 +95,7 @@ const formatDate = (value: string | undefined): string => {
 }
 
 const formatCount = (value: number): string =>
-	value.toLocaleString("en-US", { maximumFractionDigits: 0 })
+	value.toLocaleString(i18n.resolvedLanguage, { maximumFractionDigits: 0 })
 
 const renderAddress = (value: string | undefined) =>
 	value ? shortenContractId(value, 6, 6) : "Not available"
@@ -560,6 +561,88 @@ const MilestoneQueue: React.FC = () => {
 		<section>
 			<MilestoneStatsBar />
 
+			{reviewQueue?.exceeded && (
+				<div className="mb-4 rounded-xl border border-yellow-500/40 bg-yellow-500/10 px-4 py-3">
+					<p className="text-sm font-medium text-yellow-300">
+						Validator review queue is above threshold
+					</p>
+					<p className="mt-1 text-xs text-yellow-100/80">
+						Pending: {formatCount(reviewQueue.pendingReviews)} | Threshold:{" "}
+						{formatCount(reviewQueue.threshold)}
+					</p>
+				</div>
+			)}
+
+			<div className="mb-6 overflow-x-auto rounded-2xl border border-white/5 glass">
+				<div className="flex items-center justify-between px-4 pt-4">
+					<h2 className="text-sm font-medium uppercase tracking-widest text-white/50">
+						Validator Performance
+					</h2>
+				</div>
+				{analyticsError && (
+					<p className="px-4 py-2 text-xs text-red-400">
+						Failed to load validator analytics: {analyticsError}
+					</p>
+				)}
+				<table className="w-full text-left">
+					<thead>
+						<tr className="border-b border-white/5 text-xs uppercase tracking-widest text-white/40">
+							<th className="py-3 px-4 font-medium">Validator</th>
+							<th className="py-3 px-4 font-medium">Reviewed</th>
+							<th className="py-3 px-4 font-medium">Avg Review Time</th>
+							<th className="py-3 px-4 font-medium">Approval Rate</th>
+							<th className="py-3 px-4 font-medium">Appeal Reversal Rate</th>
+						</tr>
+					</thead>
+					<tbody>
+						{analyticsLoading && (
+							<tr>
+								<td
+									colSpan={5}
+									className="py-8 text-center text-sm text-white/40 animate-pulse"
+								>
+									Loading validator analytics...
+								</td>
+							</tr>
+						)}
+
+						{!analyticsLoading && analytics.length === 0 && (
+							<tr>
+								<td
+									colSpan={5}
+									className="py-8 text-center text-sm text-white/40"
+								>
+									No validator analytics available.
+								</td>
+							</tr>
+						)}
+
+						{!analyticsLoading &&
+							analytics.map((row) => (
+								<tr
+									key={row.validatorAddress}
+									className="border-b border-white/5 hover:bg-white/3 transition-colors"
+								>
+									<td className="py-3 px-4 font-mono text-xs text-white/60">
+										{shortenContractId(row.validatorAddress, 8, 4)}
+									</td>
+									<td className="py-3 px-4 text-sm text-white/80">
+										{formatCount(row.milestonesReviewed)}
+									</td>
+									<td className="py-3 px-4 text-sm text-white/80">
+										{formatReviewTime(row.averageReviewTimeSeconds)}
+									</td>
+									<td className="py-3 px-4 text-sm text-emerald-300">
+										{formatPercent(row.approvalRate)}
+									</td>
+									<td className="py-3 px-4 text-sm text-amber-200">
+										{formatPercent(row.appealReversalRate)}
+									</td>
+								</tr>
+							))}
+					</tbody>
+				</table>
+			</div>
 			<div className="flex flex-wrap gap-3 mb-4 items-center">
 				<div className="flex items-center gap-2">
 					<label

@@ -58,13 +58,19 @@ function createRedisStore(redisUrl: string): NonceStore {
 		maxRetriesPerRequest: 2,
 		lazyConnect: false,
 	})
+	const memoryFallback = createMemoryStore()
 
 	const key = (address: string): string => `${NONCE_PREFIX}${address}`
 
 	return {
 		async getNonce(address: string): Promise<string | null> {
-			const v = await client.get(key(address))
-			return v
+			try {
+				const v = await client.get(key(address))
+				return v
+			} catch (err) {
+				console.warn("Redis getNonce failed, falling back to memory store:", err)
+				return memoryFallback.getNonce(address)
+			}
 		},
 
 		async getOrSetNonce(
@@ -72,21 +78,31 @@ function createRedisStore(redisUrl: string): NonceStore {
 			nonce: string,
 			ttlSeconds = DEFAULT_TTL_SECONDS,
 		): Promise<string> {
-			const k = key(address)
-			const existing = await client.get(k)
-			if (existing !== null) {
-				const ttl = await client.ttl(k)
-				// ttl > 0: key has expiry; ttl === -1: exists with no TTL (still valid)
-				if (ttl > 0 || ttl === -1) {
-					return existing
+			try {
+				const k = key(address)
+				const existing = await client.get(k)
+				if (existing !== null) {
+					const ttl = await client.ttl(k)
+					// ttl > 0: key has expiry; ttl === -1: exists with no TTL (still valid)
+					if (ttl > 0 || ttl === -1) {
+						return existing
+					}
 				}
+				await client.set(k, nonce, "EX", ttlSeconds)
+				return nonce
+			} catch (err) {
+				console.warn("Redis getOrSetNonce failed, falling back to memory store:", err)
+				return memoryFallback.getOrSetNonce(address, nonce, ttlSeconds)
 			}
-			await client.set(k, nonce, "EX", ttlSeconds)
-			return nonce
 		},
 
 		async deleteNonce(address: string): Promise<void> {
-			await client.del(key(address))
+			try {
+				await client.del(key(address))
+			} catch (err) {
+				console.warn("Redis deleteNonce failed, falling back to memory store:", err)
+				return memoryFallback.deleteNonce(address)
+			}
 		},
 	}
 }

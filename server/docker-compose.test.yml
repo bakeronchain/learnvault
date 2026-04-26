@@ -30,6 +30,9 @@ services:
 
   redis:
     image: redis:7
+    volumes:
+      - ./redis.conf:/etc/redis/redis.conf
+    command: redis-server /etc/redis/redis.conf
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

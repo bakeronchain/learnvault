@@ -154,9 +154,37 @@ const checkRedis = async (): Promise<CheckResult> => {
 			}
 		}
 
+		// Get memory information
+		const [usedMemory, maxMemory, evictedKeys] = await Promise.all([
+			client.info("memory").then(info => {
+				const match = info.match(/used_memory:(\d+)/)
+				return match ? parseInt(match[1], 10) : null
+			}),
+			client.config("GET", "maxmemory").then(config => {
+				const maxMem = config[1]
+				return maxMem === "0" ? null : parseInt(maxMem, 10)
+			}),
+			client.info("stats").then(info => {
+				const match = info.match(/evicted_keys:(\d+)/)
+				return match ? parseInt(match[1], 10) : null
+			}),
+		])
+
+		const details = []
+		if (usedMemory !== null) {
+			details.push(`used_memory=${usedMemory}bytes`)
+		}
+		if (maxMemory !== null) {
+			details.push(`max_memory=${maxMemory}bytes`)
+		}
+		if (evictedKeys !== null && evictedKeys > 0) {
+			details.push(`evicted_keys=${evictedKeys}`)
+		}
+
 		return {
 			status: "healthy",
 			responseTimeMs: Date.now() - startedAt,
+			details: details.length > 0 ? details.join(", ") : undefined,
 		}
 	} catch (err) {
 		return {

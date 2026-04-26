@@ -44,20 +44,31 @@ function createRedisStore(redisUrl: string): TokenStore {
 		maxRetriesPerRequest: 2,
 		lazyConnect: false,
 	})
+	const memoryFallback = createMemoryStore()
 
 	const key = (hash: string): string => `${BLOCKLIST_PREFIX}${hash}`
 
 	return {
 		async isRevoked(token: string): Promise<boolean> {
-			const hash = hashToken(token)
-			const v = await client.get(key(hash))
-			return v !== null
+			try {
+				const hash = hashToken(token)
+				const v = await client.get(key(hash))
+				return v !== null
+			} catch (err) {
+				console.warn("Redis isRevoked failed, falling back to memory store:", err)
+				return memoryFallback.isRevoked(token)
+			}
 		},
 
 		async revoke(token: string, ttlSeconds: number): Promise<void> {
-			const hash = hashToken(token)
-			if (ttlSeconds > 0) {
-				await client.set(key(hash), "1", "EX", ttlSeconds)
+			try {
+				const hash = hashToken(token)
+				if (ttlSeconds > 0) {
+					await client.set(key(hash), "1", "EX", ttlSeconds)
+				}
+			} catch (err) {
+				console.warn("Redis revoke failed, falling back to memory store:", err)
+				return memoryFallback.revoke(token, ttlSeconds)
 			}
 		},
 	}

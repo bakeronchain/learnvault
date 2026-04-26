@@ -5,6 +5,10 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  schedule:
+    # Run weekly on Sunday at midnight UTC
+    - cron: "0 0 * * 0"
+  workflow_dispatch: # Allow manual trigger
 
 jobs:
   node-security:
@@ -31,3 +35,39 @@ jobs:
         run: cargo install cargo-audit
       - name: Run cargo audit
         run: cargo audit
+
+  owasp-zap-api-scan:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare OpenAPI spec for staging
+        run: |
+          sed "s|http://localhost:4000|${{ secrets.STAGING_API_URL }}|g" docs/openapi.yaml > openapi-staging.yaml
+      - name: Run OWASP ZAP API Scan
+        run: |
+          docker run --rm -v $(pwd):/zap/wrk/:rw -t zaproxy/zap-stable zap-api-scan.py \
+            -t openapi-staging.yaml \
+            -f openapi \
+            -r zap-report.html \
+            -w zap-report.md \
+            -j zap-report.json \
+            --auto
+      - name: Check for HIGH severity findings
+        run: |
+          if jq -e '.site[]?.alerts[]? | select(.risk == "High")' zap-report.json > /dev/null; then
+            echo "HIGH severity vulnerabilities found!"
+            jq '.site[]?.alerts[]? | select(.risk == "High")' zap-report.json
+            exit 1
+          else
+            echo "No HIGH severity vulnerabilities found."
+          fi
+      - name: Upload ZAP reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-reports
+          path: |
+            zap-report.html
+            zap-report.md
+            zap-report.json

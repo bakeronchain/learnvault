@@ -2172,3 +2172,35 @@ fn state_persists_after_upgrade() {
     assert_eq!(proposal.amount, 250);
     assert_eq!(stored_hash, wasm_hash);
 }
+
+#[test]
+fn benchmark_costs() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, _gov_client) = setup(&env);
+
+    // 1. Benchmark deposit
+    env.cost_estimate().budget().reset_unlimited();
+    env.mock_all_auths();
+    client.deposit(&donor, &100);
+    let dep_instr = env.cost_estimate().budget().cpu_instruction_cost();
+    let dep_mem = env.cost_estimate().budget().memory_bytes_cost();
+
+    // 2. Benchmark submit_proposal
+    env.cost_estimate().budget().reset_unlimited();
+    let prop_id = submit_sample_proposal(&env, &client, &donor, 500);
+    let sub_instr = env.cost_estimate().budget().cpu_instruction_cost();
+    let sub_mem = env.cost_estimate().budget().memory_bytes_cost();
+
+    // 3. Benchmark vote
+    let voter = Address::generate(&env);
+    env.cost_estimate().budget().reset_unlimited();
+    client.vote(&voter, &prop_id, &true);
+    let vote_instr = env.cost_estimate().budget().cpu_instruction_cost();
+    let vote_mem = env.cost_estimate().budget().memory_bytes_cost();
+
+    extern crate std;
+    std::println!("BENCHMARK_RESULTS: scholarship_treasury");
+    std::println!("deposit: instr={}, mem={}", dep_instr, dep_mem);
+    std::println!("submit_proposal: instr={}, mem={}", sub_instr, sub_mem);
+    std::println!("vote: instr={}, mem={}", vote_instr, vote_mem);
+}

@@ -611,3 +611,39 @@ fn state_persists_after_upgrade() {
     assert_eq!(escrow.total_tranches, 3);
     assert_eq!(stored_hash, wasm_hash);
 }
+
+#[test]
+fn benchmark_costs() {
+    let (env, contract_id, _token, admin, _treasury, scholar) = setup();
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+
+    // 1. Benchmark create_escrow
+    env.cost_estimate().budget().reset_unlimited();
+    env.mock_all_auths();
+    client.create_escrow(&1, &scholar, &1000, &4);
+    let create_instr = env.cost_estimate().budget().cpu_instruction_cost();
+    let create_mem = env.cost_estimate().budget().memory_bytes_cost();
+
+    // 2. Benchmark release_tranche
+    env.cost_estimate().budget().reset_unlimited();
+    set_caller(&client, "release_tranche", &admin, (1_u32,));
+    client.release_tranche(&1);
+    let release_instr = env.cost_estimate().budget().cpu_instruction_cost();
+    let release_mem = env.cost_estimate().budget().memory_bytes_cost();
+
+    // 3. Benchmark get_escrow
+    env.cost_estimate().budget().reset_unlimited();
+    client.get_escrow(&1);
+    let get_instr = env.cost_estimate().budget().cpu_instruction_cost();
+    let get_mem = env.cost_estimate().budget().memory_bytes_cost();
+
+    extern crate std;
+    std::println!("BENCHMARK_RESULTS: milestone_escrow");
+    std::println!("create_escrow: instr={}, mem={}", create_instr, create_mem);
+    std::println!(
+        "release_tranche: instr={}, mem={}",
+        release_instr,
+        release_mem
+    );
+    std::println!("get_escrow: instr={}, mem={}", get_instr, get_mem);
+}

@@ -6,7 +6,10 @@ import {
 	INDEXER_CONFIG,
 	getPollingTargets,
 } from "../lib/event-config.js"
+import { createLogger } from "../lib/logger"
 import { EVENT_TOPICS } from "../types/events.js"
+
+const logger = createLogger("event-indexer")
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL! })
 
@@ -70,14 +73,20 @@ export async function indexEventsBatch(
 					}
 				}
 			} catch (err) {
-				console.error(`[indexer:${contractId}:${topic}] Error:`, err)
+				logger.error("Failed to index events for topic", {
+					error: err,
+					contractId,
+					topic,
+				})
 			}
 		}
 	}
 
-	console.log(
-		`[indexer] Inserted ${inserted} events from ${startLedger}-${endLedger}`,
-	)
+	logger.info("Indexed event batch", {
+		inserted,
+		startLedger,
+		endLedger,
+	})
 }
 
 // Get last indexed ledger per contract (for resuming)

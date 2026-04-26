@@ -1,9 +1,12 @@
 import sgMail from "@sendgrid/mail"
+import { createLogger } from "../lib/logger"
 import {
 	templates,
 	toPlainText,
 	type EmailVariables,
 } from "../templates/email-templates"
+
+const logger = createLogger("email")
 
 export interface EmailOptions {
 	to: string
@@ -26,7 +29,7 @@ export class EmailService {
 		const templateFn = templates[templateName]
 
 		if (!templateFn) {
-			console.warn(`[EmailService] Template not found: ${templateName}`)
+			logger.warn("Template not found", { templateName })
 			return { html: "", text: "" }
 		}
 
@@ -38,9 +41,10 @@ export class EmailService {
 
 	async sendNotification(options: EmailOptions): Promise<boolean> {
 		if (!process.env.EMAIL_API_KEY) {
-			console.log(
-				`[EmailService] MOCK SEND to ${options.to}: ${options.subject}`,
-			)
+			logger.info("Mock email send", {
+				to: options.to,
+				subject: options.subject,
+			})
 			return true
 		}
 
@@ -57,7 +61,11 @@ export class EmailService {
 
 			return true
 		} catch (error) {
-			console.error("[EmailService] Error sending email:", error)
+			logger.error("Error sending email", {
+				error,
+				to: options.to,
+				template: options.template,
+			})
 			return false
 		}
 	}
@@ -69,9 +77,7 @@ export class EmailService {
 		const adminEmails = process.env.ADMIN_EMAILS
 
 		if (!adminEmails) {
-			console.warn(
-				"[EmailService] ADMIN_EMAILS not set, skipping notification.",
-			)
+			logger.warn("ADMIN_EMAILS not set, skipping notification")
 			return false
 		}
 

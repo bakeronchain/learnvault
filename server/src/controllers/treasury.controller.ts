@@ -1,5 +1,8 @@
 import { rpc } from "@stellar/stellar-sdk"
 import { type Request, type Response } from "express"
+import { createLogger } from "../lib/logger"
+
+const logger = createLogger("treasury")
 
 const STELLAR_NETWORK = process.env.STELLAR_NETWORK ?? "testnet"
 const SCHOLARSHIP_TREASURY_CONTRACT_ID =
@@ -79,7 +82,7 @@ export const getTreasuryStats = async (
 			donors_count: donors.size,
 		})
 	} catch (err) {
-		console.error("[treasury] Failed to fetch stats:", err)
+		logger.error("Failed to fetch treasury stats", { error: err })
 		res.status(500).json({
 			error: "Failed to fetch treasury statistics",
 		})
@@ -173,7 +176,11 @@ export const getTreasuryActivity = async (
 			events: paginatedEvents,
 		})
 	} catch (err) {
-		console.error("[treasury] Failed to fetch activity:", err)
+		logger.error("Failed to fetch treasury activity", {
+			error: err,
+			limit,
+			offset,
+		})
 		res.status(500).json({
 			error: "Failed to fetch treasury activity",
 		})

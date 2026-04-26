@@ -2,7 +2,10 @@ import { type Request, type Response } from "express"
 
 import { pool } from "../db/index"
 import { milestoneStore } from "../db/milestone-store"
+import { createLogger } from "../lib/logger"
 import { stellarContractService } from "../services/stellar-contract.service"
+
+const logger = createLogger("scholars")
 
 type ApiMilestoneStatus = "pending" | "verified" | "rejected"
 type InternalMilestoneStatus = "pending" | "approved" | "rejected"
@@ -82,7 +85,12 @@ export async function getScholarMilestones(
 
 		res.status(200).json({ milestones })
 	} catch (err) {
-		console.error("[scholars] getScholarMilestones error:", err)
+		logger.error("getScholarMilestones failed", {
+			error: err,
+			address,
+			courseId,
+			status: internalStatus,
+		})
 		res.status(500).json({ error: "Failed to fetch scholar milestones" })
 	}
 }
@@ -205,7 +213,7 @@ export async function getScholarProfile(
 			joined_at: joinedAt,
 		})
 	} catch (error) {
-		console.error("[scholars] Error fetching scholar profile:", error)
+		logger.error("getScholarProfile failed", { error, address })
 		res.status(500).json({ error: "Failed to fetch scholar profile" })
 	}
 }

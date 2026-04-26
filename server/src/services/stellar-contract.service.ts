@@ -175,7 +175,7 @@ async function callVerifyMilestone(
 		if (msg.includes("is not the contract admin")) {
 			throw err
 		}
-		console.error("[stellar] Contract call failed:", err)
+		logger.error("Contract call failed", { error: err })
 		throw new Error(
 			"Contract call failed: " +
 				(err instanceof Error ? err.message : String(err)),
@@ -251,7 +251,7 @@ async function emitRejectionEvent(
 		if (msg.includes("is not the contract admin")) {
 			throw err
 		}
-		console.error("[stellar] Rejection event failed:", err)
+		logger.error("Rejection event failed", { error: err })
 		throw new Error(
 			"Rejection event failed: " +
 				(err instanceof Error ? err.message : String(err)),
@@ -316,7 +316,7 @@ async function callMintScholarNFT(
 		const result = await server.sendTransaction(prepared)
 		return { txHash: result.hash, simulated: false }
 	} catch (err) {
-		console.error("[stellar] ScholarNFT mint failed:", err)
+		logger.error("ScholarNFT mint failed", { error: err })
 		throw new Error(
 			"ScholarNFT mint failed: " +
 				(err instanceof Error ? err.message : String(err)),
@@ -332,8 +332,8 @@ async function isEnrolled(
 	courseId: number,
 ): Promise<boolean> {
 	if (!COURSE_MILESTONE_CONTRACT_ID) {
-		console.warn(
-			"[stellar] COURSE_MILESTONE_CONTRACT_ID not set — simulating enrollment check",
+		logger.warn(
+			"COURSE_MILESTONE_CONTRACT_ID not set; simulating enrollment check",
 		)
 		return true // In dev mode, assume enrolled
 	}
@@ -375,26 +375,6 @@ async function isEnrolled(
 		})
 			.addOperation(
 				contract.call("is_enrolled", learnerScVal, xdr.ScVal.scvU32(courseId)),
-		const contract = new Contract(COURSE_MILESTONE_CONTRACT_ID)
-		const mockAccount = new Address(learnerAddress)
-
-		const tx = new (await import("@stellar/stellar-sdk")).TransactionBuilder(
-			new (await import("@stellar/stellar-sdk")).Account(
-				"GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBF3UKJQ2K5RQDD",
-				"0",
-			),
-			{
-				fee: "100",
-				networkPassphrase:
-					STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-			},
-		)
-			.addOperation(
-				contract.call(
-					"is_enrolled",
-					xdr.ScVal.scvAddress(mockAccount.toScAddress()),
-					xdr.ScVal.scvU32(courseId),
-				),
 			)
 			.setTimeout(30)
 			.build()
@@ -402,7 +382,11 @@ async function isEnrolled(
 		const simResult = await server.simulateTransaction(tx)
 
 		if (rpc.Api.isSimulationError(simResult)) {
-			console.error("[stellar] is_enrolled simulation failed:", simResult.error)
+			logger.error("is_enrolled simulation failed", {
+				error: simResult.error,
+				learnerAddress,
+				courseId,
+			})
 			return false
 		}
 
@@ -413,7 +397,11 @@ async function isEnrolled(
 
 		return false
 	} catch (err) {
-		console.error("[stellar] is_enrolled check failed:", err)
+		logger.error("is_enrolled check failed", {
+			error: err,
+			learnerAddress,
+			courseId,
+		})
 		return false
 	}
 }
@@ -481,7 +469,7 @@ async function submitScholarshipProposal(
 
 		return { txHash: result.hash, proposalId: null, simulated: false }
 	} catch (err) {
-		console.error("[stellar] Scholarship proposal submission failed:", err)
+		logger.error("Scholarship proposal submission failed", { error: err })
 		throw new Error(
 			"Scholarship proposal submission failed: " +
 				(err instanceof Error ? err.message : String(err)),
@@ -491,9 +479,9 @@ async function submitScholarshipProposal(
 
 async function getLearnTokenBalance(address: string): Promise<string> {
 	if (!LEARN_TOKEN_CONTRACT_ID) {
-		console.warn(
-			"[stellar] LEARN_TOKEN_CONTRACT_ID not set — simulating balance",
-		)
+		logger.warn("LEARN_TOKEN_CONTRACT_ID not set; simulating balance", {
+			address,
+		})
 		return "10000000000" // 1000 LRN
 	}
 	try {
@@ -531,16 +519,16 @@ async function getLearnTokenBalance(address: string): Promise<string> {
 		const { scValToNative } = await import("@stellar/stellar-sdk")
 		return scValToNative(simResult.result?.retval!).toString()
 	} catch (err) {
-		console.error("[stellar] getLearnTokenBalance failed:", err)
+		logger.error("getLearnTokenBalance failed", { error: err, address })
 		return "0"
 	}
 }
 
 async function getGovernanceTokenBalance(address: string): Promise<string> {
 	if (!GOVERNANCE_TOKEN_CONTRACT_ID) {
-		console.warn(
-			"[stellar] GOVERNANCE_TOKEN_CONTRACT_ID not set — simulating balance",
-		)
+		logger.warn("GOVERNANCE_TOKEN_CONTRACT_ID not set; simulating balance", {
+			address,
+		})
 		return "1250000000"
 	}
 	try {
@@ -578,15 +566,21 @@ async function getGovernanceTokenBalance(address: string): Promise<string> {
 		const { scValToNative } = await import("@stellar/stellar-sdk")
 		return scValToNative(simResult.result?.retval!).toString()
 	} catch (err) {
-		console.error("[stellar] getGovernanceTokenBalance failed:", err)
+		logger.error("getGovernanceTokenBalance failed", {
+			error: err,
+			address,
+		})
 		return "0"
 	}
 }
 
 async function getEnrolledCourses(address: string): Promise<string[]> {
 	if (!COURSE_MILESTONE_CONTRACT_ID) {
-		console.warn(
-			"[stellar] COURSE_MILESTONE_CONTRACT_ID not set — simulating enrollments",
+		logger.warn(
+			"COURSE_MILESTONE_CONTRACT_ID not set; simulating enrollments",
+			{
+				address,
+			},
 		)
 		return ["stellar-basics", "defi-101"]
 	}
@@ -595,9 +589,9 @@ async function getEnrolledCourses(address: string): Promise<string[]> {
 
 async function getScholarCredentials(address: string): Promise<any[]> {
 	if (!SCHOLAR_NFT_CONTRACT_ID) {
-		console.warn(
-			"[stellar] SCHOLAR_NFT_CONTRACT_ID not set — simulating credentials",
-		)
+		logger.warn("SCHOLAR_NFT_CONTRACT_ID not set; simulating credentials", {
+			address,
+		})
 		return [
 			{
 				token_id: 1,

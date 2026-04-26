@@ -2,7 +2,10 @@ import { type Request, type Response } from "express"
 import { z } from "zod"
 
 import { pool } from "../db/index"
+import { createLogger } from "../lib/logger"
 import { stellarContractService } from "../services/stellar-contract.service"
+
+const logger = createLogger("scholarships")
 
 const applySchema = z.object({
 	applicant_address: z.string().min(50).max(56),
@@ -104,7 +107,11 @@ export async function applyForScholarship(
 			simulated: result.simulated,
 		})
 	} catch (err) {
-		console.error("[scholarships] Application failed:", err)
+		logger.error("Scholarship application failed", {
+			error: err,
+			applicantAddress: applicant_address,
+			courseId: course_id,
+		})
 		res.status(500).json({
 			error: "Failed to submit scholarship application",
 			message: err instanceof Error ? err.message : String(err),

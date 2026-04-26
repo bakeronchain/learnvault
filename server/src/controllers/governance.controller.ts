@@ -2,7 +2,10 @@ import { type Request, type Response } from "express"
 import { z } from "zod"
 
 import { pool } from "../db/index"
+import { createLogger } from "../lib/logger"
 import { stellarContractService } from "../services/stellar-contract.service"
+
+const logger = createLogger("governance")
 
 type ProposalStatus = "pending" | "approved" | "rejected"
 
@@ -104,7 +107,7 @@ export async function getVotingPower(
 			can_vote: balanceBigInt > 0n,
 		})
 	} catch (err) {
-		console.error("[governance] getVotingPower error:", err)
+		logger.error("getVotingPower failed", { error: err, address })
 		res.status(500).json({ error: "Failed to fetch voting power" })
 	}
 }
@@ -198,7 +201,7 @@ export async function createGovernanceProposal(
 			tx_hash: contractResult.txHash,
 		})
 	} catch (err) {
-		console.error("[governance] Proposal creation failed:", err)
+		logger.error("Proposal creation failed", { error: err, title })
 		res.status(500).json({
 			error: "Failed to create governance proposal",
 			message: err instanceof Error ? err.message : String(err),

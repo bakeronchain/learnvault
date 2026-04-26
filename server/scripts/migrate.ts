@@ -11,12 +11,15 @@ import fs from "node:fs"
 import path from "node:path"
 import dotenv from "dotenv"
 import { Pool } from "pg"
+import { createLogger } from "../src/lib/logger"
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") })
 
+const logger = createLogger("db-migrate")
+
 const DATABASE_URL = process.env.DATABASE_URL
 if (!DATABASE_URL) {
-	console.error("ERROR: DATABASE_URL is not set in server/.env")
+	logger.error("DATABASE_URL is not set in server/.env")
 	process.exit(1)
 }
 
@@ -48,12 +51,12 @@ async function run(): Promise<void> {
 		let ran = 0
 		for (const file of files) {
 			if (appliedSet.has(file)) {
-				console.log(`  skip  ${file}`)
+				logger.info("Skipping already applied migration", { file })
 				continue
 			}
 
 			const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), "utf8")
-			console.log(`  apply ${file}`)
+			logger.info("Applying migration", { file })
 
 			await client.query("BEGIN")
 			try {
@@ -66,12 +69,12 @@ async function run(): Promise<void> {
 				ran++
 			} catch (err) {
 				await client.query("ROLLBACK")
-				console.error(`  FAILED ${file}:`, err)
+				logger.error("Migration failed", { file, error: err })
 				process.exit(1)
 			}
 		}
 
-		console.log(`\nMigrations complete. ${ran} new migration(s) applied.`)
+		logger.info("Migrations complete", { appliedCount: ran })
 	} finally {
 		client.release()
 		await pool.end()
@@ -79,6 +82,6 @@ async function run(): Promise<void> {
 }
 
 run().catch((err) => {
-	console.error(err)
+	logger.error("Migration runner failed", { error: err })
 	process.exit(1)
 })

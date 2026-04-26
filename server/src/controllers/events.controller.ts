@@ -1,5 +1,8 @@
 import { type Request, type Response } from "express"
 import { pool } from "../db/index"
+import { createLogger } from "../lib/logger"
+
+const logger = createLogger("events")
 
 function parsePositiveInt(value: unknown, fallback: number): number {
 	if (typeof value !== "string") return fallback
@@ -37,7 +40,7 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
 		const result = await pool.query(query, params)
 		res.status(200).json({ data: result.rows })
 	} catch (err) {
-		console.error("[events] Query failed:", err)
+		logger.error("Query failed", { error: err, typeFilter, limit, offset })
 		res.status(500).json({ error: "Failed to fetch events" })
 	}
 }

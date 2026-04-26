@@ -5,31 +5,31 @@ import express from "express"
 import morgan from "morgan"
 import swaggerUi from "swagger-ui-express"
 import YAML from "yaml"
-import { z } from "zod"
-
-import { initDb } from "./db/index"
 import { createNonceStore } from "./db/nonce-store"
-import { errorHandler } from "./middleware/error.middleware"
-import { globalLimiter } from "./middleware/rate-limit.middleware"
+import { createLogger } from "./lib/logger"
 import { buildOpenApiSpec } from "./openapi"
 import { adminMilestonesRouter } from "./routes/admin-milestones.routes"
 import { adminRouter } from "./routes/admin.routes"
-import { createAuthRouter } from "./routes/auth.routes"
 import { commentsRouter } from "./routes/comments.routes"
 import { coursesRouter } from "./routes/courses.routes"
+import { createAuthRouter } from "./routes/auth.routes"
 import { credentialsRouter } from "./routes/credentials.routes"
+import { createMeRouter } from "./routes/me.routes"
+import { createAuthService } from "./services/auth.service"
 import { enrollmentsRouter } from "./routes/enrollments.routes"
+import { errorHandler } from "./middleware/error.middleware"
 import { eventsRouter } from "./routes/events.routes"
+import { globalLimiter } from "./middleware/rate-limit.middleware"
 import { governanceRouter } from "./routes/governance.routes"
 import { healthRouter } from "./routes/health.routes"
+import { initDb } from "./db/index"
 import { leaderboardRouter } from "./routes/leaderboard.routes"
-import { createMeRouter } from "./routes/me.routes"
 import { scholarsRouter } from "./routes/scholars.routes"
 import { scholarshipsRouter } from "./routes/scholarships.routes"
 import { treasuryRouter } from "./routes/treasury.routes"
 import { uploadRouter } from "./routes/upload.routes"
 import { validatorRouter } from "./routes/validator.routes"
-import { createAuthService } from "./services/auth.service"
+import { z } from "zod"
 import {
 	createJwtService,
 	generateEphemeralDevJwtKeys,
@@ -54,6 +54,7 @@ const envSchema = z.object({
 })
 
 const env = envSchema.parse(process.env)
+const logger = createLogger("server")
 
 const isProduction = env.NODE_ENV === "production"
 
@@ -79,9 +80,9 @@ let jwtPublicKey = env.JWT_PUBLIC_KEY
 
 // Generate ephemeral keys in dev if not provided
 if (!isProduction && (!jwtPrivateKey || !jwtPublicKey)) {
-	console.warn(
-		"⚠️  JWT keys not found in .env — generating ephemeral keys (tokens will reset on restart)",
-	)
+	logger.warn("JWT keys not found in .env; generating ephemeral keys", {
+		resetOnRestart: true,
+	})
 	const ephemeral = generateEphemeralDevJwtKeys()
 	jwtPrivateKey = ephemeral.privateKeyPem
 	jwtPublicKey = ephemeral.publicKeyPem
@@ -108,7 +109,7 @@ app.use(
 			if (allowedOrigins.includes(origin)) {
 				callback(null, true)
 			} else {
-				console.warn(`CORS blocked request from origin: ${origin}`)
+				logger.warn("CORS blocked request from origin", { origin })
 				callback(new Error("Not allowed by CORS"))
 			}
 		},
@@ -143,7 +144,9 @@ app.use("/api", treasuryRouter)
 // Start event poller (non-prod only for now)
 if (process.env.NODE_ENV !== "production") {
 	void import("./workers/event-poller.js").then(({ startEventPoller }) => {
-		void startEventPoller().catch(console.error)
+		void startEventPoller().catch((error) => {
+			logger.error("Failed to start event poller", { error })
+		})
 	})
 }
 
@@ -160,11 +163,11 @@ app.use(errorHandler)
 initDb()
 	.then(() => {
 		app.listen(env.PORT, () => {
-			console.log(`Server listening on port ${env.PORT}`)
+			logger.info("Server listening", { port: env.PORT })
 		})
 	})
 	.catch((err) => {
-		console.error("Failed to initialize database:", err)
+		logger.error("Failed to initialize database", { error: err })
 		process.exit(1)
 	})
 

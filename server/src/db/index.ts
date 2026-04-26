@@ -1,4 +1,7 @@
 import { Pool } from "pg"
+import { createLogger } from "../lib/logger"
+
+const logger = createLogger("db")
 
 class MockPool {
 	async connect() {
@@ -22,7 +25,7 @@ try {
 				: false,
 	})
 } catch {
-	console.warn("[db] Failed to create postgres pool, using mock")
+	logger.warn("Failed to create postgres pool, using mock")
 	activePool = new MockPool()
 }
 
@@ -245,12 +248,14 @@ export const initDb = async () => {
                 CREATE INDEX IF NOT EXISTS idx_enrollments_course_id ON enrollments (course_id);
             `)
 			client.release()
-			console.log("Postgres database initialized")
+			logger.info("Postgres database initialized")
 		} else {
-			console.log("In-memory mock database initialized")
+			logger.info("In-memory mock database initialized")
 		}
 	} catch (err) {
-		console.error("Database initialization failed, falling back to mock")
+		logger.error("Database initialization failed, falling back to mock", {
+			error: err,
+		})
 		activePool = new MockPool()
 	}
 }

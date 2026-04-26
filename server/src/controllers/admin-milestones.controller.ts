@@ -1,8 +1,11 @@
 import { type Request, type Response } from "express"
 import { milestoneStore } from "../db/milestone-store"
+import { createLogger } from "../lib/logger"
 import { type AdminRequest } from "../middleware/admin.middleware"
 import { credentialService } from "../services/credential.service"
 import { stellarContractService } from "../services/stellar-contract.service"
+
+const logger = createLogger("admin-milestones")
 
 // ── GET /api/admin/milestones/pending ────────────────────────────────────────
 
@@ -14,7 +17,7 @@ export async function getPendingMilestones(
 		const reports = await milestoneStore.getPendingReports()
 		res.status(200).json({ data: reports })
 	} catch (err) {
-		console.error("[admin] getPendingMilestones error:", err)
+		logger.error("getPendingMilestones failed", { error: err })
 		res.status(500).json({ error: "Failed to fetch pending milestones" })
 	}
 }
@@ -38,7 +41,7 @@ export async function getMilestoneById(
 		const auditLog = await milestoneStore.getAuditForReport(id)
 		res.status(200).json({ data: { ...report, auditLog } })
 	} catch (err) {
-		console.error("[admin] getMilestoneById error:", err)
+		logger.error("getMilestoneById failed", { error: err, reportId: id })
 		res.status(500).json({ error: "Failed to fetch milestone report" })
 	}
 }
@@ -91,12 +94,17 @@ export async function approveMilestone(
 			)
 			if (mintResult.minted) {
 				certificate = mintResult
-				console.info(
-					`[admin] ScholarNFT minted for ${report.scholar_address} — course ${report.course_id} (tx: ${mintResult.mintTxHash})`,
-				)
+				logger.info("ScholarNFT minted", {
+					scholarAddress: report.scholar_address,
+					courseId: report.course_id,
+					mintTxHash: mintResult.mintTxHash,
+				})
 			}
 		} catch (mintErr) {
-			console.error("[admin] Certificate mint failed (non-blocking):", mintErr)
+			logger.error("Certificate mint failed (non-blocking)", {
+				error: mintErr,
+				reportId: id,
+			})
 		}
 
 		res.status(200).json({
@@ -110,7 +118,7 @@ export async function approveMilestone(
 			},
 		})
 	} catch (err) {
-		console.error("[admin] approveMilestone error:", err)
+		logger.error("approveMilestone failed", { error: err, reportId: id })
 		const msg = err instanceof Error ? err.message : String(err)
 		if (msg.includes("not configured")) {
 			res.status(503).json({ error: "Stellar credentials not configured" })
@@ -163,9 +171,11 @@ export async function rejectMilestone(
 		})
 
 		// TODO: send email notification to scholar (integrate email service here)
-		console.info(
-			`[admin] Scholar ${report.scholar_address} notified of rejection for milestone ${report.milestone_id} in course ${report.course_id}`,
-		)
+		logger.info("Scholar notified of rejection", {
+			scholarAddress: report.scholar_address,
+			milestoneId: report.milestone_id,
+			courseId: report.course_id,
+		})
 
 		res.status(200).json({
 			data: {
@@ -178,7 +188,7 @@ export async function rejectMilestone(
 			},
 		})
 	} catch (err) {
-		console.error("[admin] rejectMilestone error:", err)
+		logger.error("rejectMilestone failed", { error: err, reportId: id })
 		const msg = err instanceof Error ? err.message : String(err)
 		if (msg.includes("not configured")) {
 			res.status(503).json({ error: "Stellar credentials not configured" })

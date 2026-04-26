@@ -22,4 +22,17 @@ export default [
 			},
 		},
 	},
+	{
+		files: ["server/src/**/*.ts", "server/scripts/**/*.ts"],
+		rules: {
+			"no-restricted-properties": [
+				"error",
+				{
+					object: "console",
+					property: "error",
+					message: "Use the structured server logger instead of console.error.",
+				},
+			],
+		},
+	},
 ]

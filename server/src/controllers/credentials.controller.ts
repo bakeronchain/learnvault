@@ -1,8 +1,11 @@
-import { type Request, type Response } from "express"
 import fs from "fs/promises"
 import path from "path"
+import { type Request, type Response } from "express"
 
+import { createLogger } from "../lib/logger"
 import { pinJsonToIPFS, getGatewayUrl } from "../services/pinata.service"
+
+const logger = createLogger("credentials")
 
 // ---------------------------------------------------------------------------
 // Types
@@ -181,7 +184,7 @@ export async function createCredentialMetadata(
 			},
 		})
 	} catch (error) {
-		console.error("Error creating credential metadata:", error)
+		logger.error("Error creating credential metadata", { error })
 
 		if (
 			error instanceof Error &&

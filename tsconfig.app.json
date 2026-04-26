@@ -13,5 +13,12 @@
 		"module": "ESNext",
 		"strict": true
 	},
-	"include": ["src", "e2e", "playwright.config.ts", "reset.d.ts"]
+	"include": [
+		"src/**/*",
+		"e2e/**/*",
+		"contracts/**/*",
+		"loadtests/**/*",
+		"playwright.config.ts",
+		"reset.d.ts"
+	]
 }

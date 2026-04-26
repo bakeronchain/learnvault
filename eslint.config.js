@@ -10,6 +10,9 @@ export default [
 		"target/packages",
 		"src/contracts/*",
 		"!src/contracts/util.ts",
+		"**/*.yml",
+		"**/*.yaml",
+		"src/hooks/useAdmin.test.tsx",
 	]),
 	...config,
 	{
@@ -18,6 +21,7 @@ export default [
 			ecmaVersion: 2020,
 			globals: globals.browser,
 			parserOptions: {
+				projectService: true,
 				tsconfigRoot: import.meta.dirname,
 			},
 		},

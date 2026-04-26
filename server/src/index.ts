@@ -54,6 +54,7 @@ import { treasuryRouter } from "./routes/treasury.routes"
 import { createUploadRouter } from "./routes/upload.routes"
 import { createUserProfileRouter } from "./routes/user-profile.routes"
 import { validatorRouter } from "./routes/validator.routes"
+import { donorsRouter } from "./routes/donors.routes"
 import { wikiRouter } from "./routes/wiki.routes"
 import { createAuthService } from "./services/auth.service"
 import {
@@ -192,6 +193,7 @@ app.use("/api", enrollmentsRouter)
 app.use("/api", profilesRouter)
 app.use("/api", scholarshipsRouter)
 app.use("/api", treasuryRouter)
+app.use("/api", donorsRouter)
 app.use("/api", notificationsRouter)
 app.use("/api/wiki", wikiRouter)
 

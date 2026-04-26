@@ -5,6 +5,7 @@ import {
 	type DonorData,
 	type DonorContribution,
 	type DonorStats,
+	type DonorImpact,
 	type Vote,
 	type RpcEvent,
 } from "../types/contracts"
@@ -14,6 +15,7 @@ import { useWallet } from "./useWallet"
 export type {
 	DonorContribution,
 	DonorStats,
+	DonorImpact,
 	Vote,
 	Scholar,
 	DonorData,
@@ -27,6 +29,7 @@ const emptyStats: DonorStats = {
 
 const makeEmptyData = (): DonorData => ({
 	stats: emptyStats,
+	impact: null,
 	contributions: [],
 	votes: [],
 	scholars: [],
@@ -50,6 +53,16 @@ const extractNumber = (value: unknown): number => {
 	const text = stringify(value)
 	const match = text.match(/(\d{1,18})/)
 	return match ? Number.parseInt(match[1] ?? "0", 10) : 0
+}
+
+const fetchDonorImpact = async (address: string): Promise<DonorImpact | null> => {
+	try {
+		const response = await fetch(`/api/donors/${address}/impact`)
+		if (!response.ok) return null
+		return await response.json()
+	} catch {
+		return null
+	}
 }
 
 const readContractEvents = async (
@@ -103,7 +116,10 @@ export const useDonor = (): DonorData => {
 				const contractIds = [scholarshipTreasury, governanceToken].filter(
 					(id): id is string => Boolean(id),
 				)
-				const events = await readContractEvents(contractIds, address)
+				const [events, impact] = await Promise.all([
+					readContractEvents(contractIds, address),
+					fetchDonorImpact(address),
+				])
 				const contributions: DonorContribution[] = events
 					.filter((evt) =>
 						stringify({
@@ -154,6 +170,7 @@ export const useDonor = (): DonorData => {
 						votes_cast: votes.length,
 						scholars_funded: scholarsFunded,
 					},
+					impact,
 					contributions,
 					votes,
 					scholars: [],

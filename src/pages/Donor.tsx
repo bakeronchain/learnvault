@@ -11,7 +11,7 @@ import { useWallet } from "../hooks/useWallet"
 
 const Donor: React.FC = () => {
 	const { address } = useWallet()
-	const { stats, contributions, votes, scholars, isLoading, error } = useDonor()
+	const { stats, impact, contributions, votes, scholars, isLoading, error } = useDonor()
 	const { balance: usdcBalance, isLoading: usdcLoading } = useUSDC(address)
 	const [showDepositForm, setShowDepositForm] = useState(false)
 	const hasActivity =
@@ -162,6 +162,39 @@ const Donor: React.FC = () => {
 				</div>
 			</header>
 
+			{/* Impact Statistics Section */}
+			{impact && (
+				<section className="mb-20">
+					<h2 className="text-3xl font-black mb-8 text-gradient">Your Impact</h2>
+					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+						<ImpactCard
+							title="Total Donated"
+							value={`$${(Number(impact.total_donated_usdc) / 1e7).toLocaleString()}`}
+							icon="💰"
+							description="Your total contributions to the treasury"
+						/>
+						<ImpactCard
+							title="Scholars Funded"
+							value={impact.scholars_funded.toString()}
+							icon="🎓"
+							description="Number of scholars you've helped fund"
+						/>
+						<ImpactCard
+							title="Milestones Completed"
+							value={impact.milestones_completed.toString()}
+							icon="✅"
+							description="Total milestones completed by your funded scholars"
+						/>
+						<ImpactCard
+							title="Success Rate"
+							value={`${Math.round(impact.average_completion_rate * 100)}%`}
+							icon="📈"
+							description="Average milestone completion rate"
+						/>
+					</div>
+				</section>
+			)}
+
 			{/* Main Content */}
 			<div className="space-y-20">
 				<MyContributions
@@ -198,6 +231,28 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, icon, color }) => {
 				<span className={`text-2xl font-black ${color}`}>{icon}</span>
 				<p className="text-xl font-black line-clamp-1">{value}</p>
 			</div>
+		</div>
+	)
+}
+
+interface ImpactCardProps {
+	title: string
+	value: string
+	icon: string
+	description: string
+}
+
+const ImpactCard: React.FC<ImpactCardProps> = ({ title, value, icon, description }) => {
+	return (
+		<div className="glass-card p-6 rounded-2xl border border-white/5 group hover:border-white/20 transition-all">
+			<div className="flex items-start justify-between mb-4">
+				<span className="text-3xl">{icon}</span>
+				<div className="text-right">
+					<p className="text-2xl font-black text-white">{value}</p>
+				</div>
+			</div>
+			<h3 className="text-lg font-black text-white mb-2">{title}</h3>
+			<p className="text-white/60 text-sm leading-relaxed">{description}</p>
 		</div>
 	)
 }

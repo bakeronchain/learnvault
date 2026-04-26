@@ -35,7 +35,7 @@ const makeToken = (address: string) =>
 
 const testJwtService = {
 	signWalletToken: (address: string) => jwt.sign({ sub: address }, TEST_SECRET),
-	verifyWalletToken: (token: string) => {
+	verifyWalletToken: async (token: string) => {
 		const decoded = jwt.verify(token, TEST_SECRET) as {
 			sub?: string
 			address?: string
@@ -44,6 +44,7 @@ const testJwtService = {
 		if (!sub) throw new Error("Invalid token")
 		return { sub }
 	},
+	revokeToken: async () => {},
 }
 
 const buildApp = (): Express => {

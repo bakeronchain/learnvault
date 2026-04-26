@@ -16,4 +16,5 @@ export interface SubmittedMilestoneReport {
 	evidence_ipfs_cid: string | null
 	evidence_description: string | null
 	status: string
+	resubmission_count: number
 }

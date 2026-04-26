@@ -1,6 +1,7 @@
-import { Button, Card } from "@stellar/design-system"
-import React, { useState } from "react"
+import { Button } from "@stellar/design-system"
+import React, { useEffect, useRef, useState } from "react"
 import { useCourse } from "../hooks/useCourse"
+import { useNotification } from "../hooks/useNotification"
 
 interface MilestoneSubmitPanelProps {
 	courseId: string
@@ -11,13 +12,23 @@ const MilestoneSubmitPanel: React.FC<MilestoneSubmitPanelProps> = ({
 	courseId,
 	milestoneId,
 }) => {
-	const { submitMilestone, submissionStatusMap, isCompletingMilestone } =
-		useCourse()
+	const {
+		submitMilestone,
+		submissionStatusMap,
+		isCompletingMilestone,
+		getEscrowTimeout,
+	} = useCourse()
+	const { addNotification } = useNotification()
 	const [githubUrl, setGithubUrl] = useState("")
 	const [description, setDescription] = useState("")
+	const hasWarnedRef = useRef(false)
 
 	const statusKey = `${courseId}-${milestoneId}`
 	const status = submissionStatusMap[statusKey] || "none"
+	const escrowTimeout = getEscrowTimeout(courseId)
+	const daysRemaining = escrowTimeout?.daysRemaining ?? null
+	const isEscrowWarning =
+		daysRemaining !== null && daysRemaining >= 0 && daysRemaining <= 7
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
@@ -26,6 +37,16 @@ const MilestoneSubmitPanel: React.FC<MilestoneSubmitPanelProps> = ({
 			description,
 		})
 	}
+
+	useEffect(() => {
+		if (isEscrowWarning && !hasWarnedRef.current) {
+			addNotification(
+				`Escrow timeout warning: ${daysRemaining} day${daysRemaining === 1 ? "" : "s"} remaining`,
+				"warning",
+			)
+			hasWarnedRef.current = true
+		}
+	}, [addNotification, daysRemaining, isEscrowWarning])
 
 	if (status === "pending") {
 		return (
@@ -103,6 +124,19 @@ const MilestoneSubmitPanel: React.FC<MilestoneSubmitPanelProps> = ({
 			</div>
 
 			<form onSubmit={handleSubmit} className="space-y-6">
+				{daysRemaining !== null && daysRemaining >= 0 && (
+					<div
+						className={`rounded-2xl border px-4 py-3 text-sm ${
+							isEscrowWarning
+								? "border-orange-500/40 bg-orange-500/10 text-orange-100"
+								: "border-brand-cyan/30 bg-brand-cyan/10 text-brand-cyan"
+						}`}
+					>
+						Escrow timeout window: <strong>{daysRemaining}</strong> day
+						{daysRemaining === 1 ? "" : "s"} remaining
+					</div>
+				)}
+
 				<div className="space-y-2">
 					<label className="text-sm font-semibold text-white/80 ml-1">
 						GitHub Evidence Link

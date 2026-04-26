@@ -70,7 +70,7 @@ describe("useDonor", () => {
 		await waitFor(() => expect(result.current.isLoading).toBe(false))
 
 		expect(result.current.contributions).toHaveLength(0)
-		expect(result.current.stats.total_contributed).toBe(0)
+		expect(result.current.stats.total_contributed).toBe(0n)
 		expect(result.current.isEmpty).toBe(true)
 	})
 

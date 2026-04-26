@@ -1,67 +1,102 @@
 import { type Request, type Response } from "express"
+import {
+	leaderboardEmitter,
+	LEADERBOARD_UPDATE_EVENT,
+} from "../lib/leaderboard-emitter"
+import { getLeaderboardData } from "../services/leaderboard.service"
 
 /**
- * Mock data for the leaderboard.
- * In a real production app, this would be fetched from an indexer or
- * by aggregating on-chain events.
+ * List top learners (Standard API)
  */
-const MOCK_LEADERS = [
-	{
-		rank: 1,
-		address: "GDOW...7890",
-		fullAddress: "GDOWK76XRPX7PFM7W4ZREXV6XOPD6VHY6G6G6G6G6G6G6G6G6G6G6G6G",
-		balance: "1250",
-		completedCourses: 5,
-	},
-	{
-		rank: 2,
-		address: "GBAV...1234",
-		fullAddress: "GBAV76XRPX7PFM7W4ZREXV6XOPD6VHY6G6G6G6G6G6G6G6G6G6G6G6G",
-		balance: "980",
-		completedCourses: 4,
-	},
-	{
-		rank: 3,
-		address: "GCTY...5678",
-		fullAddress: "GCTY76XRPX7PFM7W4ZREXV6XOPD6VHY6G6G6G6G6G6G6G6G6G6G6G6G",
-		balance: "750",
-		completedCourses: 3,
-	},
-	{
-		rank: 4,
-		address: "GDQK...4321",
-		fullAddress: "GDQK76XRPX7PFM7W4ZREXV6XOPD6VHY6G6G6G6G6G6G6G6G6G6G6G6G",
-		balance: "420",
-		completedCourses: 2,
-	},
-	{
-		rank: 5,
-		address: "GBNZ...8765",
-		fullAddress: "GBNZ76XRPX7PFM7W4ZREXV6XOPD6VHY6G6G6G6G6G6G6G6G6G6G6G6G",
-		balance: "150",
-		completedCourses: 1,
-	},
-]
+export const getLeaderboard = async (
+	req: Request,
+	res: Response,
+): Promise<void> => {
+	try {
+		const limit = Number.parseInt(String(req.query.limit ?? "10"), 10)
+		const offset = Number.parseInt(String(req.query.offset ?? "0"), 10)
 
-export const getLeaderboard = (req: Request, res: Response): void => {
-	const limit = Number.parseInt(String(req.query.limit ?? "10"), 10)
-	const offset = Number.parseInt(String(req.query.offset ?? "0"), 10)
+		const normalizedLimit = Number.isNaN(limit)
+			? 10
+			: Math.max(1, Math.min(limit, 50))
+		const page = Math.floor(offset / normalizedLimit) + 1
 
-	const normalizedLimit = Number.isNaN(limit)
-		? 10
-		: Math.max(1, Math.min(limit, 50))
-	const normalizedOffset = Number.isNaN(offset) ? 0 : Math.max(0, offset)
+		const data = await getLeaderboardData({
+			page,
+			limit: normalizedLimit,
+			viewerAddress: req.walletAddress,
+		})
 
-	// Return a slice of mock data
-	const data = MOCK_LEADERS.slice(
-		normalizedOffset,
-		normalizedOffset + normalizedLimit,
+		res.status(200).json({
+			data: data.rankings,
+			total: data.total,
+			limit: normalizedLimit,
+			offset: (page - 1) * normalizedLimit,
+		})
+	} catch (err) {
+		console.error("[leaderboard] getLeaderboard error:", err)
+		res.status(500).json({ error: "Internal Server Error" })
+	}
+}
+
+/**
+ * Stream leaderboard updates via SSE
+ */
+export const streamLeaderboard = async (
+	req: Request,
+	res: Response,
+): Promise<void> => {
+	// Set headers for SSE
+	res.setHeader("Content-Type", "text/event-stream")
+	res.setHeader("Cache-Control", "no-cache")
+	res.setHeader("Connection", "keep-alive")
+	res.flushHeaders()
+
+	const limit = Math.min(
+		Number.parseInt(String(req.query.limit ?? "10"), 10),
+		50,
 	)
+	const viewerAddress = req.walletAddress
 
-	res.status(200).json({
-		data,
-		total: MOCK_LEADERS.length,
-		limit: normalizedLimit,
-		offset: normalizedOffset,
+	let lastUpdate = 0
+	const THROTTLE_MS = 10000 // 10 seconds
+
+	const sendUpdate = async () => {
+		const now = Date.now()
+		if (now - lastUpdate < THROTTLE_MS) return
+
+		try {
+			const data = await getLeaderboardData({
+				page: 1,
+				limit,
+				viewerAddress,
+			})
+			res.write(`data: ${JSON.stringify(data)}\n\n`)
+			lastUpdate = now
+		} catch (err) {
+			console.error("[leaderboard:stream] Error fetching updates:", err)
+		}
+	}
+
+	// Send initial data
+	await sendUpdate()
+
+	// Subscribe to updates
+	const onUpdate = () => {
+		void sendUpdate()
+	}
+
+	leaderboardEmitter.on(LEADERBOARD_UPDATE_EVENT, onUpdate)
+
+	// Keep connection alive with heartbeat
+	const heartbeat = setInterval(() => {
+		res.write(": heartbeat\n\n")
+	}, 30000)
+
+	// Clean up on disconnect
+	req.on("close", () => {
+		clearInterval(heartbeat)
+		leaderboardEmitter.removeListener(LEADERBOARD_UPDATE_EVENT, onUpdate)
+		res.end()
 	})
 }

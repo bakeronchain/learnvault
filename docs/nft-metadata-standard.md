@@ -2,23 +2,25 @@
 
 ## Overview
 
-ScholarNFT credentials follow the ERC-721/ERC-1155 metadata standard to ensure compatibility with NFT marketplaces, wallets, and tooling across the ecosystem.
+ScholarNFT credentials follow the ERC-721/ERC-1155 metadata standard to ensure
+compatibility with NFT marketplaces, wallets, and tooling across the ecosystem.
 
 ## Metadata Schema
 
-Each ScholarNFT credential includes a JSON metadata file stored on IPFS with the following structure:
+Each ScholarNFT credential includes a JSON metadata file stored on IPFS with the
+following structure:
 
 ```json
 {
-  "name": "string",
-  "description": "string",
-  "image": "ipfs://...",
-  "attributes": [
-    {
-      "trait_type": "string",
-      "value": "string"
-    }
-  ]
+	"name": "string",
+	"description": "string",
+	"image": "ipfs://...",
+	"attributes": [
+		{
+			"trait_type": "string",
+			"value": "string"
+		}
+	]
 }
 ```
 
@@ -30,11 +32,13 @@ Each ScholarNFT credential includes a JSON metadata file stored on IPFS with the
 
 - `description` (required): Detailed description of the credential
   - Format: `"Issued to learners who complete all milestones in {course_title}"`
-  - Example: `"Issued to learners who complete all milestones in Introduction to Stellar & Soroban"`
+  - Example:
+    `"Issued to learners who complete all milestones in Introduction to Stellar & Soroban"`
 
 - `image` (required): IPFS URI pointing to the credential badge image
   - Format: `"ipfs://{CID}"`
-  - Example: `"ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"`
+  - Example:
+    `"ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"`
 
 - `attributes` (required): Array of trait objects describing the credential
   - Each trait has `trait_type` and `value` fields
@@ -51,31 +55,31 @@ Each ScholarNFT credential includes a JSON metadata file stored on IPFS with the
 
 ```json
 {
-  "name": "Introduction to Stellar & Soroban — Course Completion",
-  "description": "Issued to learners who complete all milestones in Introduction to Stellar & Soroban",
-  "image": "ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
-  "attributes": [
-    {
-      "trait_type": "Course",
-      "value": "stellar-basics"
-    },
-    {
-      "trait_type": "Course Title",
-      "value": "Introduction to Stellar & Soroban"
-    },
-    {
-      "trait_type": "Completed At",
-      "value": "2026-03-26T10:30:00Z"
-    },
-    {
-      "trait_type": "Learner",
-      "value": "GABC123...XYZ789"
-    },
-    {
-      "trait_type": "Difficulty",
-      "value": "beginner"
-    }
-  ]
+	"name": "Introduction to Stellar & Soroban — Course Completion",
+	"description": "Issued to learners who complete all milestones in Introduction to Stellar & Soroban",
+	"image": "ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+	"attributes": [
+		{
+			"trait_type": "Course",
+			"value": "stellar-basics"
+		},
+		{
+			"trait_type": "Course Title",
+			"value": "Introduction to Stellar & Soroban"
+		},
+		{
+			"trait_type": "Completed At",
+			"value": "2026-03-26T10:30:00Z"
+		},
+		{
+			"trait_type": "Learner",
+			"value": "GABC123...XYZ789"
+		},
+		{
+			"trait_type": "Difficulty",
+			"value": "beginner"
+		}
+	]
 }
 ```
 
@@ -83,31 +87,31 @@ Each ScholarNFT credential includes a JSON metadata file stored on IPFS with the
 
 ```json
 {
-  "name": "DeFi Fundamentals on Stellar — Course Completion",
-  "description": "Issued to learners who complete all milestones in DeFi Fundamentals on Stellar",
-  "image": "ipfs://bafkreiabcdef1234567890ghijklmnopqrstuvwxyz",
-  "attributes": [
-    {
-      "trait_type": "Course",
-      "value": "defi-fundamentals"
-    },
-    {
-      "trait_type": "Course Title",
-      "value": "DeFi Fundamentals on Stellar"
-    },
-    {
-      "trait_type": "Completed At",
-      "value": "2026-03-15T14:22:00Z"
-    },
-    {
-      "trait_type": "Learner",
-      "value": "GDEF456...ABC123"
-    },
-    {
-      "trait_type": "Difficulty",
-      "value": "intermediate"
-    }
-  ]
+	"name": "DeFi Fundamentals on Stellar — Course Completion",
+	"description": "Issued to learners who complete all milestones in DeFi Fundamentals on Stellar",
+	"image": "ipfs://bafkreiabcdef1234567890ghijklmnopqrstuvwxyz",
+	"attributes": [
+		{
+			"trait_type": "Course",
+			"value": "defi-fundamentals"
+		},
+		{
+			"trait_type": "Course Title",
+			"value": "DeFi Fundamentals on Stellar"
+		},
+		{
+			"trait_type": "Completed At",
+			"value": "2026-03-15T14:22:00Z"
+		},
+		{
+			"trait_type": "Learner",
+			"value": "GDEF456...ABC123"
+		},
+		{
+			"trait_type": "Difficulty",
+			"value": "intermediate"
+		}
+	]
 }
 ```
 
@@ -115,7 +119,8 @@ Each ScholarNFT credential includes a JSON metadata file stored on IPFS with the
 
 ### Generating Metadata
 
-Use the `POST /api/credentials/metadata` endpoint to generate and upload metadata:
+Use the `POST /api/credentials/metadata` endpoint to generate and upload
+metadata:
 
 ```bash
 curl -X POST https://api.learnvault.xyz/api/credentials/metadata \
@@ -147,28 +152,31 @@ Response:
 
 ### Minting with Metadata
 
-After generating metadata, use the returned `metadata_uri` when calling `scholar_nft.mint()`:
+After generating metadata, use the returned `metadata_uri` when calling
+`scholar_nft.mint()`:
 
 ```typescript
-import { scholarNftContract } from './contracts';
+import { scholarNftContract } from "./contracts"
 
-const metadataUri = "ipfs://bafkreiabcdef1234567890ghijklmnopqrstuvwxyz";
-const learnerAddress = "GABC123...XYZ789";
+const metadataUri = "ipfs://bafkreiabcdef1234567890ghijklmnopqrstuvwxyz"
+const learnerAddress = "GABC123...XYZ789"
 
 const tokenId = await scholarNftContract.mint({
-  to: learnerAddress,
-  metadata_uri: metadataUri
-});
+	to: learnerAddress,
+	metadata_uri: metadataUri,
+})
 ```
 
 ## Image Assets
 
-Course completion badge images are stored in `/public/assets/brand/nft/` and follow this naming convention:
+Course completion badge images are stored in `/public/assets/brand/nft/` and
+follow this naming convention:
 
 - `scholar-nft-{course-slug}.svg` - Vector source
 - `scholar-nft-{course-slug}.png` - Rasterized version (1000x1000px)
 
 Available badges:
+
 - `scholar-nft-base.png` - Generic completion badge
 - `scholar-nft-stellar.png` - Stellar Basics course
 - `scholar-nft-soroban.png` - Soroban Contracts course
@@ -176,7 +184,8 @@ Available badges:
 
 ## IPFS Pinning
 
-Metadata is pinned to IPFS via Pinata to ensure permanent availability. The service:
+Metadata is pinned to IPFS via Pinata to ensure permanent availability. The
+service:
 
 1. Generates metadata JSON conforming to this standard
 2. Pins the JSON to IPFS using Pinata

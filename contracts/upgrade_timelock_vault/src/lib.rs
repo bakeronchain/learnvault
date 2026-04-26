@@ -31,8 +31,8 @@
 //! 5. Admin can `cancel_upgrade()` during timelock period
 
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, panic_with_error,
-    symbol_short, Address, BytesN, Env, Symbol,
+    Address, BytesN, Env, Symbol, contract, contracterror, contractevent, contractimpl,
+    contracttype, panic_with_error, symbol_short,
 };
 
 // ---------------------------------------------------------------------------
@@ -63,6 +63,8 @@ pub enum UpgradeTimelockError {
     UpgradeNotFound = 4,
     /// Timelock period has not elapsed yet.
     TimelockNotExpired = 5,
+    /// Contract has already been initialized.
+    AlreadyInitialized = 6,
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +135,7 @@ impl UpgradeTimelockVault {
     /// Sets the admin and default timelock duration (48 hours).
     pub fn initialize(env: Env, admin: Address) {
         if env.storage().instance().has(&ADMIN_KEY) {
-            panic_with_error!(&env, UpgradeTimelockError::NotInitialized);
+            panic_with_error!(&env, UpgradeTimelockError::AlreadyInitialized);
         }
         env.storage().instance().set(&ADMIN_KEY, &admin);
         env.storage()
@@ -254,7 +256,7 @@ impl UpgradeTimelockVault {
     /// Returns true if the timelock has expired for the given contract.
     pub fn is_upgrade_ready(env: Env, contract_address: Address) -> bool {
         if let Some(proposal) = Self::get_upgrade_proposal(env.clone(), contract_address) {
-            let timelock_duration = Self::get_timelock_duration(env);
+            let timelock_duration = Self::get_timelock_duration(env.clone());
             let current_time = env.ledger().timestamp();
             current_time >= proposal.queued_at + timelock_duration
         } else {
@@ -278,8 +280,8 @@ impl UpgradeTimelockVault {
 #[cfg(test)]
 mod test {
     use super::*;
-    use soroban_sdk::testutils::{Address as _, BytesN as _};
-    use soroban_sdk::{contractclient, Address, BytesN, Env};
+    use soroban_sdk::testutils::{Address as _, Ledger};
+    use soroban_sdk::{Address, BytesN, Env, IntoVal, contractclient};
 
     #[contractclient(name = "UpgradeTimelockVaultClient")]
     pub trait UpgradeTimelockVaultInterface {
@@ -298,10 +300,6 @@ mod test {
         Env::default()
     }
 
-    fn create_env() -> Env {
-        Env::default()
-    }
-
     fn create_admin(env: &Env) -> Address {
         Address::generate(env)
     }
@@ -311,14 +309,17 @@ mod test {
     }
 
     fn create_wasm_hash(env: &Env) -> BytesN<32> {
-        BytesN::generate(env)
+        BytesN::from_array(env, &[0; 32])
     }
 
     #[test]
     fn test_initialize() {
         let env = create_env();
         let admin = create_admin(&env);
-        let contract = UpgradeTimelockVaultClient::new(&env, &env.register_contract(None, UpgradeTimelockVault {}));
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
 
         contract.initialize(&admin);
 
@@ -327,11 +328,14 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "NotInitialized")]
+    #[should_panic(expected = "Error(Contract, #6)")]
     fn test_initialize_twice_fails() {
         let env = create_env();
         let admin = create_admin(&env);
-        let contract = UpgradeTimelockVaultClient::new(&env, &env.register_contract(None, UpgradeTimelockVault {}));
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
 
         contract.initialize(&admin);
         contract.initialize(&admin);
@@ -341,7 +345,10 @@ mod test {
     fn test_set_timelock_duration() {
         let env = create_env();
         let admin = create_admin(&env);
-        let contract = UpgradeTimelockVaultClient::new(&env, &env.register_contract(None, UpgradeTimelockVault {}));
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
 
         contract.initialize(&admin);
 
@@ -366,7 +373,10 @@ mod test {
         let env = create_env();
         let admin = create_admin(&env);
         let unauthorized = create_admin(&env);
-        let contract = UpgradeTimelockVaultClient::new(&env, &env.register_contract(None, UpgradeTimelockVault {}));
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
 
         contract.initialize(&admin);
 
@@ -388,9 +398,13 @@ mod test {
         let admin = create_admin(&env);
         let contract_addr = create_contract(&env);
         let wasm_hash = create_wasm_hash(&env);
-        let contract = UpgradeTimelockVaultClient::new(&env, &env.register_contract(None, UpgradeTimelockVault {}));
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
 
         contract.initialize(&admin);
+        env.ledger().set_timestamp(1);
 
         env.mock_auths(&[soroban_sdk::testutils::MockAuth {
             address: &admin,
@@ -411,13 +425,16 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "UpgradeAlreadyQueued")]
+    #[should_panic(expected = "Error(Contract, #3)")]
     fn test_queue_upgrade_twice_fails() {
         let env = create_env();
         let admin = create_admin(&env);
         let contract_addr = create_contract(&env);
         let wasm_hash = create_wasm_hash(&env);
-        let contract = UpgradeTimelockVaultClient::new(&env, &env.register_contract(None, UpgradeTimelockVault {}));
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
 
         contract.initialize(&admin);
 
@@ -450,7 +467,10 @@ mod test {
         let admin = create_admin(&env);
         let contract_addr = create_contract(&env);
         let wasm_hash = create_wasm_hash(&env);
-        let contract = UpgradeTimelockVaultClient::new(&env, &env.register_contract(None, UpgradeTimelockVault {}));
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
 
         contract.initialize(&admin);
 
@@ -467,7 +487,8 @@ mod test {
         contract.queue_upgrade(&contract_addr, &wasm_hash);
 
         // Fast forward time past timelock
-        env.ledger().set_timestamp(env.ledger().timestamp() + DEFAULT_TIMELOCK_DURATION + 1);
+        env.ledger()
+            .set_timestamp(env.ledger().timestamp() + DEFAULT_TIMELOCK_DURATION + 1);
 
         // Execute upgrade
         let returned_hash = contract.execute_upgrade(&contract_addr);
@@ -478,13 +499,16 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "TimelockNotExpired")]
+    #[should_panic(expected = "Error(Contract, #5)")]
     fn test_execute_upgrade_before_timelock() {
         let env = create_env();
         let admin = create_admin(&env);
         let contract_addr = create_contract(&env);
         let wasm_hash = create_wasm_hash(&env);
-        let contract = UpgradeTimelockVaultClient::new(&env, &env.register_contract(None, UpgradeTimelockVault {}));
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
 
         contract.initialize(&admin);
 
@@ -510,7 +534,10 @@ mod test {
         let admin = create_admin(&env);
         let contract_addr = create_contract(&env);
         let wasm_hash = create_wasm_hash(&env);
-        let contract = UpgradeTimelockVaultClient::new(&env, &env.register_contract(None, UpgradeTimelockVault {}));
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
 
         contract.initialize(&admin);
 
@@ -548,7 +575,10 @@ mod test {
         let admin = create_admin(&env);
         let contract_addr = create_contract(&env);
         let wasm_hash = create_wasm_hash(&env);
-        let contract = UpgradeTimelockVaultClient::new(&env, &env.register_contract(None, UpgradeTimelockVault {}));
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
 
         contract.initialize(&admin);
 
@@ -571,7 +601,8 @@ mod test {
         assert!(!contract.is_upgrade_ready(&contract_addr));
 
         // Fast forward time
-        env.ledger().set_timestamp(env.ledger().timestamp() + DEFAULT_TIMELOCK_DURATION + 1);
+        env.ledger()
+            .set_timestamp(env.ledger().timestamp() + DEFAULT_TIMELOCK_DURATION + 1);
 
         // Now ready
         assert!(contract.is_upgrade_ready(&contract_addr));

@@ -1,5 +1,5 @@
 import { type Request, type Response, type NextFunction } from "express"
-import rateLimit from "express-rate-limit"
+import rateLimit, { ipKeyGenerator } from "express-rate-limit"
 import { AppError } from "../errors/app-error-handler"
 
 const createRateLimitHandler =
@@ -32,7 +32,11 @@ const createWalletKeyGenerator =
 			return headerWallet
 		}
 
-		return getBodyWalletValue(req, bodyKeys) ?? req.ip ?? "unknown"
+		return (
+			getBodyWalletValue(req, bodyKeys) ??
+			ipKeyGenerator(req.ip ?? "unknown") ??
+			"unknown"
+		)
 	}
 
 export const globalLimiter = rateLimit({
@@ -57,7 +61,9 @@ export const milestoneReportLimiter = rateLimit({
 	windowMs: 60 * 60 * 1000,
 	limit: 3,
 	keyGenerator: (req: Request) =>
-		(req.headers["x-wallet-address"] as string) ?? req.ip ?? "unknown",
+		(req.headers["x-wallet-address"] as string) ??
+		ipKeyGenerator(req.ip ?? "unknown") ??
+		"unknown",
 	standardHeaders: "draft-7",
 	legacyHeaders: false,
 	handler: createRateLimitHandler(
@@ -69,7 +75,9 @@ export const proposalSubmissionLimiter = rateLimit({
 	windowMs: 24 * 60 * 60 * 1000,
 	limit: 1,
 	keyGenerator: (req: Request) =>
-		(req.headers["x-wallet-address"] as string) ?? req.ip ?? "unknown",
+		(req.headers["x-wallet-address"] as string) ??
+		ipKeyGenerator(req.ip ?? "unknown") ??
+		"unknown",
 	standardHeaders: "draft-7",
 	legacyHeaders: false,
 	handler: createRateLimitHandler(

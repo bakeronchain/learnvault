@@ -30,12 +30,15 @@ export function createAuthControllers(authService: AuthService) {
 					: ""
 
 			if (!signedTransaction) {
-				res.status(400).json({ error: "Missing required field: signed_transaction" })
+				res
+					.status(400)
+					.json({ error: "Missing required field: signed_transaction" })
 				return
 			}
 
 			try {
-				const token = await authService.verifySignedTransaction(signedTransaction)
+				const token =
+					await authService.verifySignedTransaction(signedTransaction)
 				res.status(200).json({
 					token,
 					tokenType: "Bearer",
@@ -118,5 +121,28 @@ export function createAuthControllers(authService: AuthService) {
 				res.status(401).json({ error: message })
 			}
 		},
+
+		async postLogout(req: Request, res: Response): Promise<void> {
+			const authHeader = req.headers.authorization
+			if (!authHeader || !authHeader.startsWith("Bearer ")) {
+				res.status(401).json({ error: "Missing authorization header" })
+				return
+			}
+
+			const token = authHeader.split(" ")[1]
+			if (!token) {
+				res.status(401).json({ error: "Missing token" })
+				return
+			}
+
+			try {
+				await authService.logout(token)
+				res.status(200).json({ message: "Logged out successfully" })
+			} catch (err) {
+				const message = err instanceof Error ? err.message : "Logout failed"
+				res.status(400).json({ error: message })
+			}
+		},
 	}
 }
+

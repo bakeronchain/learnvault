@@ -1,18 +1,20 @@
+import jwt from "jsonwebtoken"
 import { type NextFunction, type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
 
 import { type JwtService } from "../services/jwt.service"
+
 
 // ---------------------------------------------------------------------------
 // Factory-based auth (used by routes that receive jwtService via DI)
 // ---------------------------------------------------------------------------
 
 export function createRequireAuth(jwtService: JwtService) {
-	return function requireAuth(
+	return async function requireAuth(
 		req: Request,
 		res: Response,
 		next: NextFunction,
-	): void {
+	): Promise<void> {
 		const header = req.headers.authorization
 		if (!header?.startsWith("Bearer ")) {
 			res.status(401).json({ error: "Unauthorized" })
@@ -26,11 +28,13 @@ export function createRequireAuth(jwtService: JwtService) {
 		}
 
 		try {
-			const { sub } = jwtService.verifyWalletToken(token)
+			const { sub } = await jwtService.verifyWalletToken(token)
 			req.walletAddress = sub
+			;(req as AuthRequest).user = { address: sub }
 			next()
-		} catch {
-			res.status(401).json({ error: "Invalid or expired token" })
+		} catch (err) {
+			const message = err instanceof Error ? err.message : "Invalid or expired token"
+			res.status(401).json({ error: message })
 		}
 	}
 }
@@ -46,7 +50,9 @@ export interface AuthRequest extends Request {
 	user?: {
 		address: string
 	}
+	walletAddress?: string
 }
+
 
 export const authMiddleware = (
 	req: AuthRequest,
@@ -79,3 +85,4 @@ export const authMiddleware = (
 		return res.status(401).json({ error: "Invalid token" })
 	}
 }
+

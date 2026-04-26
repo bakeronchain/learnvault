@@ -27,7 +27,7 @@ export function WalletToastWatcher() {
 
 		if (!prev && address) {
 			showSuccess(
-				`Wallet connected: ${address.slice(0, 6)}...${address.slice(-4)}`,
+				`Wallet connected: ${address.slice(0, 4)}...${address.slice(-4)}`,
 			)
 		} else if (prev && !address) {
 			showInfo("Wallet disconnected")

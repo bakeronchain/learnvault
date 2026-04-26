@@ -2,20 +2,25 @@ extern crate std;
 
 use soroban_sdk::{
     Address, Env, IntoVal, String, Val, Vec, contract, contractimpl,
-    testutils::{Address as _, Ledger, MockAuth, MockAuthInvoke},
+    testutils::{Address as _, Events as _, Ledger, MockAuth, MockAuthInvoke},
     token::{StellarAssetClient, TokenClient},
 };
 
-use crate::{Error, ProposalStatus, ScholarshipTreasury, ScholarshipTreasuryClient, token};
+use crate::{
+    DataKey, Error, Proposal, ProposalStatus, ScholarshipTreasury, ScholarshipTreasuryClient, token,
+};
+
+const DEFAULT_QUORUM: i128 = 1;
+const DEFAULT_APPROVAL_BPS: u32 = 5_000;
 
 #[contract]
 pub struct MockGovernance;
 
 #[contractimpl]
 impl MockGovernance {
-    pub fn initialize(env: Env, treasury: Address) {}
+    pub fn initialize(_env: Env, _treasury: Address) {}
     pub fn mint(env: Env, to: Address, amount: i128) {
-        let key = soroban_sdk::Symbol::new(&env, "balance");
+        let _key = soroban_sdk::Symbol::new(&env, "balance");
         let balance: i128 = env.storage().persistent().get(&to).unwrap_or(0);
         env.storage().persistent().set(&to, &(balance + amount));
     }
@@ -55,7 +60,13 @@ fn setup<'a>(
     sac.mint(&donor, &1_000);
 
     gov_client.initialize(&contract_id);
-    client.initialize(&admin, &token_id, &gov_contract_id);
+    client.initialize(
+        &admin,
+        &token_id,
+        &gov_contract_id,
+        &DEFAULT_QUORUM,
+        &DEFAULT_APPROVAL_BPS,
+    );
     env.set_auths(&[]);
 
     (
@@ -583,7 +594,13 @@ fn initialize_sets_admin_usdc_and_gov() {
     let client = ScholarshipTreasuryClient::new(&env, &contract_id);
 
     env.mock_all_auths();
-    client.initialize(&admin, &usdc_token, &gov_contract);
+    client.initialize(
+        &admin,
+        &usdc_token,
+        &gov_contract,
+        &DEFAULT_QUORUM,
+        &DEFAULT_APPROVAL_BPS,
+    );
 
     // Verify initialization by checking that operations work
     assert_eq!(client.get_balance(), 0);
@@ -602,12 +619,61 @@ fn double_initialize_fails() {
     let gov_contract = Address::generate(&env);
 
     env.mock_all_auths();
-    let result = client.try_initialize(&admin, &usdc_token, &gov_contract);
+    let result = client.try_initialize(
+        &admin,
+        &usdc_token,
+        &gov_contract,
+        &DEFAULT_QUORUM,
+        &DEFAULT_APPROVAL_BPS,
+    );
 
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
             Error::AlreadyInitialized as u32
+        )))
+    );
+}
+
+#[test]
+fn initialize_with_zero_quorum_fails() {
+    let env = Env::default();
+    let admin = Address::generate(&env);
+    let usdc_token = Address::generate(&env);
+    let gov_contract = Address::generate(&env);
+
+    let contract_id = env.register(ScholarshipTreasury, ());
+    let client = ScholarshipTreasuryClient::new(&env, &contract_id);
+
+    env.mock_all_auths();
+    let result = client.try_initialize(
+        &admin,
+        &usdc_token,
+        &gov_contract,
+        &0_i128,
+        &DEFAULT_APPROVAL_BPS,
+    );
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidAmount as u32
+        )))
+    );
+}
+
+#[test]
+fn set_quorum_with_zero_fails() {
+    let env = Env::default();
+    let (client, _, _, _, _, _) = setup(&env);
+
+    env.mock_all_auths();
+    let result = client.try_set_quorum(&0_i128);
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidAmount as u32
         )))
     );
 }
@@ -887,6 +953,114 @@ fn submit_proposal_happy_path() {
 }
 
 #[test]
+fn submit_proposal_stores_deadline_from_current_ledger() {
+    let env = Env::default();
+    let (client, _, _donor, _recipient, _token_id, gov_client, admin) = setup_with_admin(&env);
+    let applicant = Address::generate(&env);
+    let (milestone_titles, milestone_dates) = sample_milestones(&env);
+
+    gov_client.mint(&applicant, &250);
+
+    env.mock_all_auths();
+    client.set_min_lrn_to_propose(&admin, &100);
+    env.ledger().set_sequence_number(12_345);
+
+    let proposal_id = client.submit_proposal(
+        &applicant,
+        &750,
+        &String::from_str(&env, "Soroban Fellowship"),
+        &String::from_str(&env, "https://example.com/soroban"),
+        &String::from_str(&env, "Build and ship Soroban contracts"),
+        &String::from_str(&env, "2026-06-01"),
+        &milestone_titles,
+        &milestone_dates,
+    );
+
+    assert_eq!(proposal_id, 1);
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    assert_eq!(proposal.deadline_ledger, 12_345 + 100_800);
+}
+
+#[test]
+fn submit_proposal_fails_when_reputation_is_below_threshold() {
+    let env = Env::default();
+    let (client, _, donor, _recipient, _token_id, _gov_client, admin) = setup_with_admin(&env);
+    let (milestone_titles, milestone_dates) = sample_milestones(&env);
+
+    env.mock_all_auths();
+    client.set_min_lrn_to_propose(&admin, &100);
+
+    let result = client.try_submit_proposal(
+        &donor,
+        &500,
+        &String::from_str(&env, "Scholarship"),
+        &String::from_str(&env, "https://example.com"),
+        &String::from_str(&env, "Description"),
+        &String::from_str(&env, "2026-05-01"),
+        &milestone_titles,
+        &milestone_dates,
+    );
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InsufficientReputation as u32
+        )))
+    );
+}
+
+#[test]
+fn set_min_lrn_to_propose_rejects_zero_and_negative() {
+    let env = Env::default();
+    let (client, _, _donor, _recipient, _token_id, _gov_client, admin) = setup_with_admin(&env);
+
+    env.mock_all_auths();
+    let zero = client.try_set_min_lrn_to_propose(&admin, &0);
+    assert_eq!(
+        zero.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidAmount as u32
+        )))
+    );
+    let neg = client.try_set_min_lrn_to_propose(&admin, &-1);
+    assert_eq!(
+        neg.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidAmount as u32
+        )))
+    );
+}
+
+#[test]
+fn clear_min_lrn_to_propose_allows_proposals_with_no_lrn() {
+    let env = Env::default();
+    let (client, _, _donor, _recipient, _token_id, gov_client, admin) = setup_with_admin(&env);
+    let applicant = Address::generate(&env);
+    let (milestone_titles, milestone_dates) = sample_milestones(&env);
+
+    env.mock_all_auths();
+    client.set_min_lrn_to_propose(&admin, &10_000);
+    client.clear_min_lrn_to_propose(&admin);
+    assert_eq!(client.get_min_lrn_to_propose(), 0);
+
+    // Applicant has 0 LRN; after clear, should still be able to propose (sufficient program funds etc.)
+    let proposal_id = client.submit_proposal(
+        &applicant,
+        &100,
+        &String::from_str(&env, "Open Program"),
+        &String::from_str(&env, "https://example.com/p"),
+        &String::from_str(&env, "No min LRN after clear"),
+        &String::from_str(&env, "2026-01-01"),
+        &milestone_titles,
+        &milestone_dates,
+    );
+    assert_eq!(proposal_id, 1);
+    // sanity: gov balance unchanged
+    assert_eq!(gov_client.balance(&applicant), 0);
+}
+
+#[test]
 fn submit_proposal_zero_amount_fails() {
     let env = Env::default();
     let (client, _, donor, _, _, _) = setup(&env);
@@ -1139,13 +1313,69 @@ fn mixed_yes_and_no_votes() {
 #[test]
 fn pause_only_admin_can_call() {
     let env = Env::default();
-    let (client, _, _, _, _, _) = setup(&env);
+    let (client, _, _, _, _, _, _admin) = setup_with_admin(&env);
 
     let attacker = Address::generate(&env);
-    env.mock_all_auths();
+    set_caller(&client, "pause", &attacker, ());
     let result = client.try_pause();
-    // Should succeed because mock_all_auths allows all
-    assert!(result.is_ok());
+    assert!(result.is_err());
+}
+
+#[test]
+fn unpause_only_admin_can_call() {
+    let env = Env::default();
+    let (client, _, _, _, _, _, admin) = setup_with_admin(&env);
+    let attacker = Address::generate(&env);
+
+    set_caller(&client, "pause", &admin, ());
+    client.pause();
+
+    set_caller(&client, "unpause", &attacker, ());
+    let result = client.try_unpause();
+    assert!(result.is_err());
+}
+
+#[test]
+fn set_quorum_only_admin_can_call() {
+    let env = Env::default();
+    let (client, _, _, _, _, _, _admin) = setup_with_admin(&env);
+    let attacker = Address::generate(&env);
+
+    set_caller(&client, "set_quorum", &attacker, (2_i128,));
+    let result = client.try_set_quorum(&2);
+    assert!(result.is_err());
+}
+
+#[test]
+fn set_approval_bps_only_admin_can_call() {
+    let env = Env::default();
+    let (client, _, _, _, _, _, _admin) = setup_with_admin(&env);
+    let attacker = Address::generate(&env);
+
+    set_caller(&client, "set_approval_bps", &attacker, (6_000_u32,));
+    let result = client.try_set_approval_bps(&6_000);
+    assert!(result.is_err());
+}
+
+#[test]
+fn set_min_lrn_to_propose_fails_for_non_admin() {
+    let env = Env::default();
+    let (client, _, _, _, _, _, _admin) = setup_with_admin(&env);
+    let attacker = Address::generate(&env);
+
+    set_caller(
+        &client,
+        "set_min_lrn_to_propose",
+        &attacker,
+        (attacker.clone(), 10_i128),
+    );
+    let result = client.try_set_min_lrn_to_propose(&attacker, &10);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::Unauthorized as u32
+        )))
+    );
 }
 
 #[test]
@@ -1408,9 +1638,70 @@ fn full_flow_edge_case_exact_balance_disburse() {
     assert_eq!(client.get_total_disbursed(), 500);
 }
 
+// --- fuzz tests ---
+
+use proptest::prelude::*;
+
+proptest! {
+    #[test]
+    #[ignore]
+    fn fuzz_deposit_allocates_gov_tokens_monotonically(amount1 in 1..100_000_000_i128, amount2 in 1..100_000_000_i128) {
+        let env = Env::default();
+        let (client, _, donor, _, token_id, gov_client) = setup(&env);
+        let sac = StellarAssetClient::new(&env, &token_id);
+
+        // mock_all_auths must come before sac.mint; setup() clears auths with set_auths(&[])
+        env.mock_all_auths();
+        sac.mint(&donor, &(amount1 + amount2));
+
+        client.deposit(&donor, &amount1);
+        let gov_bal1 = gov_client.balance(&donor);
+
+        client.deposit(&donor, &amount2);
+        let gov_bal2 = gov_client.balance(&donor);
+
+        // Each deposited USDC mints GOV_PER_USDC (100) governance tokens
+        assert!(gov_bal2 > gov_bal1);
+        assert_eq!(gov_bal1, amount1 * 100);
+        assert_eq!(gov_bal2, (amount1 + amount2) * 100);
+    }
+
+    #[test]
+    #[ignore]
+    fn fuzz_vote_casting_random_proposal_ids(proposal_id in any::<u32>()) {
+        let env = Env::default();
+        let (client, _, donor, _, _, gov_client) = setup(&env);
+        let (milestone_titles, milestone_dates) = sample_milestones(&env);
+
+        let voter = Address::generate(&env);
+        gov_client.mint(&voter, &500);
+
+        env.mock_all_auths();
+
+        // create one valid proposal
+        client.submit_proposal(
+            &donor, &500, &String::from_str(&env, "Test"), &String::from_str(&env, "URL"), &String::from_str(&env, "Desc"), &String::from_str(&env, "Date"), &milestone_titles, &milestone_dates,
+        );
+
+        let result = client.try_vote(&voter, &proposal_id, &true);
+
+        if proposal_id == 1 {
+            assert!(result.is_ok());
+        } else {
+            // "verify no panics" (meaning no unexpected panics, contract error ProposalNotFound expected)
+            assert_eq!(
+                result.err(),
+                Some(Ok(soroban_sdk::Error::from_contract_error(
+                    crate::Error::ProposalNotFound as u32
+                )))
+            );
+        }
+    }
+}
 #[cfg(test)]
 mod fuzz_tests {
     use super::*;
+    use crate::GOV_PER_USDC;
     use proptest::prelude::*;
 
     proptest! {
@@ -1418,17 +1709,20 @@ mod fuzz_tests {
 
         #[test]
         #[ignore]
-        fn fuzz_deposit_amounts(amount in 1..i128::MAX) {
+        fn fuzz_deposit_amounts(amount in 1..=(i128::MAX / GOV_PER_USDC)) {
             let env = Env::default();
             let (client, _, donor, _, token_id, gov_client) = setup(&env);
             env.mock_all_auths();
+
+            // Ensure donor has sufficient balance for the randomized deposit.
+            StellarAssetClient::new(&env, &token_id).mint(&donor, &amount);
 
             client.deposit(&donor, &amount);
 
             assert_eq!(client.get_donor_total(&donor), amount);
             assert_eq!(client.get_balance(), amount);
             assert_eq!(token_client(&env, &token_id).balance(&client.address), amount);
-            assert_eq!(gov_client.balance(&donor), amount);
+            assert_eq!(gov_client.balance(&donor), amount * GOV_PER_USDC);
         }
 
         #[test]
@@ -1452,4 +1746,429 @@ mod fuzz_tests {
             }
         }
     }
+}
+
+// ── Deadline and quorum tests (Issue #339) ────────────────────────────────────
+
+/// Like `setup` but also returns the admin address so finalize tests can use it.
+fn setup_with_admin<'a>(
+    env: &'a Env,
+) -> (
+    ScholarshipTreasuryClient<'a>,
+    Address,
+    Address,
+    Address,
+    Address,
+    MockGovernanceClient<'a>,
+    Address, // admin
+) {
+    let admin = Address::generate(env);
+    let donor = Address::generate(env);
+    let recipient = Address::generate(env);
+
+    let contract_id = env.register(ScholarshipTreasury, ());
+    let client = ScholarshipTreasuryClient::new(env, &contract_id);
+
+    let gov_contract_id = env.register(MockGovernance, ());
+    let gov_client = MockGovernanceClient::new(env, &gov_contract_id);
+
+    env.mock_all_auths();
+    env.as_contract(&contract_id, || token::register(env, &admin));
+    let token_id = env.as_contract(&contract_id, || token::contract_id(env));
+    let sac = StellarAssetClient::new(env, &token_id);
+    sac.mint(&donor, &1_000);
+
+    gov_client.initialize(&contract_id);
+    client.initialize(
+        &admin,
+        &token_id,
+        &gov_contract_id,
+        &DEFAULT_QUORUM,
+        &DEFAULT_APPROVAL_BPS,
+    );
+    env.set_auths(&[]);
+
+    (
+        client,
+        gov_contract_id,
+        donor,
+        recipient,
+        token_id,
+        gov_client,
+        admin,
+    )
+}
+
+#[test]
+fn finalize_proposal_before_deadline_panics() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, _gov_client, admin) =
+        setup_with_admin(&env);
+
+    env.mock_all_auths();
+    let proposal_id = submit_sample_proposal(&env, &client, &donor, 500);
+
+    // Deadline has NOT passed yet — finalize should fail with VotingNotClosed
+    let result = client.try_finalize_proposal(&admin, &proposal_id);
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::VotingNotClosed as u32
+        )))
+    );
+}
+
+#[test]
+fn finalize_proposal_approved_when_quorum_met_and_yes_wins() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client, admin) =
+        setup_with_admin(&env);
+    let (milestone_titles, milestone_dates) = sample_milestones(&env);
+
+    env.mock_all_auths();
+
+    client.set_quorum(&1);
+    client.set_approval_bps(&5_000);
+
+    let applicant = Address::generate(&env);
+    let proposal_id = client.submit_proposal(
+        &applicant,
+        &500,
+        &String::from_str(&env, "Test Program"),
+        &String::from_str(&env, "https://example.com"),
+        &String::from_str(&env, "Test description"),
+        &String::from_str(&env, "2026-05-01"),
+        &milestone_titles,
+        &milestone_dates,
+    );
+
+    gov_client.mint(&donor, &500);
+    client.vote(&donor, &proposal_id, &true);
+
+    // Advance past deadline
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1);
+
+    let status = client.finalize_proposal(&admin, &proposal_id);
+
+    assert_eq!(status, crate::ProposalStatus::Approved);
+    assert_eq!(
+        client.get_finalized_status(&proposal_id),
+        Some(crate::ProposalStatus::Approved)
+    );
+}
+
+#[test]
+fn finalize_proposal_rejected_when_quorum_not_met() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, token_id, gov_client, admin) =
+        setup_with_admin(&env);
+    let (milestone_titles, milestone_dates) = sample_milestones(&env);
+
+    env.mock_all_auths();
+
+    client.set_quorum(&1_000);
+    client.set_approval_bps(&5_000);
+
+    let applicant = Address::generate(&env);
+    let proposal_id = client.submit_proposal(
+        &applicant,
+        &500,
+        &String::from_str(&env, "Low-turnout Proposal"),
+        &String::from_str(&env, "https://example.com"),
+        &String::from_str(&env, "Description"),
+        &String::from_str(&env, "2026-05-01"),
+        &milestone_titles,
+        &milestone_dates,
+    );
+
+    gov_client.mint(&donor, &500);
+    client.vote(&donor, &proposal_id, &true);
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1);
+
+    let status = client.finalize_proposal(&admin, &proposal_id);
+
+    // Quorum not met → always Rejected
+    assert_eq!(status, crate::ProposalStatus::Rejected);
+}
+
+#[test]
+fn finalize_proposal_rejected_when_no_votes_win() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client, admin) =
+        setup_with_admin(&env);
+    let (milestone_titles, milestone_dates) = sample_milestones(&env);
+
+    env.mock_all_auths();
+
+    client.set_quorum(&1);
+    client.set_approval_bps(&5_000);
+
+    let applicant = Address::generate(&env);
+    let proposal_id = client.submit_proposal(
+        &applicant,
+        &200,
+        &String::from_str(&env, "Rejected Proposal"),
+        &String::from_str(&env, "https://example.com"),
+        &String::from_str(&env, "Will be voted down"),
+        &String::from_str(&env, "2026-06-01"),
+        &milestone_titles,
+        &milestone_dates,
+    );
+
+    gov_client.mint(&donor, &500);
+    client.vote(&donor, &proposal_id, &false);
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1);
+
+    let status = client.finalize_proposal(&admin, &proposal_id);
+
+    assert_eq!(status, crate::ProposalStatus::Rejected);
+}
+
+#[test]
+fn finalize_proposal_fails_for_non_admin() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, _gov_client, _admin) =
+        setup_with_admin(&env);
+    let attacker = Address::generate(&env);
+
+    env.mock_all_auths();
+    let proposal_id = submit_sample_proposal(&env, &client, &donor, 250);
+    env.set_auths(&[]);
+
+    set_caller(
+        &client,
+        "finalize_proposal",
+        &attacker,
+        (attacker.clone(), proposal_id),
+    );
+    let result = client.try_finalize_proposal(&attacker, &proposal_id);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::Unauthorized as u32
+        )))
+    );
+}
+
+#[test]
+fn get_total_gov_issued_tracks_deposits() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, _gov_client, _admin) =
+        setup_with_admin(&env);
+
+    env.mock_all_auths();
+    assert_eq!(client.get_total_gov_issued(), 0);
+
+    client.deposit(&donor, &100);
+    assert_eq!(client.get_total_gov_issued(), 100 * 100); // GOV_PER_USDC = 100
+
+    client.deposit(&donor, &400);
+    assert_eq!(client.get_total_gov_issued(), 500 * 100);
+}
+
+// =========================================================================
+// EXECUTE + CANCEL TESTS
+// =========================================================================
+
+#[test]
+fn execute_proposal_before_deadline_panics() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client) = setup(&env);
+
+    env.mock_all_auths();
+    client.set_quorum(&1);
+    client.set_approval_bps(&5_000);
+    let proposal_id = submit_sample_proposal(&env, &client, &donor, 100);
+
+    gov_client.mint(&donor, &100);
+    client.vote(&donor, &proposal_id, &true);
+
+    let result = client.try_execute_proposal(&proposal_id);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::VotingNotClosed as u32
+        )))
+    );
+}
+
+#[test]
+fn execute_proposal_passed_disburses_and_emits_event() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, token_id, gov_client) = setup(&env);
+    let applicant = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.deposit(&donor, &500);
+    client.set_quorum(&1);
+    client.set_approval_bps(&5_000);
+
+    let proposal_id = submit_sample_proposal(&env, &client, &applicant, 200);
+
+    gov_client.mint(&donor, &200);
+    client.vote(&donor, &proposal_id, &true);
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1);
+
+    let before = token_client(&env, &token_id).balance(&applicant);
+    client.execute_proposal(&proposal_id);
+    let after = token_client(&env, &token_id).balance(&applicant);
+    assert_eq!(after - before, 200);
+
+    let stored = client.get_proposal(&proposal_id).unwrap();
+    assert!(stored.executed);
+}
+
+#[test]
+fn execute_proposal_rejected_emits_event_and_no_disbursement() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, token_id, gov_client) = setup(&env);
+    let applicant = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.deposit(&donor, &500);
+    client.set_quorum(&1_000);
+    client.set_approval_bps(&10_000);
+
+    let proposal_id = submit_sample_proposal(&env, &client, &applicant, 200);
+
+    gov_client.mint(&donor, &10);
+    client.vote(&donor, &proposal_id, &true);
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1);
+
+    let before = token_client(&env, &token_id).balance(&applicant);
+    client.execute_proposal(&proposal_id);
+    let after = token_client(&env, &token_id).balance(&applicant);
+    assert_eq!(after, before);
+
+    let stored = client.get_proposal(&proposal_id).unwrap();
+    assert!(stored.executed);
+}
+
+#[test]
+fn execute_proposal_double_execute_panics() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client) = setup(&env);
+    let applicant = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.deposit(&donor, &500);
+    client.set_quorum(&1);
+    client.set_approval_bps(&5_000);
+    let proposal_id = submit_sample_proposal(&env, &client, &applicant, 100);
+
+    gov_client.mint(&donor, &100);
+    client.vote(&donor, &proposal_id, &true);
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1);
+
+    client.execute_proposal(&proposal_id);
+    let result = client.try_execute_proposal(&proposal_id);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::ProposalAlreadyExecuted as u32
+        )))
+    );
+}
+
+#[test]
+fn cancel_proposal_prevents_vote_and_execute() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client) = setup(&env);
+
+    env.mock_all_auths();
+    let proposal_id = submit_sample_proposal(&env, &client, &donor, 100);
+
+    client.cancel_proposal(&proposal_id);
+    let voter = Address::generate(&env);
+    gov_client.mint(&voter, &100);
+
+    let vote_result = client.try_vote(&voter, &proposal_id, &true);
+    assert_eq!(
+        vote_result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::ProposalCancelled as u32
+        )))
+    );
+
+    let prop = client.get_proposal(&proposal_id).unwrap();
+    env.ledger().set_sequence_number(prop.deadline_ledger + 1);
+    let exec_result = client.try_execute_proposal(&proposal_id);
+    assert_eq!(
+        exec_result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::ProposalCancelled as u32
+        )))
+    );
+}
+
+#[test]
+fn cancel_proposal_only_admin_can_call() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, _gov_client, _admin) =
+        setup_with_admin(&env);
+    let attacker = Address::generate(&env);
+
+    env.mock_all_auths();
+    let proposal_id = submit_sample_proposal(&env, &client, &donor, 100);
+    env.set_auths(&[]);
+
+    set_caller(&client, "cancel_proposal", &attacker, (proposal_id,));
+    let result = client.try_cancel_proposal(&proposal_id);
+    assert!(result.is_err());
+}
+
+#[test]
+fn upgrade_requires_admin_auth() {
+    let env = Env::default();
+    let (client, _governance, _donor, _recipient, _token_id, _gov_client, _admin) =
+        setup_with_admin(&env);
+    let attacker = Address::generate(&env);
+    let wasm_hash = crate::upgrade::testutils::upload_upgrade_target(&env);
+
+    set_caller(&client, "upgrade", &attacker, (wasm_hash.clone(),));
+    assert!(client.try_upgrade(&wasm_hash).is_err());
+}
+
+#[test]
+fn state_persists_after_upgrade() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, _gov_client, admin) =
+        setup_with_admin(&env);
+
+    env.mock_all_auths();
+    let proposal_id = submit_sample_proposal(&env, &client, &donor, 250);
+
+    let wasm_hash = crate::upgrade::testutils::upload_upgrade_target(&env);
+    set_caller(&client, "upgrade", &admin, (wasm_hash.clone(),));
+    client.upgrade(&wasm_hash);
+
+    let proposal = env.as_contract(&client.address, || {
+        env.storage()
+            .persistent()
+            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+    });
+    let stored_hash = env.as_contract(&client.address, || crate::upgrade::current_hash(&env));
+
+    let proposal = proposal.expect("proposal should remain after upgrade");
+    assert_eq!(proposal.id, proposal_id);
+    assert_eq!(proposal.applicant, donor);
+    assert_eq!(proposal.amount, 250);
+    assert_eq!(stored_hash, wasm_hash);
 }

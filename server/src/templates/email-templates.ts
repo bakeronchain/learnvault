@@ -34,33 +34,33 @@ const baseLayout = (content: string, vars: EmailVariables) => `
 `
 
 export const templates: Record<string, (vars: EmailVariables) => string> = {
-  "proposal-submitted": (vars) =>
-    baseLayout(
-      `
+	"proposal-submitted": (vars) =>
+		baseLayout(
+			`
     <p>Hi ${vars.name},</p>
     <p>Great news! Your scholarship proposal <strong>${vars.proposalTitle}</strong> is now live on LearnVault.</p>
     <p>Donors can now see your proposal and start voting.</p>
     <p><a href="${vars.proposalUrl}" class="button primary">View Proposal</a></p>
     <p>Best,<br>The LearnVault Team</p>
   `,
-      vars,
-    ),
+			vars,
+		),
 
-  "proposal-approved": (vars) =>
-    baseLayout(
-      `
+	"proposal-approved": (vars) =>
+		baseLayout(
+			`
     <p>Hi ${vars.name},</p>
     <p>🎉 Your scholarship proposal <strong>${vars.proposalTitle}</strong> was approved!</p>
     <p>Congratulations, you can now start your learning journey and submit milestones.</p>
     <p><a href="${vars.proposalUrl}" class="button success">Go to Dashboard</a></p>
     <p>Best,<br>The LearnVault Team</p>
   `,
-      vars,
-    ),
+			vars,
+		),
 
-  "proposal-rejected": (vars) =>
-    baseLayout(
-      `
+	"proposal-rejected": (vars) =>
+		baseLayout(
+			`
     <p>Hi ${vars.name},</p>
     <p>Unfortunately, your scholarship proposal <strong>${vars.proposalTitle}</strong> was not approved in its current form.</p>
     <p><strong>Reason:</strong> ${vars.rejectionReason}</p>
@@ -68,12 +68,12 @@ export const templates: Record<string, (vars: EmailVariables) => string> = {
     <p><a href="${vars.proposalUrl}" class="button danger">Revise Proposal</a></p>
     <p>Best,<br>The LearnVault Team</p>
   `,
-      vars,
-    ),
+			vars,
+		),
 
-  "milestone-verified": (vars) =>
-    baseLayout(
-      `
+	"milestone-verified": (vars) =>
+		baseLayout(
+			`
     <p>Hi ${vars.name},</p>
     <p><strong>Milestone verified — funds released!</strong></p>
     <p>Your milestone <strong>${vars.milestoneTitle}</strong> for the course <strong>${vars.courseTitle}</strong> has been verified by the validator.</p>
@@ -82,12 +82,12 @@ export const templates: Record<string, (vars: EmailVariables) => string> = {
     <p>Keep up the great work!</p>
     <p>Best,<br>The LearnVault Team</p>
   `,
-      vars,
-    ),
+			vars,
+		),
 
-  "milestone-rejected": (vars) =>
-    baseLayout(
-      `
+	"milestone-rejected": (vars) =>
+		baseLayout(
+			`
     <p>Hi ${vars.name},</p>
     <p><strong>Your milestone report needs more evidence.</strong></p>
     <p>Your report for <strong>${vars.milestoneTitle}</strong> was rejected by the validator.</p>
@@ -96,12 +96,12 @@ export const templates: Record<string, (vars: EmailVariables) => string> = {
     <p><a href="${vars.milestoneUrl}" class="button warning">Update Milestone</a></p>
     <p>Best,<br>The LearnVault Team</p>
   `,
-      vars,
-    ),
+			vars,
+		),
 
-  "inactivity-reminder": (vars) =>
-    baseLayout(
-      `
+	"inactivity-reminder": (vars) =>
+		baseLayout(
+			`
     <p>Hi ${vars.name},</p>
     <p><strong>Action needed — update your milestone.</strong></p>
     <p>Your scholarship milestone <strong>${vars.milestoneTitle}</strong> is approaching the inactivity timeout.</p>
@@ -109,8 +109,8 @@ export const templates: Record<string, (vars: EmailVariables) => string> = {
     <p><a href="${vars.milestoneUrl}" class="button warning" style="background-color: #f97316;">Submit Milestone</a></p>
     <p>Best,<br>The LearnVault Team</p>
   `,
-      vars,
-    ),
+			vars,
+		),
 
 	"certificate-awarded": (vars) =>
 		baseLayout(
@@ -135,30 +135,76 @@ export const templates: Record<string, (vars: EmailVariables) => string> = {
     <p><a href="${vars.proposalUrl}" class="button accent">View Proposal</a></p>
     <p>Best,<br>The LearnVault Team</p>
   `,
-      vars,
-    ),
+			vars,
+		),
 
-  "admin-alert": (vars) =>
-    baseLayout(
-      `
+	"admin-alert": (vars) =>
+		baseLayout(
+			`
     <p><strong>Attention Admin,</strong></p>
     <p>A new milestone submission requires review.</p>
     <hr />
     <p>${vars.body}</p>
-    <p><a href="${vars.adminUrl || '#'}" class="button accent">Review in Admin Panel</a></p>
+    <p><a href="${vars.adminUrl || "#"}" class="button accent">Review in Admin Panel</a></p>
     <p>Best,<br>LearnVault System</p>
   `,
-      vars,
-    ),
+			vars,
+		),
+	"milestone-approved-admin": (vars) =>
+		baseLayout(
+			`
+    <p>Hi ${vars.name},</p>
+    <p><strong>Yayy! Your milestone has been approved!</strong></p>
+    <p>Your milestone <strong>${vars.milestoneTitle}</strong> for the course <strong>${vars.courseTitle}</strong> has been approved by the admin.</p>
+    
+    <ul>
+        <li><strong>Milestone:</strong> ${vars.milestoneNumber}</li>
+        <li><strong>Reward Earned:</strong> ${vars.reward} LRN</li>
+    </ul>
+
+    <p>Keep up the great progress 🚀</p>
+
+    <p><a href="${vars.dashboardUrl}" class="button success">View Dashboard</a></p>
+
+    <p>Best,<br>The LearnVault Team</p>
+  `,
+			vars,
+		),
+
+	"milestone-rejected-admin": (vars) =>
+		baseLayout(
+			`
+    <p>Hi ${vars.name},</p>
+    <p><strong>Your milestone was not approved</strong></p>
+    <p>Your submission for <strong>${vars.milestoneTitle}</strong> in the course <strong>${vars.courseTitle}</strong> was reviewed by the admin and requires changes.</p>
+
+    <ul>
+        <li><strong>Milestone:</strong> ${vars.milestoneNumber}</li>
+    </ul>
+
+    ${
+			vars.rejectionReason
+				? `<p><strong>Reason:</strong> ${vars.rejectionReason}</p>`
+				: ""
+		}
+
+    <p>Please review the feedback and resubmit.</p>
+
+    <p><a href="${vars.milestoneUrl}" class="button warning">Update Milestone</a></p>
+
+    <p>Best,<br>The LearnVault Team</p>
+  `,
+			vars,
+		),
 }
 
 /**
  * Basic helper to strip HTML and provide a plain-text fallback.
  */
 export const toPlainText = (html: string): string => {
-  return html
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
+	return html
+		.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+		.replace(/<[^>]+>/g, " ")
+		.replace(/\s+/g, " ")
+		.trim()
 }

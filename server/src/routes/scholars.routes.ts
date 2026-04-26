@@ -1,20 +1,96 @@
 import { Router } from "express"
-import { z } from "zod"
 
 import {
+	getScholarMilestones,
 	getScholarsLeaderboard,
 	getScholarProfile,
+	getScholarCredentials,
+	getScholarEscrowTimeouts,
 } from "../controllers/scholars.controller"
 
 export const scholarsRouter = Router()
 
-const scholarMilestonesParamsSchema = z.object({
-	address: z.string().trim().min(1, "address is required"),
+/**
+ * @openapi
+ * /api/scholars/leaderboard:
+ *   get:
+ *     tags: [Scholars]
+ *     summary: Get scholars leaderboard
+ *     description: Returns a paginated ranking of scholars by LRN balance, with optional search.
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 50
+ *         description: Number of scholars per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Filter scholars by wallet address (partial match)
+ *     responses:
+ *       200:
+ *         description: Paginated scholars leaderboard
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 rankings:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/ScholarRanking'
+ *                 total:
+ *                   type: integer
+ *                 your_rank:
+ *                   type: integer
+ *                   nullable: true
+ *                   description: Current user's rank (null if not authenticated or not ranked)
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+scholarsRouter.get("/scholars/leaderboard", (req, res) => {
+	void getScholarsLeaderboard(req, res)
 })
 
-const scholarMilestonesQuerySchema = z.object({
-	status: z.enum(["pending", "verified", "rejected", "approved"]).optional(),
-	course_id: z.string().trim().min(1, "course_id cannot be empty").optional(),
+/**
+ * @openapi
+ * /api/scholars/{address}:
+ *   get:
+ *     tags: [Scholars]
+ *     summary: Get scholar profile
+ *     description: Returns a scholar's on-chain balances, enrolled courses, milestone stats, credentials, and join date.
+ *     parameters:
+ *       - in: path
+ *         name: address
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Scholar's Stellar wallet address
+ *     responses:
+ *       200:
+ *         description: Scholar profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ScholarProfile'
+ *       400:
+ *         $ref: '#/components/responses/BadRequestError'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+scholarsRouter.get("/scholars/:address", (req, res) => {
+	void getScholarProfile(req, res)
 })
 
 /**
@@ -22,27 +98,29 @@ const scholarMilestonesQuerySchema = z.object({
  * /api/scholars/{address}/milestones:
  *   get:
  *     tags: [Scholars]
- *     summary: Milestone history for a scholar
+ *     summary: Get milestones for a scholar
+ *     description: Returns milestone reports for a scholar, optionally filtered by course or status.
  *     parameters:
  *       - in: path
  *         name: address
  *         required: true
- *         schema: { type: string }
- *         description: Scholar address
+ *         schema:
+ *           type: string
+ *         description: Scholar's Stellar wallet address
+ *       - in: query
+ *         name: course_id
+ *         schema:
+ *           type: string
+ *         description: Filter milestones by course ID
  *       - in: query
  *         name: status
- *         required: false
  *         schema:
  *           type: string
  *           enum: [pending, verified, rejected]
- *       - in: query
- *         name: course_id
- *         required: false
- *         schema: { type: string }
- *         description: Course id (slug), e.g. stellar-basics
+ *         description: Filter milestones by status
  *     responses:
  *       200:
- *         description: Milestone history
+ *         description: Scholar milestones
  *         content:
  *           application/json:
  *             schema:
@@ -51,33 +129,49 @@ const scholarMilestonesQuerySchema = z.object({
  *                 milestones:
  *                   type: array
  *                   items:
- *                     type: object
- *                     properties:
- *                       id: { type: string }
- *                       course_id: { type: string }
- *                       milestone_id: { type: integer }
- *                       status: { type: string, enum: [pending, verified, rejected] }
- *                       evidence_url: { type: string, nullable: true }
- *                       submitted_at: { type: string, format: date-time, nullable: true }
- *                       verified_at: { type: string, format: date-time, nullable: true }
- *                       tx_hash: { type: string, nullable: true }
+ *                     $ref: '#/components/schemas/ScholarMilestone'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+scholarsRouter.get("/scholars/:address/milestones", (req, res) => {
+	void getScholarMilestones(req, res)
+})
+
+/**
+ * @openapi
+ * /api/scholars/{address}/credentials:
+ *   get:
+ *     tags: [Scholars]
+ *     summary: Get credentials for a scholar
+ *     description: Returns all credentials (NFTs) earned by the scholar.
+ *     parameters:
+ *       - in: path
+ *         name: address
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Scholar's Stellar wallet address
+ *     responses:
+ *       200:
+ *         description: Scholar credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 credentials:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Credential'
  *       400:
  *         $ref: '#/components/responses/BadRequestError'
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-scholarsRouter.get(
-	"/scholars/:address/milestones",
-	validate({
-		params: scholarMilestonesParamsSchema,
-		query: scholarMilestonesQuerySchema,
-	}),
-	getScholarMilestones,
-)
-scholarsRouter.get("/scholars/leaderboard", (req, res) => {
-	void getScholarsLeaderboard(req, res)
+scholarsRouter.get("/scholars/:address/credentials", (req, res) => {
+	void getScholarCredentials(req, res)
 })
 
-scholarsRouter.get("/scholars/:address", (req, res) => {
-	void getScholarProfile(req, res)
+scholarsRouter.get("/scholars/:address/escrow-timeouts", (req, res) => {
+	void getScholarEscrowTimeouts(req, res)
 })

@@ -1,9 +1,9 @@
 import { rpc } from "@stellar/stellar-sdk" // dynamic later
-import { INDEXER_CONFIG, getPollingTargets } from "../lib/event-config.js"
+import { INDEXER_CONFIG, getPollingTargets } from "../lib/event-config"
 import {
 	indexEventsBatch,
 	getLastIndexedLedger,
-} from "../services/event-indexer.service.js"
+} from "../services/event-indexer.service"
 
 let pollInterval: NodeJS.Timeout | null = null
 
@@ -13,12 +13,12 @@ export async function startEventPoller(): Promise<void> {
 	// Get global latest ledger
 	const network = new rpc.Server(process.env.SOROBAN_RPC_URL!)
 	const info = await network.getNetwork()
-	let currentLedger = Number(info.ledger)
+	let currentLedger = Number(await network.getLatestLedger())
 
 	pollInterval = setInterval(async () => {
 		try {
 			const newInfo = await network.getNetwork()
-			const latestLedger = Number(newInfo.ledger)
+			const latestLedger = Number(await network.getLatestLedger())
 
 			if (currentLedger >= latestLedger) return
 

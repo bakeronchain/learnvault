@@ -1,4 +1,5 @@
 import React from "react"
+import { useTranslation } from "react-i18next"
 import { type DonorContribution } from "../../hooks/useDonor"
 
 interface MyContributionsProps {
@@ -10,9 +11,12 @@ export const MyContributions: React.FC<MyContributionsProps> = ({
 	contributions,
 	totalContributed,
 }) => {
+	const { i18n } = useTranslation()
+	const locale = i18n.resolvedLanguage
+
 	const formatDate = (dateStr: string) => {
 		const date = new Date(dateStr)
-		return date.toLocaleDateString("en-US", {
+		return date.toLocaleDateString(locale, {
 			month: "short",
 			day: "numeric",
 			year: "numeric",
@@ -32,7 +36,7 @@ export const MyContributions: React.FC<MyContributionsProps> = ({
 						Total Deposited
 					</h3>
 					<p className="text-4xl font-black text-gradient">
-						${totalContributed.toLocaleString()}
+						${totalContributed.toLocaleString(locale)}
 					</p>
 				</div>
 				<div className="h-px bg-white/5" />
@@ -52,7 +56,7 @@ export const MyContributions: React.FC<MyContributionsProps> = ({
 							<div className="flex items-center justify-between mb-4">
 								<div>
 									<p className="text-sm font-black text-white mb-1">
-										${contribution.amount.toLocaleString()}
+										${contribution.amount.toLocaleString(locale)}
 									</p>
 									<p className="text-xs text-white/40 uppercase font-black tracking-widest">
 										{formatDate(contribution.date)}

@@ -14,6 +14,28 @@ import { NotificationProvider } from "./providers/NotificationProvider.tsx"
 import { WalletProvider } from "./providers/WalletProvider.tsx"
 import "./i18n"
 import { parseError } from "./util/error"
+import { initSentry } from "./lib/sentry"
+
+// Initialize Sentry for error monitoring
+initSentry({
+	dsn: import.meta.env.VITE_SENTRY_DSN,
+	environment: import.meta.env.VITE_SENTRY_ENVIRONMENT || "development",
+	release:
+		import.meta.env.VITE_SENTRY_RELEASE ||
+		import.meta.env.VITE_GIT_COMMIT_HASH,
+	tracesSampleRate:
+		import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE
+			? parseFloat(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE)
+			: 0.1,
+	replaysSessionSampleRate:
+		import.meta.env.VITE_SENTRY_REPLAYS_SESSION_SAMPLE_RATE
+			? parseFloat(import.meta.env.VITE_SENTRY_REPLAYS_SESSION_SAMPLE_RATE)
+			: 0.1,
+	replaysOnErrorSampleRate:
+		import.meta.env.VITE_SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE
+			? parseFloat(import.meta.env.VITE_SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE)
+			: 1.0,
+})
 
 // Issue #61 — FOUC prevention: apply theme before first render
 ;(function () {
@@ -54,6 +76,8 @@ const queryClient = new QueryClient({
 		queries: {
 			refetchOnWindowFocus: false,
 			retry: false,
+			staleTime: 30 * 1000, // 30 seconds default
+			gcTime: 10 * 60 * 1000, // 10 minutes
 		},
 	},
 })

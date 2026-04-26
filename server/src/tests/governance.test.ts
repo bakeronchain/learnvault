@@ -1,5 +1,10 @@
 process.env.JWT_SECRET = "learnvault-secret"
 process.env.ADMIN_ADDRESSES = "GADMIN123"
+process.env.NODE_ENV = "test"
+process.env.STELLAR_SECRET_KEY = "test-secret-key"
+process.env.PINATA_API_KEY = "test-api-key"
+process.env.PINATA_SECRET = "test-secret"
+process.env.FRONTEND_URL = "http://localhost:3000"
 
 import express from "express"
 import jwt from "jsonwebtoken"
@@ -20,6 +25,8 @@ jest.mock("../services/stellar-contract.service", () => ({
 			simulated: false,
 		}),
 		getGovernanceTokenBalance: jest.fn().mockResolvedValue("1250000000"),
+		getGovernanceVotingPower: jest.fn().mockResolvedValue("1250000000"),
+		getGovernanceDelegation: jest.fn().mockResolvedValue("0"),
 		castVote: jest.fn().mockResolvedValue({
 			txHash: "mock_vote_tx_hash",
 			simulated: false,
@@ -31,10 +38,39 @@ jest.mock("../services/stellar-contract.service", () => ({
 	},
 }))
 
+jest.mock("../services/pinata.service", () => ({
+	getClient: jest.fn().mockReturnValue({
+		pinFileToIPFS: jest.fn().mockResolvedValue({
+			IpfsHash: "mock-ipfs-hash",
+		}),
+		pinJsonToIPFS: jest.fn().mockResolvedValue({
+			IpfsHash: "mock-json-hash",
+		}),
+	}),
+}))
+
+jest.mock("../services/email.service", () => ({
+	createEmailService: jest.fn().mockReturnValue({
+		sendNotification: jest.fn().mockResolvedValue({}),
+	}),
+}))
+
+jest.mock("../services/escrow-timeout.service", () => ({
+	trackEscrowTimeout: jest.fn().mockResolvedValue(undefined),
+}))
+
+jest.mock("../lib/request-context", () => ({
+	getRequestContext: jest.fn().mockReturnValue({
+		requestId: "test-request-id-123",
+	}),
+	runWithRequestContext: jest.fn((context, fn) => fn()),
+}))
+
 import { governanceRouter } from "../routes/governance.routes"
 
 const app = express()
 app.use(express.json())
+app.use(require("../middleware/request-logger.middleware").createRequestLogger({ enabled: false }))
 app.use("/api", governanceRouter)
 
 const JWT_SECRET = "learnvault-secret"
@@ -159,7 +195,7 @@ describe("GET /api/governance/voting-power/:address", () => {
 		const { stellarContractService } =
 			await import("../services/stellar-contract.service")
 		;(
-			stellarContractService.getGovernanceTokenBalance as jest.Mock
+			stellarContractService.getGovernanceVotingPower as jest.Mock
 		).mockResolvedValueOnce("0")
 
 		const response = await request(app).get(
@@ -211,9 +247,9 @@ describe("GET /api/proposals", () => {
 		)
 
 		expect(response.status).toBe(200)
-		expect(response.body.total).toBe(1)
-		expect(response.body.proposals[0]).toHaveProperty("id", 7)
-		expect(response.body.proposals[0]).toHaveProperty("user_vote_support", true)
+		expect(response.body.pagination.total).toBe(1)
+		expect(response.body.data[0]).toHaveProperty("id", 7)
+		expect(response.body.data[0]).toHaveProperty("user_vote_support", true)
 	})
 })
 
@@ -278,7 +314,7 @@ describe("POST /api/governance/vote", () => {
 			.mockResolvedValueOnce({
 				rows: [{ votes_for: "1250000000", votes_against: "0" }],
 			}) // fetch updated counts
-		stellarContractService.getGovernanceTokenBalance.mockResolvedValue(
+		stellarContractService.getGovernanceVotingPower.mockResolvedValue(
 			"1250000000",
 		)
 		stellarContractService.castVote.mockResolvedValue({
@@ -397,7 +433,7 @@ describe("POST /api/governance/vote", () => {
 				],
 			})
 			.mockResolvedValueOnce({ rows: [] })
-		stellarContractService.getGovernanceTokenBalance.mockResolvedValueOnce("0")
+		stellarContractService.getGovernanceVotingPower.mockResolvedValueOnce("0")
 
 		const response = await request(app).post("/api/governance/vote").send({
 			proposal_id: 1,
@@ -520,9 +556,10 @@ describe("DELETE /api/proposals/:id", () => {
 			.set("Authorization", `Bearer ${makeToken("GADMIN123")}`)
 
 		expect(response.status).toBe(204)
-		expect(stellarContractService.cancelProposal).toHaveBeenCalledWith({
-			proposalId: 12,
-		})
+		expect(stellarContractService.cancelProposal).toHaveBeenCalledWith(
+			{ proposalId: 12 },
+			expect.any(Object),
+		)
 		expect(pool.query).toHaveBeenNthCalledWith(
 			2,
 			"UPDATE proposals SET cancelled = TRUE WHERE id = $1",

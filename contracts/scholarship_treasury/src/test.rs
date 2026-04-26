@@ -635,6 +635,49 @@ fn double_initialize_fails() {
     );
 }
 
+#[test]
+fn initialize_with_zero_quorum_fails() {
+    let env = Env::default();
+    let admin = Address::generate(&env);
+    let usdc_token = Address::generate(&env);
+    let gov_contract = Address::generate(&env);
+
+    let contract_id = env.register(ScholarshipTreasury, ());
+    let client = ScholarshipTreasuryClient::new(&env, &contract_id);
+
+    env.mock_all_auths();
+    let result = client.try_initialize(
+        &admin,
+        &usdc_token,
+        &gov_contract,
+        &0_i128,
+        &DEFAULT_APPROVAL_BPS,
+    );
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidAmount as u32
+        )))
+    );
+}
+
+#[test]
+fn set_quorum_with_zero_fails() {
+    let env = Env::default();
+    let (client, _, _, _, _, _) = setup(&env);
+
+    env.mock_all_auths();
+    let result = client.try_set_quorum(&0_i128);
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidAmount as u32
+        )))
+    );
+}
+
 // ============================================================================
 // DEPOSIT TESTS
 // ============================================================================
@@ -968,6 +1011,56 @@ fn submit_proposal_fails_when_reputation_is_below_threshold() {
 }
 
 #[test]
+fn set_min_lrn_to_propose_rejects_zero_and_negative() {
+    let env = Env::default();
+    let (client, _, _donor, _recipient, _token_id, _gov_client, admin) = setup_with_admin(&env);
+
+    env.mock_all_auths();
+    let zero = client.try_set_min_lrn_to_propose(&admin, &0);
+    assert_eq!(
+        zero.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidAmount as u32
+        )))
+    );
+    let neg = client.try_set_min_lrn_to_propose(&admin, &-1);
+    assert_eq!(
+        neg.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidAmount as u32
+        )))
+    );
+}
+
+#[test]
+fn clear_min_lrn_to_propose_allows_proposals_with_no_lrn() {
+    let env = Env::default();
+    let (client, _, _donor, _recipient, _token_id, gov_client, admin) = setup_with_admin(&env);
+    let applicant = Address::generate(&env);
+    let (milestone_titles, milestone_dates) = sample_milestones(&env);
+
+    env.mock_all_auths();
+    client.set_min_lrn_to_propose(&admin, &10_000);
+    client.clear_min_lrn_to_propose(&admin);
+    assert_eq!(client.get_min_lrn_to_propose(), 0);
+
+    // Applicant has 0 LRN; after clear, should still be able to propose (sufficient program funds etc.)
+    let proposal_id = client.submit_proposal(
+        &applicant,
+        &100,
+        &String::from_str(&env, "Open Program"),
+        &String::from_str(&env, "https://example.com/p"),
+        &String::from_str(&env, "No min LRN after clear"),
+        &String::from_str(&env, "2026-01-01"),
+        &milestone_titles,
+        &milestone_dates,
+    );
+    assert_eq!(proposal_id, 1);
+    // sanity: gov balance unchanged
+    assert_eq!(gov_client.balance(&applicant), 0);
+}
+
+#[test]
 fn submit_proposal_zero_amount_fails() {
     let env = Env::default();
     let (client, _, donor, _, _, _) = setup(&env);
@@ -1220,13 +1313,69 @@ fn mixed_yes_and_no_votes() {
 #[test]
 fn pause_only_admin_can_call() {
     let env = Env::default();
-    let (client, _, _, _, _, _) = setup(&env);
+    let (client, _, _, _, _, _, _admin) = setup_with_admin(&env);
 
     let attacker = Address::generate(&env);
-    env.mock_all_auths();
+    set_caller(&client, "pause", &attacker, ());
     let result = client.try_pause();
-    // Should succeed because mock_all_auths allows all
-    assert!(result.is_ok());
+    assert!(result.is_err());
+}
+
+#[test]
+fn unpause_only_admin_can_call() {
+    let env = Env::default();
+    let (client, _, _, _, _, _, admin) = setup_with_admin(&env);
+    let attacker = Address::generate(&env);
+
+    set_caller(&client, "pause", &admin, ());
+    client.pause();
+
+    set_caller(&client, "unpause", &attacker, ());
+    let result = client.try_unpause();
+    assert!(result.is_err());
+}
+
+#[test]
+fn set_quorum_only_admin_can_call() {
+    let env = Env::default();
+    let (client, _, _, _, _, _, _admin) = setup_with_admin(&env);
+    let attacker = Address::generate(&env);
+
+    set_caller(&client, "set_quorum", &attacker, (2_i128,));
+    let result = client.try_set_quorum(&2);
+    assert!(result.is_err());
+}
+
+#[test]
+fn set_approval_bps_only_admin_can_call() {
+    let env = Env::default();
+    let (client, _, _, _, _, _, _admin) = setup_with_admin(&env);
+    let attacker = Address::generate(&env);
+
+    set_caller(&client, "set_approval_bps", &attacker, (6_000_u32,));
+    let result = client.try_set_approval_bps(&6_000);
+    assert!(result.is_err());
+}
+
+#[test]
+fn set_min_lrn_to_propose_fails_for_non_admin() {
+    let env = Env::default();
+    let (client, _, _, _, _, _, _admin) = setup_with_admin(&env);
+    let attacker = Address::generate(&env);
+
+    set_caller(
+        &client,
+        "set_min_lrn_to_propose",
+        &attacker,
+        (attacker.clone(), 10_i128),
+    );
+    let result = client.try_set_min_lrn_to_propose(&attacker, &10);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::Unauthorized as u32
+        )))
+    );
 }
 
 #[test]
@@ -1785,6 +1934,32 @@ fn finalize_proposal_rejected_when_no_votes_win() {
 }
 
 #[test]
+fn finalize_proposal_fails_for_non_admin() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, _gov_client, _admin) =
+        setup_with_admin(&env);
+    let attacker = Address::generate(&env);
+
+    env.mock_all_auths();
+    let proposal_id = submit_sample_proposal(&env, &client, &donor, 250);
+    env.set_auths(&[]);
+
+    set_caller(
+        &client,
+        "finalize_proposal",
+        &attacker,
+        (attacker.clone(), proposal_id),
+    );
+    let result = client.try_finalize_proposal(&attacker, &proposal_id);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::Unauthorized as u32
+        )))
+    );
+}
+
+#[test]
 fn get_total_gov_issued_tracks_deposits() {
     let env = Env::default();
     let (client, _governance, donor, _recipient, _token_id, _gov_client, _admin) =
@@ -1941,6 +2116,22 @@ fn cancel_proposal_prevents_vote_and_execute() {
             Error::ProposalCancelled as u32
         )))
     );
+}
+
+#[test]
+fn cancel_proposal_only_admin_can_call() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, _gov_client, _admin) =
+        setup_with_admin(&env);
+    let attacker = Address::generate(&env);
+
+    env.mock_all_auths();
+    let proposal_id = submit_sample_proposal(&env, &client, &donor, 100);
+    env.set_auths(&[]);
+
+    set_caller(&client, "cancel_proposal", &attacker, (proposal_id,));
+    let result = client.try_cancel_proposal(&proposal_id);
+    assert!(result.is_err());
 }
 
 #[test]

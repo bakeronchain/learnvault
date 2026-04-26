@@ -58,12 +58,16 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
 		1,
 		Math.min(parsePositiveInt(req.query.limit, 50), 100),
 	)
-	const offset = Math.max(0, parsePositiveInt(req.query.offset, 0))
+	const pageParam = parsePositiveInt(req.query.page, 1)
+	const offsetQueryParam = parsePositiveInt(req.query.offset, -1)
+	const offset = offsetQueryParam >= 0 ? offsetQueryParam : (pageParam - 1) * limit
+	const page = offsetQueryParam >= 0 ? Math.floor(offset / limit) + 1 : pageParam
 
 	let query = `
 		SELECT id, contract, event_type, data, ledger_sequence, created_at
 		FROM events
 	`
+	let countQuery = `SELECT COUNT(*)::int as total FROM events`
 	const conditions: string[] = []
 	const params: unknown[] = []
 
@@ -83,7 +87,9 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
 	}
 
 	if (conditions.length > 0) {
-		query += ` WHERE ${conditions.join(" AND ")}`
+		const whereClause = ` WHERE ${conditions.join(" AND ")}`
+		query += whereClause
+		countQuery += whereClause
 	}
 
 	const limitParam = params.length + 1
@@ -92,12 +98,18 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
 	params.push(limit, offset)
 
 	try {
+		const countResult = await pool.query(countQuery, params.slice(0, params.length - 2))
+		const total = countResult.rows[0]?.total || 0
+
 		const result = await pool.query(query, params)
 		const data = result.rows.map((row) => ({
 			...row,
 			tx_hash: extractTxHash(row.data),
 		}))
-		res.status(200).json({ data })
+		res.status(200).json({ 
+			data,
+			pagination: { page, limit, total },
+		})
 	} catch (err) {
 		console.error("[events] Query failed:", err)
 		res.status(500).json({ error: "Failed to fetch events" })

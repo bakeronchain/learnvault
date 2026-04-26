@@ -1,0 +1,38 @@
+# Weekly smoke load test against staging. Configure repository / environment variables.
+name: Staging load tests (k6)
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Monday 06:00 UTC
+  workflow_dispatch: {}
+
+concurrency:
+  group: k6-staging
+  cancel-in-progress: true
+
+jobs:
+  k6-smoke:
+    runs-on: ubuntu-latest
+    if: vars.K6_STAGING_BASE_URL != ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up k6
+        run: |
+          curl -L https://github.com/grafana/k6/releases/download/v0.52.0/k6-v0.52.0-linux-amd64.tar.gz -o k6.tgz
+          tar -xzf k6.tgz
+          sudo mv k6-v0.52.0-linux-amd64/k6 /usr/local/bin/
+
+      - name: Run smoke
+        env:
+          BASE_URL: ${{ vars.K6_STAGING_BASE_URL }}
+          K6_JWT: ${{ secrets.K6_STAGING_JWT }}
+        run: k6 run loadtests/k6/smoke.js
+
+  # Fails the job if you want a hard gate (optional): parse k6 output or upload to Grafana Cloud
+  k6-skip:
+    if: vars.K6_STAGING_BASE_URL == ''
+    runs-on: ubuntu-latest
+    steps:
+      - run: 'echo "Set K6_STAGING_BASE_URL in repo variables to enable weekly k6."'

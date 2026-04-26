@@ -259,7 +259,9 @@ export async function rejectMilestone(
 		return
 	}
 	if (reason.length > 1000) {
-		res.status(400).json({ error: "Rejection reason must be 1000 characters or fewer" })
+		res
+			.status(400)
+			.json({ error: "Rejection reason must be 1000 characters or fewer" })
 		return
 	}
 	const sanitizedReason = sanitizeHtml(reason, {
@@ -455,9 +457,7 @@ export async function batchApproveMilestones(
 								milestoneTitle:
 									r.milestone_title ||
 									`Milestone ${r.milestone_number ?? r.milestone_id}`,
-								milestoneNumber: String(
-									r.milestone_number ?? r.milestone_id,
-								),
+								milestoneNumber: String(r.milestone_number ?? r.milestone_id),
 								reward: String(r.lrn_reward ?? 0),
 								dashboardUrl: `${process.env.FRONTEND_URL || ""}/dashboard`,
 								unsubscribeUrl: "#",
@@ -519,7 +519,9 @@ export async function batchRejectMilestones(
 			? rawReason.trim()
 			: "Batch rejection"
 	if (reasonInput.length > 1000) {
-		res.status(400).json({ error: "Rejection reason must be 1000 characters or fewer" })
+		res
+			.status(400)
+			.json({ error: "Rejection reason must be 1000 characters or fewer" })
 		return
 	}
 	const sanitizedReason = sanitizeHtml(reasonInput, {
@@ -607,9 +609,7 @@ export async function batchRejectMilestones(
 								milestoneTitle:
 									r.milestone_title ||
 									`Milestone ${r.milestone_number ?? r.milestone_id}`,
-								milestoneNumber: String(
-									r.milestone_number ?? r.milestone_id,
-								),
+								milestoneNumber: String(r.milestone_number ?? r.milestone_id),
 								rejectionReason: sanitizedReason,
 								milestoneUrl: `${process.env.FRONTEND_URL || ""}/milestones`,
 								unsubscribeUrl: "#",

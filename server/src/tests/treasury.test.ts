@@ -80,12 +80,14 @@ describe("Treasury Routes", () => {
 				],
 			})
 
-			const res = await request(buildApp()).get("/api/treasury/activity?limit=1")
+			const res = await request(buildApp()).get(
+				"/api/treasury/activity?limit=1",
+			)
 
 			expect(res.status).toBe(200)
-			expect(res.body.events).toHaveLength(1)
+			expect(res.body.data).toHaveLength(1)
 			// Sorted by date descending, so disburse should be first
-			expect(res.body.events[0].type).toBe("disburse")
+			expect(res.body.data[0].type).toBe("disburse")
 		})
 	})
 })

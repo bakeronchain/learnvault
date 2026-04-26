@@ -19,7 +19,10 @@
 
 // Must be declared before any imports so Jest hoisting works correctly.
 jest.mock("../db/index", () => ({
-	pool: { query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }), connect: jest.fn() },
+	pool: {
+		query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+		connect: jest.fn(),
+	},
 }))
 jest.mock("../db/milestone-store")
 jest.mock("../services/stellar-contract.service")
@@ -71,7 +74,6 @@ const pendingReport = {
 	status: "pending" as const,
 	resubmission_count: 0,
 	submitted_at: new Date().toISOString(),
-	resubmission_count: 0,
 	scholar_email: "scholar@example.com",
 	scholar_name: "Test Scholar",
 	course_title: "Test Course",

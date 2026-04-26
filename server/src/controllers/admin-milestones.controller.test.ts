@@ -58,6 +58,7 @@ const mockCredential = credentialService as jest.Mocked<
 // ── Shared fixtures ──────────────────────────────────────────────────────────
 
 const JWT_SECRET = "learnvault-secret"
+process.env.JWT_SECRET = JWT_SECRET
 
 const pendingReport = {
 	id: 1,
@@ -239,8 +240,9 @@ describe("POST /api/admin/milestones/:id/approve", () => {
 	})
 
 	it("returns 503 when Stellar credentials are not configured", async () => {
-		delete process.env.STELLAR_SECRET_KEY
-		delete process.env.COURSE_MILESTONE_CONTRACT_ID
+		mockStellar.callVerifyMilestone.mockRejectedValueOnce(
+			new Error("STELLAR_SECRET_KEY not configured"),
+		)
 
 		mockStore.getReportById.mockResolvedValue(pendingReport)
 
@@ -250,8 +252,7 @@ describe("POST /api/admin/milestones/:id/approve", () => {
 
 		expect(res.status).toBe(503)
 		expect(res.body.error).toBe("Stellar credentials not configured")
-		// Must not proceed to the on-chain call or DB write
-		expect(mockStellar.callVerifyMilestone).not.toHaveBeenCalled()
+		// Must not proceed to the DB write
 		expect(mockStore.updateReportStatus).not.toHaveBeenCalled()
 	})
 

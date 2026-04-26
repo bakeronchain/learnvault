@@ -7,6 +7,7 @@ import {
 	getScholarCredentials,
 	getScholarEscrowTimeouts,
 } from "../controllers/scholars.controller"
+import { validate } from "../middleware/validation.middleware"
 
 export const scholarsRouter = Router()
 

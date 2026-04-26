@@ -1,6 +1,5 @@
 import { type NextFunction, type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
-import { validateAdminApiKey } from "../services/admin-key.service"
 
 const DEFAULT_NON_PROD_JWT_SECRET = "learnvault-secret"
 
@@ -25,7 +24,7 @@ function getJwtSecret(): string | undefined {
 
 export interface AdminRequest extends Request {
 	adminAddress?: string
-	adminAuthMethod?: "jwt" | "api_key"
+	walletAddress?: string
 }
 
 /**
@@ -39,23 +38,7 @@ export function requireAdmin(
 	req: AdminRequest,
 	res: Response,
 	next: NextFunction,
-): void | Promise<void> {
-	const apiKey = req.header("x-api-key")?.trim()
-	if (apiKey) {
-		void (async () => {
-			if (await validateAdminApiKey(apiKey)) {
-				req.adminAddress = "admin-api-key"
-				req.adminAuthMethod = "api_key"
-				req.walletAddress = "admin-api-key"
-				next()
-				return
-			}
-
-			res.status(401).json({ error: "Unauthorized" })
-		})()
-		return
-	}
-
+): void {
 	const header = req.headers.authorization
 	if (!header?.startsWith("Bearer ")) {
 		res.status(401).json({ error: "Unauthorized" })
@@ -100,7 +83,6 @@ export function requireAdmin(
 	}
 
 	req.adminAddress = address
-	req.adminAuthMethod = "jwt"
 	req.walletAddress = address
 	next()
 }

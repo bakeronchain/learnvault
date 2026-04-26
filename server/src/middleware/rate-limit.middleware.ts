@@ -39,11 +39,16 @@ const createWalletKeyGenerator =
 		)
 	}
 
+const getKeyForRequest = (req: Request): string => {
+	return (req.headers["x-wallet-address"] as string) || req.ip || "unknown"
+}
+
 export const globalLimiter = rateLimit({
 	windowMs: 60 * 1000,
 	limit: 100,
 	standardHeaders: "draft-7",
 	legacyHeaders: false,
+	validate: false,
 	handler: createRateLimitHandler("Too many requests, please try again later."),
 })
 
@@ -52,6 +57,7 @@ export const uploadLimiter = rateLimit({
 	limit: 5,
 	standardHeaders: "draft-7",
 	legacyHeaders: false,
+	validate: false,
 	handler: createRateLimitHandler(
 		"Upload limit reached. You can upload 5 times per minute.",
 	),
@@ -60,12 +66,10 @@ export const uploadLimiter = rateLimit({
 export const milestoneReportLimiter = rateLimit({
 	windowMs: 60 * 60 * 1000,
 	limit: 3,
-	keyGenerator: (req: Request) =>
-		(req.headers["x-wallet-address"] as string) ??
-		ipKeyGenerator(req.ip ?? "unknown") ??
-		"unknown",
+	keyGenerator: getKeyForRequest,
 	standardHeaders: "draft-7",
 	legacyHeaders: false,
+	validate: false,
 	handler: createRateLimitHandler(
 		"Milestone report limit reached. You can submit 3 reports per hour.",
 	),
@@ -74,12 +78,10 @@ export const milestoneReportLimiter = rateLimit({
 export const proposalSubmissionLimiter = rateLimit({
 	windowMs: 24 * 60 * 60 * 1000,
 	limit: 1,
-	keyGenerator: (req: Request) =>
-		(req.headers["x-wallet-address"] as string) ??
-		ipKeyGenerator(req.ip ?? "unknown") ??
-		"unknown",
+	keyGenerator: getKeyForRequest,
 	standardHeaders: "draft-7",
 	legacyHeaders: false,
+	validate: false,
 	handler: createRateLimitHandler(
 		"Proposal limit reached. You can submit 1 proposal per day.",
 	),
@@ -90,6 +92,7 @@ export const authVerifyLimiter = rateLimit({
 	limit: 10,
 	standardHeaders: "draft-7",
 	legacyHeaders: false,
+	validate: false,
 	handler: createRateLimitHandler(
 		"Verification limit reached. You can verify up to 10 times every 15 minutes.",
 	),
@@ -101,6 +104,7 @@ export const scholarshipApplyLimiter = rateLimit({
 	keyGenerator: createWalletKeyGenerator(["applicant_address"]),
 	standardHeaders: "draft-7",
 	legacyHeaders: false,
+	validate: false,
 	handler: createRateLimitHandler(
 		"Application limit reached. You can submit 3 scholarship applications per hour.",
 	),
@@ -117,6 +121,7 @@ export const governanceVoteLimiter = rateLimit({
 	]),
 	standardHeaders: "draft-7",
 	legacyHeaders: false,
+	validate: false,
 	handler: createRateLimitHandler(
 		"Voting limit reached. You can submit 20 governance votes per hour.",
 	),
@@ -128,6 +133,7 @@ export const milestoneSubmissionLimiter = rateLimit({
 	keyGenerator: createWalletKeyGenerator(["scholarAddress", "scholar_address"]),
 	standardHeaders: "draft-7",
 	legacyHeaders: false,
+	validate: false,
 	handler: createRateLimitHandler(
 		"Milestone limit reached. You can submit 10 milestone reports per hour.",
 	),

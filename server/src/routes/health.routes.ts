@@ -10,7 +10,9 @@ import {
 	resetPoolAlerts,
 } from "../controllers/metrics.controller"
 import { pool } from "../db"
-import { stellarRpcCircuitBreaker } from "../services/stellar-contract.service"
+import { logger } from "../lib/logger"
+
+const log = logger.child({ module: "health" })
 
 export const healthRouter = Router()
 

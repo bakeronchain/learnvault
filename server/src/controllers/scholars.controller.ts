@@ -1,9 +1,11 @@
 import { type Request, type Response } from "express"
 
+import { logger } from "../lib/logger"
 import { pool } from "../db/index"
+
+const log = logger.child({ module: "scholars" })
 import { milestoneStore } from "../db/milestone-store"
 import { listEscrowTimeoutsForScholar } from "../services/escrow-timeout.service"
-import { getLeaderboardData } from "../services/leaderboard.service"
 import { stellarContractService } from "../services/stellar-contract.service"
 
 type ApiMilestoneStatus = "pending" | "verified" | "rejected"
@@ -78,7 +80,7 @@ export async function getScholarMilestones(
 				[reportIds],
 			)
 			lastDecisionByReportId = Object.fromEntries(
-				auditResult.rows.map((row) => [
+				(auditResult?.rows ?? []).map((row) => [
 					Number(row.report_id),
 					{
 						decided_at: row.decided_at,
@@ -113,7 +115,7 @@ export async function getScholarMilestones(
 
 		res.status(200).json({ milestones })
 	} catch (err) {
-		console.error("[scholars] getScholarMilestones error:", err)
+		log.error({ err }, "getScholarMilestones error")
 		res.status(500).json({ error: "Failed to fetch scholar milestones" })
 	}
 }
@@ -133,18 +135,54 @@ export async function getScholarsLeaderboard(
 	const limit = Math.min(parsePositiveInt(req.query.limit, 50), 100)
 	const search =
 		typeof req.query.search === "string" ? req.query.search.trim() : ""
-	const viewerAddress = req.walletAddress
+	const offset = (page - 1) * limit
+
+	const whereClause = search ? "WHERE address ILIKE $1" : ""
+	const whereValues: unknown[] = search ? [`%${search}%`] : []
 
 	try {
-		const data = await getLeaderboardData({
-			page,
-			limit,
-			search,
-			viewerAddress,
+		const totalResult = await pool.query(
+			`SELECT COUNT(*)::int AS total FROM scholar_balances ${whereClause}`,
+			whereValues,
+		)
+		const total = Number(totalResult.rows[0]?.total ?? 0)
+
+		const rankingsValues = [...whereValues, limit, offset]
+		const rankingsResult = await pool.query(
+			`SELECT
+				ROW_NUMBER() OVER (ORDER BY lrn_balance DESC, address ASC) AS rank,
+				address,
+				lrn_balance,
+				courses_completed
+			 FROM scholar_balances
+			 ${whereClause}
+			 ORDER BY lrn_balance DESC, address ASC
+			 LIMIT $${whereValues.length + 1}
+			 OFFSET $${whereValues.length + 2}`,
+			rankingsValues,
+		)
+
+		const currentAddress = req.walletAddress
+		let yourRank: number | null = null
+
+		if (currentAddress) {
+			const rankResult = await pool.query(
+				`SELECT rank FROM (
+					SELECT ROW_NUMBER() OVER (ORDER BY lrn_balance DESC, address ASC) AS rank, address
+					FROM scholar_balances
+				) ranked
+				WHERE address = $1`,
+				[currentAddress],
+			)
+			yourRank = rankResult.rows[0]?.rank ?? null
+		}
+
+		res.status(200).json({
+			rankings: rankingsResult.rows,
+			total,
+			your_rank: yourRank,
 		})
-		res.status(200).json(data)
-	} catch (err) {
-		console.error("[scholars] getScholarsLeaderboard error:", err)
+	} catch {
 		res.status(500).json({ error: "Failed to fetch scholars leaderboard" })
 	}
 }
@@ -200,7 +238,7 @@ export async function getScholarProfile(
 			joined_at: joinedAt,
 		})
 	} catch (error) {
-		console.error("[scholars] Error fetching scholar profile:", error)
+		log.error({ err: error }, "Error fetching scholar profile")
 		res.status(500).json({ error: "Failed to fetch scholar profile" })
 	}
 }
@@ -221,7 +259,7 @@ export async function getScholarCredentials(
 			await stellarContractService.getScholarCredentials(address)
 		res.status(200).json({ credentials })
 	} catch (error) {
-		console.error("[scholars] Error fetching scholar credentials:", error)
+		log.error({ err: error }, "Error fetching scholar credentials")
 		res.status(500).json({ error: "Failed to fetch scholar credentials" })
 	}
 }

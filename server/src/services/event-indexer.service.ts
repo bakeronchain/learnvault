@@ -6,6 +6,9 @@ import {
 	getPollingTargets,
 } from "../lib/event-config"
 import { leaderboardEmitter } from "../lib/leaderboard-emitter"
+import { logger } from "../lib/logger"
+
+const log = logger.child({ module: "indexer" })
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL! })
 
@@ -124,7 +127,7 @@ export async function indexEventsBatch(
 					}
 				}
 			} catch (err) {
-				console.error(`[indexer:${contractId}:${topic}] Error:`, err)
+				log.error({ err, contractId, topic }, "Indexer error")
 			}
 		}
 
@@ -132,9 +135,7 @@ export async function indexEventsBatch(
 		await updateIndexerState(contractId, maxLedgerForContract)
 	}
 
-	console.log(
-		`[indexer] Inserted ${inserted}, skipped ${skipped} events from ${startLedger}-${endLedger}`,
-	)
+	log.info({ inserted, startLedger, endLedger }, "Events indexed")
 }
 
 /**

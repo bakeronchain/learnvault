@@ -1,6 +1,9 @@
 import { type Request, type Response } from "express"
 import sanitizeHtml from "sanitize-html"
+import { logger } from "../lib/logger"
 import { milestoneStore } from "../db/milestone-store"
+
+const log = logger.child({ module: "milestones" })
 import { createEmailService } from "../services/email.service"
 import { markEscrowActivity } from "../services/escrow-timeout.service"
 
@@ -72,7 +75,7 @@ export async function submitMilestoneReport(
 				courseId,
 				milestoneId.toString(),
 			)
-			.catch((err) => console.error("[EmailService] Admin alert failed:", err))
+			.catch((err) => log.error({ err }, "Admin alert email failed"))
 		res.status(201).json({ data: report })
 	} catch (err) {
 		if (err instanceof Error && err.message === "DUPLICATE_REPORT") {
@@ -81,7 +84,7 @@ export async function submitMilestoneReport(
 			})
 			return
 		}
-		console.error("[milestones] submitMilestoneReport error:", err)
+		log.error({ err }, "submitMilestoneReport error")
 		res.status(500).json({ error: "Failed to submit milestone report" })
 	}
 }

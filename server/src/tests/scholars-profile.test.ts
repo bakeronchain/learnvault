@@ -42,7 +42,11 @@ import { type JwtService } from "../services/jwt.service"
 
 const testJwtService: JwtService = {
 	signWalletToken: () => "mock-token",
-	verifyWalletToken: (token: string) => ({ sub: "GSCHOLAR1" }),
+	verifyWalletToken: async (_token: string) => ({
+		sub: "GSCHOLAR1",
+		jti: "test-jti",
+	}),
+	revokeToken: async () => {},
 }
 
 const buildApp = (): express.Express => {

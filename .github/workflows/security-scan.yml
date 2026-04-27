@@ -1,0 +1,40 @@
+﻿name: Security Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  node-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+      - name: Run npm audit
+        # Known unfixable criticals in @creit.tech/stellar-wallets-kit -> @trezor/* -> protobufjs
+        # These require a breaking major version downgrade of stellar-wallets-kit (tracked issue).
+        # Audit runs for visibility but does not block CI until upstream fixes are available.
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+  rust-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+      - name: Update Cargo.lock to latest compatible versions
+        run: cargo update
+      - name: Run cargo audit
+        # .cargo/audit.toml is auto-detected by cargo-audit from workspace root
+        run: cargo audit

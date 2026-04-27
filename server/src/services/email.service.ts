@@ -1,9 +1,12 @@
 import { Resend } from "resend"
+import { logger } from "../lib/logger"
 import {
 	templates,
 	toPlainText,
 	type EmailVariables,
 } from "../templates/email-templates"
+
+const log = logger.child({ module: "email" })
 
 export interface EmailOptions {
 	to: string
@@ -31,7 +34,7 @@ export class EmailService {
 		const templateFn = templates[templateName]
 
 		if (!templateFn) {
-			console.warn(`[EmailService] Template not found: ${templateName}`)
+			log.warn({ templateName }, "Email template not found")
 			return { html: "", text: "" }
 		}
 
@@ -45,10 +48,7 @@ export class EmailService {
 		const { html, text } = await this.render(options.template, options.data)
 
 		if (!this.resendClient) {
-			console.log(
-				`[EmailService] MOCK SEND to ${options.to}: ${options.subject}`,
-			)
-			console.log(html)
+			log.debug({ subject: options.subject }, "MOCK email send")
 			return true
 		}
 
@@ -63,7 +63,7 @@ export class EmailService {
 
 			return true
 		} catch (error) {
-			console.error("[EmailService] Error sending email:", error)
+			log.error({ err: error }, "Error sending email")
 			return false
 		}
 	}
@@ -76,9 +76,7 @@ export class EmailService {
 		const adminEmails = process.env.ADMIN_EMAILS
 
 		if (!adminEmails) {
-			console.warn(
-				"[EmailService] ADMIN_EMAILS not set, skipping notification.",
-			)
+			log.warn("ADMIN_EMAILS not set, skipping admin notification")
 			return false
 		}
 
@@ -93,6 +91,42 @@ export class EmailService {
 			const success = await this.sendNotification({
 				to: email,
 				subject: `New Milestone Submission`,
+				template: "admin-alert",
+				data: {
+					body,
+					adminUrl: adminLink,
+					unsubscribeUrl: "#",
+				},
+			})
+			if (!success) allSent = false
+		}
+
+		return allSent
+	}
+
+	async sendAdminFlagNotification(
+		contentType: string,
+		contentId: number,
+		reason: string,
+		reporterAddress: string,
+	): Promise<boolean> {
+		const adminEmails = process.env.ADMIN_EMAILS
+
+		if (!adminEmails) {
+			log.warn("ADMIN_EMAILS not set, skipping admin flag notification")
+			return false
+		}
+
+		const adminLink = `${process.env.FRONTEND_URL || "http://localhost:3000"}/admin/moderation`
+		const body = `Content flagged: ${contentType} #${contentId}\nReporter: ${reporterAddress}\nReason: ${reason}\nReview: ${adminLink}`
+
+		const emails = adminEmails.split(",").map((email) => email.trim())
+
+		let allSent = true
+		for (const email of emails) {
+			const success = await this.sendNotification({
+				to: email,
+				subject: "Content Flagged",
 				template: "admin-alert",
 				data: {
 					body,

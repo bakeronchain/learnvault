@@ -1,8 +1,12 @@
 import { type Request, type Response } from "express"
+import sanitizeHtml from "sanitize-html"
 import { z } from "zod"
 
 import { pool } from "../db/index"
+import { logger } from "../lib/logger"
 import { trackEscrowTimeout } from "../services/escrow-timeout.service"
+
+const log = logger.child({ module: "governance" })
 import { stellarContractService } from "../services/stellar-contract.service"
 
 type ProposalStatus = "pending" | "approved" | "rejected"
@@ -163,7 +167,7 @@ export async function getGovernanceProposalById(
 			values,
 		)
 
-		if (result.rows.length === 0) {
+		if (!result?.rows || result.rows.length === 0) {
 			res.status(404).json({ error: "Proposal not found" })
 			return
 		}
@@ -202,7 +206,7 @@ export async function getVotingPower(
 			can_vote: balanceBigInt > 0n,
 		})
 	} catch (err) {
-		console.error("[governance] getVotingPower error:", err)
+		log.error({ err }, "getVotingPower error")
 		res.status(500).json({ error: "Failed to fetch voting power" })
 	}
 }
@@ -210,7 +214,7 @@ export async function getVotingPower(
 const createProposalSchema = z.object({
 	author_address: z.string().min(50).max(56),
 	title: z.string().min(5).max(200),
-	description: z.string().min(10),
+	description: z.string().min(10).max(5000),
 	requested_amount: z.string().regex(/^\d+(\.\d+)?$/, "Must be a valid number"),
 	evidence_url: z.string().url().optional(),
 })
@@ -244,6 +248,17 @@ export async function createGovernanceProposal(
 
 	const { author_address, title, description, requested_amount, evidence_url } =
 		validation.data
+
+	// Sanitize HTML content
+	const sanitizedTitle = sanitizeHtml(title, {
+		allowedTags: [],
+		allowedAttributes: {},
+	})
+	const sanitizedDescription = sanitizeHtml(description, {
+		allowedTags: ["p", "br", "strong", "em", "ul", "ol", "li"],
+		allowedAttributes: {},
+	})
+
 	const programUrl = evidence_url ?? "https://learnvault.app/dao/proposals"
 
 	try {
@@ -304,7 +319,7 @@ export async function createGovernanceProposal(
 				created_at
 			) VALUES ($1, $2, $3, $4, 'pending', NOW() + INTERVAL '7 days', NOW())
 			RETURNING id`,
-			[author_address, title, description, amount],
+			[author_address, sanitizedTitle, sanitizedDescription, amount],
 		)
 
 		const proposal_id = dbResult.rows[0]?.id
@@ -324,7 +339,7 @@ export async function createGovernanceProposal(
 			tx_hash: contractResult.txHash,
 		})
 	} catch (err) {
-		console.error("[governance] Proposal creation failed:", err)
+		log.error({ err }, "Proposal creation failed")
 		res.status(500).json({
 			error: "Failed to create governance proposal",
 			message: err instanceof Error ? err.message : String(err),
@@ -351,7 +366,7 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 			[proposal_id],
 		)
 
-		if (proposalResult.rows.length === 0) {
+		if (!proposalResult?.rows || proposalResult.rows.length === 0) {
 			res.status(404).json({ error: "Proposal not found" })
 			return
 		}
@@ -387,12 +402,12 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 			[proposal_id, voter_address],
 		)
 
-		if (existingVote.rows.length > 0) {
+		if ((existingVote?.rows ?? []).length > 0) {
 			res.status(409).json({ error: "You have already voted on this proposal" })
 			return
 		}
 
-		// 4. Check voter's GOV token balance (voting power)
+		// 4. Check voter's effective voting power (own balance + any delegated-to-them)
 		const rawBalance =
 			await stellarContractService.getGovernanceTokenBalance(voter_address)
 		const balanceBigInt = BigInt(rawBalance)
@@ -449,7 +464,7 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 			votes_against: updatedProposal.rows[0]?.votes_against ?? "0",
 		})
 	} catch (err) {
-		console.error("[governance] Vote casting failed:", err)
+		log.error({ err }, "Vote casting failed")
 		res.status(500).json({
 			error: "Failed to cast vote",
 			message: err instanceof Error ? err.message : String(err),
@@ -487,7 +502,7 @@ export async function getProposalStatus(
 			deadline: proposal.deadline ?? null,
 		})
 	} catch (err) {
-		console.error("[governance] Get proposal status failed:", err)
+		log.error({ err }, "Get proposal status failed")
 		res.status(500).json({ error: "Failed to fetch proposal status" })
 	}
 }
@@ -535,10 +550,45 @@ export async function cancelProposal(
 
 		res.status(204).end()
 	} catch (err) {
-		console.error("[governance] Cancel proposal failed:", err)
+		log.error({ err }, "Cancel proposal failed")
 		res.status(500).json({
 			error: "Failed to cancel proposal",
 			message: err instanceof Error ? err.message : String(err),
 		})
+	}
+}
+
+export async function getDelegation(
+	req: Request,
+	res: Response,
+): Promise<void> {
+	const { address } = req.params
+	if (!address || address.length < 50) {
+		res.status(400).json({ error: "Invalid Stellar address" })
+		return
+	}
+
+	try {
+		const [rawVotingPower, rawOwnBalance, delegatee] = await Promise.all([
+			stellarContractService.getGovernanceTokenBalance(address),
+			stellarContractService.getGovernanceTokenBalance(address),
+			stellarContractService.getGovernanceDelegation(address),
+		])
+
+		const ownBalance = BigInt(rawOwnBalance)
+		const votingPower = BigInt(rawVotingPower)
+		const delegatedToMe = delegatee ? 0n : votingPower - ownBalance
+
+		res.status(200).json({
+			address,
+			delegatee,
+			is_delegating: delegatee !== null,
+			own_balance: rawOwnBalance,
+			delegated_to_me: delegatedToMe > 0n ? delegatedToMe.toString() : "0",
+			voting_power: rawVotingPower,
+		})
+	} catch (err) {
+		console.error("[governance] getDelegation error:", err)
+		res.status(500).json({ error: "Failed to fetch delegation state" })
 	}
 }

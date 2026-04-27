@@ -2,7 +2,10 @@ import { type Request, type Response } from "express"
 import { z } from "zod"
 
 import { pool } from "../db/index"
+import { logger } from "../lib/logger"
 import { trackEscrowTimeout } from "../services/escrow-timeout.service"
+
+const log = logger.child({ module: "scholarships" })
 import { stellarContractService } from "../services/stellar-contract.service"
 
 const applySchema = z.object({
@@ -118,7 +121,7 @@ export async function applyForScholarship(
 			simulated: result.simulated,
 		})
 	} catch (err) {
-		console.error("[scholarships] Application failed:", err)
+		log.error({ err }, "Application failed")
 		res.status(500).json({
 			error: "Failed to submit scholarship application",
 			message: err instanceof Error ? err.message : String(err),

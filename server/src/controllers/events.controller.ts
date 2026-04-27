@@ -1,6 +1,9 @@
 import { type Request, type Response } from "express"
 import { pool } from "../db/index"
 import { socialStore } from "../db/social-store"
+import { logger } from "../lib/logger"
+
+const log = logger.child({ module: "events" })
 
 function parsePositiveInt(value: unknown, fallback: number): number {
 	if (typeof value !== "string") return fallback
@@ -114,7 +117,7 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
 		}))
 		res.status(200).json({ data })
 	} catch (err) {
-		console.error("[events] Query failed:", err)
+		log.error({ err }, "Query failed")
 		res.status(500).json({ error: "Failed to fetch events" })
 	}
 }

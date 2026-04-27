@@ -3,7 +3,35 @@ name: Build Project and Run Tests
 on:
   push:
     branches: ["main"]
+    paths:
+      - "src/**"
+      - "public/**"
+      - "e2e/**"
+      - "packages/**"
+      - "contracts/**"
+      - "scripts/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "playwright.config.ts"
+      - "vite.config.ts"
+      - "Cargo.toml"
+      - "Cargo.lock"
   pull_request:
+    paths:
+      - "src/**"
+      - "public/**"
+      - "e2e/**"
+      - "packages/**"
+      - "contracts/**"
+      - "scripts/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "playwright.config.ts"
+      - "vite.config.ts"
+      - "Cargo.toml"
+      - "Cargo.lock"
 
 env:
   CARGO_TERM_COLOR: always

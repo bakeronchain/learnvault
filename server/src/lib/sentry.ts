@@ -138,9 +138,9 @@ export function initSentry(config: SentryConfig): void {
 		beforeSend: (event: Sentry.ErrorEvent) => {
 			return scrubPII(event as unknown as Sentry.Event) as Sentry.ErrorEvent | null
 		},
-		beforeSendTransaction: (transaction) => {
+		beforeSendTransaction: (transaction: any) => {
 			// Also scrub PII from transaction events
-			return scrubPII(transaction as unknown as Sentry.Event) as Sentry.Event | null
+			return scrubPII(transaction as Sentry.Event) as typeof transaction | null
 		},
 		ignoreErrors: [
 			// Ignore common non-actionable errors

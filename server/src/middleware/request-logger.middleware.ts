@@ -1,8 +1,7 @@
 import { randomUUID } from "crypto"
 import { type NextFunction, type Request, type Response } from "express"
-import { runWithRequestContext } from "../lib/request-context"
-
 import { logger as rootLogger } from "../lib/logger"
+import { runWithRequestContext } from "../lib/request-context"
 
 // Minimal interface so tests can inject a spy without depending on pino internals.
 type Logger = {
@@ -36,7 +35,7 @@ export function createRequestLogger(options: RequestLoggerOptions = {}) {
 			req.requestId = requestId
 			res.setHeader("X-Request-ID", requestId)
 
-			res.on("finish", () => {
+			res.once("finish", () => {
 				if (!enabled) {
 					return
 				}

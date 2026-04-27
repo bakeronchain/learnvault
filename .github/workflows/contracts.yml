@@ -4,6 +4,10 @@ on:
   pull_request:
     branches:
       - main
+    paths:
+      - "contracts/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
 
 jobs:
   contract-tests:

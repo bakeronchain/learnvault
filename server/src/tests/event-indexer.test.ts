@@ -82,25 +82,30 @@ describe("Event Indexer & Poller Integration Tests", () => {
 			mockGetEvents.mockImplementationOnce(async () => ({
 				events: [],
 			}))
+			mockQuery
+				.mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 1 }] })
+				.mockResolvedValueOnce({ rowCount: 0, rows: [] })
 
 			await indexEventsBatch(100, 150)
 
 			expect(mockGetEvents).toHaveBeenCalledTimes(2) // Once per topic
 
-			// Check idempotency check was called
-			expect(mockQuery).toHaveBeenCalledWith(
-				"SELECT 1 FROM events WHERE contract = $1 AND ledger_sequence = $2",
-				["C123", 105],
-			)
-
-			// Check insertion query was called
+			// Check insertion query was called for the event payload
 			expect(mockQuery).toHaveBeenCalledWith(
 				expect.stringContaining("INSERT INTO events"),
 				[
 					"C123",
 					"LearnToken_Mint",
-					{ id: "ev1", type: "contract", ledger: "105" },
+					{
+						id: "ev1",
+						type: "contract",
+						ledger: "105",
+						topic: undefined,
+						value: undefined,
+					},
 					105,
+					undefined,
+					undefined,
 				],
 			)
 
@@ -117,19 +122,15 @@ describe("Event Indexer & Poller Integration Tests", () => {
 			}))
 			mockGetEvents.mockImplementationOnce(async () => ({ events: [] }))
 
-			// Simulate idempotency check finding the record
-			mockQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{}] })
+			// Simulate ON CONFLICT DO NOTHING for the event insert
+			mockQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] })
 
 			await indexEventsBatch(100, 150)
 
-			// The insert query should NOT have been called
-			// mockQuery was called once for the SELECT 1 check. Since we return rowCount 1, INSERT is skipped.
-			// However, there's a second topic to process which will also check for its events.
-			// Let's just verify that INSERT INTO was never called
-			const insertCalls = mockQuery.mock.calls.filter((call) =>
-				call[0].includes("INSERT INTO"),
+			const eventInsertCalls = mockQuery.mock.calls.filter((call) =>
+				call[0].includes("INSERT INTO events"),
 			)
-			expect(insertCalls).toHaveLength(0)
+			expect(eventInsertCalls).toHaveLength(1)
 
 			expect(leaderboardEmitter.emitUpdate).not.toHaveBeenCalled()
 		})
@@ -137,38 +138,37 @@ describe("Event Indexer & Poller Integration Tests", () => {
 
 	describe("Network Failures", () => {
 		it("should handle rpc errors gracefully without crashing", async () => {
-			const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {})
-
 			// Simulate RPC error
 			mockGetEvents.mockRejectedValueOnce(new Error("RPC Timeout"))
 
 			// Should not throw
 			await indexEventsBatch(100, 150)
-
-			expect(errorSpy).toHaveBeenCalledWith(
-				"[indexer:C123:LearnToken_Mint] Error:",
-				expect.any(Error),
+			expect(mockQuery).toHaveBeenCalledWith(
+				expect.stringContaining("INSERT INTO indexer_state"),
+				["C123", 100],
 			)
-
-			errorSpy.mockRestore()
 		})
 	})
 
 	describe("Restart Recovery", () => {
 		it("should get the last indexed ledger from the database", async () => {
-			mockQuery.mockResolvedValueOnce({ rows: [{ max: "205" }] })
+			mockQuery.mockResolvedValueOnce({
+				rows: [{ last_processed_ledger: "205" }],
+			})
 
 			const ledger = await getLastIndexedLedger("C123")
 
 			expect(mockQuery).toHaveBeenCalledWith(
-				"SELECT MAX(ledger_sequence) FROM events WHERE contract = $1",
+				"SELECT last_processed_ledger FROM indexer_state WHERE contract = $1",
 				["C123"],
 			)
-			expect(ledger).toBe("205")
+			expect(ledger).toBe(205)
 		})
 
 		it("should return the starting ledger from config if no events exist", async () => {
-			mockQuery.mockResolvedValueOnce({ rows: [{ max: null }] })
+			mockQuery
+				.mockResolvedValueOnce({ rows: [] })
+				.mockResolvedValueOnce({ rows: [{ max: null }] })
 
 			const ledger = await getLastIndexedLedger("C123")
 
@@ -180,8 +180,8 @@ describe("Event Indexer & Poller Integration Tests", () => {
 		it("should start poller and fetch batches correctly", async () => {
 			const logSpy = jest.spyOn(console, "log").mockImplementation(() => {})
 
-			mockGetLatestLedger.mockResolvedValueOnce(100) // Initial latest
-			mockGetLatestLedger.mockResolvedValueOnce(200) // Next latest
+			mockGetLatestLedger.mockResolvedValueOnce({ sequence: "100" }) // Initial latest
+			mockGetLatestLedger.mockResolvedValueOnce({ sequence: "200" }) // Next latest
 
 			jest.useFakeTimers()
 

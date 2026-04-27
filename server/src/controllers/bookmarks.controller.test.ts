@@ -26,14 +26,17 @@ const COURSE_A = "stellar-basics"
 const COURSE_B = "soroban-advanced"
 
 const makeToken = (address: string) =>
-	`Bearer ${jwt.sign({ sub: address }, TEST_SECRET)}`
+	`Bearer ${jwt.sign({ sub: address, jti: "test-jti" }, TEST_SECRET)}`
 
 const testJwtService = {
 	signWalletToken: (address: string) => jwt.sign({ sub: address }, TEST_SECRET),
 	verifyWalletToken: async (token: string) => {
-		const decoded = jwt.verify(token, TEST_SECRET) as { sub?: string }
+		const decoded = jwt.verify(token, TEST_SECRET) as {
+			sub?: string
+			jti?: string
+		}
 		if (!decoded.sub) throw new Error("Invalid token")
-		return { sub: decoded.sub }
+		return { sub: decoded.sub, jti: decoded.jti ?? "test-jti" }
 	},
 	revokeToken: async (_token: string) => {},
 }

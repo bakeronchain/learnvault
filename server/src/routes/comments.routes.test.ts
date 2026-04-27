@@ -31,7 +31,7 @@ const PROPOSAL_AUTHOR = "GPROP_AUTHOR_ADDRESS0"
 
 /** Generate a test Bearer token for a given address */
 const makeToken = (address: string) =>
-	`Bearer ${jwt.sign({ sub: address }, TEST_SECRET)}`
+	`Bearer ${jwt.sign({ sub: address, jti: "test-jti" }, TEST_SECRET)}`
 
 const testJwtService = {
 	signWalletToken: (address: string) => jwt.sign({ sub: address }, TEST_SECRET),
@@ -39,10 +39,11 @@ const testJwtService = {
 		const decoded = jwt.verify(token, TEST_SECRET) as {
 			sub?: string
 			address?: string
+			jti?: string
 		}
 		const sub = decoded.sub ?? decoded.address ?? ""
 		if (!sub) throw new Error("Invalid token")
-		return { sub }
+		return { sub, jti: decoded.jti ?? "test-jti" }
 	},
 	revokeToken: jest.fn().mockResolvedValue(undefined),
 }

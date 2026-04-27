@@ -10,7 +10,6 @@ export const listForumThreads = async (
 		const idOrSlug = req.params.idOrSlug
 		const isNumericId = /^\d+$/.test(idOrSlug)
 
-		// First try to find the course
 		const courseQuery = isNumericId
 			? `SELECT id FROM courses WHERE id = $1 AND published_at IS NOT NULL`
 			: `SELECT id, slug FROM courses WHERE slug = $1 AND published_at IS NOT NULL`
@@ -19,13 +18,12 @@ export const listForumThreads = async (
 			isNumericId ? Number.parseInt(idOrSlug, 10) : idOrSlug,
 		])
 
-		if ((courseResult as any).rowCount === 0) {
+		if (courseResult.rows.length === 0) {
 			res.status(404).json({ error: "Course not found" })
 			return
 		}
 
-		// List threads
-		const course_id = isNumericId ? idOrSlug : courseResult.rows[0].slug
+		const courseId = isNumericId ? idOrSlug : courseResult.rows[0].slug
 
 		const threadsResult = await pool.query(
 			`SELECT t.id, t.course_id, t.author_address, t.title, t.content, t.created_at, t.updated_at,
@@ -33,7 +31,7 @@ export const listForumThreads = async (
 			 FROM forum_threads t
 			 WHERE t.course_id = $1
 			 ORDER BY t.created_at DESC`,
-			[course_id],
+			[courseId],
 		)
 
 		res.status(200).json({ data: threadsResult.rows })
@@ -65,12 +63,12 @@ export const createForumThread = async (
 			[isNumericId ? Number.parseInt(idOrSlug, 10) : idOrSlug],
 		)
 
-		if ((courseResult as any).rowCount === 0) {
+		if (courseResult.rows.length === 0) {
 			res.status(404).json({ error: "Course not found" })
 			return
 		}
 
-		const course_id = courseResult.rows[0].slug
+		const courseId = courseResult.rows[0].slug
 		const { title, content } = req.body
 
 		if (!title || typeof title !== "string" || title.trim().length === 0) {
@@ -78,11 +76,7 @@ export const createForumThread = async (
 			return
 		}
 
-		if (
-			!content ||
-			typeof content !== "string" ||
-			content.trim().length === 0
-		) {
+		if (!content || typeof content !== "string" || content.trim().length === 0) {
 			res.status(400).json({ error: "content is required" })
 			return
 		}
@@ -91,7 +85,7 @@ export const createForumThread = async (
 			`INSERT INTO forum_threads (course_id, author_address, title, content)
 			 VALUES ($1, $2, $3, $4)
 			 RETURNING *`,
-			[course_id, authorAddress, title.trim(), content.trim()],
+			[courseId, authorAddress, title.trim(), content.trim()],
 		)
 
 		res.status(201).json(result.rows[0])
@@ -117,7 +111,7 @@ export const getForumThread = async (
 			[threadId],
 		)
 
-		if ((threadResult as any).rowCount === 0) {
+		if (threadResult.rows.length === 0) {
 			res.status(404).json({ error: "Thread not found" })
 			return
 		}
@@ -157,11 +151,7 @@ export const replyToForumThread = async (
 
 		const { content } = req.body
 
-		if (
-			!content ||
-			typeof content !== "string" ||
-			content.trim().length === 0
-		) {
+		if (!content || typeof content !== "string" || content.trim().length === 0) {
 			res.status(400).json({ error: "content is required" })
 			return
 		}
@@ -171,7 +161,7 @@ export const replyToForumThread = async (
 			[threadId],
 		)
 
-		if ((threadResult as any).rowCount === 0) {
+		if (threadResult.rows.length === 0) {
 			res.status(404).json({ error: "Thread not found" })
 			return
 		}
@@ -185,29 +175,27 @@ export const replyToForumThread = async (
 			[threadId, authorAddress, content.trim()],
 		)
 
-		// Email notification using mock mechanism if email isn't directly known or mapped
-		// Real implementation would look up scholar_email by author_address but we don't have a reliable email mapping table currently
 		try {
-			// Wait, we can fetch email if it was stored, but since it's not uniformly stored,
-			// we will simulate the EmailService call to log it.
 			const emailService = createEmailService(process.env.RESEND_API_KEY || "")
 			console.log(
 				`[Forum] Sending reply notification to thread owner: ${thread.author_address}`,
 			)
 
-			// For now, let's use a dummy email based on wallet to simulate since we don't store actual emails universally
-			const targetEmail = `${thread.author_address}@example.com` // Mock email
+			const targetEmail = `${thread.author_address}@example.com`
 
 			await emailService.sendNotification({
 				to: targetEmail,
 				subject: "New Reply to your Thread",
 				template: "forum-reply",
 				data: {
-					name: thread.author_address.slice(0, 6) + "...", // Short wallet as name
+					name: `${thread.author_address.slice(0, 6)}...`,
 					threadTitle: thread.title,
 					replyPreview:
-						content.trim().slice(0, 100) + (content.length > 100 ? "..." : ""),
-					threadUrl: `${process.env.FRONTEND_URL || "http://localhost:3000"}/courses/${thread.course_id}?tab=forum&thread=${thread.id}`,
+						content.trim().slice(0, 100) +
+						(content.length > 100 ? "..." : ""),
+					threadUrl: `${
+						process.env.FRONTEND_URL || "http://localhost:3000"
+					}/courses/${thread.course_id}?tab=forum&thread=${thread.id}`,
 				},
 			})
 		} catch (emailErr) {

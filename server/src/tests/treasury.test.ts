@@ -85,9 +85,9 @@ describe("Treasury Routes", () => {
 			)
 
 			expect(res.status).toBe(200)
-			expect(res.body.data).toHaveLength(1)
+			expect(res.body.events).toHaveLength(1)
 			// Sorted by date descending, so disburse should be first
-			expect(res.body.data[0].type).toBe("disburse")
+			expect(res.body.events[0].type).toBe("disburse")
 		})
 	})
 })

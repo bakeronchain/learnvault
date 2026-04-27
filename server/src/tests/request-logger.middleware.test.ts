@@ -49,20 +49,22 @@ describe("requestLogger middleware", () => {
 		const previousNodeEnv = process.env.NODE_ENV
 		process.env.NODE_ENV = "test"
 
-		const info = jest.fn()
-		const app = express()
+		try {
+			const info = jest.fn()
+			const app = express()
 
-		app.use(createRequestLogger({ logger: { info } }))
-		app.get("/api/quiet", (_req, res) => {
-			res.sendStatus(204)
-		})
+			app.use(createRequestLogger({ logger: { info } }))
+			app.get("/api/quiet", (_req, res) => {
+				res.sendStatus(204)
+			})
 
-		const response = await request(app).get("/api/quiet")
+			const response = await request(app).get("/api/quiet")
 
-		expect(response.status).toBe(204)
-		expect(response.headers["x-request-id"]).toBeTruthy()
-		expect(info).not.toHaveBeenCalled()
-
-		process.env.NODE_ENV = previousNodeEnv
+			expect(response.status).toBe(204)
+			expect(response.headers["x-request-id"]).toBeTruthy()
+			expect(info).not.toHaveBeenCalled()
+		} finally {
+			process.env.NODE_ENV = previousNodeEnv
+		}
 	})
 })

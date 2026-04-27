@@ -17,6 +17,9 @@ export interface MilestoneReport {
 	milestone_title?: string
 	milestone_number?: number
 	lrn_reward?: number
+	/** Counts from milestone_peer_reviews (informational for admins). */
+	peer_approval_count?: number
+	peer_rejection_count?: number
 }
 
 export interface MilestoneAuditEntry {
@@ -208,13 +211,14 @@ export const milestoneStore = {
 		const total = Number(totalResult.rows[0]?.total ?? 0)
 		const offset = (page - 1) * pageSize
 		const rowValues = [...values, pageSize, offset]
+		const limitParam = values.length + 1
+		const offsetParam = values.length + 2
 		const dataResult = await pool.query(
 			`SELECT *
 			 FROM milestone_reports
 			 ${whereClause}
 			 ORDER BY submitted_at DESC
-			 LIMIT $${rowValues.length - 1}
-			 OFFSET $${rowValues.length}`,
+			 LIMIT $${limitParam} OFFSET $${offsetParam}`,
 			rowValues,
 		)
 

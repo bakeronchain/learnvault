@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express"
-import { type z } from "zod"
+import { z } from "zod"
 
 import {
 	isValidStellarPublicKey,

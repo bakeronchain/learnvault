@@ -51,9 +51,14 @@ export const getDonorImpact = async (
 
 		// Fetch events from the ScholarshipTreasury contract
 		const response = await server.getEvents({
-			filters: [{ contract: SCHOLARSHIP_TREASURY_CONTRACT_ID }],
-			startLedger: process.env.STARTING_LEDGER || "460000000",
-			pagination: { maxPageSize: 1000 },
+			filters: [
+				{
+					type: "contract",
+					contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID],
+				},
+			],
+			startLedger: Number(process.env.STARTING_LEDGER ?? 460000000),
+			limit: 1000,
 		})
 
 		let totalDonated = BigInt(0)
@@ -61,29 +66,27 @@ export const getDonorImpact = async (
 		const scholarToMilestones = new Map<string, { completed: number; total: number }>()
 
 		// Parse events to calculate donor-specific impact
-		for (const page of response.events) {
-			for (const event of page) {
-				const { scValToNative } = await import("@stellar/stellar-sdk")
-				const eventData = scValToNative(event.value)
+		for (const event of response.events) {
+			const { scValToNative } = await import("@stellar/stellar-sdk")
+			const eventData = scValToNative(event.value)
 
-				// Identify event type from topics
-				const topics = event.topic.map((t: any) => scValToNative(t))
-				const eventType = topics[0]
+			// Identify event type from topics
+			const topics = event.topic.map((topic) => scValToNative(topic))
+			const eventType = topics[0]
 
-				if (eventType === "deposit" || eventType === "Deposit") {
-					const donor = eventData.donor
-					if (donor && donor.toLowerCase() === address.toLowerCase()) {
-						const amount = BigInt(eventData.amount || 0)
-						totalDonated += amount
-					}
-				} else if (eventType === "disburse" || eventType === "Disburse") {
-					const scholar = eventData.scholar
-					if (scholar) {
-						fundedScholars.add(scholar)
-						// Initialize milestone tracking for this scholar if not already done
-						if (!scholarToMilestones.has(scholar)) {
-							scholarToMilestones.set(scholar, { completed: 0, total: 0 })
-						}
+			if (eventType === "deposit" || eventType === "Deposit") {
+				const donor = eventData.donor
+				if (donor && donor.toLowerCase() === address.toLowerCase()) {
+					const amount = BigInt(eventData.amount || 0)
+					totalDonated += amount
+				}
+			} else if (eventType === "disburse" || eventType === "Disburse") {
+				const scholar = eventData.scholar
+				if (scholar) {
+					fundedScholars.add(scholar)
+					// Initialize milestone tracking for this scholar if not already done
+					if (!scholarToMilestones.has(scholar)) {
+						scholarToMilestones.set(scholar, { completed: 0, total: 0 })
 					}
 				}
 			}
@@ -145,25 +148,28 @@ export const getDonorImpact = async (
  * Helper function to fetch milestone data for a scholar
  */
 async function fetchScholarMilestones(
-	scholarAddress: string
+	scholarAddress: string,
 ): Promise<{ completed: number; total: number }> {
 	try {
 		// Fetch all milestone reports for this scholar
 		const reports = await milestoneStore.getReportsForScholar(scholarAddress, {})
-		
+
 		// Count completed vs total milestones
 		let completed = 0
 		const total = reports.length
-		
+
 		for (const report of reports) {
-			if (report.status === 'approved') {
+			if (report.status === "approved") {
 				completed++
 			}
 		}
-		
+
 		return { completed, total }
 	} catch (error) {
-		console.error(`[donors] Failed to fetch milestones for scholar ${scholarAddress}:`, error)
+		console.error(
+			`[donors] Failed to fetch milestones for scholar ${scholarAddress}:`,
+			error,
+		)
 		// Return zero values if we can't fetch milestone data
 		return { completed: 0, total: 0 }
 	}

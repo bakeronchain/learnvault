@@ -2,6 +2,15 @@ name: E2E (Playwright)
 
 on:
   pull_request:
+    paths:
+      - "src/**"
+      - "public/**"
+      - "e2e/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "playwright.config.ts"
+      - "vite.config.ts"
 
 jobs:
   e2e:

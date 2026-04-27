@@ -302,14 +302,13 @@ export const bookmarkCourseIdParamSchema = z
 	})
 	.strict()
 
-export const bookmarkBodySchema = z
+export const userProfileSchema = z
 	.object({
-		course_id: requiredString("course_id", 100),
-	})
-	.strict()
-
-export const bookmarkCourseIdParamSchema = z
-	.object({
-		courseId: requiredString("courseId", 100),
+		display_name: z.string().trim().min(2).max(50).optional(),
+		bio: z.string().trim().max(1000).optional(),
+		avatar_url: z.string().trim().url().max(2048).optional(),
+		twitter: z.string().trim().max(255).optional(),
+		github: z.string().trim().max(255).optional(),
+		website: z.string().trim().url().max(2048).optional(),
 	})
 	.strict()

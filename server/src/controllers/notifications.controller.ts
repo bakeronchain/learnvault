@@ -62,7 +62,7 @@ export async function markAllRead(
 			[address],
 		)
 
-		res.status(200).json({ updated: result.rowCount ?? 0 })
+		res.status(200).json({ updated: result.rows.length })
 	} catch (err) {
 		console.error("[notifications] markAllRead error:", err)
 		res.status(500).json({ error: "Failed to mark notifications as read" })
@@ -98,7 +98,7 @@ export async function markOneRead(
 			[id, address],
 		)
 
-		if ((result.rowCount ?? 0) === 0) {
+		if (result.rows.length === 0) {
 			res.status(404).json({ error: "Notification not found" })
 			return
 		}

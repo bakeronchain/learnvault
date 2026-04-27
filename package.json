@@ -23,7 +23,9 @@
     "test:frontend": "vitest run",
     "test:contracts": "cargo test --workspace",
     "test:watch": "cargo watch -x 'test --workspace'",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "i18n:scan": "npx i18next-scanner --config ./i18next-scanner.config.js",
+    "i18n:pseudo": "node scripts/generate-pseudo-locale.mjs"
   },
   "workspaces": [
     "packages/*"
@@ -83,7 +85,8 @@
     "vite": "^7.3.1",
     "vite-plugin-node-polyfills": "^0.25.0",
     "vite-plugin-wasm": "^3.5.0",
-    "vitest": "^4.1.1"
+    "vitest": "^4.1.1",
+    "i18next-scanner": "^4.3.1"
   },
   "lint-staged": {
     "**/*": [

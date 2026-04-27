@@ -34,6 +34,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: i18n scan
+        run: npm run i18n:scan
+
       - name: Test
         run: npm run test:frontend
 

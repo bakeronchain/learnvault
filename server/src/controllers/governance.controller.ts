@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express"
-import { z } from "zod"
 import sanitizeHtml from "sanitize-html"
+import { z } from "zod"
 
 import { logger } from "../lib/logger"
 import { pool } from "../db/index"
@@ -134,8 +134,10 @@ export async function getGovernanceProposals(
 		)
 
 		res.status(200).json({
-			data: proposalsResult.rows,
-			pagination: { page, limit, total },
+			proposals: proposalsResult.rows,
+			total,
+			page,
+			totalPages: Math.ceil(total / limit),
 		})
 	} catch {
 		res.status(500).json({ error: "Failed to fetch governance proposals" })
@@ -165,7 +167,7 @@ export async function getGovernanceProposalById(
 			values,
 		)
 
-		if (result.rows.length === 0) {
+		if (!result?.rows || result.rows.length === 0) {
 			res.status(404).json({ error: "Proposal not found" })
 			return
 		}
@@ -191,7 +193,7 @@ export async function getVotingPower(
 
 	try {
 		const rawBalance =
-			await stellarContractService.getGovernanceVotingPower(address)
+			await stellarContractService.getGovernanceTokenBalance(address)
 		const balanceBigInt = BigInt(rawBalance)
 		const whole = balanceBigInt / GOV_DIVISOR
 		const frac = balanceBigInt % GOV_DIVISOR
@@ -246,17 +248,17 @@ export async function createGovernanceProposal(
 
 	const { author_address, title, description, requested_amount, evidence_url } =
 		validation.data
-	
+
 	// Sanitize HTML content
 	const sanitizedTitle = sanitizeHtml(title, {
 		allowedTags: [],
 		allowedAttributes: {},
 	})
 	const sanitizedDescription = sanitizeHtml(description, {
-		allowedTags: ['p', 'br', 'strong', 'em', 'ul', 'ol', 'li'],
+		allowedTags: ["p", "br", "strong", "em", "ul", "ol", "li"],
 		allowedAttributes: {},
 	})
-	
+
 	const programUrl = evidence_url ?? "https://learnvault.app/dao/proposals"
 
 	try {
@@ -364,7 +366,7 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 			[proposal_id],
 		)
 
-		if (proposalResult.rows.length === 0) {
+		if (!proposalResult?.rows || proposalResult.rows.length === 0) {
 			res.status(404).json({ error: "Proposal not found" })
 			return
 		}
@@ -400,14 +402,14 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 			[proposal_id, voter_address],
 		)
 
-		if (existingVote.rows.length > 0) {
+		if ((existingVote?.rows ?? []).length > 0) {
 			res.status(409).json({ error: "You have already voted on this proposal" })
 			return
 		}
 
 		// 4. Check voter's effective voting power (own balance + any delegated-to-them)
 		const rawBalance =
-			await stellarContractService.getGovernanceVotingPower(voter_address)
+			await stellarContractService.getGovernanceTokenBalance(voter_address)
 		const balanceBigInt = BigInt(rawBalance)
 
 		if (balanceBigInt <= 0n) {
@@ -568,7 +570,7 @@ export async function getDelegation(
 
 	try {
 		const [rawVotingPower, rawOwnBalance, delegatee] = await Promise.all([
-			stellarContractService.getGovernanceVotingPower(address),
+			stellarContractService.getGovernanceTokenBalance(address),
 			stellarContractService.getGovernanceTokenBalance(address),
 			stellarContractService.getGovernanceDelegation(address),
 		])

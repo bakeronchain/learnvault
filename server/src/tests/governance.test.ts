@@ -26,7 +26,6 @@ jest.mock("../services/stellar-contract.service", () => ({
 		}),
 		getGovernanceTokenBalance: jest.fn().mockResolvedValue("1250000000"),
 		getGovernanceVotingPower: jest.fn().mockResolvedValue("1250000000"),
-		getGovernanceDelegation: jest.fn().mockResolvedValue("0"),
 		castVote: jest.fn().mockResolvedValue({
 			txHash: "mock_vote_tx_hash",
 			simulated: false,
@@ -70,7 +69,11 @@ import { governanceRouter } from "../routes/governance.routes"
 
 const app = express()
 app.use(express.json())
-app.use(require("../middleware/request-logger.middleware").createRequestLogger({ enabled: false }))
+app.use(
+	require("../middleware/request-logger.middleware").createRequestLogger({
+		enabled: false,
+	}),
+)
 app.use("/api", governanceRouter)
 
 const JWT_SECRET = "learnvault-secret"
@@ -195,7 +198,7 @@ describe("GET /api/governance/voting-power/:address", () => {
 		const { stellarContractService } =
 			await import("../services/stellar-contract.service")
 		;(
-			stellarContractService.getGovernanceVotingPower as jest.Mock
+			stellarContractService.getGovernanceTokenBalance as jest.Mock
 		).mockResolvedValueOnce("0")
 
 		const response = await request(app).get(
@@ -247,9 +250,9 @@ describe("GET /api/proposals", () => {
 		)
 
 		expect(response.status).toBe(200)
-		expect(response.body.pagination.total).toBe(1)
-		expect(response.body.data[0]).toHaveProperty("id", 7)
-		expect(response.body.data[0]).toHaveProperty("user_vote_support", true)
+		expect(response.body.total).toBe(1)
+		expect(response.body.proposals[0]).toHaveProperty("id", 7)
+		expect(response.body.proposals[0]).toHaveProperty("user_vote_support", true)
 	})
 })
 
@@ -314,7 +317,7 @@ describe("POST /api/governance/vote", () => {
 			.mockResolvedValueOnce({
 				rows: [{ votes_for: "1250000000", votes_against: "0" }],
 			}) // fetch updated counts
-		stellarContractService.getGovernanceVotingPower.mockResolvedValue(
+		stellarContractService.getGovernanceTokenBalance.mockResolvedValue(
 			"1250000000",
 		)
 		stellarContractService.castVote.mockResolvedValue({
@@ -433,7 +436,7 @@ describe("POST /api/governance/vote", () => {
 				],
 			})
 			.mockResolvedValueOnce({ rows: [] })
-		stellarContractService.getGovernanceVotingPower.mockResolvedValueOnce("0")
+		stellarContractService.getGovernanceTokenBalance.mockResolvedValueOnce("0")
 
 		const response = await request(app).post("/api/governance/vote").send({
 			proposal_id: 1,
@@ -558,7 +561,7 @@ describe("DELETE /api/proposals/:id", () => {
 		expect(response.status).toBe(204)
 		expect(stellarContractService.cancelProposal).toHaveBeenCalledWith(
 			{ proposalId: 12 },
-			expect.any(Object),
+			{ requestId: expect.any(String) },
 		)
 		expect(pool.query).toHaveBeenNthCalledWith(
 			2,

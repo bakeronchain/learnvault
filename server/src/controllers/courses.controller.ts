@@ -120,6 +120,7 @@ export const getCourses = async (
 		const params: unknown[] = []
 
 		if (!includeUnpublished) {
+			params.push(true)
 			conditions.push("c.published_at IS NOT NULL")
 		}
 
@@ -139,7 +140,10 @@ export const getCourses = async (
 			if (!difficultyValues.has(difficulty)) {
 				res.status(200).json({
 					data: [],
-					pagination: { page, limit, total: 0 },
+					page,
+					limit,
+					total: 0,
+					totalPages: 0,
 				})
 				return
 			}
@@ -150,11 +154,9 @@ export const getCourses = async (
 		const whereClause =
 			conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
 
-		// Snapshot filter params so COUNT is not affected when LIMIT/OFFSET are appended.
-		const countParams = [...params]
 		const totalResult = (await pool.query(
 			`SELECT COUNT(*) AS count FROM courses c ${whereClause}`,
-			countParams,
+			params,
 		)) as { rows: Array<{ count: string }> }
 		const total = Number.parseInt(totalResult.rows[0]?.count ?? "0", 10)
 		const totalPages = total === 0 ? 0 : Math.ceil(total / limit)
@@ -185,7 +187,10 @@ export const getCourses = async (
 
 		res.status(200).json({
 			data: rowsResult.rows.map(toCourse),
-			pagination: { page, limit, total },
+			page,
+			limit,
+			total,
+			totalPages,
 		})
 	} catch {
 		res.status(500).json({ error: "Internal server error" })
@@ -345,15 +350,20 @@ export const createCourse = async (
 		let description = ""
 		if (body.description) {
 			if (typeof body.description !== "string") {
-				res.status(400).json({ error: "description must be a string", field: "description" })
+				res
+					.status(400)
+					.json({ error: "description must be a string", field: "description" })
 				return
 			}
 			if (body.description.length > 2000) {
-				res.status(400).json({ error: "description must be 2000 characters or fewer", field: "description" })
+				res.status(400).json({
+					error: "description must be 2000 characters or fewer",
+					field: "description",
+				})
 				return
 			}
 			description = sanitizeHtml(body.description, {
-				allowedTags: ['p', 'br', 'strong', 'em', 'ul', 'ol', 'li'],
+				allowedTags: ["p", "br", "strong", "em", "ul", "ol", "li"],
 				allowedAttributes: {},
 			})
 		}
@@ -438,11 +448,14 @@ export const updateCourse = async (
 		}
 		if ("description" in body && typeof body.description === "string") {
 			if (body.description.length > 2000) {
-				res.status(400).json({ error: "description must be 2000 characters or fewer", field: "description" })
+				res.status(400).json({
+					error: "description must be 2000 characters or fewer",
+					field: "description",
+				})
 				return
 			}
 			const sanitizedDescription = sanitizeHtml(body.description, {
-				allowedTags: ['p', 'br', 'strong', 'em', 'ul', 'ol', 'li'],
+				allowedTags: ["p", "br", "strong", "em", "ul", "ol", "li"],
 				allowedAttributes: {},
 			})
 			addField("description", sanitizedDescription)

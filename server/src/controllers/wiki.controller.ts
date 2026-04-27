@@ -12,18 +12,7 @@ type WikiPageRow = {
 	updated_at: string
 }
 
-interface WikiPage {
-	id: number
-	slug: string
-	title: string
-	content: string
-	category: string
-	isPublished: boolean
-	createdAt: string
-	updatedAt: string
-}
-
-const toWikiPage = (row: WikiPageRow): WikiPage => ({
+const toWikiPage = (row: WikiPageRow) => ({
 	id: row.id,
 	slug: row.slug,
 	title: row.title,

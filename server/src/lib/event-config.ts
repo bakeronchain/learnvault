@@ -1,16 +1,12 @@
 // Event configuration and helpers
-// Import types for reuse
 import {
-	type ContractName,
-	type EventTopic,
-	type EventTopicValue,
-	type ApiEvent,
 	CONTRACT_IDS,
 	EVENTS_TO_INDEX,
-	EVENT_DATA_SCHEMAS,
-	DB_EVENT_SCHEMA,
+	EVENT_TOPICS,
+	type ContractName,
 } from "../types/events"
 
+// Re-export types/constants for reuse by consumers
 export {
 	type ContractName,
 	type EventTopic,
@@ -20,7 +16,7 @@ export {
 	EVENTS_TO_INDEX,
 	EVENT_DATA_SCHEMAS,
 	DB_EVENT_SCHEMA,
-}
+} from "../types/events"
 
 // Soroban RPC endpoints
 export const SOROBAN_RPC_URL =
@@ -41,10 +37,15 @@ export function getPollingTargets(): Array<{
 	contractId: string
 	topics: string[]
 }> {
-	return Object.entries(CONTRACT_IDS)
+	return (Object.entries(CONTRACT_IDS) as Array<[ContractName, string]>)
 		.map(([name, id]) => ({
 			contractId: id,
-			topics: (EVENTS_TO_INDEX as any)[name as ContractName] || [],
+			topics: (EVENTS_TO_INDEX[name] ?? []).map((topic) => EVENT_TOPICS[topic]),
 		}))
-		.filter((t) => t.topics.length > 0 && t.contractId)
+		.filter(
+			(t) =>
+				t.topics.length > 0 &&
+				typeof t.contractId === "string" &&
+				t.contractId.length > 0,
+		)
 }

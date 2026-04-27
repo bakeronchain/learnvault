@@ -1,4 +1,9 @@
-import express, { type Express, type NextFunction, type Request, type Response } from "express"
+import express, {
+	type Express,
+	type NextFunction,
+	type Request,
+	type Response,
+} from "express"
 import request from "supertest"
 
 // Mock database
@@ -88,7 +93,8 @@ describe("User Profiles API", () => {
 				bio: "I am a <b>developer</b> <script>alert('xss')</script> and I like <a href='javascript:alert(1)'>links</a>.",
 			}
 
-			const expectedSanitizedBio = "I am a <b>developer</b>  and I like <a>links</a>."
+			const expectedSanitizedBio =
+				"I am a <b>developer</b>  and I like <a>links</a>."
 
 			mockedQuery.mockResolvedValueOnce({
 				rows: [
@@ -124,7 +130,9 @@ describe("User Profiles API", () => {
 		})
 
 		it("handles unique display_name constraint violations", async () => {
-			const dbError = new Error("duplicate key value violates unique constraint")
+			const dbError = new Error(
+				"duplicate key value violates unique constraint",
+			)
 			;(dbError as any).code = "23505"
 			mockedQuery.mockRejectedValueOnce(dbError)
 

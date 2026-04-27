@@ -84,7 +84,7 @@ export async function flagContent(req: Request, res: Response): Promise<void> {
 				reason,
 				reporterAddress,
 			)
-			.catch((err) =>
+			.catch((err: unknown) =>
 				console.error("[EmailService] Admin flag alert failed:", err),
 			)
 

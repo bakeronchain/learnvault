@@ -30,7 +30,9 @@ export async function resubmitMilestoneReport(
 		}
 
 		if (existing.status !== "rejected") {
-			res.status(400).json({ error: "Only rejected milestones can be resubmitted" })
+			res
+				.status(400)
+				.json({ error: "Only rejected milestones can be resubmitted" })
 			return
 		}
 
@@ -41,7 +43,8 @@ export async function resubmitMilestoneReport(
 			milestone_id: existing.milestone_id,
 			evidence_github: evidenceGithub ?? existing.evidence_github,
 			evidence_ipfs_cid: evidenceIpfsCid ?? existing.evidence_ipfs_cid,
-			evidence_description: evidenceDescription ?? existing.evidence_description,
+			evidence_description:
+				evidenceDescription ?? existing.evidence_description,
 		})
 
 		res.status(200).json({ data: updated })

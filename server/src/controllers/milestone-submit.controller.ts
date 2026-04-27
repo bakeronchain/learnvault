@@ -1,7 +1,7 @@
 import { type Request, type Response } from "express"
 import sanitizeHtml from "sanitize-html"
-import { logger } from "../lib/logger"
 import { milestoneStore } from "../db/milestone-store"
+import { logger } from "../lib/logger"
 
 const log = logger.child({ module: "milestones" })
 import { createEmailService } from "../services/email.service"
@@ -42,14 +42,16 @@ export async function submitMilestoneReport(
 
 	// Validate evidence description length
 	if (evidenceDescription && evidenceDescription.length > 2000) {
-		res.status(400).json({ error: "Evidence description must be 2000 characters or fewer" })
+		res
+			.status(400)
+			.json({ error: "Evidence description must be 2000 characters or fewer" })
 		return
 	}
 
 	// Sanitize evidence description
 	if (evidenceDescription) {
 		evidenceDescription = sanitizeHtml(evidenceDescription, {
-			allowedTags: ['p', 'br', 'strong', 'em', 'ul', 'ol', 'li'],
+			allowedTags: ["p", "br", "strong", "em", "ul", "ol", "li"],
 			allowedAttributes: {},
 		})
 	}

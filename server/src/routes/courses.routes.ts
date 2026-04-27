@@ -34,11 +34,6 @@ export const coursesRouter = Router()
  *           enum: [beginner, intermediate, advanced]
  *         description: Filter by difficulty level
  *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *         description: Case-insensitive search across course title and description
- *       - in: query
  *         name: page
  *         schema:
  *           type: integer

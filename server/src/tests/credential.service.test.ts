@@ -1,6 +1,6 @@
 jest.mock("../db/index", () => ({
 	pool: {
-		query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+		query: jest.fn(),
 		connect: jest.fn(),
 	},
 }))

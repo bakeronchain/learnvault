@@ -2,8 +2,8 @@ import { type Request, type Response } from "express"
 import sanitizeHtml from "sanitize-html"
 import { z } from "zod"
 
-import { logger } from "../lib/logger"
 import { pool } from "../db/index"
+import { logger } from "../lib/logger"
 import { trackEscrowTimeout } from "../services/escrow-timeout.service"
 
 const log = logger.child({ module: "governance" })

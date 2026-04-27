@@ -1,8 +1,12 @@
 import express from "express"
 import request from "supertest"
-import { globalLimiter, authVerifyLimiter, milestoneSubmissionLimiter } from "../middleware/rate-limit.middleware"
-import { nonceRateLimiter } from "../middleware/nonce-rate-limit.middleware"
 import { errorHandler } from "../middleware/error.middleware"
+import { nonceRateLimiter } from "../middleware/nonce-rate-limit.middleware"
+import {
+	globalLimiter,
+	authVerifyLimiter,
+	milestoneSubmissionLimiter,
+} from "../middleware/rate-limit.middleware"
 
 describe("Rate Limiting Middleware", () => {
 	let app: express.Application
@@ -14,10 +18,18 @@ describe("Rate Limiting Middleware", () => {
 		app.use(globalLimiter)
 
 		// Dummy routes to test rate limiters
-		app.get("/api/auth/nonce", nonceRateLimiter, (req, res) => res.status(200).send("nonce"))
-		app.post("/api/auth/verify", authVerifyLimiter, (req, res) => res.status(200).send("verify"))
-		app.post("/api/milestones", milestoneSubmissionLimiter, (req, res) => res.status(201).send("submit"))
-		app.get("/api/admin/stats", (req, res) => res.status(200).send("admin stats")) // Only global limiter
+		app.get("/api/auth/nonce", nonceRateLimiter, (req, res) =>
+			res.status(200).send("nonce"),
+		)
+		app.post("/api/auth/verify", authVerifyLimiter, (req, res) =>
+			res.status(200).send("verify"),
+		)
+		app.post("/api/milestones", milestoneSubmissionLimiter, (req, res) =>
+			res.status(201).send("submit"),
+		)
+		app.get("/api/admin/stats", (req, res) =>
+			res.status(200).send("admin stats"),
+		) // Only global limiter
 
 		app.use(errorHandler)
 	})
@@ -38,7 +50,7 @@ describe("Rate Limiting Middleware", () => {
 			const res = await request(app)
 				.get("/api/auth/nonce")
 				.set("X-Forwarded-For", ip)
-			
+
 			expect(res.status).toBe(429)
 			expect(res.body.error).toMatch(/too many nonce requests/i)
 		})
@@ -52,7 +64,9 @@ describe("Rate Limiting Middleware", () => {
 			for (let i = 0; i < 10; i++) {
 				await request(app).get("/api/auth/nonce").set("X-Forwarded-For", ip)
 			}
-			const res1 = await request(app).get("/api/auth/nonce").set("X-Forwarded-For", ip)
+			const res1 = await request(app)
+				.get("/api/auth/nonce")
+				.set("X-Forwarded-For", ip)
 			expect(res1.status).toBe(429)
 
 			// Advance time by 61 seconds (window is 60s)
@@ -60,7 +74,9 @@ describe("Rate Limiting Middleware", () => {
 			jest.setSystemTime(new Date("2026-01-01T00:01:01Z"))
 
 			// Should pass now
-			const res2 = await request(app).get("/api/auth/nonce").set("X-Forwarded-For", ip)
+			const res2 = await request(app)
+				.get("/api/auth/nonce")
+				.set("X-Forwarded-For", ip)
 			expect(res2.status).toBe(200)
 
 			jest.useRealTimers()
@@ -69,13 +85,19 @@ describe("Rate Limiting Middleware", () => {
 		it("allows different IPs separate buckets", async () => {
 			// IP 1 reaches limit
 			for (let i = 0; i < 10; i++) {
-				await request(app).get("/api/auth/nonce").set("X-Forwarded-For", "1.1.1.1")
+				await request(app)
+					.get("/api/auth/nonce")
+					.set("X-Forwarded-For", "1.1.1.1")
 			}
-			const res1 = await request(app).get("/api/auth/nonce").set("X-Forwarded-For", "1.1.1.1")
+			const res1 = await request(app)
+				.get("/api/auth/nonce")
+				.set("X-Forwarded-For", "1.1.1.1")
 			expect(res1.status).toBe(429)
 
 			// IP 2 should still be fine
-			const res2 = await request(app).get("/api/auth/nonce").set("X-Forwarded-For", "2.2.2.2")
+			const res2 = await request(app)
+				.get("/api/auth/nonce")
+				.set("X-Forwarded-For", "2.2.2.2")
 			expect(res2.status).toBe(200)
 		})
 	})
@@ -95,7 +117,7 @@ describe("Rate Limiting Middleware", () => {
 				.post("/api/auth/verify")
 				.set("X-Forwarded-For", ip)
 				.send({ address: "G..." })
-			
+
 			expect(res.status).toBe(429)
 		})
 	})
@@ -117,22 +139,31 @@ describe("Rate Limiting Middleware", () => {
 				.post("/api/milestones")
 				.set("X-Forwarded-For", ip)
 				.send({ scholarAddress })
-			
+
 			expect(res.status).toBe(429)
 		})
 
 		it("allows different scholar addresses even from same IP", async () => {
 			const ip = "13.14.15.16"
-			
+
 			// Address 1 reaches limit
 			for (let i = 0; i < 10; i++) {
-				await request(app).post("/api/milestones").set("X-Forwarded-For", ip).send({ scholarAddress: "A1" })
+				await request(app)
+					.post("/api/milestones")
+					.set("X-Forwarded-For", ip)
+					.send({ scholarAddress: "A1" })
 			}
-			const res1 = await request(app).post("/api/milestones").set("X-Forwarded-For", ip).send({ scholarAddress: "A1" })
+			const res1 = await request(app)
+				.post("/api/milestones")
+				.set("X-Forwarded-For", ip)
+				.send({ scholarAddress: "A1" })
 			expect(res1.status).toBe(429)
 
 			// Address 2 should still be fine from same IP
-			const res2 = await request(app).post("/api/milestones").set("X-Forwarded-For", ip).send({ scholarAddress: "A2" })
+			const res2 = await request(app)
+				.post("/api/milestones")
+				.set("X-Forwarded-For", ip)
+				.send({ scholarAddress: "A2" })
 			expect(res2.status).toBe(201)
 		})
 	})
@@ -140,7 +171,7 @@ describe("Rate Limiting Middleware", () => {
 	describe("Admin Endpoints & Global Limiter", () => {
 		it("admin endpoints only have global limit (100) and not functional limits (10)", async () => {
 			const ip = "17.18.19.20"
-			
+
 			// Functional limit is 10, so we send 15 requests
 			for (let i = 0; i < 15; i++) {
 				const res = await request(app)
@@ -148,7 +179,7 @@ describe("Rate Limiting Middleware", () => {
 					.set("X-Forwarded-For", ip)
 				expect(res.status).toBe(200)
 			}
-			
+
 			// Should still pass because global limit is 100
 			const res = await request(app)
 				.get("/api/admin/stats")

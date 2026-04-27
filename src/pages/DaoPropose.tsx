@@ -675,7 +675,7 @@ const DaoPropose: React.FC = () => {
 					</div>
 				)}
 
-				<form onSubmit={handleSubmit} className="space-y-8" noValidate>
+				<form onSubmit={handleSubmit} className="space-y-8">
 					<div className="glass-card p-8 rounded-[2.5rem] border border-white/5">
 						<div className="space-y-6">
 							<div>
@@ -862,7 +862,9 @@ const DaoPropose: React.FC = () => {
 								type="submit"
 								data-testid="submit-proposal"
 								disabled={
-									isSubmittingProposal
+									isSubmittingProposal ||
+									!formData.title.trim() ||
+									!formData.description.trim()
 								}
 								className="px-8 py-3 bg-brand-cyan/10 border border-brand-cyan/30 text-brand-cyan font-black uppercase tracking-widest rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3"
 							>

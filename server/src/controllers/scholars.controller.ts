@@ -5,6 +5,7 @@ import { pool } from "../db/index"
 
 const log = logger.child({ module: "scholars" })
 import { milestoneStore } from "../db/milestone-store"
+import { socialStore } from "../db/social-store"
 import { listEscrowTimeoutsForScholar } from "../services/escrow-timeout.service"
 import { stellarContractService } from "../services/stellar-contract.service"
 
@@ -150,7 +151,7 @@ export async function getScholarsLeaderboard(
 		const rankingsValues = [...whereValues, limit, offset]
 		const rankingsResult = await pool.query(
 			`SELECT
-				ROW_NUMBER() OVER (ORDER BY lrn_balance DESC, address ASC) AS rank,
+				ROW_NUMBER() OVER (ORDER BY lrn_balance DESC, address ASC) + $${whereValues.length + 2} AS rank,
 				address,
 				lrn_balance,
 				courses_completed
@@ -228,6 +229,13 @@ export async function getScholarProfile(
 		const joinedAt =
 			joinedAtResult.rows[0]?.joined_at ?? new Date().toISOString()
 
+		// 3. Fetch social data
+		const counts = await socialStore.getFollowCounts(address)
+		const currentAddress = (req as any).user?.address
+		const isFollowing = currentAddress
+			? await socialStore.isFollowing(currentAddress, address)
+			: false
+
 		res.status(200).json({
 			address,
 			lrn_balance,
@@ -236,6 +244,9 @@ export async function getScholarProfile(
 			pending_milestones: Number(stats?.pending ?? 0),
 			credentials,
 			joined_at: joinedAt,
+			follower_count: counts.followerCount,
+			following_count: counts.followingCount,
+			is_following: isFollowing,
 		})
 	} catch (error) {
 		log.error({ err: error }, "Error fetching scholar profile")

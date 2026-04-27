@@ -180,7 +180,7 @@ export const flaggedContentStore = {
 
 		// Create new flag
 		const result = await pool.query(
-			`INSERT INTO flagged_content (content_type, content_id, reporter_address, reason) 
+			`INSERT INTO flagged_content (content_type, content_id, reporter_address, reason)
 			 VALUES ($1, $2, $3, $4) RETURNING *`,
 			[contentType, contentId, reporterAddress, reason],
 		)
@@ -213,7 +213,8 @@ export const flaggedContentStore = {
 		contentType: "comment" | "proposal",
 		contentId: number,
 	): Promise<FlaggedContent[]> {
-		if (!isRealPool()) return inMemoryStore.getFlagsForContent(contentType, contentId)
+		if (!isRealPool())
+			return inMemoryStore.getFlagsForContent(contentType, contentId)
 
 		const result = await pool.query(
 			`SELECT * FROM flagged_content WHERE content_type = $1 AND content_id = $2 ORDER BY created_at DESC`,
@@ -241,7 +242,13 @@ export const flaggedContentStore = {
 
 		const result = await pool.query(
 			`UPDATE flagged_content SET status = $1, reviewed_at = NOW(), admin_address = $2, admin_action = $3, admin_notes = $4 WHERE id = $5 RETURNING *`,
-			[status, adminAddress ?? null, adminAction ?? null, adminNotes ?? null, id],
+			[
+				status,
+				adminAddress ?? null,
+				adminAction ?? null,
+				adminNotes ?? null,
+				id,
+			],
 		)
 		return result.rows[0] ?? null
 	},

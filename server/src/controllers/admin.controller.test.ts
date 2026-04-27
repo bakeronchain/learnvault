@@ -8,9 +8,9 @@ import express from "express"
 import jwt from "jsonwebtoken"
 import request from "supertest"
 
+import { pool } from "../db/index"
 import { errorHandler } from "../middleware/error.middleware"
 import { adminRouter } from "../routes/admin.routes"
-import { pool } from "../db/index"
 
 const JWT_SECRET = "learnvault-secret"
 const queryMock = pool.query as jest.Mock

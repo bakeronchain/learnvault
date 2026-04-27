@@ -18,12 +18,12 @@ import { NotificationBell } from "./NotificationBell"
 import { ReputationBadge } from "./ReputationBadge"
 import { ThemeToggle } from "./ThemeToggle"
 import { WalletButton } from "./WalletButton"
+import { getAuthToken } from "../util/auth"
 
 export default function NavBar() {
 	const [menuOpen, setMenuOpen] = useState(false)
 	const mobileMenuId = useId()
 	const { t } = useTranslation()
-	const token = localStorage.getItem("auth_token") ?? undefined
 
 	useEffect(() => {
 		if (typeof document === "undefined") return
@@ -63,6 +63,7 @@ export default function NavBar() {
 
 	const queryClient = useQueryClient()
 	const { address } = useWallet()
+	const token = getAuthToken()
 
 	const handlePrefetch = useCallback(
 		(to: string) => {

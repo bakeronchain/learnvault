@@ -290,15 +290,28 @@ export const enrollmentBodySchema = z
 	})
 	.strict()
 
-export const bookmarkBodySchema = z
+export const userProfileSchema = z
 	.object({
-		course_id: requiredString("course_id", 100),
-	})
-	.strict()
-
-export const bookmarkCourseIdParamSchema = z
-	.object({
-		courseId: requiredString("courseId", 100),
+		display_name: optionalTrimmedString("display_name", 50),
+		bio: optionalTrimmedString("bio", 2000),
+		avatar_url: z
+			.string({
+				invalid_type_error: "avatar_url must be a string",
+			})
+			.trim()
+			.url("avatar_url must be a valid URL")
+			.max(2048, "avatar_url must be 2048 characters or fewer")
+			.optional(),
+		twitter: optionalTrimmedString("twitter", 255),
+		github: optionalTrimmedString("github", 255),
+		website: z
+			.string({
+				invalid_type_error: "website must be a string",
+			})
+			.trim()
+			.url("website must be a valid URL")
+			.max(2048, "website must be 2048 characters or fewer")
+			.optional(),
 	})
 	.strict()
 

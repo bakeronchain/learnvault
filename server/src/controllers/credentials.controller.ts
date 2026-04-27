@@ -2,8 +2,8 @@ import fs from "fs/promises"
 import path from "path"
 import { type Request, type Response } from "express"
 
-import { logger } from "../lib/logger"
 import { pool } from "../db/index"
+import { logger } from "../lib/logger"
 
 const log = logger.child({ module: "credentials" })
 import { pinJsonToIPFS, getGatewayUrl } from "../services/pinata.service"

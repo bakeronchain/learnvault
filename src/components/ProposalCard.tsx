@@ -1,7 +1,6 @@
 import { Card, Badge, Button } from "@stellar/design-system"
 import React from "react"
 import { shortenAddress } from "../util/contract"
-import AddressDisplay from "./AddressDisplay"
 import ProposalCountdown from "./ProposalCountdown"
 
 export interface ProposalCardProps {
@@ -65,11 +64,9 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({
 					<div className="flex justify-between items-start gap-4">
 						<div>
 							<h3 className="text-xl font-bold text-white mb-1">{title}</h3>
-							<AddressDisplay 
-								address={proposerAddress} 
-								addressClassName="text-sm text-white/50 font-mono"
-								showCopyButton={false}
-							/>
+							<p className="text-sm text-white/50 font-mono">
+								{shortenAddress(proposerAddress)}
+							</p>
 						</div>
 						<Badge variant="primary" size="md">
 							{`${amountUsdc} USDC`}

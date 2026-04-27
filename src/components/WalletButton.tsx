@@ -1,26 +1,19 @@
-import { Button, Icon } from "@stellar/design-system"
+import { Button, Icon, Text, Modal, Profile } from "@stellar/design-system"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
+import { motion } from "framer-motion"
+import { Link } from "react-router-dom"
 import ConfirmDialog from "./ConfirmDialog"
 import { useWallet } from "../hooks/useWallet"
-import { WalletInfoModal } from "./WalletInfoModal"
-import { motion } from "framer-motion"
 
-/**
- * Wallet control button for the navigation bar.
- * In disconnected state: triggers wallet connection.
- * In connected state: shows compact identity and triggers info modal.
- */
 export const WalletButton = () => {
-	const [showModal, setShowModal] = useState(false)
+	const [showDisconnectModal, setShowDisconnectModal] = useState(false)
 	const { address, isPending, isReconnecting, balances } = useWallet()
 	const { t } = useTranslation()
-	
 	const buttonLabel =
 		isPending || isReconnecting ? t("wallet.loading") : t("wallet.connect")
 
 	const handleConnect = async () => {
-		// Dynamic import to keep main bundle size small
 		const { connectWallet } = await import("../util/wallet")
 		await connectWallet()
 	}
@@ -28,7 +21,7 @@ export const WalletButton = () => {
 	const handleDisconnect = async () => {
 		const { disconnectWallet } = await import("../util/wallet")
 		await disconnectWallet()
-		setShowModal(false)
+		setShowDisconnectModal(false)
 	}
 
 	if (!address) {
@@ -39,7 +32,6 @@ export const WalletButton = () => {
 				size="md"
 				onClick={() => void handleConnect()}
 				disabled={isReconnecting}
-				id="nav-connect-wallet"
 			>
 				<Icon.Wallet02 />
 				{buttonLabel}
@@ -48,18 +40,18 @@ export const WalletButton = () => {
 	}
 
 	return (
-		<>
-			{/* Compact trigger with premium glassmorphic style */}
-			<motion.button
-				whileHover={{ scale: 1.02, y: -2 }}
-				whileTap={{ scale: 0.98 }}
-				onClick={() => setShowModal(true)}
-				className="glass flex items-center gap-4 px-4 py-2 rounded-2xl border border-white/10 hover:border-brand-cyan/30 transition-all bg-white/5 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.3)] group relative overflow-hidden"
-				aria-label={t("wallet.view_details", "View wallet details")}
-				id="nav-wallet-trigger"
-			>
-				{/* Inner glow effect on hover */}
-				<div className="absolute inset-0 bg-linear-to-r from-brand-cyan/0 via-brand-cyan/5 to-brand-cyan/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+		<div
+			style={{
+				display: "flex",
+				flexDirection: "row",
+				alignItems: "center",
+				gap: "5px",
+				opacity: isPending || isReconnecting ? 0.6 : 1,
+			}}
+		>
+			<Text as="div" size="sm">
+				{t("wallet.balance", { amount: balances?.lrn?.balance ?? "-" })}
+			</Text>
 
 			<div id="modalContainer">
 				{showDisconnectModal && (
@@ -74,6 +66,12 @@ export const WalletButton = () => {
 					/>
 				)}
 			</div>
+			<motion.button
+				onClick={() => setShowDisconnectModal(true)}
+				className="flex items-center gap-4 px-4 py-2 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all group"
+				whileHover={{ scale: 1.02 }}
+				whileTap={{ scale: 0.98 }}
+			>
 				<div className="flex flex-col items-end hidden sm:flex pointer-events-none">
 					<span className="text-[9px] font-black uppercase tracking-widest text-white/40 group-hover:text-brand-cyan transition-colors">
 						Wallet
@@ -92,11 +90,7 @@ export const WalletButton = () => {
 				</div>
 			</motion.button>
 
-			<WalletInfoModal 
-				isOpen={showModal} 
-				onClose={() => setShowModal(false)} 
-				onDisconnect={() => void handleDisconnect()} 
-			/>
-		</>
+
+		</div>
 	)
 }

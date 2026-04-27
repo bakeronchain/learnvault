@@ -37,6 +37,30 @@ export function createRequireAuth(jwtService: JwtService) {
 	}
 }
 
+export function createOptionalAuth(jwtService: JwtService) {
+	return async function optionalAuth(
+		req: Request,
+		_res: Response,
+		next: NextFunction,
+	): Promise<void> {
+		const header = req.headers.authorization
+		if (header?.startsWith("Bearer ")) {
+			const token = header.slice("Bearer ".length).trim()
+			if (token) {
+				try {
+					const { sub } = await jwtService.verifyWalletToken(token)
+					req.walletAddress = sub
+					;(req as AuthRequest).user = { address: sub }
+				} catch {
+					// Ignore invalid tokens for optional auth
+				}
+			}
+		}
+
+		next()
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Standalone auth (used by self-contained routers, e.g. upload, comments)
 // ---------------------------------------------------------------------------

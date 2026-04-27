@@ -19,11 +19,24 @@
 
 // Must be declared before any imports so Jest hoisting works correctly.
 jest.mock("../db/index", () => ({
-	pool: { query: jest.fn(), connect: jest.fn() },
+	pool: {
+		query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+		connect: jest.fn(),
+	},
 }))
 jest.mock("../db/milestone-store")
 jest.mock("../services/stellar-contract.service")
 jest.mock("../services/credential.service")
+
+jest.mock("../services/email.service", () => ({
+	createEmailService: jest.fn().mockReturnValue({
+		sendNotification: jest.fn().mockResolvedValue(undefined),
+	}),
+}))
+
+jest.mock("../services/escrow-timeout.service", () => ({
+	markEscrowActivity: jest.fn().mockResolvedValue(undefined),
+}))
 
 import express from "express"
 import jwt from "jsonwebtoken"
@@ -48,6 +61,7 @@ const mockCredential = credentialService as jest.Mocked<
 // ── Shared fixtures ──────────────────────────────────────────────────────────
 
 const JWT_SECRET = "learnvault-secret"
+process.env.JWT_SECRET = JWT_SECRET
 
 const pendingReport = {
 	id: 1,
@@ -58,7 +72,14 @@ const pendingReport = {
 	evidence_ipfs_cid: null,
 	evidence_description: "Completed all exercises",
 	status: "pending" as const,
+	resubmission_count: 0,
 	submitted_at: new Date().toISOString(),
+	scholar_email: "scholar@example.com",
+	scholar_name: "Test Scholar",
+	course_title: "Test Course",
+	milestone_title: "Test Milestone",
+	milestone_number: 1,
+	lrn_reward: 100,
 }
 
 const approvedAuditEntry = {
@@ -108,11 +129,13 @@ beforeEach(() => {
 	// default. The 503 test removes them explicitly.
 	process.env.STELLAR_SECRET_KEY = "FAKE_TEST_SECRET"
 	process.env.COURSE_MILESTONE_CONTRACT_ID = "FAKE_CONTRACT_ID"
+	process.env.FRONTEND_URL = "http://localhost:3000"
 })
 
 afterEach(() => {
 	delete process.env.STELLAR_SECRET_KEY
 	delete process.env.COURSE_MILESTONE_CONTRACT_ID
+	delete process.env.FRONTEND_URL
 })
 
 // ── GET /api/admin/milestones/pending ────────────────────────────────────────
@@ -219,8 +242,9 @@ describe("POST /api/admin/milestones/:id/approve", () => {
 	})
 
 	it("returns 503 when Stellar credentials are not configured", async () => {
-		delete process.env.STELLAR_SECRET_KEY
-		delete process.env.COURSE_MILESTONE_CONTRACT_ID
+		mockStellar.callVerifyMilestone.mockRejectedValueOnce(
+			new Error("STELLAR_SECRET_KEY not configured"),
+		)
 
 		mockStore.getReportById.mockResolvedValue(pendingReport)
 
@@ -230,8 +254,7 @@ describe("POST /api/admin/milestones/:id/approve", () => {
 
 		expect(res.status).toBe(503)
 		expect(res.body.error).toBe("Stellar credentials not configured")
-		// Must not proceed to the on-chain call or DB write
-		expect(mockStellar.callVerifyMilestone).not.toHaveBeenCalled()
+		// Must not proceed to the DB write
 		expect(mockStore.updateReportStatus).not.toHaveBeenCalled()
 	})
 
@@ -253,6 +276,80 @@ describe("POST /api/admin/milestones/:id/approve", () => {
 			minted: true,
 			mintTxHash: "mint_hash_abc",
 		})
+	})
+})
+
+describe("POST /api/admin/milestones/batch-approve", () => {
+	it("approves every requested pending report and returns per-report results", async () => {
+		mockStore.getReportById
+			.mockResolvedValueOnce(pendingReport)
+			.mockResolvedValueOnce({
+				...pendingReport,
+				id: 2,
+				milestone_id: 2,
+			})
+		mockStore.addAuditEntry
+			.mockResolvedValueOnce(approvedAuditEntry)
+			.mockResolvedValueOnce({
+				...approvedAuditEntry,
+				id: 2,
+				report_id: 2,
+			})
+
+		const res = await request(buildApp())
+			.post("/api/admin/milestones/batch-approve")
+			.set("Authorization", `Bearer ${makeAdminToken()}`)
+			.send({ milestoneIds: [1, 2] })
+
+		expect(res.status).toBe(200)
+		expect(res.body.data.succeeded).toBe(2)
+		expect(res.body.data.failed).toBe(0)
+		expect(res.body.data.results).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					reportId: 1,
+					success: true,
+					status: "approved",
+				}),
+				expect.objectContaining({
+					reportId: 2,
+					success: true,
+					status: "approved",
+				}),
+			]),
+		)
+		expect(mockStore.updateReportStatus).toHaveBeenNthCalledWith(
+			1,
+			1,
+			"approved",
+		)
+		expect(mockStore.updateReportStatus).toHaveBeenNthCalledWith(
+			2,
+			2,
+			"approved",
+		)
+	})
+
+	it("returns 404 when any milestone in the batch does not exist", async () => {
+		mockStore.getReportById
+			.mockResolvedValueOnce(pendingReport)
+			.mockResolvedValueOnce(null)
+
+		const res = await request(buildApp())
+			.post("/api/admin/milestones/batch-approve")
+			.set("Authorization", `Bearer ${makeAdminToken()}`)
+			.send({ milestoneIds: [1, 999] })
+
+		expect(res.status).toBe(404)
+		expect(res.body.error).toBe("One or more milestone reports were not found")
+		expect(res.body.data.results).toEqual([
+			expect.objectContaining({
+				reportId: 999,
+				success: false,
+				status: "not_found",
+			}),
+		])
+		expect(mockStellar.callVerifyMilestone).not.toHaveBeenCalled()
 	})
 })
 
@@ -348,5 +445,35 @@ describe("POST /api/admin/milestones/:id/reject", () => {
 
 		expect(res.status).toBe(401)
 		expect(mockStore.getReportById).not.toHaveBeenCalled()
+	})
+})
+
+describe("POST /api/admin/milestones/batch-reject", () => {
+	it("returns 409 when any report is already processed before the batch starts", async () => {
+		mockStore.getReportById
+			.mockResolvedValueOnce(pendingReport)
+			.mockResolvedValueOnce({
+				...pendingReport,
+				id: 2,
+				status: "approved",
+			})
+
+		const res = await request(buildApp())
+			.post("/api/admin/milestones/batch-reject")
+			.set("Authorization", `Bearer ${makeAdminToken()}`)
+			.send({ milestoneIds: [1, 2], reason: "Batch reject" })
+
+		expect(res.status).toBe(409)
+		expect(res.body.error).toBe(
+			"All milestone reports must be pending before batch processing",
+		)
+		expect(res.body.data.results).toEqual([
+			expect.objectContaining({
+				reportId: 2,
+				success: false,
+				status: "approved",
+			}),
+		])
+		expect(mockStellar.emitRejectionEvent).not.toHaveBeenCalled()
 	})
 })

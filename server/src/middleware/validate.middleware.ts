@@ -8,17 +8,15 @@ type SchemaMap = {
 	params?: ZodTypeAny
 }
 
-const formatErrors = (
-	error: ZodError,
-	location: "body" | "query" | "params",
-) =>
+const formatErrors = (error: ZodError, location: "body" | "query" | "params") =>
 	error.issues.map((issue) => ({
 		field: issue.path.join(".") || location,
 		message: issue.message,
 	}))
 
 export const validate =
-	(schemas: SchemaMap) => (req: Request, _res: Response, next: NextFunction) => {
+	(schemas: SchemaMap) =>
+	(req: Request, _res: Response, next: NextFunction) => {
 		try {
 			if (schemas.body) {
 				const result = schemas.body.safeParse(req.body)

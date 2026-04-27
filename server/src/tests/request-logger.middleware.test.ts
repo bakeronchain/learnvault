@@ -1,9 +1,7 @@
 import express from "express"
 import request from "supertest"
 
-import {
-	createRequestLogger,
-} from "../middleware/request-logger.middleware"
+import { createRequestLogger } from "../middleware/request-logger.middleware"
 
 describe("requestLogger middleware", () => {
 	it("attaches a request id header to every response", async () => {

@@ -5,11 +5,8 @@ import { stellarNetwork } from "../contracts/util"
 import { useWallet } from "../hooks/useWallet"
 
 // Format network name with first letter capitalized
-const formatNetworkName = (name: string, t: any) =>
-	// TODO: This is a workaround until @creit-tech/stellar-wallets-kit uses the new name for a local network.
-	name === "STANDALONE"
-		? t("connect.local")
-		: name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()
+const formatNetworkName = (name: string) =>
+	name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()
 
 const bgColor = "#F0F2F5"
 const textColor = "#4A5362"
@@ -18,10 +15,10 @@ const NetworkPill: React.FC = () => {
 	const { network, address } = useWallet()
 	const { t } = useTranslation()
 
-	const appNetwork = formatNetworkName(stellarNetwork, t)
+	const appNetwork = formatNetworkName(stellarNetwork)
 
 	// Check if there's a network mismatch
-	const walletNetwork = formatNetworkName(network ?? "", t)
+	const walletNetwork = formatNetworkName(network ?? "")
 	const isNetworkMismatch = walletNetwork !== appNetwork
 
 	let title = ""

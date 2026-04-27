@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto"
-import type { NextFunction, Request, Response } from "express"
+import { type NextFunction, type Request, type Response } from "express"
 import pino from "pino"
+import { runWithRequestContext } from "../lib/request-context"
 
 type LogPayload = {
 	requestId: string
@@ -30,9 +31,7 @@ const jsonLogger: Logger = {
 	},
 }
 
-export function createRequestLogger(
-	options: RequestLoggerOptions = {},
-) {
+export function createRequestLogger(options: RequestLoggerOptions = {}) {
 	const enabled = options.enabled ?? process.env.NODE_ENV !== "test"
 	const logger = options.logger ?? jsonLogger
 
@@ -42,28 +41,31 @@ export function createRequestLogger(
 		next: NextFunction,
 	) {
 		const requestId = randomUUID()
-		const startedAt = process.hrtime.bigint()
+		runWithRequestContext({ requestId }, () => {
+			const startedAt = process.hrtime.bigint()
 
-		req.requestId = requestId
-		res.setHeader("X-Request-Id", requestId)
+			req.requestId = requestId
+			res.setHeader("X-Request-ID", requestId)
 
-		res.once("finish", () => {
-			if (!enabled) {
-				return
-			}
+			res.once("finish", () => {
+				if (!enabled) {
+					return
+				}
 
-			const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000
+				const durationMs =
+					Number(process.hrtime.bigint() - startedAt) / 1_000_000
 
-			logger.info({
-				requestId,
-				method: req.method,
-				path: req.originalUrl || req.path,
-				statusCode: res.statusCode,
-				durationMs: Number(durationMs.toFixed(3)),
+				logger.info({
+					requestId,
+					method: req.method,
+					path: req.originalUrl || req.path,
+					statusCode: res.statusCode,
+					durationMs: Number(durationMs.toFixed(3)),
+				})
 			})
-		})
 
-		next()
+			next()
+		})
 	}
 }
 

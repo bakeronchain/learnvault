@@ -11,12 +11,11 @@ import { useWallet } from "../hooks/useWallet"
 
 const Donor: React.FC = () => {
 	const { address } = useWallet()
-	const { stats, contributions, votes, scholars, isLoading, error } = useDonor()
+	const { stats, impact, contributions, votes, scholars, isLoading, error } = useDonor()
 	const { balance: usdcBalance, isLoading: usdcLoading } = useUSDC(address)
 	const [showDepositForm, setShowDepositForm] = useState(false)
 	const hasActivity =
-		stats.totalContributed > 0 ||
-		stats.governanceBalance > 0 ||
+		stats.total_contributed > 0n ||
 		contributions.length > 0 ||
 		votes.length > 0 ||
 		scholars.length > 0
@@ -24,21 +23,58 @@ const Donor: React.FC = () => {
 	// Guard: Not connected
 	if (!address) {
 		return (
-			<div className="min-h-screen p-12 text-white animate-in fade-in">
-				<div className="max-w-6xl mx-auto">
-					<div className="text-center py-20">
-						<div className="text-6xl mb-6">🔓</div>
-						<h1 className="text-4xl font-black mb-4">
-							Wallet Connection Required
-						</h1>
-						<p className="text-white/40 text-lg font-medium mb-8">
-							Please connect your wallet to access the donor dashboard.
-						</p>
-						<p className="text-white/30 text-sm">
-							The donor dashboard connects to your wallet to display
-							contributions, governance power, and funded scholars.
-						</p>
-					</div>
+			<div className="p-8 md:p-12 max-w-6xl mx-auto text-white animate-in fade-in duration-700">
+				<header className="text-center mb-16">
+					<h1 className="text-6xl font-black mb-4 tracking-tighter text-gradient">
+						Donor Dashboard
+					</h1>
+					<p className="text-white/40 text-lg font-medium max-w-2xl mx-auto">
+						Fund scholars, earn governance power, and shape the future of
+						decentralized education.
+					</p>
+				</header>
+
+				{/* Connect prompt */}
+				<div className="glass-card p-12 rounded-[3rem] border border-brand-cyan/20 text-center mb-16 shadow-2xl">
+					<div className="text-6xl mb-6">🔐</div>
+					<h2 className="text-3xl font-black mb-4">Connect Your Wallet</h2>
+					<p className="text-white/40 mb-2 max-w-lg mx-auto">
+						Connect your Stellar wallet to view your contribution history,
+						governance power, and funded scholars.
+					</p>
+					<p className="text-white/20 text-sm">
+						Use the Connect Wallet button in the top-right corner.
+					</p>
+				</div>
+
+				{/* Feature preview cards */}
+				<div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+					{[
+						{
+							icon: "💰",
+							title: "My Contributions",
+							desc: "Track every USDC donation you've made to the scholarship treasury.",
+						},
+						{
+							icon: "🗳️",
+							title: "Governance Power",
+							desc: "Your LRN tokens grant voting rights on scholarship proposals and DAO decisions.",
+						},
+						{
+							icon: "🎓",
+							title: "Scholars Funded",
+							desc: "See which scholars you've directly helped fund through the decentralized treasury.",
+						},
+					].map(({ icon, title, desc }) => (
+						<div
+							key={title}
+							className="glass-card p-8 rounded-[2.5rem] border border-white/5 opacity-60"
+						>
+							<div className="text-3xl mb-4">{icon}</div>
+							<h3 className="text-lg font-black mb-2">{title}</h3>
+							<p className="text-white/40 text-sm leading-relaxed">{desc}</p>
+						</div>
+					))}
 				</div>
 			</div>
 		)
@@ -107,42 +143,66 @@ const Donor: React.FC = () => {
 					/>
 					<StatCard
 						label="Total Contributed"
-						value={`$${stats.totalContributed.toLocaleString()}`}
+						value={`$${(Number(stats.total_contributed) / 1e7).toLocaleString()}`}
 						icon="💰"
 						color="text-brand-cyan"
 					/>
 					<StatCard
-						label="Governance Tokens"
-						value={stats.governanceBalance.toLocaleString()}
+						label="Votes Cast"
+						value={stats.votes_cast.toString()}
 						icon="🗳️"
 						color="text-brand-purple"
 					/>
 					<StatCard
-						label="Proposals Voted"
-						value={stats.proposalsVoted.toString()}
-						icon="✓"
-						color="text-brand-emerald"
-					/>
-					<StatCard
 						label="Scholars Funded"
-						value={stats.scholarsFunded.toString()}
+						value={stats.scholars_funded.toString()}
 						icon="🎓"
 						color="text-brand-blue"
 					/>
 				</div>
 			</header>
 
+			{/* Impact Statistics Section */}
+			{impact && (
+				<section className="mb-20">
+					<h2 className="text-3xl font-black mb-8 text-gradient">Your Impact</h2>
+					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+						<ImpactCard
+							title="Total Donated"
+							value={`$${(Number(impact.total_donated_usdc) / 1e7).toLocaleString()}`}
+							icon="💰"
+							description="Your total contributions to the treasury"
+						/>
+						<ImpactCard
+							title="Scholars Funded"
+							value={impact.scholars_funded.toString()}
+							icon="🎓"
+							description="Number of scholars you've helped fund"
+						/>
+						<ImpactCard
+							title="Milestones Completed"
+							value={impact.milestones_completed.toString()}
+							icon="✅"
+							description="Total milestones completed by your funded scholars"
+						/>
+						<ImpactCard
+							title="Success Rate"
+							value={`${Math.round(impact.average_completion_rate * 100)}%`}
+							icon="📈"
+							description="Average milestone completion rate"
+						/>
+					</div>
+				</section>
+			)}
+
 			{/* Main Content */}
 			<div className="space-y-20">
 				<MyContributions
 					contributions={contributions}
-					totalContributed={stats.totalContributed}
+					totalContributed={Number(stats.total_contributed) / 1e7}
 				/>
 
-				<GovernancePower
-					balance={stats.governanceBalance}
-					percentage={stats.governancePercentage}
-				/>
+				<GovernancePower balance={stats.votes_cast} percentage={0} />
 
 				<ActiveVotes votes={votes} />
 
@@ -171,6 +231,28 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, icon, color }) => {
 				<span className={`text-2xl font-black ${color}`}>{icon}</span>
 				<p className="text-xl font-black line-clamp-1">{value}</p>
 			</div>
+		</div>
+	)
+}
+
+interface ImpactCardProps {
+	title: string
+	value: string
+	icon: string
+	description: string
+}
+
+const ImpactCard: React.FC<ImpactCardProps> = ({ title, value, icon, description }) => {
+	return (
+		<div className="glass-card p-6 rounded-2xl border border-white/5 group hover:border-white/20 transition-all">
+			<div className="flex items-start justify-between mb-4">
+				<span className="text-3xl">{icon}</span>
+				<div className="text-right">
+					<p className="text-2xl font-black text-white">{value}</p>
+				</div>
+			</div>
+			<h3 className="text-lg font-black text-white mb-2">{title}</h3>
+			<p className="text-white/60 text-sm leading-relaxed">{description}</p>
 		</div>
 	)
 }

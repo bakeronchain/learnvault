@@ -1,4 +1,4 @@
-import sgMail from "@sendgrid/mail"
+import { Resend } from "resend"
 import {
 	templates,
 	toPlainText,
@@ -13,9 +13,14 @@ export interface EmailOptions {
 }
 
 export class EmailService {
-	constructor(apiKey: string) {
-		if (apiKey) {
-			sgMail.setApiKey(apiKey)
+	private readonly from: string
+	private readonly resendClient?: Resend
+
+	constructor(apiKey?: string) {
+		this.from = process.env.EMAIL_FROM || "notifications@learnvault.xyz"
+		const resendApiKey = process.env.RESEND_API_KEY || apiKey
+		if (resendApiKey) {
+			this.resendClient = new Resend(resendApiKey)
 		}
 	}
 
@@ -37,22 +42,23 @@ export class EmailService {
 	}
 
 	async sendNotification(options: EmailOptions): Promise<boolean> {
-		if (!process.env.EMAIL_API_KEY) {
+		const { html, text } = await this.render(options.template, options.data)
+
+		if (!this.resendClient) {
 			console.log(
 				`[EmailService] MOCK SEND to ${options.to}: ${options.subject}`,
 			)
+			console.log(html)
 			return true
 		}
 
 		try {
-			const { html, text } = await this.render(options.template, options.data)
-
-			await sgMail.send({
+			await this.resendClient.emails.send({
+				from: this.from,
 				to: options.to,
-				from: process.env.EMAIL_FROM || "notifications@learnvault.xyz",
 				subject: options.subject,
-				text,
 				html,
+				text,
 			})
 
 			return true
@@ -61,6 +67,7 @@ export class EmailService {
 			return false
 		}
 	}
+
 	async sendAdminMilestoneNotification(
 		scholarName: string,
 		courseSlug: string,
@@ -98,6 +105,45 @@ export class EmailService {
 
 		return allSent
 	}
+
+	async sendAdminFlagNotification(
+		contentType: string,
+		contentId: number,
+		reason: string,
+		reporterAddress: string,
+	): Promise<boolean> {
+		const adminEmails = process.env.ADMIN_EMAILS
+
+		if (!adminEmails) {
+			console.warn(
+				"[EmailService] ADMIN_EMAILS not set, skipping flag notification.",
+			)
+			return false
+		}
+
+		const adminLink = `${process.env.FRONTEND_URL || "http://localhost:3000"}/admin/moderation`
+
+		const body = `New content flag: ${contentType} #${contentId} reported by ${reporterAddress}. Reason: ${reason}. Review it here: ${adminLink}`
+
+		const emails = adminEmails.split(",").map((email) => email.trim())
+
+		let allSent = true
+		for (const email of emails) {
+			const success = await this.sendNotification({
+				to: email,
+				subject: `New Content Flag - ${contentType.toUpperCase()}`,
+				template: "admin-alert",
+				data: {
+					body,
+					adminUrl: adminLink,
+					unsubscribeUrl: "#",
+				},
+			})
+			if (!success) allSent = false
+		}
+
+		return allSent
+	}
 }
 
-export const createEmailService = (apiKey: string) => new EmailService(apiKey)
+export const createEmailService = (apiKey?: string) => new EmailService(apiKey)

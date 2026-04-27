@@ -23,7 +23,8 @@
     "test:frontend": "vitest run",
     "test:contracts": "cargo test --workspace",
     "test:watch": "cargo watch -x 'test --workspace'",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "i18n:pseudo": "node scripts/generate-pseudo-locale.mjs"
   },
   "workspaces": [
     "packages/*"

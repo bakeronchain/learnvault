@@ -1,4 +1,5 @@
 import React from "react"
+import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 
 interface CourseCardProps {
@@ -44,6 +45,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
 	isEnrolled = false,
 	onEnroll,
 }) => {
+	const { t } = useTranslation()
 	const difficultyData = difficultyConfig[difficulty]
 
 	return (
@@ -69,7 +71,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
 					<span
 						className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border backdrop-blur-md ${difficultyData.className}`}
 					>
-						{difficultyData.label}
+						{t(difficultyData.labelKey)}
 					</span>
 				</div>
 			</div>
@@ -87,11 +89,11 @@ const CourseCard: React.FC<CourseCardProps> = ({
 				<div className="flex flex-wrap items-center justify-between py-4 border-t border-white/5 gap-4">
 					<div className="text-xs font-bold text-white/40 uppercase tracking-widest flex items-center gap-2">
 						<span className="text-lg opacity-80 leading-none">📖</span>{" "}
-						{lessonCount} Lessons
+						{lessonCount} {t("course.lessons", { count: lessonCount })}
 					</div>
 					<div className="text-xs font-bold text-brand-cyan uppercase tracking-widest bg-brand-cyan/10 px-3 py-1.5 rounded-xl border border-brand-cyan/20 flex items-center gap-1.5 shadow-inner shadow-brand-cyan/10">
-						<span className="text-[14px] leading-none">🏆</span> +{lrnReward}{" "}
-						LRN
+						<span className="text-[14px] leading-none">🏆</span> 
+						{t("course.lrnReward", { amount: lrnReward })}
 					</div>
 				</div>
 
@@ -102,14 +104,14 @@ const CourseCard: React.FC<CourseCardProps> = ({
 							to={`/courses/${id}/lessons/1`}
 							className="block w-full text-center py-4 glass rounded-2xl border border-white/10 text-white font-black hover:bg-white/10 hover:border-white/20 active:scale-95 transition-all text-xs uppercase tracking-[3px]"
 						>
-							Continue Track
+							{t("course.continueTrack")}
 						</Link>
 					) : (
 						<button
 							onClick={onEnroll}
 							className="w-full text-center py-4 bg-white text-black rounded-2xl border border-transparent hover:bg-brand-cyan hover:shadow-[0_0_20px_rgba(0,212,255,0.4)] hover:text-black active:scale-95 transition-all font-black text-xs uppercase tracking-[3px]"
 						>
-							Enroll Now
+							{t("course.enrollNow")}
 						</button>
 					)}
 				</div>

@@ -1,11 +1,13 @@
 import React from "react"
 import { type Vote } from "../../hooks/useDonor"
+import { useTranslation } from "react-i18next"
 
 interface ActiveVotesProps {
 	votes: Vote[]
 }
 
 export const ActiveVotes: React.FC<ActiveVotesProps> = ({ votes }) => {
+	const { t } = useTranslation()
 	const getStatusColor = (status: string) => {
 		switch (status) {
 			case "active":
@@ -35,7 +37,7 @@ export const ActiveVotes: React.FC<ActiveVotesProps> = ({ votes }) => {
 	return (
 		<section className="mb-20">
 			<div className="flex items-center gap-4 mb-12">
-				<h2 className="text-2xl font-black tracking-tight">Active Votes</h2>
+				<h2 className="text-2xl font-black tracking-tight">{t("pages.donor.activeVotes")}</h2>
 				<div className="h-px flex-1 bg-linear-to-r from-white/10 to-transparent" />
 			</div>
 
@@ -58,13 +60,13 @@ export const ActiveVotes: React.FC<ActiveVotesProps> = ({ votes }) => {
 											{vote.status}
 										</span>
 										<span className="text-xs text-white/40 uppercase font-black tracking-widest">
-											Proposal #{vote.proposalId}
+											{t("pages.donor.proposalNumber", { id: vote.proposalId })}
 										</span>
 									</div>
 								</div>
 								<div className="text-right">
 									<p className="text-[10px] text-white/40 uppercase font-black tracking-widest mb-1">
-										Your Vote
+										{t("pages.donor.yourVote")}
 									</p>
 									<p className="text-lg font-black text-gradient capitalize">
 										{vote.voteChoice}
@@ -76,7 +78,7 @@ export const ActiveVotes: React.FC<ActiveVotesProps> = ({ votes }) => {
 
 							<div>
 								<p className="text-xs text-white/40 uppercase font-black tracking-widest mb-3">
-									Voting Power Used
+									{t("pages.donor.votingPowerUsed")}
 								</p>
 								<div className="flex items-center justify-between gap-4">
 									<div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
@@ -97,11 +99,10 @@ export const ActiveVotes: React.FC<ActiveVotesProps> = ({ votes }) => {
 				<div className="glass-card p-12 rounded-[3rem] border border-white/5 text-center">
 					<div className="text-4xl mb-4">🗳️</div>
 					<p className="text-white/40 font-medium mb-4">
-						You haven't voted on any proposals yet.
+						{t("pages.donor.noVotesYet")}
 					</p>
 					<p className="text-xs text-white/30">
-						Once you gain governance power, you'll be able to vote on proposals
-						that shape the future of LearnVault.
+						{t("pages.donor.noVotesDesc")}
 					</p>
 				</div>
 			)}

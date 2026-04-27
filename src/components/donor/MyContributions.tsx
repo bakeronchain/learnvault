@@ -1,5 +1,6 @@
 import React from "react"
 import { type DonorContribution } from "../../hooks/useDonor"
+import { useTranslation } from "react-i18next"
 
 interface MyContributionsProps {
 	contributions: DonorContribution[]
@@ -10,6 +11,8 @@ export const MyContributions: React.FC<MyContributionsProps> = ({
 	contributions,
 	totalContributed,
 }) => {
+
+	const { t } = useTranslation()
 	const formatDate = (dateStr: string) => {
 		const date = new Date(dateStr)
 		return date.toLocaleDateString("en-US", {
@@ -22,14 +25,14 @@ export const MyContributions: React.FC<MyContributionsProps> = ({
 	return (
 		<section className="mb-20">
 			<div className="flex items-center gap-4 mb-12">
-				<h2 className="text-2xl font-black tracking-tight">My Contributions</h2>
+				<h2 className="text-2xl font-black tracking-tight">{t("pages.donor.myContributionsSection")}</h2>
 				<div className="h-px flex-1 bg-linear-to-r from-white/10 to-transparent" />
 			</div>
 
 			<div className="glass-card p-10 rounded-[3rem] border border-white/5 mb-12">
 				<div className="flex items-baseline justify-between mb-8">
 					<h3 className="text-sm text-white/40 uppercase font-black tracking-widest">
-						Total Deposited
+						{t("pages.donor.totalDeposited")}
 					</h3>
 					<p className="text-4xl font-black text-gradient">
 						${totalContributed.toLocaleString()}
@@ -37,8 +40,7 @@ export const MyContributions: React.FC<MyContributionsProps> = ({
 				</div>
 				<div className="h-px bg-white/5" />
 				<p className="text-xs mt-8 text-white/40 font-medium">
-					Help us shape the future of decentralized education. Your
-					contributions unlock governance voting power.
+					{t("pages.donor.helpDesc")}
 				</p>
 			</div>
 
@@ -60,7 +62,7 @@ export const MyContributions: React.FC<MyContributionsProps> = ({
 								</div>
 								<div className="text-right">
 									<p className="text-[10px] text-white/30 uppercase font-black tracking-widest mb-2">
-										Transaction Hash
+										{t("pages.donor.txHash")}
 									</p>
 									<a
 										href={`https://stellar.expert/explorer/testnet/tx/${contribution.txHash}`}
@@ -73,7 +75,7 @@ export const MyContributions: React.FC<MyContributionsProps> = ({
 								</div>
 							</div>
 							<div className="flex items-center gap-2 text-[10px] text-white/20">
-								<span>Block {contribution.block}</span>
+								<span>{t("pages.donor.block", { number: contribution.block })}</span>
 							</div>
 						</div>
 					))}
@@ -81,7 +83,7 @@ export const MyContributions: React.FC<MyContributionsProps> = ({
 			) : (
 				<div className="glass-card p-12 rounded-[3rem] border border-white/5 text-center">
 					<p className="text-white/40 font-medium">
-						No contributions yet. Make your first deposit to support scholars.
+						{t("pages.donor.noContributions")}
 					</p>
 				</div>
 			)}

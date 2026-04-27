@@ -12,6 +12,7 @@ on:
       - "vitest.config.ts"
       - "tsconfig*.json"
       - "eslint.config.js"
+      - "i18next-scanner.config.js"
 
 jobs:
   frontend:
@@ -25,7 +26,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          # We are REMOVING the cache line temporarily to force a clean download
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
@@ -35,6 +35,20 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Check translation keys
+        run: |
+          npx i18next-scanner \
+            --config i18next-scanner.config.js \
+            'src/**/*.{ts,tsx}' \
+            '!src/**/*.test.{ts,tsx}' \
+            '!src/locales/**'
+          if grep -q '"__MISSING__"' src/locales/en.json; then
+            echo "❌ Missing translation keys found in en.json"
+            grep -n '"__MISSING__"' src/locales/en.json
+            exit 1
+          fi
+          echo "✅ All translation keys are present"
 
       - name: Test with coverage
         run: npm run test:coverage

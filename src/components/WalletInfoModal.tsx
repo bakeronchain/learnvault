@@ -85,7 +85,7 @@ export const WalletInfoModal: React.FC<WalletInfoModalProps> = ({
 					className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-12"
 					aria-modal="true"
 					role="dialog"
-					aria-label="Wallet information"
+					aria-label={t("wallet.myWallet")}
 				>
 					{/* Backdrop */}
 					<motion.div
@@ -110,7 +110,7 @@ export const WalletInfoModal: React.FC<WalletInfoModalProps> = ({
 						<button
 							onClick={onClose}
 							className="absolute top-8 right-8 p-3 hover:bg-white/10 rounded-full transition-all hover:rotate-90 z-10 bg-white/5 border border-white/10"
-							aria-label="Close wallet modal"
+							aria-label={t("common.close")}
 						>
 							<svg
 								className="w-6 h-6 opacity-70"
@@ -145,10 +145,10 @@ export const WalletInfoModal: React.FC<WalletInfoModalProps> = ({
 
 								<div className="space-y-4">
 									<h2 className="text-3xl font-black tracking-tighter text-white leading-tight">
-										My Wallet
+										{t("wallet.myWallet")}
 									</h2>
 									<p className="text-xs font-black uppercase tracking-[0.3em] text-brand-cyan/60">
-										Trust Verified
+										{t("wallet.trustVerified")}
 									</p>
 									<AddressDisplay
 										address={address}
@@ -165,17 +165,17 @@ export const WalletInfoModal: React.FC<WalletInfoModalProps> = ({
 								<div className="space-y-12">
 									<div className="space-y-6">
 										<h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30">
-											Active Assets
+											{t("wallet.activeAssets")}
 										</h3>
 
 										<div className="space-y-6">
 											<div className="group p-6 rounded-3xl bg-white/5 border border-white/10 hover:border-brand-cyan/30 transition-all">
 												<div className="flex justify-between items-center mb-2">
 													<span className="text-xs font-bold text-white/40 group-hover:text-brand-cyan transition-colors">
-														LearnToken
+														{t("wallet.learnToken")}
 													</span>
 													<span className="text-[10px] font-black text-brand-cyan/40 bg-brand-cyan/5 px-2 py-0.5 rounded border border-brand-cyan/10">
-														GOVERNANCE
+														{t("wallet.governance")}
 													</span>
 												</div>
 												<p className="text-4xl font-black text-white tracking-tighter">
@@ -189,10 +189,10 @@ export const WalletInfoModal: React.FC<WalletInfoModalProps> = ({
 											<div className="group p-6 rounded-3xl bg-white/5 border border-white/10 hover:border-white/20 transition-all">
 												<div className="flex justify-between items-center mb-2">
 													<span className="text-xs font-bold text-white/40">
-														Native Assets
+														{t("wallet.nativeAssets")}
 													</span>
 													<span className="text-[10px] font-black text-white/20 bg-white/5 px-2 py-0.5 rounded border border-white/10">
-														GAS
+														{t("wallet.gas")}
 													</span>
 												</div>
 												<p className="text-2xl font-black text-white/90 tracking-tighter">
@@ -225,11 +225,11 @@ export const WalletInfoModal: React.FC<WalletInfoModalProps> = ({
 													d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
 												/>
 											</svg>
-											Disconnect Wallet
+											{t("wallet.disconnectWallet")}
 										</button>
 									</div>
 									<p className="mt-6 text-center text-[10px] text-white/10 uppercase tracking-[0.4em] font-black">
-										Stellar Protocol Level Security
+										{t("wallet.securityNote")}
 									</p>
 								</div>
 							</div>

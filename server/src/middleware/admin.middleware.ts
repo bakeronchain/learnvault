@@ -13,6 +13,7 @@ if (!JWT_SECRET) {
 
 export interface AdminRequest extends Request {
 	adminAddress?: string
+	walletAddress?: string
 }
 
 /**

@@ -236,6 +236,7 @@ const Courses: React.FC = () => {
 										<span>{course.track}</span>
 										<Link
 											to={`/courses/${course.slug}/lessons/1`}
+											id={paginatedCourses.indexOf(course) === 0 ? "course-card-0" : undefined}
 											className="iridescent-border w-full sm:w-auto text-center px-4 py-2 rounded-xl font-semibold text-white hover:scale-105 transition-transform"
 										>
 											Open course

@@ -18,6 +18,7 @@ import { NotificationBell } from "./NotificationBell"
 import { ReputationBadge } from "./ReputationBadge"
 import { ThemeToggle } from "./ThemeToggle"
 import { WalletButton } from "./WalletButton"
+import { getAuthToken } from "../util/auth"
 
 export default function NavBar() {
 	const [menuOpen, setMenuOpen] = useState(false)
@@ -62,6 +63,7 @@ export default function NavBar() {
 
 	const queryClient = useQueryClient()
 	const { address } = useWallet()
+	const token = getAuthToken()
 
 	const handlePrefetch = useCallback(
 		(to: string) => {
@@ -129,6 +131,7 @@ export default function NavBar() {
 						<NavLink
 							key={to}
 							to={to}
+							id={to === "/courses" ? "courses-nav-link" : undefined}
 							onMouseEnter={() => handlePrefetch(to)}
 							className={({ isActive }) =>
 								`px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${

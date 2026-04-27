@@ -244,6 +244,37 @@ export function useProposals() {
 		},
 	})
 
+	const cancelProposalMutation = useMutation({
+		mutationFn: async (proposalId: number) => {
+			if (!address) {
+				throw new Error("Connect your wallet to cancel proposal")
+			}
+
+			const response = await fetch(
+				`${API_BASE}/api/proposals/${proposalId}/cancel`,
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({
+						author_address: address,
+					}),
+				},
+			)
+
+			return readJson<{ message: string }>(response)
+		},
+		onSuccess: async (_data, proposalId) => {
+			await queryClient.invalidateQueries({
+				queryKey: ["proposals"],
+			})
+			await queryClient.invalidateQueries({
+				queryKey: ["proposal", proposalId],
+			})
+		},
+	})
+
 	return {
 		proposals: proposalsQuery.data?.proposals ?? [],
 		total: proposalsQuery.data?.total ?? 0,
@@ -258,6 +289,8 @@ export function useProposals() {
 		isSubmittingProposal: createProposalMutation.isPending,
 		castVote: castVoteMutation.mutateAsync,
 		isVoting: castVoteMutation.isPending,
+		cancelProposal: cancelProposalMutation.mutateAsync,
+		isCancelling: cancelProposalMutation.isPending,
 		walletAddress: address,
 	}
 }

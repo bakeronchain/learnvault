@@ -3,6 +3,7 @@ import { Outlet, Route, Routes } from "react-router-dom"
 import ErrorBoundary from "./components/ErrorBoundary"
 import Footer from "./components/Footer"
 import NavBar from "./components/NavBar"
+import { OnboardingTour } from "./components/OnboardingTour"
 import NetworkPreconnect from "./components/NetworkPreconnect"
 import TestnetBanner from "./components/TestnetBanner"
 import { ToastProvider } from "./components/Toast/ToastProvider"
@@ -113,7 +114,8 @@ const AppLayout = () => (
 		<NetworkPreconnect />
 		<TestnetBanner />
 		<NavBar />
-		<main className="flex-1 relative z-10">
+		<OnboardingTour />
+		<main id="main-content" className="flex-1 relative z-10" tabIndex={-1}>
 			<Outlet />
 		</main>
 		<Footer />

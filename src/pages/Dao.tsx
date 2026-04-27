@@ -1,11 +1,72 @@
-import React from "react"
 import { Link } from "react-router-dom"
+import { useDelegation } from "../hooks/useDelegation"
 import { useProposals } from "../hooks/useProposals"
 import { useWallet } from "../hooks/useWallet"
+import { hasProposalDraft } from "../util/proposalDraft"
+import { useState, useEffect } from "react"
+
+const GOV_DECIMALS = 7
+const GOV_DIVISOR = 10 ** GOV_DECIMALS
+
+function formatGov(raw: string): string {
+	const n = Number(raw) / GOV_DIVISOR
+	return n.toLocaleString("en-US", { maximumFractionDigits: 2 })
+}
+
+function shortenAddress(addr: string): string {
+	if (addr.length <= 12) return addr
+	return `${addr.slice(0, 6)}…${addr.slice(-4)}`
+}
 
 export default function Dao() {
 	const { address } = useWallet()
 	const { proposals, votingPower, isLoading } = useProposals()
+	const [hasDraft, setHasDraft] = useState(false)
+
+	useEffect(() => {
+		setHasDraft(hasProposalDraft())
+	}, [])
+	const {
+		delegatee,
+		isDelegating,
+		ownBalance,
+		delegatedToMe,
+		votingPower: onChainVotingPower,
+		isLoading: isDelegationLoading,
+		isUpdating,
+		delegateTo,
+		undelegate,
+	} = useDelegation()
+
+	const [delegateeInput, setDelegateeInput] = useState("")
+	const [inputError, setInputError] = useState<string | null>(null)
+
+	const handleDelegate = async () => {
+		setInputError(null)
+		const trimmed = delegateeInput.trim()
+		if (!trimmed) {
+			setInputError("Enter the Stellar address of your delegatee.")
+			return
+		}
+		try {
+			await delegateTo(trimmed)
+			setDelegateeInput("")
+		} catch {
+			// errors handled in hook via toast
+		}
+	}
+
+	const handleUndelegate = async () => {
+		try {
+			await undelegate()
+		} catch {
+			// errors handled in hook via toast
+		}
+	}
+
+	const ownFmt = formatGov(ownBalance)
+	const delegatedFmt = formatGov(delegatedToMe)
+	const effectiveFmt = formatGov(onChainVotingPower)
 
 	return (
 		<div className="p-8 md:p-12 max-w-5xl mx-auto text-white animate-in fade-in duration-700">
@@ -60,7 +121,7 @@ export default function Dao() {
 				</Link>
 				<Link
 					to="/dao/propose"
-					className={`px-10 py-4 glass text-white rounded-2xl font-black text-sm uppercase tracking-widest border border-white/10 transition-all ${
+					className={`relative px-10 py-4 glass text-white rounded-2xl font-black text-sm uppercase tracking-widest border border-white/10 transition-all ${
 						address
 							? "hover:bg-white/10 hover:scale-105 active:scale-95"
 							: "opacity-40 pointer-events-none"
@@ -68,6 +129,9 @@ export default function Dao() {
 					data-testid="create-proposal"
 				>
 					Create Proposal
+					{hasDraft && (
+						<span className="absolute -top-2 -right-2 w-4 h-4 bg-brand-amber rounded-full border-2 border-background animate-pulse" />
+					)}
 				</Link>
 			</div>
 

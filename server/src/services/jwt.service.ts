@@ -6,6 +6,9 @@ import { type TokenStore } from "../db/token-store"
 
 const JWT_EXPIRY = "24h"
 
+export const JWT_ISSUER = "learnvault"
+export const JWT_AUDIENCE = "learnvault-api"
+
 function normalizePem(pem: string): string {
 	return pem.replace(/\\n/g, "\n").trim()
 }
@@ -25,7 +28,7 @@ export function generateEphemeralDevJwtKeys(): {
 
 export type JwtService = {
 	signWalletToken(stellarAddress: string): string
-	verifyWalletToken(token: string): Promise<{ sub: string }>
+	verifyWalletToken(token: string): Promise<{ sub: string; jti: string }>
 	revokeToken(token: string): Promise<void>
 }
 
@@ -39,13 +42,19 @@ export function createJwtService(
 
 	return {
 		signWalletToken(stellarAddress: string): string {
-			return jwt.sign({ sub: stellarAddress }, privateKey, {
-				algorithm: "RS256",
-				expiresIn: JWT_EXPIRY,
-			})
+			return jwt.sign(
+				{ sub: stellarAddress, jti: crypto.randomUUID() },
+				privateKey,
+				{
+					algorithm: "RS256",
+					expiresIn: JWT_EXPIRY,
+					issuer: JWT_ISSUER,
+					audience: JWT_AUDIENCE,
+				},
+			)
 		},
 
-		async verifyWalletToken(token: string): Promise<{ sub: string }> {
+		async verifyWalletToken(token: string): Promise<{ sub: string; jti: string }> {
 			const isRevoked = await tokenStore.isRevoked(token)
 			if (isRevoked) {
 				throw new Error("Token has been revoked")
@@ -53,13 +62,18 @@ export function createJwtService(
 
 			const decoded = jwt.verify(token, publicKey, {
 				algorithms: ["RS256"],
-			}) as { sub?: string }
+				issuer: JWT_ISSUER,
+				audience: JWT_AUDIENCE,
+			}) as { sub?: string; jti?: string }
 
 			if (typeof decoded.sub !== "string" || decoded.sub.length === 0) {
-				throw new Error("Invalid token payload")
+				throw new Error("Invalid token payload: missing sub")
+			}
+			if (typeof decoded.jti !== "string" || decoded.jti.length === 0) {
+				throw new Error("Invalid token payload: missing jti")
 			}
 
-			return { sub: decoded.sub }
+			return { sub: decoded.sub, jti: decoded.jti }
 		},
 
 		async revokeToken(token: string): Promise<void> {

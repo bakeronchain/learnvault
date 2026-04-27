@@ -84,7 +84,10 @@ setupConsoleRequestTracing()
 
 const isProduction = env.NODE_ENV === "production"
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> upstream/main
 let jwtPrivateKey = env.JWT_PRIVATE_KEY
 let jwtPublicKey = env.JWT_PUBLIC_KEY
 
@@ -181,7 +184,7 @@ app.use("/api", createScholarsRouter(jwtService))
 app.use("/api", adminRouter)
 app.use("/api", adminMilestonesRouter)
 app.use("/api", moderationRouter)
-app.use("/api", createScholarsRouter(jwtService))
+
 app.use("/api", createUserProfileRouter(jwtService))
 app.use("/api", createUploadRouter(jwtService))
 app.use("/api", enrollmentsRouter)

@@ -162,6 +162,8 @@ const Profile: React.FC = () => {
 		void fetchProfileData()
 	}, [fetchProfileData])
 
+
+
 	useEffect(() => {
 		void fetchCredentials()
 	}, [fetchCredentials])
@@ -221,8 +223,8 @@ const Profile: React.FC = () => {
 		Object.values(userProfile.socialLinks).some(Boolean)
 
 	const siteUrl = "https://learnvault.app"
-	const lrnBalance = profile?.lrn_balance || stats?.lrnBalance.toLocaleString() || "0"
-	const coursesCompleted = nfts.length
+	const lrnBalance = stats?.lrnBalance?.toLocaleString() || profile?.lrn_balance?.toLocaleString() || "0"
+	const coursesCompleted = stats?.coursesCompleted ?? nfts.length
 	const title = `${displayName} — ${lrnBalance} LRN · ${coursesCompleted} Course${
 		coursesCompleted !== 1 ? "s" : ""
 	} — LearnVault`
@@ -286,6 +288,11 @@ const Profile: React.FC = () => {
 					<h1 className="text-4xl font-black mb-3 tracking-tighter">
 						{displayName}
 					</h1>
+					{bio && (
+						<p className="text-white/70 mb-4 max-w-lg mx-auto md:mx-0 line-clamp-3">
+							{bio}
+						</p>
+					)}
 					<div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mb-4">
 						{displayAddress ? (
 							<div className="flex items-center gap-6">
@@ -307,11 +314,6 @@ const Profile: React.FC = () => {
 							</code>
 						)}
 					</div>
-					{bio && (
-						<p className="text-white/70 mb-6 max-w-lg mx-auto md:mx-0 line-clamp-3">
-							{bio}
-						</p>
-					)}
 					<div className="flex flex-wrap justify-center md:justify-start gap-6 mb-6">
 						<div className="flex gap-4">
 							<div className="text-center md:text-left">
@@ -453,7 +455,6 @@ const Profile: React.FC = () => {
 				</section>
 			)}
 
-			<ProfileLinkedWallets />
 			<section>
 				<div className="flex items-center gap-4 mb-12">
 					<h2 className="text-2xl font-black tracking-tight">

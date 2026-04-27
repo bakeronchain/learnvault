@@ -5,11 +5,13 @@ import { initReactI18next } from "react-i18next"
 import en from "./locales/en.json"
 import fr from "./locales/fr.json"
 import sw from "./locales/sw.json"
+import ps from "./locales/ps.json"
 
 const resources = {
 	en: { translation: en },
 	fr: { translation: fr },
 	sw: { translation: sw },
+	ps: { translation: ps },
 }
 
 void i18n

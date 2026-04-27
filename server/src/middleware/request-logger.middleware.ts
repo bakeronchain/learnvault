@@ -2,16 +2,11 @@ import { randomUUID } from "crypto"
 import { type NextFunction, type Request, type Response } from "express"
 import { runWithRequestContext } from "../lib/request-context"
 
-type LogPayload = {
-	requestId: string
-	method: string
-	path: string
-	statusCode: number
-	durationMs: number
-}
+import { logger as rootLogger } from "../lib/logger"
 
+// Minimal interface so tests can inject a spy without depending on pino internals.
 type Logger = {
-	info: (payload: LogPayload) => void
+	info: (payload: Record<string, unknown>) => void
 }
 
 type RequestLoggerOptions = {
@@ -19,15 +14,15 @@ type RequestLoggerOptions = {
 	enabled?: boolean
 }
 
-const jsonLogger: Logger = {
+const defaultLogger: Logger = {
 	info(payload) {
-		process.stdout.write(`${JSON.stringify(payload)}\n`)
+		rootLogger.info(payload, "request")
 	},
 }
 
 export function createRequestLogger(options: RequestLoggerOptions = {}) {
 	const enabled = options.enabled ?? process.env.NODE_ENV !== "test"
-	const logger = options.logger ?? jsonLogger
+	const log = options.logger ?? defaultLogger
 
 	return function requestLogger(
 		req: Request,
@@ -49,7 +44,7 @@ export function createRequestLogger(options: RequestLoggerOptions = {}) {
 				const durationMs =
 					Number(process.hrtime.bigint() - startedAt) / 1_000_000
 
-				logger.info({
+				log.info({
 					requestId,
 					method: req.method,
 					path: req.originalUrl || req.path,

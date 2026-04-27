@@ -2,7 +2,10 @@ import fs from "fs/promises"
 import path from "path"
 import { type Request, type Response } from "express"
 
+import { logger } from "../lib/logger"
 import { pool } from "../db/index"
+
+const log = logger.child({ module: "credentials" })
 import { pinJsonToIPFS, getGatewayUrl } from "../services/pinata.service"
 
 // ---------------------------------------------------------------------------
@@ -187,7 +190,7 @@ export async function createCredentialMetadata(
 			},
 		})
 	} catch (error) {
-		console.error("Error creating credential metadata:", error)
+		log.error({ err: error }, "Error creating credential metadata")
 
 		if (
 			error instanceof Error &&
@@ -246,7 +249,7 @@ export async function getCredentialsByAddress(
 
 		res.status(200).json({ data })
 	} catch (error) {
-		console.error("Error fetching credentials by address:", error)
+		log.error({ err: error }, "Error fetching credentials by address")
 		res.status(500).json({
 			error: "Internal server error",
 			message: "Failed to fetch credentials",

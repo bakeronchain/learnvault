@@ -1,14 +1,17 @@
 import { rpc } from "@stellar/stellar-sdk" // dynamic later
 import { INDEXER_CONFIG, getPollingTargets } from "../lib/event-config"
+import { logger } from "../lib/logger"
 import {
 	indexEventsBatch,
 	getLastIndexedLedger,
 } from "../services/event-indexer.service"
 
+const log = logger.child({ module: "poller" })
+
 let pollInterval: NodeJS.Timeout | null = null
 
 export async function startEventPoller(): Promise<void> {
-	console.log("[poller] Starting event indexer...")
+	log.info("Starting event indexer")
 
 	// Get global latest ledger
 	const network = new rpc.Server(process.env.SOROBAN_RPC_URL!)
@@ -35,12 +38,17 @@ export async function startEventPoller(): Promise<void> {
 
 			currentLedger = latestLedger
 		} catch (err) {
-			console.error("[poller] Poll failed:", err)
+			log.error({ err }, "Poll failed")
 		}
 	}, INDEXER_CONFIG.pollIntervalMs)
 
-	console.log(
-		`[poller] Running - poll ${INDEXER_CONFIG.pollIntervalMs}ms, batch ${INDEXER_CONFIG.batchSize}, from ledger ${INDEXER_CONFIG.startingLedger}`,
+	log.info(
+		{
+			intervalMs: INDEXER_CONFIG.pollIntervalMs,
+			batchSize: INDEXER_CONFIG.batchSize,
+			startingLedger: INDEXER_CONFIG.startingLedger,
+		},
+		"Poller running",
 	)
 }
 
@@ -49,7 +57,7 @@ export function stopEventPoller(): void {
 		clearInterval(pollInterval)
 		pollInterval = null
 	}
-	console.log("[poller] Stopped")
+	log.info("Poller stopped")
 }
 
 // Graceful shutdown

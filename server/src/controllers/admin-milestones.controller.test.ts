@@ -17,6 +17,9 @@
  *     - returns only pending reports
  */
 
+// Provide JWT_SECRET explicitly — no hardcoded fallback exists anymore.
+process.env.JWT_SECRET = "learnvault-secret"
+
 // Must be declared before any imports so Jest hoisting works correctly.
 jest.mock("../db/index", () => ({
 	pool: { query: jest.fn(), connect: jest.fn() },

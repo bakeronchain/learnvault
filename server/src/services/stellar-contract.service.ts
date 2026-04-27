@@ -6,6 +6,9 @@
 
 import { pool } from "../db/index"
 import { getRequestId } from "../lib/request-context"
+import { logger } from "../lib/logger"
+
+const log = logger.child({ module: "stellar" })
 
 const STELLAR_NETWORK = process.env.STELLAR_NETWORK ?? "testnet"
 const STELLAR_SECRET_KEY = process.env.STELLAR_SECRET_KEY ?? ""
@@ -131,7 +134,7 @@ async function withRetry<T>(
 				break
 			}
 			const delayMs = 500 * 2 ** (attempt - 1) // 500 ms, 1 s, 2 s, …
-			console.warn(
+			log.warn(
 				`[stellar] ${label} failed (attempt ${attempt}/${maxAttempts}), retrying in ${delayMs}ms…`,
 				err instanceof Error ? err.message : String(err),
 			)
@@ -289,7 +292,7 @@ async function callVerifyMilestone(
 			if (msg.includes("is not the contract admin")) {
 				throw err
 			}
-			console.error("[stellar] Contract call failed:", err)
+			log.error({ err }, "Contract call failed")
 			throw new Error(
 				"Contract call failed: " +
 					(err instanceof Error ? err.message : String(err)),
@@ -368,7 +371,7 @@ async function emitRejectionEvent(
 			if (msg.includes("is not the contract admin")) {
 				throw err
 			}
-			console.error("[stellar] Rejection event failed:", err)
+			log.error({ err }, "Rejection event failed")
 			throw new Error(
 				"Rejection event failed: " +
 					(err instanceof Error ? err.message : String(err)),
@@ -433,12 +436,11 @@ async function callMintScholarNFT(
 			prepared.sign(keypair)
 
 			const result = await server.sendTransaction(prepared)
-			return { txHash: result.hash, simulated: false }
+			return { txHash: result.hash, simulated: false, tokenId }
 		} catch (err) {
-			console.error("[stellar] ScholarNFT mint failed:", err)
+			log.error({ err }, "ScholarNFT mint failed")
 			throw new Error(
-				"ScholarNFT mint failed: " +
-					(err instanceof Error ? err.message : String(err)),
+				`ScholarNFT mint failed: ${err instanceof Error ? err.message : String(err)}`,
 			)
 		}
 	}, 3, "callMintScholarNFT")
@@ -453,9 +455,7 @@ async function isEnrolled(
 	_options: RequestTraceOptions = {},
 ): Promise<boolean> {
 	if (!COURSE_MILESTONE_CONTRACT_ID) {
-		console.warn(
-			"[stellar] COURSE_MILESTONE_CONTRACT_ID not set — simulating enrollment check",
-		)
+		log.warn("COURSE_MILESTONE_CONTRACT_ID not set — simulating enrollment check")
 		return true // In dev mode, assume enrolled
 	}
 
@@ -501,7 +501,7 @@ async function isEnrolled(
 		const simResult = await server.simulateTransaction(tx)
 
 		if (rpc.Api.isSimulationError(simResult)) {
-			console.error("[stellar] is_enrolled simulation failed:", simResult.error)
+			log.error({ err: simResult.error }, "is_enrolled simulation failed")
 			return false
 		}
 
@@ -512,7 +512,7 @@ async function isEnrolled(
 
 		return false
 	} catch (err) {
-		console.error("[stellar] is_enrolled check failed:", err)
+		log.error({ err }, "is_enrolled check failed")
 		return false
 	}
 }
@@ -582,7 +582,7 @@ async function submitScholarshipProposal(
 
 			return { txHash: result.hash, proposalId: null, simulated: false }
 		} catch (err) {
-			console.error("[stellar] Scholarship proposal submission failed:", err)
+			log.error({ err }, "Scholarship proposal submission failed")
 			throw new Error(
 				"Scholarship proposal submission failed: " +
 					(err instanceof Error ? err.message : String(err)),
@@ -657,7 +657,7 @@ async function castVote(
 
 		return { txHash: result.hash, simulated: false }
 	} catch (err) {
-		console.error("[stellar] Cast vote failed:", err)
+		log.error({ err }, "Cast vote failed")
 		throw new Error(
 			"Cast vote failed: " + (err instanceof Error ? err.message : String(err)),
 		)
@@ -728,7 +728,7 @@ async function cancelProposal(
 
 		return { txHash: result.hash, simulated: false }
 	} catch (err) {
-		console.error("[stellar] Cancel proposal failed:", err)
+		log.error({ err }, "Cancel proposal failed")
 		throw new Error(
 			"Cancel proposal failed: " +
 				(err instanceof Error ? err.message : String(err)),
@@ -799,7 +799,7 @@ async function reclaimInactiveEscrow(
 		const result = await server.sendTransaction(prepared)
 		return { txHash: result.hash, simulated: false }
 	} catch (err) {
-		console.error("[stellar] reclaim_inactive failed:", err)
+		log.error({ err }, "reclaim_inactive failed")
 		throw new Error(
 			"reclaim_inactive failed: " +
 				(err instanceof Error ? err.message : String(err)),
@@ -809,9 +809,7 @@ async function reclaimInactiveEscrow(
 
 async function getLearnTokenBalance(address: string): Promise<string> {
 	if (!LEARN_TOKEN_CONTRACT_ID) {
-		console.warn(
-			"[stellar] LEARN_TOKEN_CONTRACT_ID not set — simulating balance",
-		)
+		log.warn("LEARN_TOKEN_CONTRACT_ID not set — simulating balance")
 		return "10000000000" // 1000 LRN
 	}
 	try {
@@ -849,16 +847,14 @@ async function getLearnTokenBalance(address: string): Promise<string> {
 		const { scValToNative } = await import("@stellar/stellar-sdk")
 		return scValToNative(simResult.result?.retval!).toString()
 	} catch (err) {
-		console.error("[stellar] getLearnTokenBalance failed:", err)
+		log.error({ err }, "getLearnTokenBalance failed")
 		return "0"
 	}
 }
 
 async function getGovernanceTokenBalance(address: string): Promise<string> {
 	if (!GOVERNANCE_TOKEN_CONTRACT_ID) {
-		console.warn(
-			"[stellar] GOVERNANCE_TOKEN_CONTRACT_ID not set — simulating balance",
-		)
+		log.warn("GOVERNANCE_TOKEN_CONTRACT_ID not set — simulating balance")
 		return "1250000000"
 	}
 	try {
@@ -896,14 +892,14 @@ async function getGovernanceTokenBalance(address: string): Promise<string> {
 		const { scValToNative } = await import("@stellar/stellar-sdk")
 		return scValToNative(simResult.result?.retval!).toString()
 	} catch (err) {
-		console.error("[stellar] getGovernanceTokenBalance failed:", err)
+		log.error({ err }, "getGovernanceTokenBalance failed")
 		return "0"
 	}
 }
 
 async function getGovernanceVotingPower(address: string): Promise<string> {
 	if (!GOVERNANCE_TOKEN_CONTRACT_ID) {
-		console.warn(
+		log.warn(
 			"[stellar] GOVERNANCE_TOKEN_CONTRACT_ID not set — simulating voting power",
 		)
 		return "1250000000"
@@ -945,7 +941,7 @@ async function getGovernanceVotingPower(address: string): Promise<string> {
 		const { scValToNative } = await import("@stellar/stellar-sdk")
 		return scValToNative(simResult.result?.retval!).toString()
 	} catch (err) {
-		console.error("[stellar] getGovernanceVotingPower failed:", err)
+		log.error({ err }, "getGovernanceVotingPower failed")
 		return "0"
 	}
 }
@@ -993,16 +989,14 @@ async function getGovernanceDelegation(
 		// Option<Address> → null (None) or an Address string (Some)
 		return typeof raw === "string" ? raw : null
 	} catch (err) {
-		console.error("[stellar] getGovernanceDelegation failed:", err)
+		log.error({ err }, "getGovernanceDelegation failed")
 		return null
 	}
 }
 
 async function getEnrolledCourses(address: string): Promise<string[]> {
 	if (!COURSE_MILESTONE_CONTRACT_ID) {
-		console.warn(
-			"[stellar] COURSE_MILESTONE_CONTRACT_ID not set — simulating enrollments",
-		)
+		log.warn("COURSE_MILESTONE_CONTRACT_ID not set — simulating enrollments")
 		return ["stellar-basics", "defi-101"]
 	}
 	return ["stellar-basics", "defi-101"]
@@ -1042,7 +1036,7 @@ async function getScholarCredentials(address: string): Promise<any[]> {
 			revoked: row.revoked,
 		}))
 	} catch (err) {
-		console.error("[stellar] getScholarCredentials failed:", err)
+		log.error({ err }, "getScholarCredentials failed")
 		return []
 	}
 }

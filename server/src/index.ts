@@ -14,7 +14,6 @@ import express, {
 	type NextFunction,
 } from "express"
 import helmet from "helmet"
-import morgan from "morgan"
 import swaggerUi from "swagger-ui-express"
 import YAML from "yaml"
 import { z } from "zod"
@@ -54,6 +53,7 @@ import {
 	createJwtService,
 	generateEphemeralDevJwtKeys,
 } from "./services/jwt.service"
+import { logger } from "./lib/logger"
 
 const _ignoredPemString = z
 	.string()
@@ -102,8 +102,8 @@ if (!jwtPrivateKey || !jwtPublicKey) {
 			"JWT_PRIVATE_KEY and JWT_PUBLIC_KEY environment variables are required in production",
 		)
 	}
-	console.warn(
-		"⚠️  JWT keys not found in .env — generating ephemeral keys (tokens will reset on restart)",
+	logger.warn(
+		"JWT keys not found in .env — generating ephemeral keys (tokens will reset on restart)",
 	)
 	const ephemeral = generateEphemeralDevJwtKeys()
 	jwtPrivateKey = ephemeral.privateKeyPem
@@ -214,7 +214,7 @@ app.use(
 			if (allowedOrigins.includes(origin)) {
 				callback(null, true)
 			} else {
-				console.warn(`CORS blocked request from origin: ${origin}`)
+				logger.warn({ origin }, "CORS blocked request")
 				callback(new Error("Not allowed by CORS"))
 			}
 		},
@@ -251,6 +251,21 @@ app.use("/api", adminRouter)
 app.use("/api", adminMilestonesRouter)
 app.use("/api", moderationRouter)
 app.use("/api", createUploadRouter(jwtService))
+app.use("/api", enrollmentsRouter)
+app.use("/api", profilesRouter)
+app.use("/api", createBookmarksRouter(jwtService))
+app.use("/api", scholarshipsRouter)
+app.use("/api", treasuryRouter)
+app.use("/api", donorsRouter)
+app.use("/api", notificationsRouter)
+app.use("/api/wiki", wikiRouter)
+
+// Start event poller (non-prod only for now)
+if (process.env.NODE_ENV !== "production") {
+	void import("./workers/event-poller").then(({ startEventPoller }) => {
+		void startEventPoller().catch((err) => logger.error({ err }, "Event poller failed"))
+	})
+}
 
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(openApiSpec))
 
@@ -262,6 +277,16 @@ app.use(errorHandler)
 async function start() {
 	const skipDb = process.env.SKIP_DB === "true"
 
+initDb()
+	.then(() => {
+		app.listen(env.PORT, () => {
+			logger.info({ port: env.PORT }, "Server listening")
+		})
+	})
+	.catch((err) => {
+		logger.error({ err }, "Failed to initialize database")
+		process.exit(1)
+	})
 	if (skipDb) {
 		console.warn(
 			"⚠️  SKIP_DB=true — skipping database initialization (dev/test mode only)",

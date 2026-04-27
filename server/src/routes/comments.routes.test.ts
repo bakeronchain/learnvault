@@ -44,7 +44,7 @@ const testJwtService = {
 		if (!sub) throw new Error("Invalid token")
 		return { sub }
 	},
-	revokeToken: async () => {},
+	revokeToken: jest.fn().mockResolvedValue(undefined),
 }
 
 const buildApp = (): Express => {

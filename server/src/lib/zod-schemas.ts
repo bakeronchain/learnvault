@@ -8,11 +8,14 @@ const requiredString = (field: string, maxLength?: number) => {
 		})
 		.trim()
 		.min(1, `${field} is required`)
-	
+
 	if (maxLength) {
-		return schema.max(maxLength, `${field} must be ${maxLength} characters or fewer`)
+		return schema.max(
+			maxLength,
+			`${field} must be ${maxLength} characters or fewer`,
+		)
 	}
-	
+
 	return schema
 }
 
@@ -23,11 +26,13 @@ const optionalTrimmedString = (field: string, maxLength?: number) => {
 		})
 		.trim()
 		.min(1, `${field} cannot be empty`)
-	
+
 	if (maxLength) {
-		return schema.max(maxLength, `${field} must be ${maxLength} characters or fewer`).optional()
+		return schema
+			.max(maxLength, `${field} must be ${maxLength} characters or fewer`)
+			.optional()
 	}
-	
+
 	return schema.optional()
 }
 
@@ -54,6 +59,19 @@ export const milestoneReportIdParamSchema = z
 				invalid_type_error: "id must be a string",
 			})
 			.regex(/^[1-9]\d*$/, "id must be a positive integer"),
+	})
+	.strict()
+
+export const peerReviewSubmitBodySchema = z
+	.object({
+		verdict: z.enum(["approve", "reject"], {
+			required_error: "verdict is required",
+			invalid_type_error: "verdict must be approve or reject",
+		}),
+		comment: z
+			.string()
+			.max(500, "comment must be 500 characters or fewer")
+			.optional(),
 	})
 	.strict()
 
@@ -170,6 +188,12 @@ export const batchRejectMilestonesBodySchema = z
 	})
 	.strict()
 
+export const updateCommentBodySchema = z
+	.object({
+		content: requiredString("content", 2000),
+	})
+	.strict()
+
 export const createCommentBodySchema = z
 	.object({
 		proposalId: optionalTrimmedString("proposalId", 100),
@@ -260,8 +284,32 @@ export const createCredentialMetadataBodySchema = z
 
 export const enrollmentBodySchema = z
 	.object({
-		learner_address: requiredString("learner_address", 100),
+		learner_address: requiredString("learner_address"),
+		course_id: requiredString("course_id"),
+		tx_hash: requiredString("tx_hash"),
+	})
+	.strict()
+
+export const bookmarkBodySchema = z
+	.object({
 		course_id: requiredString("course_id", 100),
-		tx_hash: requiredString("tx_hash", 200),
+	})
+	.strict()
+
+export const bookmarkCourseIdParamSchema = z
+	.object({
+		courseId: requiredString("courseId", 100),
+	})
+	.strict()
+
+export const bookmarkBodySchema = z
+	.object({
+		course_id: requiredString("course_id", 100),
+	})
+	.strict()
+
+export const bookmarkCourseIdParamSchema = z
+	.object({
+		courseId: requiredString("courseId", 100),
 	})
 	.strict()

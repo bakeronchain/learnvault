@@ -18,6 +18,7 @@ interface CourseMetadata {
 interface NFTAttribute {
 	trait_type: string
 	value: string
+	[key: string]: any
 }
 
 interface NFTMetadata {
@@ -25,7 +26,9 @@ interface NFTMetadata {
 	description: string
 	image: string
 	attributes: NFTAttribute[]
+	[key: string]: any
 }
+
 
 interface CreateMetadataRequest {
 	course_id: string
@@ -170,7 +173,10 @@ export async function createCredentialMetadata(
 
 		// Upload to IPFS via Pinata
 		const metadataName = `${course_id}-${learner_address}-${Date.now()}`
-		const cid = await pinJsonToIPFS(metadata, metadataName)
+		const cid = await pinJsonToIPFS(metadata as any, metadataName)
+		if (!cid) {
+			throw new Error("Failed to pin metadata to IPFS")
+		}
 
 		// Build response
 		const metadataUri = `ipfs://${cid}`

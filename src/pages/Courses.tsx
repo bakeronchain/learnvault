@@ -1,6 +1,7 @@
 import { BookOpen } from "lucide-react"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useSearchParams } from "react-router-dom"
+import BookmarkButton from "../components/BookmarkButton"
 import { CourseFilter } from "../components/CourseFilter"
 import Pagination from "../components/Pagination"
 import { CourseCardSkeleton } from "../components/skeletons/CourseCardSkeleton"
@@ -209,8 +210,12 @@ const Courses: React.FC = () => {
 						{paginatedCourses.map((course) => (
 							<article
 								key={course.id}
-								className="glass-card rounded-4xl flex flex-col h-full border border-white/10 overflow-hidden group"
+								className="glass-card rounded-4xl flex flex-col h-full border border-white/10 overflow-hidden group relative"
 							>
+								{/* Bookmark toggle — hidden when wallet not connected */}
+								<div className="absolute top-4 right-4 z-10">
+									<BookmarkButton courseId={course.id} />
+								</div>
 								<div
 									className={`h-36 bg-linear-to-br ${course.accentClassName} border-b border-white/10`}
 								/>

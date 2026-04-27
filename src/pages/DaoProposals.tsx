@@ -18,8 +18,6 @@ type FilterType =
 	| "Rejected"
 	| "All"
 
-type SortType = "newest" | "most-votes" | "ending-soon"
-
 const ITEMS_PER_PAGE = 5
 
 import AddressDisplay from "../components/AddressDisplay"
@@ -52,10 +50,6 @@ const getFilterValue = (proposal: ProposalRecord): FilterType => {
 const DaoProposals: React.FC = () => {
 	const [searchParams, setSearchParams] = useSearchParams()
 	const [filter, setFilter] = useState<FilterType>("Voting Open")
-	const [sort, setSort] = useState<SortType>("newest")
-	const [searchQuery, setSearchQuery] = useState(
-		() => searchParams.get("q") ?? "",
-	)
 	const [now, setNow] = useState(() => Date.now())
 	const {
 		proposals,
@@ -78,40 +72,9 @@ const DaoProposals: React.FC = () => {
 		Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
 
 	const filteredProposals = useMemo(() => {
-		let result =
-			filter === "All"
-				? proposals
-				: proposals.filter((proposal) => getFilterValue(proposal) === filter)
-
-		if (searchQuery.trim()) {
-			const q = searchQuery.toLowerCase()
-			result = result.filter(
-				(p) =>
-					p.title.toLowerCase().includes(q) ||
-					p.description.toLowerCase().includes(q),
-			)
-		}
-
-		if (sort === "newest") {
-			result = [...result].sort(
-				(a, b) =>
-					new Date(b.createdAt ?? 0).getTime() -
-					new Date(a.createdAt ?? 0).getTime(),
-			)
-		} else if (sort === "most-votes") {
-			result = [...result].sort((a, b) =>
-				Number(b.votesFor + b.votesAgainst - a.votesFor - a.votesAgainst),
-			)
-		} else if (sort === "ending-soon") {
-			result = [...result].sort((a, b) => {
-				const aDeadline = a.deadline ? new Date(a.deadline).getTime() : Infinity
-				const bDeadline = b.deadline ? new Date(b.deadline).getTime() : Infinity
-				return aDeadline - bDeadline
-			})
-		}
-
-		return result
-	}, [filter, proposals, searchQuery, sort])
+		if (filter === "All") return proposals
+		return proposals.filter((proposal) => getFilterValue(proposal) === filter)
+	}, [filter, proposals])
 
 	const totalPages = Math.max(
 		1,
@@ -196,22 +159,7 @@ const DaoProposals: React.FC = () => {
 		setFilter(nextFilter)
 		const nextParams = new URLSearchParams(searchParams)
 		nextParams.set("page", "1")
-		if (searchQuery.trim()) nextParams.set("q", searchQuery.trim())
-		else nextParams.delete("q")
 		setSearchParams(nextParams)
-	}
-
-	const handleSearchChange = (value: string) => {
-		setSearchQuery(value)
-		const nextParams = new URLSearchParams(searchParams)
-		nextParams.set("page", "1")
-		if (value.trim()) nextParams.set("q", value.trim())
-		else nextParams.delete("q")
-		setSearchParams(nextParams, { replace: true })
-	}
-
-	const handleSortChange = (nextSort: SortType) => {
-		setSort(nextSort)
 	}
 
 	const totalVotes = selectedProposal
@@ -320,38 +268,6 @@ const DaoProposals: React.FC = () => {
 					</button>
 				))}
 			</div>
-
-			<div className="flex flex-col sm:flex-row gap-3 mb-6 max-w-2xl mx-auto">
-				<input
-					type="search"
-					placeholder="Search proposals by title or description…"
-					value={searchQuery}
-					onChange={(e) => handleSearchChange(e.target.value)}
-					aria-label="Search proposals"
-					className="flex-1 px-5 py-3 rounded-full border border-white/10 bg-white/5 text-white placeholder:text-white/40 text-sm font-medium focus:outline-none focus:border-brand-cyan/40 transition-colors"
-				/>
-				<select
-					value={sort}
-					onChange={(e) => handleSortChange(e.target.value as SortType)}
-					aria-label="Sort proposals"
-					className="px-5 py-3 rounded-full border border-white/10 bg-white/5 text-white text-sm font-medium focus:outline-none focus:border-brand-cyan/40 transition-colors appearance-none cursor-pointer"
-				>
-					<option value="newest" className="bg-gray-900">
-						Newest
-					</option>
-					<option value="most-votes" className="bg-gray-900">
-						Most Votes
-					</option>
-					<option value="ending-soon" className="bg-gray-900">
-						Ending Soon
-					</option>
-				</select>
-			</div>
-
-			<p className="text-center text-xs text-white/40 font-medium mb-8">
-				{filteredProposals.length} result
-				{filteredProposals.length !== 1 ? "s" : ""}
-			</p>
 
 			{selectedProposal && (
 				<section className="glass-card p-10 rounded-[2.5rem] border border-white/5 mb-10">

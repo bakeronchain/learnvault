@@ -1,5 +1,10 @@
 import { type Api } from "@stellar/stellar-sdk/rpc"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+	useMutation,
+	useQueries,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query"
 import { useCallback } from "react"
 import { useToast } from "../components/Toast/ToastProvider"
 import { type LearnTokenInfo } from "../types/contracts"
@@ -304,4 +309,46 @@ export function useLearnToken(address?: string): UseLearnTokenResult {
 		mint,
 		isMinting,
 	}
+}
+
+/**
+ * Sum of LRN across several Stellar addresses. Uses the same query keys as
+ * {@link useLearnToken} so the balance cache is shared.
+ */
+export function useLrnTotalForLinkedWallets(addresses: string[]) {
+	const { learnToken: contractId, isDeployed } = useContractIds()
+	const contractReady = isDeployed(contractId)
+
+	const results = useQueries({
+		queries: addresses.map((targetAddress) => ({
+			queryKey: [...BALANCE_QUERY_KEY_PREFIX, targetAddress] as const,
+			queryFn: async (): Promise<bigint> => {
+				const client = await loadLearnTokenClient()
+				if (!client || !contractReady) return 0n
+
+				const fn = toMethod(client, "balance")
+				if (!fn) return 0n
+
+				const raw = await fn({ account: targetAddress, id: targetAddress })
+				const resolved = unwrapResult(raw)
+				if (
+					resolved !== null &&
+					typeof resolved === "object" &&
+					typeof (resolved as ContractRecord).isErr === "function" &&
+					((resolved as ContractRecord).isErr as () => boolean)()
+				) {
+					return 0n
+				}
+
+				return toBigInt(resolved)
+			},
+			enabled: contractReady && targetAddress.length > 0,
+			staleTime: BALANCE_STALE_TIME,
+		})),
+	})
+
+	const isLoading = results.some((r) => r.isLoading)
+	const total = results.reduce((acc, r) => acc + toBigInt(r.data), 0n)
+
+	return { total, isLoading }
 }

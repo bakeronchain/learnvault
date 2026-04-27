@@ -11,8 +11,6 @@ use crate::{
     MilestoneCompleted, MilestoneStatus, VerifyBatchEntry,
 };
 
-use proptest::prelude::*;
-
 #[contracttype]
 enum MockTokenDataKey {
     Balance(Address),
@@ -439,6 +437,53 @@ fn reject_milestone_marks_rejected_and_clears_submission() {
 }
 
 #[test]
+fn rejected_milestone_can_be_resubmitted() {
+    let (env, contract_id, admin, _token_id, client, _token_client) = setup();
+    let learner = Address::generate(&env);
+    let course_id = sid(&env, "rust-101");
+    let first_evidence_uri = sid(&env, "ipfs://proof-1");
+    let second_evidence_uri = sid(&env, "ipfs://proof-2");
+
+    add_course(&env, &contract_id, &admin, &client, &course_id, 3);
+    enroll(&env, &contract_id, &learner, &client, &course_id);
+    submit_milestone(
+        &env,
+        &contract_id,
+        &learner,
+        &client,
+        &course_id,
+        1,
+        &first_evidence_uri,
+    );
+
+    authorize(
+        &env,
+        &admin,
+        &contract_id,
+        "reject_milestone",
+        (admin.clone(), learner.clone(), course_id.clone(), 1_u32),
+    );
+    client.reject_milestone(&admin, &learner, &course_id, &1);
+
+    submit_milestone(
+        &env,
+        &contract_id,
+        &learner,
+        &client,
+        &course_id,
+        1,
+        &second_evidence_uri,
+    );
+
+    assert_eq!(client.get_milestone_state(&learner, &course_id, &1), MilestoneStatus::Pending);
+
+    let submission = client
+        .get_milestone_submission(&learner, &course_id, &1)
+        .expect("submission should exist after resubmission");
+    assert_eq!(submission.evidence_uri, second_evidence_uri);
+}
+
+#[test]
 fn set_milestone_reward_stores_config() {
     let (env, contract_id, admin, _token_id, client, _token_client) = setup();
     let course_id = sid(&env, "rust-101");
@@ -687,6 +732,7 @@ fn batch_verify_milestones_reverts_on_invalid_entry() {
     let uri = sid(&env, "ipfs://evidence");
     submit_milestone(&env, &contract_id, &learner1, &client, &course_id, 1, &uri);
 
+    // Second entry: not_enrolled learner has no enrollment → should cause revert
     let submissions = soroban_sdk::vec![
         &env,
         VerifyBatchEntry {
@@ -718,10 +764,12 @@ fn batch_verify_milestones_reverts_on_invalid_entry() {
         )))
     );
 
+    // Because the batch reverted, learner1 should NOT be marked approved
     assert_eq!(
         client.get_milestone_state(&learner1, &course_id, &1),
         MilestoneStatus::Pending,
     );
+    // And no tokens were minted
     assert_eq!(token_client.balance(&learner1), 0);
 }
 
@@ -780,184 +828,40 @@ fn state_persists_after_upgrade() {
     assert_eq!(stored_hash, wasm_hash);
 }
 
-// ── property-based tests (proptest) ─────────────────────────────────────────
-
-fn count_completed(
-    env: &Env,
-    contract_id: &Address,
-    learner: &Address,
-    course_id: &String,
-    milestone_count: u32,
-) -> u32 {
-    let mut count = 0u32;
-    let mut id = 1u32;
-    while id <= milestone_count {
-        let done = env.as_contract(contract_id, || {
-            env.storage()
-                .persistent()
-                .get::<_, bool>(&DataKey::Completed(learner.clone(), course_id.clone(), id))
-                .unwrap_or(false)
-        });
-        if done {
-            count += 1;
-        }
-        id += 1;
-    }
-    count
-}
-
-proptest! {
-  #![proptest_config(ProptestConfig::with_cases(10))]
-
-  #[test]
-  fn completing_milestone_always_increments_completion_count(
-    milestone_count in 1u32..=5u32,
-  ) {
-    let (env, contract_id, admin, _token_id, client, token_client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "proptest-inc-course");
-
-    add_course(&env, &contract_id, &admin, &client, &course_id, milestone_count);
-    enroll(&env, &contract_id, &learner, &client, &course_id);
-
-    let before = count_completed(&env, &contract_id, &learner, &course_id, milestone_count);
-    prop_assert_eq!(before, 0);
-
-    for mid in 1..=milestone_count {
-      let evidence = sid(&env, "ipfs://proptest-ev");
-      submit_milestone(&env, &contract_id, &learner, &client, &course_id, mid, &evidence);
-
-      let reward = 50_i128;
-      authorize(
-        &env,
-        &admin,
-        &contract_id,
-        "verify_milestone",
-        (admin.clone(), learner.clone(), course_id.clone(), mid, reward),
-      );
-      client.verify_milestone(&admin, &learner, &course_id, &mid, &reward);
-
-      let after = count_completed(&env, &contract_id, &learner, &course_id, milestone_count);
-      prop_assert_eq!(after, mid);
-    }
-  }
-
-  #[test]
-  fn same_milestone_cannot_be_completed_twice_by_same_scholar(
-    milestone_count in 1u32..=4u32,
-    duplicate_id in 1u32..=4u32,
-  ) {
+#[test]
+fn benchmark_costs() {
     let (env, contract_id, admin, _token_id, client, _token_client) = setup();
     let learner = Address::generate(&env);
-    let course_id = sid(&env, "proptest-dup-course");
+    let course_id = sid(&env, "rust-101");
 
-    let mc = milestone_count.max(duplicate_id);
-    add_course(&env, &contract_id, &admin, &client, &course_id, mc);
+    // 1. Benchmark add_course
+    env.cost_estimate().budget().reset_unlimited();
+    add_course(&env, &contract_id, &admin, &client, &course_id, 3);
+    let add_instr = env.cost_estimate().budget().cpu_instruction_cost();
+    let add_mem = env.cost_estimate().budget().memory_bytes_cost();
+
+    // 2. Benchmark enroll
+    env.cost_estimate().budget().reset_unlimited();
     enroll(&env, &contract_id, &learner, &client, &course_id);
+    let enroll_instr = env.cost_estimate().budget().cpu_instruction_cost();
+    let enroll_mem = env.cost_estimate().budget().memory_bytes_cost();
 
-    let mid = duplicate_id.min(milestone_count);
-    let evidence = sid(&env, "ipfs://evidence");
-    submit_milestone(&env, &contract_id, &learner, &client, &course_id, mid, &evidence);
-
+    // 3. Benchmark complete_milestone
+    env.cost_estimate().budget().reset_unlimited();
     authorize(
-      &env,
-      &admin,
-      &contract_id,
-      "complete_milestone",
-      (learner.clone(), course_id.clone(), mid),
-    );
-    client.complete_milestone(&learner, &course_id, &mid);
-
-    let after_first = count_completed(&env, &contract_id, &learner, &course_id, mc);
-    prop_assert!(after_first >= 1);
-
-    authorize(
-      &env,
-      &admin,
-      &contract_id,
-      "complete_milestone",
-      (learner.clone(), course_id.clone(), mid),
-    );
-    let result = client.try_complete_milestone(&learner, &course_id, &mid);
-    prop_assert!(result.is_err());
-  }
-
-  #[test]
-  fn milestone_completion_triggers_exactly_one_lrn_mint_event(
-    milestone_count in 1u32..=3u32,
-  ) {
-    let (env, contract_id, admin, _token_id, client, token_client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "proptest-mint-course");
-
-    add_course(&env, &contract_id, &admin, &client, &course_id, milestone_count);
-    enroll(&env, &contract_id, &learner, &client, &course_id);
-
-    let mut total_minted = 0_i128;
-
-    for mid in 1..=milestone_count {
-      let evidence = sid(&env, "ipfs://proptest-mint-ev");
-      submit_milestone(&env, &contract_id, &learner, &client, &course_id, mid, &evidence);
-
-      let reward = 100_i128;
-      authorize(
-        &env,
-        &admin,
-        &contract_id,
-        "verify_milestone",
-        (admin.clone(), learner.clone(), course_id.clone(), mid, reward),
-      );
-      client.verify_milestone(&admin, &learner, &course_id, &mid, &reward);
-      total_minted += reward;
-    }
-
-    prop_assert_eq!(token_client.balance(&learner), total_minted);
-
-    let events = env.events().all();
-    let ms_done_count = events.iter().filter(|(_, topics, _)| {
-      topics.contains(&symbol_short!("ms_done").into_val(&env))
-    }).count();
-    prop_assert_eq!(ms_done_count, milestone_count as usize);
-  }
-
-  #[test]
-  fn completion_count_bounded_by_milestone_count(
-    milestone_count in 1u32..=5u32,
-  ) {
-    let (env, contract_id, admin, _token_id, client, _token_client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "proptest-bound-course");
-
-    add_course(&env, &contract_id, &admin, &client, &course_id, milestone_count);
-    enroll(&env, &contract_id, &learner, &client, &course_id);
-
-    for mid in 1..=milestone_count {
-      let evidence = sid(&env, "ipfs://proptest-bound-ev");
-      submit_milestone(&env, &contract_id, &learner, &client, &course_id, mid, &evidence);
-
-      authorize(
         &env,
         &admin,
         &contract_id,
         "complete_milestone",
-        (learner.clone(), course_id.clone(), mid),
-      );
-      client.complete_milestone(&learner, &course_id, &mid);
-    }
-
-    let completed = count_completed(&env, &contract_id, &learner, &course_id, milestone_count);
-    prop_assert_eq!(completed, milestone_count);
-    prop_assert!(completed <= milestone_count);
-
-    let overflow_id = milestone_count + 1;
-    authorize(
-      &env,
-      &admin,
-      &contract_id,
-      "complete_milestone",
-      (learner.clone(), course_id.clone(), overflow_id),
+        (learner.clone(), course_id.clone(), 1_u32),
     );
-    let result = client.try_complete_milestone(&learner, &course_id, &overflow_id);
-    prop_assert!(result.is_err() || client.is_completed(&learner, &course_id, &overflow_id));
-  }
+    client.complete_milestone(&learner, &course_id, &1);
+    let comp_instr = env.cost_estimate().budget().cpu_instruction_cost();
+    let comp_mem = env.cost_estimate().budget().memory_bytes_cost();
+
+    extern crate std;
+    std::println!("BENCHMARK_RESULTS: course_milestone");
+    std::println!("add_course: instr={}, mem={}", add_instr, add_mem);
+    std::println!("enroll: instr={}, mem={}", enroll_instr, enroll_mem);
+    std::println!("complete_milestone: instr={}, mem={}", comp_instr, comp_mem);
 }

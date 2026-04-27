@@ -1,5 +1,6 @@
 import { formatDistanceToNow } from "date-fns"
 import React from "react"
+import { useTranslation } from "react-i18next"
 import { stellarNetwork } from "../contracts/util"
 import {
 	useActivityFeed,
@@ -75,6 +76,7 @@ function formatRelativeTime(timestamp: string): string {
 
 function ActivityEventRow({ event }: { event: ActivityEvent }) {
 	const config = EVENT_CONFIG[event.type]
+	const { t } = useTranslation()
 
 	return (
 		<div className="flex items-start gap-4 p-4 rounded-2xl hover:bg-white/[0.03] transition-colors duration-300 group">
@@ -102,10 +104,14 @@ function ActivityEventRow({ event }: { event: ActivityEvent }) {
 					target="_blank"
 					rel="noopener noreferrer"
 					className="flex-shrink-0 text-[10px] font-bold uppercase tracking-widest text-brand-cyan/60 hover:text-brand-cyan transition-colors self-center"
+
+					title={t("activity.viewOnExplorer")}
+
 					title="View on Stellar Explorer"
 					aria-label={`View transaction ${event.txHash} on Stellar Explorer`}
+
 				>
-					View Tx &rarr;
+					{t("activity.viewTx")}
 				</a>
 			)}
 		</div>
@@ -129,11 +135,13 @@ function ActivityFeedSkeleton() {
 }
 
 function EmptyState() {
+	const { t } = useTranslation()
+
 	return (
 		<div className="text-center py-16">
 			<div className="text-4xl mb-4">🚀</div>
 			<p className="text-white/40 text-sm font-medium">
-				No activity yet — start learning!
+				{t("activity.noActivity")}
 			</p>
 		</div>
 	)
@@ -145,8 +153,12 @@ export function ActivityFeed({
 	filter: initialFilter = "all",
 	title = "Activity Feed",
 }: ActivityFeedProps) {
+
+	const { t } = useTranslation()
+
 	const [activeFilter, setActiveFilter] =
 		React.useState<ActivityEventFilter>(initialFilter)
+
 	const { events, isLoading, error, hasMore, loadMore } = useActivityFeed(
 		address,
 		limit,
@@ -222,7 +234,7 @@ export function ActivityFeed({
 									onClick={loadMore}
 									className="px-6 py-2.5 glass rounded-full border border-white/10 hover:border-brand-cyan/30 text-xs font-black uppercase tracking-widest text-white/50 hover:text-brand-cyan transition-all duration-300"
 								>
-									Load more
+									{t("activity.loadMore")}
 								</button>
 							</div>
 						)}

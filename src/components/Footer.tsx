@@ -61,7 +61,7 @@ export default function Footer() {
 						<div className="flex items-center gap-2 px-3 py-1.5 glass rounded-xl border border-white/5">
 							<span className="w-1.5 h-1.5 bg-brand-emerald rounded-full animate-pulse shrink-0" />
 							<span className="text-[10px] font-black uppercase tracking-[2px] text-white/30 whitespace-nowrap">
-								Powered by Soroban
+								{t("footer.poweredBy")}
 							</span>
 						</div>
 					</div>
@@ -70,7 +70,7 @@ export default function Footer() {
 				{/* Bottom copyright */}
 				<div className="mt-8 pt-6 border-t border-white/5 text-center">
 					<p className="text-[11px] text-white/20 uppercase tracking-widest font-semibold">
-						© {year} LearnVault DAO. All Rights Reserved.
+						{t("footer.copyright", { year })}
 					</p>
 				</div>
 			</div>

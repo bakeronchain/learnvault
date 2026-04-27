@@ -53,5 +53,9 @@ src/contracts/*
 !src/contracts/util.ts
 
 # test coverage
+
+coverage/all_frontend_files.txt
+output.txt
 coverage/target_local/
 target_local/
+

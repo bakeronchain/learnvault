@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
 import {
 	type AppNotification,
@@ -11,6 +12,7 @@ interface NotificationBellProps {
 }
 
 export function NotificationBell({ token }: NotificationBellProps) {
+	const { t } = useTranslation()
 	const [open, setOpen] = useState(false)
 	const panelRef = useRef<HTMLDivElement>(null)
 	const buttonRef = useRef<HTMLButtonElement>(null)
@@ -102,7 +104,7 @@ export function NotificationBell({ token }: NotificationBellProps) {
 			<button
 				ref={buttonRef}
 				type="button"
-				aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
+				aria-label={`${t("notifications.title")}${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
 				aria-haspopup="dialog"
 				aria-expanded={open}
 				onClick={() => setOpen((o) => !o)}
@@ -138,13 +140,13 @@ export function NotificationBell({ token }: NotificationBellProps) {
 				<div
 					ref={panelRef}
 					role="dialog"
-					aria-label="Notifications"
+					aria-label={t("notifications.title")}
 					aria-modal="true"
 					className="absolute right-0 top-full mt-3 w-80 glass border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2"
 				>
 					<div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
 						<h3 className="text-sm font-black uppercase tracking-widest text-white/80">
-							Notifications
+							{t("notifications.title")}
 						</h3>
 						{unreadCount > 0 && (
 							<button
@@ -152,7 +154,7 @@ export function NotificationBell({ token }: NotificationBellProps) {
 								className="text-xs text-brand-cyan hover:underline font-bold"
 								onClick={() => void handleMarkAllRead()}
 							>
-								Mark all read
+								{t("notifications.markAllRead")}
 							</button>
 						)}
 					</div>
@@ -160,7 +162,8 @@ export function NotificationBell({ token }: NotificationBellProps) {
 					<div className="max-h-80 overflow-y-auto">
 						{notifications.length === 0 ? (
 							<p className="text-center text-white/30 text-sm py-10 px-5">
-								No notifications yet
+								{t("notifications.noNotifications")}
+		
 							</p>
 						) : (
 							notifications.map((notification) => (

@@ -7,27 +7,49 @@ import es from "./locales/es.json"
 import fr from "./locales/fr.json"
 import sw from "./locales/sw.json"
 
-const resources = {
+// Pseudo-locale is loaded lazily only when explicitly requested (dev/CI only).
+// It is never shipped in the production bundle.
+const loadPseudo = async () => {
+	if (import.meta.env.DEV || import.meta.env.VITE_PSEUDO_LOCALE === "true") {
+		try {
+			const pseudo = await import("./locales/pseudo.json")
+			return pseudo.default
+		} catch {
+			return null
+		}
+	}
+	return null
+}
+
+const resources: Record<string, { translation: unknown }> = {
 	en: { translation: en },
 	es: { translation: es },
 	fr: { translation: fr },
 	sw: { translation: sw },
 }
 
+// Attach pseudo-locale in dev and CI environments
+const pseudoTranslation = await loadPseudo()
+if (pseudoTranslation) {
+	resources["pseudo"] = { translation: pseudoTranslation }
+}
+
 void i18n
-	// detect user language
-	// learn more: https://github.com/i18next/i18next-browser-languageDetector
 	.use(LanguageDetector)
-	// pass the i18n instance to react-i18next.
 	.use(initReactI18next)
-	// init i18next
-	// for all options read: https://www.i18next.com/overview/configuration-options
 	.init({
 		resources,
 		fallbackLng: "en",
 		interpolation: {
-			escapeValue: false, // not needed for react as it escapes by default
+			escapeValue: false,
 		},
+		// In development, warn on missing keys so contributors catch gaps early
+		...(import.meta.env.DEV && {
+			saveMissing: true,
+			missingKeyHandler: (lngs, ns, key) => {
+				console.warn(`[i18n] Missing key: "${key}" for languages: ${lngs.join(", ")}`)
+			},
+		}),
 	})
 
 export default i18n

@@ -2,12 +2,17 @@ import { Button } from "@stellar/design-system"
 import React, { useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import ReactMarkdown from "react-markdown"
+
+import { useTranslation } from "react-i18next"
+import { deleteReply, deleteThread, replyToThread, useForumThreadDetail } from "../../hooks/useForum"
+
 import {
 	deleteReply,
 	deleteThread,
 	replyToThread,
 	useForumThreadDetail,
 } from "../../hooks/useForum"
+
 import { WalletAddressPill } from "../WalletAddressPill"
 
 interface ThreadDetailProps {
@@ -19,6 +24,12 @@ interface ThreadDetailProps {
 }
 
 export const ThreadDetail: React.FC<ThreadDetailProps> = ({
+
+	courseId, threadId, onBack, currentAddress, isAdmin,
+}) => {
+	const { t } = useTranslation()
+	const { data: thread, isLoading, error } = useForumThreadDetail(courseId, threadId)
+
 	courseId,
 	threadId,
 	onBack,
@@ -29,6 +40,7 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 		courseId,
 		threadId,
 	)
+
 	const queryClient = useQueryClient()
 	const [replyContent, setReplyContent] = useState("")
 	const [isSubmitting, setIsSubmitting] = useState(false)
@@ -40,12 +52,20 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 		try {
 			setIsSubmitting(true)
 			await replyToThread(courseId, threadId, replyContent)
+			await queryClient.invalidateQueries({ queryKey: ["forum", "thread", courseId, threadId] })
+			await queryClient.invalidateQueries({ queryKey: ["forum", "threads", courseId] })
+
+
+		try {
+			setIsSubmitting(true)
+			await replyToThread(courseId, threadId, replyContent)
 			await queryClient.invalidateQueries({
 				queryKey: ["forum", "thread", courseId, threadId],
 			})
 			await queryClient.invalidateQueries({
 				queryKey: ["forum", "threads", courseId],
 			})
+
 			setReplyContent("")
 		} catch (err) {
 			console.error("Failed to post reply", err)
@@ -55,12 +75,19 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 	}
 
 	const handleDeleteThread = async () => {
+
+		if (!confirm(t("forum.deleteThreadConfirm"))) return
+		try {
+			await deleteThread(courseId, threadId)
+			await queryClient.invalidateQueries({ queryKey: ["forum", "threads", courseId] })
+
 		if (!confirm("Are you sure you want to delete this thread?")) return
 		try {
 			await deleteThread(courseId, threadId)
 			await queryClient.invalidateQueries({
 				queryKey: ["forum", "threads", courseId],
 			})
+
 			onBack()
 		} catch (err) {
 			console.error("Failed to delete thread", err)
@@ -68,29 +95,46 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 	}
 
 	const handleDeleteReply = async (replyId: number) => {
+
+		if (!confirm(t("forum.deleteReplyConfirm"))) return
+		try {
+			await deleteReply(courseId, replyId)
+			await queryClient.invalidateQueries({ queryKey: ["forum", "thread", courseId, threadId] })
+
 		if (!confirm("Are you sure you want to delete this reply?")) return
 		try {
 			await deleteReply(courseId, replyId)
 			await queryClient.invalidateQueries({
 				queryKey: ["forum", "thread", courseId, threadId],
 			})
+
 		} catch (err) {
 			console.error("Failed to delete reply", err)
 		}
 	}
 
 	if (isLoading) {
+
+		return <div className="text-white/60 animate-pulse">{t("forum.loadingThread")}</div>
+
 		return <div className="text-white/60 animate-pulse">Loading discussion...</div>
+
 	}
 
 	if (error || !thread) {
 		return (
 			<div className="space-y-4">
+
+				<Button variant="secondary" size="sm" onClick={onBack}>{t("forum.backToDiscussions")}</Button>
+				<div className="text-red-400 bg-red-400/10 p-4 rounded-xl border border-red-400/20">
+					{t("forum.threadNotFound")}
+
 				<Button variant="secondary" size="sm" onClick={onBack}>
 					← Back to Discussions
 				</Button>
 				<div className="text-red-400 bg-red-400/10 p-4 rounded-xl border border-red-400/20">
 					Thread not found or failed to load.
+
 				</div>
 			</div>
 		)
@@ -99,6 +143,22 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 	return (
 		<div className="space-y-8">
 			<div>
+
+				<button type="button" onClick={onBack}
+					className="text-white/50 hover:text-white transition-colors text-sm mb-4 inline-flex items-center gap-2">
+					{t("forum.backToDiscussions")}
+				</button>
+				<div className="flex justify-between items-start gap-4 mb-6">
+					<h2 className="text-3xl font-bold text-white">{thread.title}</h2>
+					{(isAdmin || currentAddress === thread.author_address) && (
+						<button type="button"
+							className="text-red-400/60 hover:text-red-400 transition-colors shrink-0 text-sm"
+							onClick={handleDeleteThread}>
+							{t("forum.deleteThread")}
+						</button>
+					)}
+				</div>
+
 				<button
 					type="button"
 					onClick={onBack}
@@ -121,11 +181,15 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 					)}
 				</div>
 
+
 				<div className="flex items-center gap-3 text-sm text-white/50 mb-8 border-b border-white/10 pb-6">
 					<WalletAddressPill address={thread.author_address} />
 					<span>•</span>
 					<span>{new Date(thread.created_at).toLocaleString()}</span>
 				</div>
+
+
+
 
 				<div className="prose prose-invert max-w-none text-white/80 pb-8 border-b border-white/10">
 					<ReactMarkdown>{thread.content}</ReactMarkdown>
@@ -134,24 +198,47 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 
 			<div className="space-y-6">
 				<h3 className="text-xl font-bold text-white">
+
+					{t("forum.replies", { count: thread.replies?.length || 0 })}
+
 					Replies ({thread.replies?.length || 0})
+
 				</h3>
 
 				{thread.replies?.length === 0 ? (
 					<div className="text-white/40 text-center py-6 glass-card rounded-2xl">
+
+						{t("forum.noReplies")}
+
 						No replies yet.
+
 					</div>
 				) : (
 					<div className="space-y-4">
 						{thread.replies.map((reply) => (
+
+							<div key={reply.id} className="glass-card p-5 rounded-2xl border border-white/10 flex flex-col gap-3">
+
 							<div
 								key={reply.id}
 								className="glass-card p-5 rounded-2xl border border-white/10 flex flex-col gap-3"
 							>
+
 								<div className="flex justify-between items-start">
 									<div className="flex items-center gap-3 text-xs text-white/50">
 										<WalletAddressPill address={reply.author_address} />
 										<span>•</span>
+
+										<span>{new Date(reply.created_at).toLocaleString()}</span>
+									</div>
+									{(isAdmin || currentAddress === reply.author_address) && (
+										<button type="button"
+											className="text-white/30 hover:text-red-400 transition-colors px-2 py-1"
+											onClick={() => handleDeleteReply(reply.id)}
+											title={t("common.delete")}>×</button>
+									)}
+								</div>
+
 										<span>
 											{new Date(reply.created_at).toLocaleString()}
 										</span>
@@ -170,6 +257,7 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 									)}
 								</div>
 
+
 								<div className="prose prose-sm prose-invert max-w-none text-white/70">
 									<ReactMarkdown>{reply.content}</ReactMarkdown>
 								</div>
@@ -181,6 +269,18 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 
 			{currentAddress ? (
 				<div className="glass-card p-6 rounded-2xl border border-brand-cyan/20">
+
+					<h4 className="font-bold mb-4">{t("forum.addReply")}</h4>
+					<form onSubmit={handleReply} className="space-y-4">
+						<textarea placeholder={t("forum.replyPlaceholder")} value={replyContent}
+							onChange={(e) => setReplyContent(e.target.value)} rows={4}
+							className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:outline-hidden focus:border-brand-cyan transition-colors font-mono text-sm"
+						/>
+						<div className="flex justify-end">
+							<Button variant="primary" size="sm" onClick={handleReply}
+								disabled={isSubmitting || !replyContent.trim()}>
+								{isSubmitting ? t("forum.posting") : t("forum.postReply")}
+
 					<h4 className="font-bold mb-4">Add a Reply</h4>
 
 					<form onSubmit={handleReply} className="space-y-4">
@@ -200,17 +300,26 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 								disabled={isSubmitting || !replyContent.trim()}
 							>
 								{isSubmitting ? "Posting..." : "Post Reply"}
+
 							</Button>
 						</div>
 					</form>
 				</div>
 			) : (
 				<div className="bg-white/5 p-6 rounded-2xl text-center">
+
+					<p className="text-white/60 mb-3">{t("forum.connectToReply")}</p>
+
 					<p className="text-white/60 mb-3">
 						You must be connected to reply.
 					</p>
+
 				</div>
 			)}
 		</div>
 	)
+
 }
+
+}
+

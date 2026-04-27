@@ -7,6 +7,10 @@ import ConfirmDialog from "./ConfirmDialog"
 import { useWallet } from "../hooks/useWallet"
 import { getAuthToken } from "../util/auth"
 
+import AddressDisplay from "./AddressDisplay"
+import { useTranslation } from "react-i18next"
+
+
 const API_BASE = import.meta.env.VITE_SERVER_URL ?? "http://localhost:4000"
 
 export interface Comment {
@@ -49,6 +53,10 @@ const CommentCard: React.FC<CommentCardProps> = ({
 	canDelete,
 	onUpdate,
 }) => {
+
+	const { t } = useTranslation()
+	const { address } = useWallet()
+
 	const [isReplying, setIsReplying] = useState(false)
 	const [replyText, setReplyText] = useState("")
 	const [replyError, setReplyError] = useState<string | null>(null)
@@ -57,6 +65,64 @@ const CommentCard: React.FC<CommentCardProps> = ({
 	const replyErrorId = `${replyFieldId}-error`
 	const replySectionId = `${replyFieldId}-section`
 	const authorId = `comment-${comment.id}-author`
+
+
+	const isOwnComment =
+		!!address &&
+		comment.author_address.toLowerCase() === address.toLowerCase()
+
+	const handleSaveEdit = async () => {
+		if (!editText.trim()) {
+			setEditError(t("comments.emptyEdit"))
+			return
+		}
+		const token = getAuthToken()
+		if (!token) {
+			setEditError(t("comments.signInToEdit"))
+			return
+		}
+		setEditError(null)
+		try {
+			const res = await fetch(`${API_URL}/api/comments/${comment.id}`, {
+				method: "PATCH",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
+				},
+				body: JSON.stringify({ content: editText }),
+			})
+			if (res.ok) {
+				setIsEditing(false)
+				onUpdate?.()
+			} else {
+				const err = await res.json().catch(() => ({}))
+				setEditError(err.error || t("comments.failedToUpdate"))
+			}
+		} catch (err) {
+			console.error("Edit failed", err)
+			setEditError(t("comments.failedToUpdate"))
+		}
+	}
+
+	const handleDelete = async () => {
+		if (!window.confirm(t("comments.deleteConfirm"))) {
+			return
+		}
+		const token = getAuthToken()
+		if (!token) return
+		try {
+			const res = await fetch(`${API_URL}/api/comments/${comment.id}`, {
+				method: "DELETE",
+				headers: {
+					Authorization: `Bearer ${token}`,
+				},
+			})
+			if (res.ok) onUpdate?.()
+		} catch (err) {
+			console.error("Delete failed", err)
+		}
+	}
+
 
 	const handleVote = async (type: "upvote" | "downvote") => {
 		const token = getAuthToken()
@@ -92,15 +158,64 @@ const CommentCard: React.FC<CommentCardProps> = ({
 		}
 	}
 
-	const handlePostReply = async () => {
-		if (!replyText.trim()) {
-			setReplyError("Enter a reply before submitting.")
+
+	const handleFlag = async () => {
+		if (!flagReason.trim()) {
+			setFlagError(t("comments.reasonRequired"))
+			return
+		}
+
+		if (flagReason.length < 10) {
+			setFlagError(t("comments.reasonTooShort"))
 			return
 		}
 
 		const token = getAuthToken()
 		if (!token) {
-			setReplyError("Sign in to reply.")
+			setFlagError(t("comments.signInToFlag"))
+			return
+		}
+
+		setFlagError(null)
+		try {
+			const res = await fetch(`${API_URL}/api/content/flag`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
+				},
+				body: JSON.stringify({
+					contentType: "comment",
+					contentId: comment.id,
+					reason: flagReason,
+				}),
+			})
+
+			if (res.ok) {
+				setIsFlagging(false)
+				setFlagReason("")
+				// Show success message
+			} else {
+				const err = await res.json().catch(() => ({}))
+				setFlagError(err.error || t("comments.failedToReport"))
+			}
+		} catch (err) {
+			console.error("Flag failed", err)
+			setFlagError(t("comments.failedToReport"))
+		}
+	}
+
+
+
+	const handlePostReply = async () => {
+		if (!replyText.trim()) {
+			setReplyError(t("comments.emptyReply"))
+			return
+		}
+
+		const token = getAuthToken()
+		if (!token) {
+			setReplyError(t("comments.signInToReply"))
 			return
 		}
 		setReplyError(null)
@@ -124,11 +239,11 @@ const CommentCard: React.FC<CommentCardProps> = ({
 				onUpdate?.()
 			} else {
 				const err = await res.json().catch(() => ({}))
-				setReplyError(err.error || "Reply failed.")
+				setReplyError(err.error || t("comments.replyFailed"))
 			}
 		} catch (err) {
 			console.error("Reply failed", err)
-			setReplyError("Reply failed.")
+			setReplyError(t("comments.replyFailed"))
 		}
 	}
 
@@ -184,7 +299,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 			)}
 			{comment.is_pinned && (
 				<div className="absolute -top-3 left-6 px-3 py-1 bg-brand-cyan text-black text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-1 shadow-xl">
-					Pinned by Author
+					{t("comments.pinnedByAuthor")}
 				</div>
 			)}
 
@@ -200,7 +315,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 							</span>
 							{isAuthor && (
 								<span className="px-2 py-0.5 bg-brand-purple/20 text-brand-purple text-[8px] font-black uppercase tracking-widest rounded-sm border border-brand-purple/20">
-									Author
+									{t("comments.author")}
 								</span>
 							)}
 						</div>
@@ -211,13 +326,39 @@ const CommentCard: React.FC<CommentCardProps> = ({
 				</div>
 
 				<div className="flex gap-2">
+
+					{isOwnComment && (
+						<>
+							<button
+								type="button"
+								data-testid="comment-edit"
+								onClick={() => {
+									setIsEditing((v) => !v)
+									setEditText(comment.content)
+									setEditError(null)
+								}}
+								className="text-[10px] font-black uppercase text-white/70 hover:text-brand-cyan transition-colors"
+							>
+								{isEditing ?t("comments.close") : t("comments.edit")}
+							</button>
+							<button
+								type="button"
+								data-testid="comment-delete"
+								onClick={() => void handleDelete()}
+								className="text-[10px] font-black uppercase text-white/70 hover:text-red-400 transition-colors"
+							>
+								{t("comments.delete")}
+							</button>
+						</>
+					)}
+
 					{canPin && !comment.is_pinned && (
 						<button
 							type="button"
 							onClick={() => void handlePin()}
 							className="text-[10px] font-black uppercase text-white/70 hover:text-brand-cyan transition-colors"
 						>
-							Pin
+							{t("comments.pin")}
 						</button>
 					)}
 					{canDelete && (
@@ -237,9 +378,65 @@ const CommentCard: React.FC<CommentCardProps> = ({
 							aria-controls={replySectionId}
 							className="text-[10px] font-black uppercase text-white/70 hover:text-brand-cyan transition-colors"
 						>
-							Reply
+							{t("comments.replyLabel")}
 						</button>
 					)}
+
+					<button
+						type="button"
+						onClick={() => setIsFlagging(!isFlagging)}
+						className="text-[10px] font-black uppercase text-white/70 hover:text-red-400 transition-colors"
+					>
+						{t("comments.flag")}
+					</button>
+				</div>
+			</header>
+
+			{isEditing ? (
+				<div className="mb-8">
+					<textarea
+						value={editText}
+						onChange={(e) => {
+							setEditText(e.target.value)
+							if (editError) setEditError(null)
+						}}
+						data-testid="comment-edit-field"
+						className="w-full h-32 bg-black/40 border border-white/10 rounded-2xl p-4 text-sm text-white focus:outline-none focus:border-brand-cyan/40"
+					/>
+					{editError && (
+						<p className="mt-2 text-sm text-red-400" role="alert">
+							{editError}
+						</p>
+					)}
+					<div className="flex justify-end gap-3 mt-4">
+						<button
+							type="button"
+							onClick={() => {
+								setIsEditing(false)
+								setEditText(comment.content)
+								setEditError(null)
+							}}
+							className="px-5 py-2 text-[10px] font-black uppercase text-white/70 border border-white/10 rounded-full hover:bg-white/5 transition-colors"
+						>
+							{t("comments.cancel")}
+						</button>
+						<button
+							type="button"
+							data-testid="comment-save-edit"
+							onClick={() => void handleSaveEdit()}
+							disabled={!editText.trim()}
+							className="px-5 py-2 bg-brand-cyan text-black text-[10px] font-black uppercase tracking-widest rounded-full hover:scale-105 transition-all disabled:opacity-50"
+						>
+							{t("comments.save")}
+						</button>
+					</div>
+				</div>
+			) : (
+				<div className="prose prose-invert prose-sm max-w-none text-white/80 leading-relaxed font-medium mb-8">
+					<ReactMarkdown>{comment.content}</ReactMarkdown>
+				</div>
+			)}
+
 				</div>
 			</header>
 
@@ -249,13 +446,18 @@ const CommentCard: React.FC<CommentCardProps> = ({
 				<ReactMarkdown>{comment.content}</ReactMarkdown>
 			</div>
 
+
 			<footer className="flex items-center gap-6">
 				<div className="flex items-center bg-white/5 rounded-full p-1 border border-white/5">
 					<button
 						type="button"
 						onClick={() => void handleVote("upvote")}
 						className="w-8 h-8 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+
+						aria-label={t("comments.upvote")}
+
 						aria-label={`Upvote comment from ${shortenAddress(comment.author_address)}`}
+
 					>
 						👍
 					</button>
@@ -266,7 +468,11 @@ const CommentCard: React.FC<CommentCardProps> = ({
 						type="button"
 						onClick={() => void handleVote("downvote")}
 						className="w-8 h-8 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+
+						aria-label={t("comments.downvote")}
+
 						aria-label={`Downvote comment from ${shortenAddress(comment.author_address)}`}
+
 					>
 						👎
 					</button>
@@ -282,10 +488,10 @@ const CommentCard: React.FC<CommentCardProps> = ({
 						htmlFor={replyFieldId}
 						className="block text-sm font-bold text-white mb-3"
 					>
-						Reply
+						{t("comments.reply")}
 					</label>
 					<p id={replyHintId} className="mb-3 text-sm text-white/70">
-						Markdown is supported.
+						{t("comments.markdownSupported")}
 					</p>
 					<textarea
 						id={replyFieldId}
@@ -296,7 +502,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 								setReplyError(null)
 							}
 						}}
-						placeholder="Write your reply..."
+						placeholder={t("comments.writeReply")}
 						className="w-full h-24 bg-black/40 border border-white/10 rounded-2xl p-4 text-xs text-white focus:outline-none focus:border-brand-cyan/40"
 						aria-invalid={Boolean(replyError)}
 						aria-describedby={replyDescriptionIds || undefined}
@@ -320,7 +526,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 							}}
 							className="px-5 py-2 text-[10px] font-black uppercase text-white/70 border border-white/10 rounded-full hover:bg-white/5 transition-colors"
 						>
-							Cancel
+							{t("comments.cancel")}
 						</button>
 						<button
 							type="button"
@@ -328,11 +534,66 @@ const CommentCard: React.FC<CommentCardProps> = ({
 							disabled={!replyText.trim()}
 							className="px-5 py-2 bg-brand-cyan text-black text-[10px] font-black uppercase tracking-widest rounded-full hover:scale-105 transition-all disabled:opacity-50"
 						>
-							Submit Reply
+							{t("comments.submitReply")}
 						</button>
 					</div>
 				</div>
 			)}
+
+
+			{isFlagging && (
+				<div className="mt-8 pt-8 border-t border-white/5 animate-in slide-in-from-top-4 duration-500">
+					<label
+						htmlFor={`flag-reason-${comment.id}`}
+						className="block text-sm font-bold text-white mb-3"
+					>
+						{t("comments.reportComment")}
+					</label>
+					<p className="mb-3 text-sm text-white/70">
+						{t("comments.reportDesc")}
+					</p>
+					<textarea
+						id={`flag-reason-${comment.id}`}
+						value={flagReason}
+						onChange={(event) => {
+							setFlagReason(event.target.value)
+							if (flagError) {
+								setFlagError(null)
+							}
+						}}
+						placeholder={t("comments.reportPlaceholder")}
+						className="w-full h-24 bg-black/40 border border-white/10 rounded-2xl p-4 text-xs text-white focus:outline-none focus:border-red-500/40"
+						aria-invalid={Boolean(flagError)}
+					/>
+					{flagError && (
+						<p className="mt-3 text-sm text-red-400" role="alert">
+							{flagError}
+						</p>
+					)}
+					<div className="flex justify-end gap-3 mt-4">
+						<button
+							type="button"
+							onClick={() => {
+								setIsFlagging(false)
+								setFlagReason("")
+								setFlagError(null)
+							}}
+							className="px-5 py-2 text-[10px] font-black uppercase text-white/70 border border-white/10 rounded-full hover:bg-white/5 transition-colors"
+						>
+							{t("comments.cancel")}
+						</button>
+						<button
+							type="button"
+							onClick={() => void handleFlag()}
+							disabled={!flagReason.trim()}
+							className="px-5 py-2 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:scale-105 transition-all disabled:opacity-50"
+						>
+							{t("comments.submitReport")}
+						</button>
+					</div>
+				</div>
+			)}
+
 		</article>
 	)
 }

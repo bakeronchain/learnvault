@@ -113,7 +113,7 @@ export default function NavBar() {
 				<NavLink
 					to="/"
 					className="flex items-center gap-2 sm:gap-3 group shrink-0"
-					aria-label="LearnVault home"
+					aria-label={t("nav.home")}
 				>
 					<div className="w-8 h-8 bg-linear-to-br from-brand-cyan to-brand-blue rounded-lg flex items-center justify-center font-black text-[10px] shadow-lg shadow-brand-cyan/20 group-hover:scale-110 transition-transform">
 						LV
@@ -174,7 +174,7 @@ export default function NavBar() {
 						aria-controls={mobileMenuId}
 						aria-expanded={menuOpen}
 						aria-label={
-							menuOpen ? "Close navigation menu" : "Open navigation menu"
+							menuOpen ? t("nav.closeMenu") : t("nav.openMenu")
 						}
 					>
 						<div className="w-5 flex flex-col gap-1" aria-hidden="true">
@@ -213,13 +213,13 @@ export default function NavBar() {
 				>
 					<div className="flex items-center justify-between">
 						<span className="text-xs font-black uppercase tracking-[0.25em] text-slate-500 dark:text-white/40">
-							Menu
+							{t("nav.menu")}
 						</span>
 						<button
 							type="button"
 							onClick={closeMenu}
 							className="w-9 h-9 rounded-xl border border-white/10 text-slate-700 dark:text-white/70 hover:text-black dark:hover:text-white hover:border-white/20"
-							aria-label="Close mobile navigation menu"
+							aria-label={t("nav.closeMenu")}
 						>
 							×
 						</button>

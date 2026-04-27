@@ -1,10 +1,13 @@
 import React from "react"
+import { useTranslation } from "react-i18next"
 
 interface EmptyStateProps {
 	onBecomeDonor: () => void
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({ onBecomeDonor }) => {
+	const { t } = useTranslation()
+ 
 	return (
 		<div className="min-h-screen flex items-center justify-center p-12">
 			<div className="text-center max-w-2xl">
@@ -13,50 +16,48 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onBecomeDonor }) => {
 						<div className="text-7xl animate-bounce">💚</div>
 					</div>
 					<h1 className="text-5xl font-black mb-4 text-gradient">
-						Support Education, Earn Governance
+						{t("pages.donor.supportEducation")}
 					</h1>
 					<p className="text-white/40 text-xl font-medium leading-relaxed">
-						Join the LearnVault donor community. Your contributions fund
-						scholarship proposals and earn you governance tokens to shape the
-						future of decentralized education.
+						{t("pages.donor.supportDesc")}
 					</p>
 				</div>
 
 				<div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
 					<div className="glass-card p-8 rounded-[2.5rem] border border-white/5">
 						<div className="text-4xl mb-4">🎓</div>
-						<h3 className="font-black mb-2 text-lg">Fund Scholars</h3>
+						<h3 className="font-black mb-2 text-lg">{t("pages.donor.fundScholarsFeature")}</h3>
 						<p className="text-white/40 text-sm font-medium">
-							Support approved scholarship proposals that change lives
+							{t("pages.donor.fundScholarsDesc")}
 						</p>
 					</div>
 					<div className="glass-card p-8 rounded-[2.5rem] border border-white/5">
 						<div className="text-4xl mb-4">🗳️</div>
-						<h3 className="font-black mb-2 text-lg">Earn Voting Power</h3>
+						<h3 className="font-black mb-2 text-lg">{t("pages.donor.earnVotingPower")}</h3>
 						<p className="text-white/40 text-sm font-medium">
-							Get governance tokens and vote on DAO decisions
+							{t("pages.donor.earnVotingDesc")}
 						</p>
 					</div>
 					<div className="glass-card p-8 rounded-[2.5rem] border border-white/5">
 						<div className="text-4xl mb-4">✓</div>
-						<h3 className="font-black mb-2 text-lg">Track Impact</h3>
+						<h3 className="font-black mb-2 text-lg">{t("pages.donor.trackImpact")}</h3>
 						<p className="text-white/40 text-sm font-medium">
-							See real-time progress of scholars you funded
+							{t("pages.donor.trackImpactDesc")}
 						</p>
 					</div>
 				</div>
 
 				<div className="glass-card p-12 rounded-[3rem] border border-white/5 mb-12 bg-brand-cyan/5 border-brand-cyan/20">
-					<h2 className="text-2xl font-black mb-6">How It Works</h2>
+					<h2 className="text-2xl font-black mb-6">{t("pages.donor.howItWorks")}</h2>
 					<div className="space-y-4 text-left">
 						<div className="flex gap-4">
 							<div className="w-12 h-12 flex-shrink-0 rounded-full bg-brand-cyan/20 border border-brand-cyan/40 flex items-center justify-center font-black text-brand-cyan">
 								1
 							</div>
 							<div>
-								<h4 className="font-black mb-2">Deposit USDC</h4>
+								<h4 className="font-black mb-2">t("pages.donor.step1Title")</h4>
 								<p className="text-white/40 font-medium">
-									Use your wallet to deposit USDC to the scholarship treasury
+									t("pages.donor.step1Desc")
 								</p>
 							</div>
 						</div>
@@ -65,9 +66,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onBecomeDonor }) => {
 								2
 							</div>
 							<div>
-								<h4 className="font-black mb-2">Receive Governance Tokens</h4>
+								<h4 className="font-black mb-2">t("pages.donor.step2Title")</h4>
 								<p className="text-white/40 font-medium">
-									1 USDC = 1 GOV token for voting and impact tracking
+									 t("pages.donor.step2Desc")
 								</p>
 							</div>
 						</div>
@@ -76,9 +77,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onBecomeDonor }) => {
 								3
 							</div>
 							<div>
-								<h4 className="font-black mb-2">Vote & Track Impact</h4>
+								<h4 className="font-black mb-2">t("pages.donor.step3Title")</h4>
 								<p className="text-white/40 font-medium">
-									Vote on proposals and watch your funded scholars succeed
+									t("pages.donor.step3Desc")
 								</p>
 							</div>
 						</div>
@@ -89,11 +90,11 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onBecomeDonor }) => {
 					onClick={onBecomeDonor}
 					className="px-12 py-4 bg-brand-cyan text-black font-black uppercase tracking-widest rounded-2xl shadow-2xl shadow-brand-cyan/40 hover:scale-105 hover:shadow-[0_0_30px_rgba(0,210,255,0.5)] transition-all active:scale-95"
 				>
-					Become a Donor →
+					{t("pages.donor.becomeDonor")}
 				</button>
 
 				<p className="text-xs text-white/30 mt-8">
-					🔐 Your deposits are secured on the Stellar blockchain
+					🔐 {t("pages.donor.blockchainSecurity")}
 				</p>
 			</div>
 		</div>

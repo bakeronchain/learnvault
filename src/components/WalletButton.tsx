@@ -1,6 +1,7 @@
 import { Button, Icon } from "@stellar/design-system"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
+import ConfirmDialog from "./ConfirmDialog"
 import { useWallet } from "../hooks/useWallet"
 import { WalletInfoModal } from "./WalletInfoModal"
 import { motion } from "framer-motion"
@@ -33,6 +34,7 @@ export const WalletButton = () => {
 	if (!address) {
 		return (
 			<Button
+				id="connect-wallet-button"
 				variant="secondary"
 				size="md"
 				onClick={() => void handleConnect()}
@@ -59,6 +61,19 @@ export const WalletButton = () => {
 				{/* Inner glow effect on hover */}
 				<div className="absolute inset-0 bg-linear-to-r from-brand-cyan/0 via-brand-cyan/5 to-brand-cyan/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
 
+			<div id="modalContainer">
+				{showDisconnectModal && (
+					<ConfirmDialog
+						title="Disconnect Wallet"
+						description={`You are currently connected as ${address}. Are you sure you want to disconnect? Any unsaved progress may be lost.`}
+						confirmLabel={t("wallet.disconnect")}
+						cancelLabel={t("wallet.cancel")}
+						onConfirm={() => void handleDisconnect()}
+						onCancel={() => setShowDisconnectModal(false)}
+						isDestructive
+					/>
+				)}
+			</div>
 				<div className="flex flex-col items-end hidden sm:flex pointer-events-none">
 					<span className="text-[9px] font-black uppercase tracking-widest text-white/40 group-hover:text-brand-cyan transition-colors">
 						Wallet

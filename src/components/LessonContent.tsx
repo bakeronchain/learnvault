@@ -137,6 +137,7 @@ const LessonContent: React.FC<LessonContentProps> = ({
 				</div>
 
 				<Button
+					id="mark-complete-button"
 					onClick={onMarkComplete}
 					disabled={isCompleted || isCompleting}
 					isLoading={isCompleting}

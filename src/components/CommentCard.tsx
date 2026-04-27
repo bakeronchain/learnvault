@@ -1,6 +1,7 @@
 import { formatDistanceToNow } from "date-fns"
 import React, { useId, useState } from "react"
 import ReactMarkdown from "react-markdown"
+import ConfirmDialog from "./ConfirmDialog"
 import { useWallet } from "../hooks/useWallet"
 import { getAuthToken } from "../util/auth"
 import AddressDisplay from "./AddressDisplay"
@@ -24,6 +25,7 @@ interface CommentCardProps {
 	isAuthor?: boolean
 	isReply?: boolean
 	canPin?: boolean
+	canDelete?: boolean
 	onUpdate?: () => void
 }
 
@@ -41,6 +43,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 	isAuthor,
 	isReply,
 	canPin,
+	canDelete,
 	onUpdate,
 }) => {
 	const { address } = useWallet()
@@ -240,6 +243,28 @@ const CommentCard: React.FC<CommentCardProps> = ({
 		setReplyError(null)
 	}
 
+	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+	const handleDelete = async () => {
+		const token = getAuthToken()
+		if (!token) return
+		try {
+			const res = await fetch(`${API_URL}/api/comments/${comment.id}`, {
+				method: "DELETE",
+				headers: {
+					Authorization: `Bearer ${token}`,
+				},
+			})
+			if (res.ok) {
+				onUpdate?.()
+			}
+		} catch (err) {
+			console.error("Delete failed", err)
+		} finally {
+			setShowDeleteConfirm(false)
+		}
+	}
+
 	const replyDescriptionIds = [
 		replyHintId,
 		replyError ? replyErrorId : undefined,
@@ -253,6 +278,17 @@ const CommentCard: React.FC<CommentCardProps> = ({
 			className={`glass-card p-6 rounded-3xl border border-white/5 relative ${comment.is_pinned ? "border-brand-cyan/30 bg-brand-cyan/5" : ""}`}
 			aria-labelledby={authorId}
 		>
+			{showDeleteConfirm && (
+				<ConfirmDialog
+					title="Delete Comment"
+					description="Are you sure you want to delete this comment? This action is permanent and cannot be undone."
+					confirmLabel="Delete"
+					cancelLabel="Keep Comment"
+					onConfirm={() => void handleDelete()}
+					onCancel={() => setShowDeleteConfirm(false)}
+					isDestructive
+				/>
+			)}
 			{comment.is_pinned && (
 				<div className="absolute -top-3 left-6 px-3 py-1 bg-brand-cyan text-black text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-1 shadow-xl">
 					Pinned by Author
@@ -315,6 +351,15 @@ const CommentCard: React.FC<CommentCardProps> = ({
 							className="text-[10px] font-black uppercase text-white/70 hover:text-brand-cyan transition-colors"
 						>
 							Pin
+						</button>
+					)}
+					{canDelete && (
+						<button
+							type="button"
+							onClick={() => setShowDeleteConfirm(true)}
+							className="text-[10px] font-black uppercase text-red-400/70 hover:text-red-400 transition-colors"
+						>
+							Delete
 						</button>
 					)}
 					{!isReply && (

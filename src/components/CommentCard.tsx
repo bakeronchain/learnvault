@@ -1,10 +1,15 @@
 import { formatDistanceToNow } from "date-fns"
+import React, { useState } from "react"
+import SafeMarkdown from "./SafeMarkdown"
 import React, { useId, useState } from "react"
 import ReactMarkdown from "react-markdown"
+import ConfirmDialog from "./ConfirmDialog"
 import { useWallet } from "../hooks/useWallet"
 import { getAuthToken } from "../util/auth"
+
 import AddressDisplay from "./AddressDisplay"
 import { useTranslation } from "react-i18next"
+
 
 const API_BASE = import.meta.env.VITE_SERVER_URL ?? "http://localhost:4000"
 
@@ -25,6 +30,7 @@ interface CommentCardProps {
 	isAuthor?: boolean
 	isReply?: boolean
 	canPin?: boolean
+	canDelete?: boolean
 	onUpdate?: () => void
 }
 
@@ -34,32 +40,32 @@ const API_URL = (
 	""
 ).replace(/\/$/, "")
 
-
-
+const shortenAddress = (address: string) => {
+	if (!address) return ""
+	return `${address.slice(0, 6)}...${address.slice(-4)}`
+}
 
 const CommentCard: React.FC<CommentCardProps> = ({
 	comment,
 	isAuthor,
 	isReply,
 	canPin,
+	canDelete,
 	onUpdate,
 }) => {
+
 	const { t } = useTranslation()
 	const { address } = useWallet()
+
 	const [isReplying, setIsReplying] = useState(false)
 	const [replyText, setReplyText] = useState("")
 	const [replyError, setReplyError] = useState<string | null>(null)
-	const [isFlagging, setIsFlagging] = useState(false)
-	const [flagReason, setFlagReason] = useState("")
-	const [flagError, setFlagError] = useState<string | null>(null)
-	const [isEditing, setIsEditing] = useState(false)
-	const [editText, setEditText] = useState(comment.content)
-	const [editError, setEditError] = useState<string | null>(null)
 	const replyFieldId = useId()
 	const replyHintId = `${replyFieldId}-hint`
 	const replyErrorId = `${replyFieldId}-error`
 	const replySectionId = `${replyFieldId}-section`
 	const authorId = `comment-${comment.id}-author`
+
 
 	const isOwnComment =
 		!!address &&
@@ -117,6 +123,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 		}
 	}
 
+
 	const handleVote = async (type: "upvote" | "downvote") => {
 		const token = getAuthToken()
 		if (!token) return
@@ -150,6 +157,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 			console.error("Pin failed", err)
 		}
 	}
+
 
 	const handleFlag = async () => {
 		if (!flagReason.trim()) {
@@ -197,6 +205,8 @@ const CommentCard: React.FC<CommentCardProps> = ({
 		}
 	}
 
+
+
 	const handlePostReply = async () => {
 		if (!replyText.trim()) {
 			setReplyError(t("comments.emptyReply"))
@@ -242,6 +252,28 @@ const CommentCard: React.FC<CommentCardProps> = ({
 		setReplyError(null)
 	}
 
+	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+	const handleDelete = async () => {
+		const token = getAuthToken()
+		if (!token) return
+		try {
+			const res = await fetch(`${API_URL}/api/comments/${comment.id}`, {
+				method: "DELETE",
+				headers: {
+					Authorization: `Bearer ${token}`,
+				},
+			})
+			if (res.ok) {
+				onUpdate?.()
+			}
+		} catch (err) {
+			console.error("Delete failed", err)
+		} finally {
+			setShowDeleteConfirm(false)
+		}
+	}
+
 	const replyDescriptionIds = [
 		replyHintId,
 		replyError ? replyErrorId : undefined,
@@ -251,10 +283,20 @@ const CommentCard: React.FC<CommentCardProps> = ({
 
 	return (
 		<article
-			data-testid={`comment-card-${comment.id}`}
 			className={`glass-card p-6 rounded-3xl border border-white/5 relative ${comment.is_pinned ? "border-brand-cyan/30 bg-brand-cyan/5" : ""}`}
 			aria-labelledby={authorId}
 		>
+			{showDeleteConfirm && (
+				<ConfirmDialog
+					title="Delete Comment"
+					description="Are you sure you want to delete this comment? This action is permanent and cannot be undone."
+					confirmLabel="Delete"
+					cancelLabel="Keep Comment"
+					onConfirm={() => void handleDelete()}
+					onCancel={() => setShowDeleteConfirm(false)}
+					isDestructive
+				/>
+			)}
 			{comment.is_pinned && (
 				<div className="absolute -top-3 left-6 px-3 py-1 bg-brand-cyan text-black text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-1 shadow-xl">
 					{t("comments.pinnedByAuthor")}
@@ -268,11 +310,9 @@ const CommentCard: React.FC<CommentCardProps> = ({
 					</div>
 					<div>
 						<div className="flex items-center gap-2">
-							<AddressDisplay 
-								address={comment.author_address} 
-								addressClassName="text-sm font-black text-white"
-								showCopyButton={false}
-							/>
+							<span id={authorId} className="text-sm font-black text-white">
+								{shortenAddress(comment.author_address)}
+							</span>
 							{isAuthor && (
 								<span className="px-2 py-0.5 bg-brand-purple/20 text-brand-purple text-[8px] font-black uppercase tracking-widest rounded-sm border border-brand-purple/20">
 									{t("comments.author")}
@@ -286,6 +326,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 				</div>
 
 				<div className="flex gap-2">
+
 					{isOwnComment && (
 						<>
 							<button
@@ -310,6 +351,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 							</button>
 						</>
 					)}
+
 					{canPin && !comment.is_pinned && (
 						<button
 							type="button"
@@ -317,6 +359,15 @@ const CommentCard: React.FC<CommentCardProps> = ({
 							className="text-[10px] font-black uppercase text-white/70 hover:text-brand-cyan transition-colors"
 						>
 							{t("comments.pin")}
+						</button>
+					)}
+					{canDelete && (
+						<button
+							type="button"
+							onClick={() => setShowDeleteConfirm(true)}
+							className="text-[10px] font-black uppercase text-red-400/70 hover:text-red-400 transition-colors"
+						>
+							Delete
 						</button>
 					)}
 					{!isReply && (
@@ -330,6 +381,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 							{t("comments.replyLabel")}
 						</button>
 					)}
+
 					<button
 						type="button"
 						onClick={() => setIsFlagging(!isFlagging)}
@@ -385,13 +437,27 @@ const CommentCard: React.FC<CommentCardProps> = ({
 				</div>
 			)}
 
+				</div>
+			</header>
+
+			<div className="prose prose-invert prose-sm max-w-none text-white/60 leading-relaxed font-medium mb-8">
+				<SafeMarkdown content={comment.content} />
+			<div className="prose prose-invert prose-sm max-w-none text-white/80 leading-relaxed font-medium mb-8">
+				<ReactMarkdown>{comment.content}</ReactMarkdown>
+			</div>
+
+
 			<footer className="flex items-center gap-6">
 				<div className="flex items-center bg-white/5 rounded-full p-1 border border-white/5">
 					<button
 						type="button"
 						onClick={() => void handleVote("upvote")}
 						className="w-8 h-8 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+
 						aria-label={t("comments.upvote")}
+
+						aria-label={`Upvote comment from ${shortenAddress(comment.author_address)}`}
+
 					>
 						👍
 					</button>
@@ -402,7 +468,11 @@ const CommentCard: React.FC<CommentCardProps> = ({
 						type="button"
 						onClick={() => void handleVote("downvote")}
 						className="w-8 h-8 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+
 						aria-label={t("comments.downvote")}
+
+						aria-label={`Downvote comment from ${shortenAddress(comment.author_address)}`}
+
 					>
 						👎
 					</button>
@@ -470,6 +540,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 				</div>
 			)}
 
+
 			{isFlagging && (
 				<div className="mt-8 pt-8 border-t border-white/5 animate-in slide-in-from-top-4 duration-500">
 					<label
@@ -522,6 +593,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 					</div>
 				</div>
 			)}
+
 		</article>
 	)
 }

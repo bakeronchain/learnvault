@@ -1,10 +1,18 @@
-import React, { useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react"
 import ReactMarkdown from "react-markdown"
 import { useNavigate } from "react-router-dom"
 import { useToast } from "../components/Toast/ToastProvider"
 import { WalletButton } from "../components/WalletButton"
 import { useProposals } from "../hooks/useProposals"
 import { useWallet } from "../hooks/useWallet"
+import {
+	saveProposalDraft,
+	loadProposalDraft,
+	clearProposalDraft,
+	hasProposalDraft,
+	getDraftTimestamp,
+	ProposalDraft,
+} from "../util/proposalDraft"
 
 type ProposalType = "scholarship" | "parameter_change" | "new_course"
 
@@ -69,7 +77,7 @@ const DaoPropose: React.FC = () => {
 		isLoadingVotingPower,
 		isVotingPowerError,
 	} = useProposals()
-	const { showError } = useToast()
+	const { showError, showSuccess } = useToast()
 	const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit")
 	const [submissionError, setSubmissionError] = useState<string | null>(null)
 	const [formErrors, setFormErrors] = useState<FormErrors>({})
@@ -78,8 +86,80 @@ const DaoPropose: React.FC = () => {
 	)
 	const [createdTxHash, setCreatedTxHash] = useState<string | null>(null)
 	const [formData, setFormData] = useState<FormData>(initialFormData)
+	const [hasDraft, setHasDraft] = useState(false)
+	const [showRestorePrompt, setShowRestorePrompt] = useState(false)
+	const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null)
 
-	// Allow form access while loading or when the voting power API is unreachable
+	// Check for existing draft on mount
+	useEffect(() => {
+		const existingDraft = hasProposalDraft()
+		setHasDraft(existingDraft)
+		if (existingDraft) {
+			const timestamp = getDraftTimestamp()
+			setDraftTimestamp(timestamp)
+			setShowRestorePrompt(true)
+		}
+	}, [])
+
+	// Auto-save draft with debounce
+	useEffect(() => {
+		// Only save if there's actual content
+		const hasContent =
+			formData.title.trim() ||
+			formData.description.trim() ||
+			formData.applicationUrl.trim() ||
+			formData.fundingAmount.trim() ||
+			formData.parameterName.trim() ||
+			formData.parameterValue.trim() ||
+			formData.courseTitle.trim()
+
+		if (!hasContent) return
+
+		const timeout = setTimeout(() => {
+			saveProposalDraft(formData)
+			setHasDraft(true)
+			setDraftTimestamp(Date.now())
+		}, 500)
+
+		return () => clearTimeout(timeout)
+	}, [formData])
+
+	// Handle restore draft
+	const handleRestoreDraft = () => {
+		const draft = loadProposalDraft()
+		if (draft) {
+			const { savedAt, ...draftData } = draft
+			setFormData(draftData as FormData)
+			showSuccess("Draft restored successfully")
+		}
+		setShowRestorePrompt(false)
+	}
+
+	// Handle delete draft
+	const [showDeleteDraftConfirm, setShowDeleteDraftConfirm] = useState(false)
+
+	const handleDeleteDraft = () => {
+		clearProposalDraft()
+		setHasDraft(false)
+		setDraftTimestamp(null)
+		setShowRestorePrompt(false)
+		setShowDeleteDraftConfirm(false)
+		showSuccess("Draft deleted")
+	}
+
+	// Format draft timestamp for display
+	const formatDraftTime = (timestamp: number | null): string => {
+		if (!timestamp) return ""
+		const date = new Date(timestamp)
+		const now = new Date()
+		const diffMs = now.getTime() - date.getTime()
+		const diffMins = Math.floor(diffMs / 60000)
+
+		if (diffMins < 1) return "just now"
+		if (diffMins < 60) return `${diffMins}m ago`
+		if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`
+		return date.toLocaleDateString()
+	}
 	const hasMinimumBalance =
 		isLoadingVotingPower ||
 		isVotingPowerError ||
@@ -217,6 +297,10 @@ const DaoPropose: React.FC = () => {
 			setCreatedTxHash(created.tx_hash ?? null)
 			setFormData(initialFormData)
 			setFormErrors({})
+			// Clear draft after successful submission
+			clearProposalDraft()
+			setHasDraft(false)
+			setDraftTimestamp(null)
 		} catch (error) {
 			const message =
 				error instanceof Error
@@ -520,18 +604,78 @@ const DaoPropose: React.FC = () => {
 
 	return (
 		<div className="min-h-screen text-white">
+			{showDeleteDraftConfirm && (
+				<ConfirmDialog
+					title="Delete Draft"
+					description="Are you sure you want to delete your proposal draft? All your progress will be permanently lost. This action cannot be undone."
+					confirmLabel="Delete Draft"
+					cancelLabel="Keep Draft"
+					onConfirm={handleDeleteDraft}
+					onCancel={() => setShowDeleteDraftConfirm(false)}
+					isDestructive
+				/>
+			)}
 			<div className="p-12 max-w-4xl mx-auto">
 				<header className="mb-12">
-					<h1 className="text-6xl font-black mb-4 tracking-tighter text-gradient">
+				<div className="flex items-center gap-4 mb-4">
+					<h1 className="text-6xl font-black tracking-tighter text-gradient">
 						Create Proposal
 					</h1>
-					<p className="text-white/40 text-lg font-medium max-w-2xl">
-						Submit a governance proposal to the backend API for community review
-						and voting.
-					</p>
-				</header>
+					{hasDraft && (
+						<span className="inline-flex items-center gap-2 px-3 py-1 bg-brand-amber/20 border border-brand-amber/40 text-brand-amber text-xs font-black uppercase tracking-widest rounded-full">
+							<span className="w-2 h-2 bg-brand-amber rounded-full animate-pulse" />
+							Draft
+							{draftTimestamp && (
+								<span className="text-brand-amber/60">
+									({formatDraftTime(draftTimestamp)})
+								</span>
+							)}
+						</span>
+					)}
+				</div>
+				<p className="text-white/40 text-lg font-medium max-w-2xl">
+					Submit a governance proposal to the backend API for community review
+					and voting.
+				</p>
+				{hasDraft && !showRestorePrompt && (
+					<button
+						type="button"
+						onClick={() => setShowDeleteDraftConfirm(true)}
+						className="mt-4 text-sm text-white/40 hover:text-red-400 transition-colors"
+					>
+						✕ Delete draft
+					</button>
+				)}
 
-				<form onSubmit={handleSubmit} className="space-y-8" noValidate>
+				{showRestorePrompt && (
+					<div className="mt-6 p-4 rounded-xl bg-brand-amber/10 border border-brand-amber/30">
+						<p className="text-sm text-white mb-4">
+							You have an unsaved draft from{" "}
+							<span className="text-brand-amber">
+								{draftTimestamp && formatDraftTime(draftTimestamp)}
+							</span>
+							. Would you like to restore it?
+						</p>
+						<div className="flex gap-3">
+							<button
+								type="button"
+								onClick={handleRestoreDraft}
+								className="px-4 py-2 bg-brand-amber/20 border border-brand-amber/40 text-brand-amber font-black uppercase tracking-widest text-sm rounded-lg hover:bg-brand-amber/30 transition-all"
+							>
+								Restore Draft
+							</button>
+							<button
+								type="button"
+								onClick={() => setShowDeleteDraftConfirm(true)}
+								className="px-4 py-2 bg-white/5 border border-white/10 text-white/60 font-black uppercase tracking-widest text-sm rounded-lg hover:bg-white/10 transition-all"
+							>
+								Discard
+							</button>
+						</div>
+					</div>
+				)}
+
+				<form onSubmit={handleSubmit} className="space-y-8">
 					<div className="glass-card p-8 rounded-[2.5rem] border border-white/5">
 						<div className="space-y-6">
 							<div>
@@ -718,7 +862,9 @@ const DaoPropose: React.FC = () => {
 								type="submit"
 								data-testid="submit-proposal"
 								disabled={
-									isSubmittingProposal
+									isSubmittingProposal ||
+									!formData.title.trim() ||
+									!formData.description.trim()
 								}
 								className="px-8 py-3 bg-brand-cyan/10 border border-brand-cyan/30 text-brand-cyan font-black uppercase tracking-widest rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3"
 							>

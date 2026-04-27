@@ -1,6 +1,7 @@
 import { BookOpen } from "lucide-react"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useSearchParams } from "react-router-dom"
+import BookmarkButton from "../components/BookmarkButton"
 import { CourseFilter } from "../components/CourseFilter"
 import Pagination from "../components/Pagination"
 import { CourseCardSkeleton } from "../components/skeletons/CourseCardSkeleton"
@@ -23,7 +24,7 @@ function trackSlug(track: string): string {
 
 const Courses: React.FC = () => {
 	const [searchParams, setSearchParams] = useSearchParams()
-	const { courses, isLoading, error, refetch } = useCourses()
+	const { courses, isLoading, error } = useCourses()
 
 	const [searchInput, setSearchInput] = useState(
 		() => searchParams.get("q") ?? "",
@@ -172,13 +173,7 @@ const Courses: React.FC = () => {
 					))}
 				</div>
 			) : error ? (
-				<ErrorState
-					message={
-						error ||
-						"Failed to load courses. The server may be temporarily unavailable."
-					}
-					onRetry={() => void refetch()}
-				/>
+				<ErrorState message={error} onRetry={() => window.location.reload()} />
 			) : courses.length === 0 ? (
 				<EmptyState
 					icon={BookOpen}
@@ -209,8 +204,12 @@ const Courses: React.FC = () => {
 						{paginatedCourses.map((course) => (
 							<article
 								key={course.id}
-								className="glass-card rounded-4xl flex flex-col h-full border border-white/10 overflow-hidden group"
+								className="glass-card rounded-4xl flex flex-col h-full border border-white/10 overflow-hidden group relative"
 							>
+								{/* Bookmark toggle — hidden when wallet not connected */}
+								<div className="absolute top-4 right-4 z-10">
+									<BookmarkButton courseId={course.id} />
+								</div>
 								<div
 									className={`h-36 bg-linear-to-br ${course.accentClassName} border-b border-white/10`}
 								/>
@@ -237,6 +236,7 @@ const Courses: React.FC = () => {
 										<span>{course.track}</span>
 										<Link
 											to={`/courses/${course.slug}/lessons/1`}
+											id={paginatedCourses.indexOf(course) === 0 ? "course-card-0" : undefined}
 											className="iridescent-border w-full sm:w-auto text-center px-4 py-2 rounded-xl font-semibold text-white hover:scale-105 transition-transform"
 										>
 											Open course

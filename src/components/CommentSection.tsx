@@ -1,4 +1,5 @@
-import { useEffect, useId, useState, useCallback } from "react"
+import { useEffect, useId, useState } from "react"
+import { formatDistanceToNow } from "date-fns"
 import { useTranslation } from "react-i18next"
 import { useWallet } from "../hooks/useWallet"
 import { getAuthToken } from "../util/auth"
@@ -173,11 +174,22 @@ const CommentSection: React.FC<CommentSectionProps> = ({ proposalId, proposalAut
 								comment={comment}
 								isAuthor={comment.author_address === proposalAuthor}
 								canPin={proposalAuthor === address}
+								canDelete={comment.author_address === address}
 								onUpdate={fetchComments}
 							/>
 							<div className="ml-12 mt-6 space-y-6 border-l border-white/5 pl-8">
 								{getReplies(comment.id).map((reply) => (
+
 									<CommentCard key={reply.id} comment={reply} isReply onUpdate={fetchComments} />
+
+									<CommentCard
+										key={reply.id}
+										comment={reply}
+										isReply
+										canDelete={reply.author_address === address}
+										onUpdate={fetchComments}
+									/>
+
 								))}
 							</div>
 						</div>

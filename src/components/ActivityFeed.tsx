@@ -8,6 +8,7 @@ import {
 	type ActivityEventType,
 	type ActivityEventFilter,
 } from "../hooks/useActivityFeed"
+import { useWallet } from "../hooks/useWallet"
 
 export interface ActivityFeedProps {
 	address: string | undefined
@@ -103,7 +104,12 @@ function ActivityEventRow({ event }: { event: ActivityEvent }) {
 					target="_blank"
 					rel="noopener noreferrer"
 					className="flex-shrink-0 text-[10px] font-bold uppercase tracking-widest text-brand-cyan/60 hover:text-brand-cyan transition-colors self-center"
+
 					title={t("activity.viewOnExplorer")}
+
+					title="View on Stellar Explorer"
+					aria-label={`View transaction ${event.txHash} on Stellar Explorer`}
+
 				>
 					{t("activity.viewTx")}
 				</a>
@@ -144,21 +150,57 @@ function EmptyState() {
 export function ActivityFeed({
 	address,
 	limit = 10,
-	filter = "all",
+	filter: initialFilter = "all",
 	title = "Activity Feed",
 }: ActivityFeedProps) {
+
 	const { t } = useTranslation()
+
+	const [activeFilter, setActiveFilter] =
+		React.useState<ActivityEventFilter>(initialFilter)
+
 	const { events, isLoading, error, hasMore, loadMore } = useActivityFeed(
 		address,
 		limit,
-		filter,
+		activeFilter,
 	)
+
+	const { address: currentUserAddress } = useWallet()
 
 	return (
 		<section>
-			<div className="flex items-center gap-4 mb-8">
-				<h2 className="text-2xl font-black tracking-tight">{title}</h2>
-				<div className="h-px flex-1 bg-linear-to-r from-white/10 to-transparent" />
+			<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+				<div className="flex items-center gap-4 flex-1">
+					<h2 className="text-2xl font-black tracking-tight whitespace-nowrap">
+						{title}
+					</h2>
+					<div className="h-px flex-1 bg-linear-to-r from-white/10 to-transparent" />
+				</div>
+
+				{currentUserAddress && (
+					<div className="flex bg-white/5 p-1 rounded-full border border-white/10 self-start">
+						<button
+							onClick={() => setActiveFilter(address ? "all" : "all")}
+							className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+								activeFilter !== "followed"
+									? "bg-brand-cyan text-black"
+									: "text-white/40 hover:text-white/70"
+							}`}
+						>
+							{address ? "Mine" : "All"}
+						</button>
+						<button
+							onClick={() => setActiveFilter("followed")}
+							className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+								activeFilter === "followed"
+									? "bg-brand-cyan text-black"
+									: "text-white/40 hover:text-white/70"
+							}`}
+						>
+							Following
+						</button>
+					</div>
+				)}
 			</div>
 
 			<div className="glass-card rounded-[2.5rem] p-6 overflow-hidden">
@@ -169,7 +211,16 @@ export function ActivityFeed({
 						<p className="text-red-400/80 text-sm">{error}</p>
 					</div>
 				) : events.length === 0 ? (
-					<EmptyState />
+					<div className="text-center py-16">
+						<div className="text-4xl mb-4">
+							{activeFilter === "followed" ? "\u{1F465}" : "\u{1F680}"}
+						</div>
+						<p className="text-white/40 text-sm font-medium">
+							{activeFilter === "followed"
+								? "No activity from scholars you follow"
+								: "No activity yet \u2014 start learning!"}
+						</p>
+					</div>
 				) : (
 					<>
 						<div className="divide-y divide-white/5">

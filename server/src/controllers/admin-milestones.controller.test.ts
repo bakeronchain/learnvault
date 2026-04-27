@@ -17,9 +17,12 @@
  *     - returns only pending reports
  */
 
+// Provide JWT_SECRET explicitly — no hardcoded fallback exists anymore.
+process.env.JWT_SECRET = "learnvault-secret"
+
 // Must be declared before any imports so Jest hoisting works correctly.
 jest.mock("../db/index", () => ({
-	pool: { query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }), connect: jest.fn() },
+	pool: { query: jest.fn(), connect: jest.fn() },
 }))
 jest.mock("../db/milestone-store")
 jest.mock("../services/stellar-contract.service")
@@ -68,15 +71,14 @@ const pendingReport = {
 	evidence_ipfs_cid: null,
 	evidence_description: "Completed all exercises",
 	status: "pending" as const,
-	resubmission_count: 0,
 	submitted_at: new Date().toISOString(),
-	resubmission_count: 0,
 	scholar_email: "scholar@example.com",
 	scholar_name: "Test Scholar",
 	course_title: "Test Course",
 	milestone_title: "Test Milestone",
 	milestone_number: 1,
 	lrn_reward: 100,
+	resubmission_count: 0,
 }
 
 const approvedAuditEntry = {

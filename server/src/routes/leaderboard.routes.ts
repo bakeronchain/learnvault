@@ -1,9 +1,6 @@
 import { Router } from "express"
 
-import {
-	getLeaderboard,
-	streamLeaderboard,
-} from "../controllers/leaderboard.controller"
+import { getLeaderboard } from "../controllers/leaderboard.controller"
 
 export const leaderboardRouter = Router()
 
@@ -58,4 +55,3 @@ export const leaderboardRouter = Router()
  *         $ref: '#/components/responses/InternalServerError'
  */
 leaderboardRouter.get("/leaderboard", getLeaderboard)
-leaderboardRouter.get("/leaderboard/stream", streamLeaderboard)

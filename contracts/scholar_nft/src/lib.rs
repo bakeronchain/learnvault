@@ -32,7 +32,6 @@ pub struct ScholarMetadata {
 pub enum DataKey {
     Admin,
     Counter,
-    Scholars,
     Owner(u64),
     TokenUri(u64),
     Revoked(u64),
@@ -103,11 +102,6 @@ impl ScholarNFT {
         env.storage().instance().set(&TOKEN_COUNTER_KEY, &0_u64);
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::Counter, &0_u64);
-        let scholars: Vec<Address> = Vec::new(&env);
-        env.storage()
-            .persistent()
-            .set(&DataKey::Scholars, &scholars);
-        Self::extend_persistent(&env, &DataKey::Scholars);
 
         env.events()
             .publish((symbol_short!("init"),), InitializedEventData { admin });
@@ -142,17 +136,6 @@ impl ScholarNFT {
             .persistent()
             .set(&DataKey::Metadata(token_id), &metadata);
         Self::extend_persistent(&env, &DataKey::Metadata(token_id));
-
-        let mut scholars: Vec<Address> = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Scholars)
-            .unwrap_or_else(|| Vec::new(&env));
-        scholars.push_back(to.clone());
-        env.storage()
-            .persistent()
-            .set(&DataKey::Scholars, &scholars);
-        Self::extend_persistent(&env, &DataKey::Scholars);
 
         env.events().publish(
             (symbol_short!("minted"), token_id),
@@ -249,14 +232,17 @@ impl ScholarNFT {
 
     pub fn get_all_scholars(env: Env) -> Vec<Address> {
         Self::extend_instance(&env);
-        let key = DataKey::Scholars;
-        let scholars: Vec<Address> = env
-            .storage()
-            .persistent()
-            .get(&key)
-            .unwrap_or_else(|| Vec::new(&env));
-        if env.storage().persistent().has(&key) {
-            Self::extend_persistent(&env, &key);
+        let count = Self::token_counter(env.clone());
+        let mut scholars = Vec::new(&env);
+        for i in 1..=count {
+            if let Some(owner) = env
+                .storage()
+                .persistent()
+                .get::<_, Address>(&DataKey::Owner(i))
+            {
+                scholars.push_back(owner);
+                Self::extend_persistent(&env, &DataKey::Owner(i));
+            }
         }
         scholars
     }

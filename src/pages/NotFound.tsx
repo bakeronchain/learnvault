@@ -4,7 +4,7 @@ import styles from "./NotFound.module.css"
 
 const NotFound: React.FC = () => {
 	return (
-		<div className={styles.container} data-testid="not-found-page">
+		<div className={styles.container}>
 			<div className={styles.content}>
 				<div className={styles.iconWrapper}>
 					<Icon.SearchLg size="xl" />
@@ -13,26 +13,11 @@ const NotFound: React.FC = () => {
 				<p className={styles.message}>
 					This page doesn't exist — but your learning journey does.
 				</p>
-				<div className={styles.actions}>
-					<Button
-						type="button"
-						size="md"
-						variant="secondary"
-						onClick={() => window.history.back()}
-						data-testid="not-found-go-back"
-					>
-						Go back
+				<Link to="/" className={styles.buttonLink}>
+					<Button size="md" variant="primary">
+						Go Home
 					</Button>
-					<Link
-						to="/"
-						className={styles.buttonLink}
-						data-testid="not-found-go-home"
-					>
-						<Button size="md" variant="primary">
-							Go Home
-						</Button>
-					</Link>
-				</div>
+				</Link>
 			</div>
 		</div>
 	)

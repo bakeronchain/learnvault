@@ -5,17 +5,7 @@ import { nodePolyfills } from "vite-plugin-node-polyfills"
 import wasm from "vite-plugin-wasm"
 // https://vite.dev/config/
 export default defineConfig({
-	plugins: [
-		react(),
-		tailwindcss(),
-		nodePolyfills({
-			include: ["buffer"],
-			globals: {
-				Buffer: true,
-			},
-		}),
-		wasm(),
-	],
+	plugins: [react(), tailwindcss(), nodePolyfills(), wasm()],
 	optimizeDeps: {
 		esbuildOptions: {
 			loader: {

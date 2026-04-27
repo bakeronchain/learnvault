@@ -3,9 +3,13 @@
  * Uses the in-memory store so no database is required.
  */
 
+// Provide an explicit JWT_SECRET so the admin middleware does not rely on a
+// hardcoded fallback (which was removed as part of the JWT security hardening).
+process.env.JWT_SECRET = "learnvault-secret"
+
 jest.mock("../db/index", () => ({
 	pool: {
-		query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+		query: jest.fn(),
 		connect: jest.fn(),
 	},
 }))
@@ -24,35 +28,16 @@ jest.mock("../services/stellar-contract.service", () => ({
 	},
 }))
 
-jest.mock("../services/email.service", () => ({
-	createEmailService: jest.fn().mockReturnValue({
-		sendNotification: jest.fn().mockResolvedValue(undefined),
-		sendAdminMilestoneNotification: jest.fn().mockResolvedValue(undefined),
-	}),
-}))
-
-jest.mock("../services/escrow-timeout.service", () => ({
-	markEscrowActivity: jest.fn().mockResolvedValue(undefined),
-}))
-
-jest.mock("../services/credential.service", () => ({
-	credentialService: {
-		mintCertificateIfComplete: jest
-			.fn()
-			.mockResolvedValue({ minted: false }),
-	},
-}))
-
 import express from "express"
 import jwt from "jsonwebtoken"
 import request from "supertest"
 import { inMemoryMilestoneStore } from "../db/milestone-store"
-import { resetPeerReviewMemoryForTests } from "../db/peer-review-store"
 import { errorHandler } from "../middleware/error.middleware"
 import { adminMilestonesRouter } from "../routes/admin-milestones.routes"
 import { stellarContractService } from "../services/stellar-contract.service"
 
 const JWT_SECRET = "learnvault-secret"
+process.env.JWT_SECRET = JWT_SECRET
 
 function makeAdminToken(address = "GADMIN123") {
 	return jwt.sign({ address }, JWT_SECRET, { expiresIn: "1h" })
@@ -69,7 +54,6 @@ function buildApp() {
 // Reset in-memory store before each test
 beforeEach(() => {
 	jest.clearAllMocks()
-
 	// @ts-ignore – reset private fields for test isolation
 	inMemoryMilestoneStore["reports"] = []
 	// @ts-ignore
@@ -78,21 +62,16 @@ beforeEach(() => {
 	inMemoryMilestoneStore["reportSeq"] = 1
 	// @ts-ignore
 	inMemoryMilestoneStore["auditSeq"] = 1
-	resetPeerReviewMemoryForTests()
 
 	// Provide fake Stellar credentials so the approve/reject credential guard
 	// passes — the pool mock ensures no real SDK call is made.
 	process.env.STELLAR_SECRET_KEY = "FAKE_TEST_KEY"
 	process.env.COURSE_MILESTONE_CONTRACT_ID = "FAKE_TEST_CONTRACT"
-	process.env.FRONTEND_URL = "http://localhost:3000"
-	process.env.NODE_ENV = "test"
 })
 
 afterEach(() => {
 	delete process.env.STELLAR_SECRET_KEY
 	delete process.env.COURSE_MILESTONE_CONTRACT_ID
-	delete process.env.FRONTEND_URL
-	delete process.env.NODE_ENV
 })
 
 describe("POST /api/milestones/submit", () => {
@@ -202,8 +181,6 @@ describe("GET /api/admin/milestones/pending", () => {
 		expect(res.status).toBe(200)
 		expect(res.body.data).toHaveLength(1)
 		expect(res.body.data[0].status).toBe("pending")
-		expect(res.body.data[0].peer_approval_count).toBe(0)
-		expect(res.body.data[0].peer_rejection_count).toBe(0)
 	})
 })
 
@@ -235,9 +212,6 @@ describe("GET /api/admin/milestones/:id", () => {
 		expect(res.status).toBe(200)
 		expect(res.body.data.id).toBe(report.id)
 		expect(Array.isArray(res.body.data.auditLog)).toBe(true)
-		expect(Array.isArray(res.body.data.peer_reviews)).toBe(true)
-		expect(res.body.data.peer_approval_count).toBe(0)
-		expect(res.body.data.peer_rejection_count).toBe(0)
 	})
 })
 

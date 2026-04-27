@@ -2,6 +2,8 @@ import React from "react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 
+import BookmarkButton from "./BookmarkButton"
+
 interface CourseCardProps {
 	id: string
 	title: string
@@ -73,6 +75,10 @@ const CourseCard: React.FC<CourseCardProps> = ({
 					>
 						{t(difficultyData.labelKey)}
 					</span>
+				</div>
+				{/* Bookmark toggle (hidden when wallet not connected) */}
+				<div className="absolute top-5 right-5">
+					<BookmarkButton courseId={id} />
 				</div>
 			</div>
 

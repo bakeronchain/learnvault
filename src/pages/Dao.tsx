@@ -1,8 +1,9 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import { useDelegation } from "../hooks/useDelegation"
 import { useProposals } from "../hooks/useProposals"
 import { useWallet } from "../hooks/useWallet"
+import { hasProposalDraft } from "../util/proposalDraft"
 
 const GOV_DECIMALS = 7
 const GOV_DIVISOR = 10 ** GOV_DECIMALS
@@ -20,6 +21,11 @@ function shortenAddress(addr: string): string {
 export default function Dao() {
 	const { address } = useWallet()
 	const { proposals, votingPower, isLoading } = useProposals()
+	const [hasDraft, setHasDraft] = useState(false)
+
+	useEffect(() => {
+		setHasDraft(hasProposalDraft())
+	}, [])
 	const {
 		delegatee,
 		isDelegating,
@@ -237,7 +243,7 @@ export default function Dao() {
 				</Link>
 				<Link
 					to="/dao/propose"
-					className={`px-10 py-4 glass text-white rounded-2xl font-black text-sm uppercase tracking-widest border border-white/10 transition-all ${
+					className={`relative px-10 py-4 glass text-white rounded-2xl font-black text-sm uppercase tracking-widest border border-white/10 transition-all ${
 						address
 							? "hover:bg-white/10 hover:scale-105 active:scale-95"
 							: "opacity-40 pointer-events-none"
@@ -245,6 +251,9 @@ export default function Dao() {
 					data-testid="create-proposal"
 				>
 					Create Proposal
+					{hasDraft && (
+						<span className="absolute -top-2 -right-2 w-4 h-4 bg-brand-amber rounded-full border-2 border-background animate-pulse" />
+					)}
 				</Link>
 			</div>
 

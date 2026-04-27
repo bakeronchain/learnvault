@@ -1,5 +1,8 @@
 import { type Request, type Response } from "express"
+import { logger } from "../lib/logger"
 import { pool } from "../db/index"
+
+const log = logger.child({ module: "admin" })
 
 const STELLAR_NETWORK = process.env.STELLAR_NETWORK ?? "testnet"
 const STELLAR_SECRET_KEY = process.env.STELLAR_SECRET_KEY ?? ""
@@ -73,7 +76,7 @@ async function queryContractI128(
 		if (typeof value === "string") return value
 		return "0"
 	} catch (err) {
-		console.warn(`[admin] Failed to query contract method ${method}:`, err)
+		log.warn({ method, err }, "Failed to query contract method")
 		return "0"
 	}
 }
@@ -109,7 +112,7 @@ export async function getAdminStats(
 			treasury_balance_usdc: treasuryBalanceUsdc,
 		})
 	} catch (err) {
-		console.error("[admin] getAdminStats error:", err)
+		log.error({ err }, "getAdminStats error")
 		res.status(500).json({ error: "Failed to fetch admin stats" })
 	}
 }

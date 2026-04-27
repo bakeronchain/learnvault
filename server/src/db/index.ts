@@ -1,6 +1,9 @@
 import { Pool } from "pg"
 
 import { poolMonitor } from "../services/pool-monitor.service"
+import { logger } from "../lib/logger"
+
+const log = logger.child({ module: "db" })
 
 // Environment-specific pool configuration
 const getPoolConfig = () => {
@@ -64,16 +67,17 @@ let activePool: Pool | MockPool
 try {
 	const poolConfig = getPoolConfig()
 	activePool = new Pool(poolConfig)
-	console.log(
-		`[db] Pool configured: max=${poolConfig.max}, min=${poolConfig.min}, idleTimeout=${poolConfig.idleTimeoutMillis}ms, connectionTimeout=${poolConfig.connectionTimeoutMillis}ms`,
+	log.info(
+		{ max: poolConfig.max, min: poolConfig.min, idleTimeoutMillis: poolConfig.idleTimeoutMillis, connectionTimeoutMillis: poolConfig.connectionTimeoutMillis },
+		"Pool configured",
 	)
 
 	// Initialize pool monitoring
 	if (activePool instanceof Pool) {
 		poolMonitor.initializeMonitor(activePool)
 	}
-} catch {
-	console.warn("[db] Failed to create postgres pool, using mock")
+} catch (err) {
+	log.warn({ err }, "Failed to create postgres pool, using mock")
 	activePool = new MockPool()
 }
 
@@ -90,13 +94,13 @@ export const initDb = async () => {
 			const client = await activePool.connect()
 			await client.query("SELECT 1")
 			client.release()
-			console.log("[db] Postgres connection verified")
+			log.info("Postgres connection verified")
 			await logPgStatStatementsSnapshot()
 		} else {
-			console.log("[db] In-memory mock database initialized")
+			log.info("In-memory mock database initialized")
 		}
 	} catch (err) {
-		console.error("[db] Connection check failed, falling back to mock:", err)
+		log.error({ err }, "Connection check failed, falling back to mock")
 		activePool = new MockPool()
 	}
 }

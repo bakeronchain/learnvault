@@ -1,5 +1,3 @@
-// Admin milestones routes - handles approval/rejection of milestone submissions
-// Last updated: 2025-01-24 to resolve CI caching issues
 import { Router } from "express"
 import {
 	listMilestones,
@@ -11,7 +9,6 @@ import {
 	rejectMilestone,
 } from "../controllers/admin-milestones.controller"
 import { submitMilestoneReport } from "../controllers/milestone-submit.controller"
-import { resubmitMilestoneReport } from "../controllers/milestone-resubmit.controller"
 import {
 	approveMilestoneBodySchema,
 	batchApproveMilestonesBodySchema,
@@ -237,42 +234,4 @@ adminMilestonesRouter.post(
 		body: milestoneSubmitBodySchema,
 	}),
 	submitMilestoneReport,
-)
-
-/**
- * @openapi
- * /api/milestones/resubmit:
- *   post:
- *     tags: [Milestones]
- *     summary: Scholar resubmits a rejected milestone report
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [id]
- *             properties:
- *               id:
- *                 type: integer
- *               evidenceGithub:
- *                 type: string
- *               evidenceIpfsCid:
- *                 type: string
- *               evidenceDescription:
- *                 type: string
- *     responses:
- *       200:
- *         description: Report resubmitted
- *       400:
- *         $ref: '#/components/responses/BadRequestError'
- *       404:
- *         description: Report not found
- *       429:
- *         description: Rate limit exceeded
- */
-adminMilestonesRouter.post(
-	"/milestones/resubmit",
-	milestoneSubmissionLimiter,
-	resubmitMilestoneReport,
 )

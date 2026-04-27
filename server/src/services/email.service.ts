@@ -1,10 +1,10 @@
 import { Resend } from "resend"
+import { logger } from "../lib/logger"
 import {
 	templates,
 	toPlainText,
 	type EmailVariables,
 } from "../templates/email-templates"
-import { logger } from "../lib/logger"
 
 const log = logger.child({ module: "email" })
 
@@ -113,15 +113,12 @@ export class EmailService {
 		const adminEmails = process.env.ADMIN_EMAILS
 
 		if (!adminEmails) {
-			console.warn(
-				"[EmailService] ADMIN_EMAILS not set, skipping flag notification.",
-			)
+			log.warn("ADMIN_EMAILS not set, skipping admin flag notification")
 			return false
 		}
 
 		const adminLink = `${process.env.FRONTEND_URL || "http://localhost:3000"}/admin/moderation`
-
-		const body = `New content flag: ${contentType} #${contentId} reported by ${reporterAddress}. Reason: ${reason}. Review it here: ${adminLink}`
+		const body = `Content flagged: ${contentType} #${contentId}\nReporter: ${reporterAddress}\nReason: ${reason}\nReview: ${adminLink}`
 
 		const emails = adminEmails.split(",").map((email) => email.trim())
 
@@ -129,7 +126,7 @@ export class EmailService {
 		for (const email of emails) {
 			const success = await this.sendNotification({
 				to: email,
-				subject: `New Content Flag - ${contentType.toUpperCase()}`,
+				subject: "Content Flagged",
 				template: "admin-alert",
 				data: {
 					body,

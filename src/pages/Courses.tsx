@@ -24,7 +24,7 @@ function trackSlug(track: string): string {
 
 const Courses: React.FC = () => {
 	const [searchParams, setSearchParams] = useSearchParams()
-	const { courses, isLoading, error, refetch } = useCourses()
+	const { courses, isLoading, error } = useCourses()
 
 	const [searchInput, setSearchInput] = useState(
 		() => searchParams.get("q") ?? "",
@@ -173,13 +173,7 @@ const Courses: React.FC = () => {
 					))}
 				</div>
 			) : error ? (
-				<ErrorState
-					message={
-						error ||
-						"Failed to load courses. The server may be temporarily unavailable."
-					}
-					onRetry={() => void refetch()}
-				/>
+				<ErrorState message={error} onRetry={() => window.location.reload()} />
 			) : courses.length === 0 ? (
 				<EmptyState
 					icon={BookOpen}

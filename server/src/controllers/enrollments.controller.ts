@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express"
-import { logger } from "../lib/logger"
 import { pool } from "../db/index"
+import { logger } from "../lib/logger"
 
 const log = logger.child({ module: "enrollments" })
 import { stellarContractService } from "../services/stellar-contract.service"
@@ -51,11 +51,16 @@ export const createEnrollment = async (
 				// course_id is a string slug (e.g., "stellar-basics")
 				// Skip on-chain validation - mapping from slug to contract ID
 				// would require additional database logic
-				log.warn({ courseId: course_id }, "course_id is not numeric, skipping on-chain validation")
+				log.warn(
+					{ courseId: course_id },
+					"course_id is not numeric, skipping on-chain validation",
+				)
 			}
 		} else {
 			// If no contract configured, allow enrollment (development mode)
-			log.warn("No COURSE_MILESTONE_CONTRACT_ID configured, skipping on-chain validation")
+			log.warn(
+				"No COURSE_MILESTONE_CONTRACT_ID configured, skipping on-chain validation",
+			)
 		}
 
 		// Check if already enrolled in DB

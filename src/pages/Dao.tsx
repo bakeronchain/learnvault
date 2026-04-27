@@ -1,10 +1,9 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import { useDelegation } from "../hooks/useDelegation"
 import { useProposals } from "../hooks/useProposals"
 import { useWallet } from "../hooks/useWallet"
 import { hasProposalDraft } from "../util/proposalDraft"
-import { useState, useEffect } from "react"
 
 const GOV_DECIMALS = 7
 const GOV_DIVISOR = 10 ** GOV_DECIMALS

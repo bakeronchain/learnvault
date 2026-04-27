@@ -3,7 +3,6 @@ import express from "express"
 import request from "supertest"
 import { allowedOrigins } from "../config/cors-config"
 
-
 describe("CORS Configuration", () => {
 	let app: express.Application
 
@@ -29,22 +28,27 @@ describe("CORS Configuration", () => {
 		)
 
 		app.get("/api/test", (req, res) => res.status(200).json({ success: true }))
-		
+
 		// Add error handler to capture CORS errors as 403 (or similar)
-		app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-			if (err.message === "Not allowed by CORS") {
-				res.status(403).json({ error: err.message })
-			} else {
-				next(err)
-			}
-		})
+		app.use(
+			(
+				err: any,
+				req: express.Request,
+				res: express.Response,
+				next: express.NextFunction,
+			) => {
+				if (err.message === "Not allowed by CORS") {
+					res.status(403).json({ error: err.message })
+				} else {
+					next(err)
+				}
+			},
+		)
 	})
 
 	it("allows requests from legitimate origins with correct headers", async () => {
 		const origin = allowedOrigins[0]
-		const res = await request(app)
-			.get("/api/test")
-			.set("Origin", origin)
+		const res = await request(app).get("/api/test").set("Origin", origin)
 
 		expect(res.status).toBe(200)
 		expect(res.header["access-control-allow-origin"]).toBe(origin)

@@ -16,6 +16,7 @@ import {
 	createRequireAuth,
 	createOptionalAuth,
 } from "../middleware/auth.middleware"
+import { validate } from "../middleware/validation.middleware"
 import { type JwtService } from "../services/jwt.service"
 
 export function createScholarsRouter(jwtService: JwtService): Router {

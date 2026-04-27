@@ -103,6 +103,7 @@ function ActivityEventRow({ event }: { event: ActivityEvent }) {
 					rel="noopener noreferrer"
 					className="flex-shrink-0 text-[10px] font-bold uppercase tracking-widest text-brand-cyan/60 hover:text-brand-cyan transition-colors self-center"
 					title="View on Stellar Explorer"
+					aria-label={`View transaction ${event.txHash} on Stellar Explorer`}
 				>
 					View Tx &rarr;
 				</a>

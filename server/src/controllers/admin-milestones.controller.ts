@@ -1,5 +1,10 @@
 import { type Request, type Response } from "express"
-import { milestoneStore } from "../db/milestone-store"
+import sanitizeHtml from "sanitize-html"
+import { milestoneStore, type MilestoneReport } from "../db/milestone-store"
+import {
+	attachPeerSummariesToReports,
+	listRecentPeerReviewsForReport,
+} from "../db/peer-review-store"
 import { type AdminRequest } from "../middleware/admin.middleware"
 import { credentialService } from "../services/credential.service"
 import { createEmailService } from "../services/email.service"
@@ -61,8 +66,10 @@ export async function listMilestones(
 			safePageSize,
 		)
 
+		const dataWithPeers = await attachPeerSummariesToReports(result.data)
+
 		res.status(200).json({
-			data: result.data,
+			data: dataWithPeers,
 			total: result.total,
 			page: safePage,
 			pageSize: safePageSize,
@@ -79,7 +86,8 @@ export async function getPendingMilestones(
 ): Promise<void> {
 	try {
 		const reports = await milestoneStore.getPendingReports()
-		res.status(200).json({ data: reports })
+		const withPeers = await attachPeerSummariesToReports(reports)
+		res.status(200).json({ data: withPeers })
 	} catch (err) {
 		console.error("[admin] getPendingMilestones error:", err)
 		res.status(500).json({ error: "Failed to fetch pending milestones" })
@@ -103,7 +111,11 @@ export async function getMilestoneById(
 			return
 		}
 		const auditLog = await milestoneStore.getAuditForReport(id)
-		res.status(200).json({ data: { ...report, auditLog } })
+		const [withPeers] = await attachPeerSummariesToReports([report])
+		const peer_reviews = await listRecentPeerReviewsForReport(id, 20)
+		res.status(200).json({
+			data: { ...(withPeers ?? report), auditLog, peer_reviews },
+		})
 	} catch (err) {
 		console.error("[admin] getMilestoneById error:", err)
 		res.status(500).json({ error: "Failed to fetch milestone report" })
@@ -214,11 +226,17 @@ export async function approveMilestone(
 	} catch (err) {
 		console.error("[admin] approveMilestone error:", err)
 		const msg = err instanceof Error ? err.message : String(err)
+		const retriesExhausted =
+			typeof err === "object" && err !== null && "retriesExhausted" in err
 		if (msg.includes("not configured")) {
 			res.status(503).json({ error: "Stellar credentials not configured" })
 			return
 		}
-		res.status(500).json({ error: "Failed to approve milestone" })
+		res.status(500).json({
+			error: "Failed to approve milestone",
+			details: msg,
+			retriesExhausted: retriesExhausted,
+		})
 	}
 }
 
@@ -234,6 +252,22 @@ export async function rejectMilestone(
 
 	const { reason } = req.body as { reason: string }
 	const validatorAddress = req.adminAddress ?? "unknown"
+
+	// Validate and sanitize rejection reason
+	if (!reason || typeof reason !== "string") {
+		res.status(400).json({ error: "Rejection reason is required" })
+		return
+	}
+	if (reason.length > 1000) {
+		res
+			.status(400)
+			.json({ error: "Rejection reason must be 1000 characters or fewer" })
+		return
+	}
+	const sanitizedReason = sanitizeHtml(reason, {
+		allowedTags: [],
+		allowedAttributes: {},
+	})
 
 	try {
 		const report = await milestoneStore.getReportById(id)
@@ -270,7 +304,7 @@ export async function rejectMilestone(
 			report_id: id,
 			validator_address: validatorAddress,
 			decision: "rejected",
-			rejection_reason: reason,
+			rejection_reason: sanitizedReason,
 			contract_tx_hash: contractResult.txHash,
 		})
 
@@ -289,7 +323,7 @@ export async function rejectMilestone(
 						milestoneNumber: String(
 							report.milestone_number ?? report.milestone_id,
 						),
-						rejectionReason: reason || "",
+						rejectionReason: sanitizedReason,
 						milestoneUrl: `${process.env.FRONTEND_URL || ""}/milestones`,
 						unsubscribeUrl: "#",
 					},
@@ -307,7 +341,7 @@ export async function rejectMilestone(
 			data: {
 				reportId: id,
 				status: "rejected",
-				reason,
+				reason: sanitizedReason,
 				contractTxHash: contractResult.txHash,
 				simulated: contractResult.simulated,
 				auditEntry,
@@ -316,12 +350,25 @@ export async function rejectMilestone(
 	} catch (err) {
 		console.error("[admin] rejectMilestone error:", err)
 		const msg = err instanceof Error ? err.message : String(err)
+		const retriesExhausted =
+			typeof err === "object" && err !== null && "retriesExhausted" in err
 		if (msg.includes("not configured")) {
 			res.status(503).json({ error: "Stellar credentials not configured" })
 			return
 		}
-		res.status(500).json({ error: "Failed to reject milestone" })
+		res.status(500).json({
+			error: "Failed to reject milestone",
+			details: msg,
+			retriesExhausted,
+		})
 	}
+}
+
+type BatchItemResult = {
+	reportId: number
+	success: boolean
+	status: string
+	reason?: string
 }
 
 export async function batchApproveMilestones(
@@ -329,94 +376,125 @@ export async function batchApproveMilestones(
 	res: Response,
 ): Promise<void> {
 	const { milestoneIds } = req.body as { milestoneIds: number[] }
-	if (!Array.isArray(milestoneIds) || milestoneIds.length === 0) {
-		res.status(400).json({ error: "Invalid or empty milestoneIds array" })
-		return
-	}
-
 	const validatorAddress = req.adminAddress ?? "unknown"
 
 	try {
-		// 1. Validate all reports exist and are pending
-		const reports = []
-		const failedResults = []
+		const loaded: Array<{ id: number; report: MilestoneReport | null }> = []
 		for (const id of milestoneIds) {
-			const report = await milestoneStore.getReportById(id)
-			if (!report) {
-				failedResults.push({
-					reportId: id,
-					success: false,
-					status: "not_found",
-				})
-				continue
-			}
-			if (report.status !== "pending") {
-				failedResults.push({
-					reportId: id,
-					success: false,
-					status: report.status,
-				})
-				continue
-			}
-			reports.push(report)
+			loaded.push({ id, report: await milestoneStore.getReportById(id) })
 		}
 
-		if (failedResults.some((r) => r.status === "not_found")) {
+		const missing = loaded.filter((x) => !x.report)
+		if (missing.length > 0) {
 			res.status(404).json({
 				error: "One or more milestone reports were not found",
 				data: {
-					results: failedResults.filter((r) => r.status === "not_found"),
+					results: missing.map((m) => ({
+						reportId: m.id,
+						success: false,
+						status: "not_found",
+					})),
 				},
 			})
 			return
 		}
 
-		if (failedResults.length > 0) {
+		const notPending = loaded.filter((x) => x.report!.status !== "pending")
+		if (notPending.length > 0) {
 			res.status(409).json({
-				error: "All milestone reports must be pending before batch processing",
-				data: { results: failedResults },
+				error: "One or more milestone reports are not pending",
+				data: {
+					results: notPending.map((x) => ({
+						reportId: x.id,
+						success: false,
+						status: x.report!.status,
+					})),
+				},
 			})
 			return
 		}
 
-		// 2. Process all reports
-		const results = []
-		for (const report of reports) {
+		if (!hasStellarMilestoneCredentials()) {
+			res.status(503).json({ error: "Stellar credentials not configured" })
+			return
+		}
+
+		const results: BatchItemResult[] = []
+		let succeeded = 0
+
+		for (const { id, report } of loaded) {
+			const r = report!
 			try {
-				await stellarContractService.callVerifyMilestone(
-					report.scholar_address,
-					report.course_id,
-					report.milestone_id,
+				const contractResult = await stellarContractService.callVerifyMilestone(
+					r.scholar_address,
+					r.course_id,
+					r.milestone_id,
 					{ requestId: req.requestId },
 				)
-
-				await milestoneStore.updateReportStatus(report.id, "approved")
+				await milestoneStore.updateReportStatus(id, "approved")
+				try {
+					await markEscrowActivity(r.scholar_address, r.course_id)
+				} catch (trackingErr) {
+					console.error("[admin] escrow activity update failed:", trackingErr)
+				}
 				await milestoneStore.addAuditEntry({
-					report_id: report.id,
+					report_id: id,
 					validator_address: validatorAddress,
 					decision: "approved",
 					rejection_reason: null,
-					contract_tx_hash: "batch_processed",
+					contract_tx_hash: contractResult.txHash,
 				})
 
-				results.push({ reportId: report.id, success: true, status: "approved" })
+				try {
+					if (r.scholar_email) {
+						await emailService.sendNotification({
+							to: r.scholar_email,
+							subject: "Milestone Approved ",
+							template: "milestone-approved-admin",
+							data: {
+								name: r.scholar_name || "Scholar",
+								courseTitle: r.course_title || `Course ${r.course_id}`,
+								milestoneTitle:
+									r.milestone_title ||
+									`Milestone ${r.milestone_number ?? r.milestone_id}`,
+								milestoneNumber: String(r.milestone_number ?? r.milestone_id),
+								reward: String(r.lrn_reward ?? 0),
+								dashboardUrl: `${process.env.FRONTEND_URL || ""}/dashboard`,
+								unsubscribeUrl: "#",
+							},
+						})
+					}
+				} catch (emailErr) {
+					console.error(
+						"[admin] approval email failed (non-blocking):",
+						emailErr,
+					)
+				}
+
+				try {
+					await credentialService.mintCertificateIfComplete(
+						r.scholar_address,
+						r.course_id,
+					)
+				} catch (mintErr) {
+					console.error(
+						"[admin] Certificate mint failed (non-blocking):",
+						mintErr,
+					)
+				}
+
+				succeeded++
+				results.push({ reportId: id, success: true, status: "approved" })
 			} catch (err) {
-				results.push({
-					reportId: report.id,
-					success: false,
-					status: "failed",
-					error: err instanceof Error ? err.message : String(err),
-				})
+				console.error("[admin] batchApproveMilestones item error:", err)
+				results.push({ reportId: id, success: false, status: "error" })
 			}
 		}
 
 		res.status(200).json({
 			data: {
-				action: "approve",
-				totalRequested: milestoneIds.length,
-				processed: results.length,
-				succeeded: results.filter((r) => r.success).length,
-				failed: results.filter((r) => !r.success).length,
+				succeeded,
+				failed: results.length - succeeded,
 				results,
 			},
 		})
@@ -430,105 +508,138 @@ export async function batchRejectMilestones(
 	req: AdminRequest,
 	res: Response,
 ): Promise<void> {
-	const { milestoneIds, reason } = req.body as {
+	const { milestoneIds, reason: rawReason } = req.body as {
 		milestoneIds: number[]
 		reason?: string
 	}
-	if (!Array.isArray(milestoneIds) || milestoneIds.length === 0) {
-		res.status(400).json({ error: "Invalid or empty milestoneIds array" })
+	const validatorAddress = req.adminAddress ?? "unknown"
+
+	const reasonInput =
+		typeof rawReason === "string" && rawReason.trim().length > 0
+			? rawReason.trim()
+			: "Batch rejection"
+	if (reasonInput.length > 1000) {
+		res
+			.status(400)
+			.json({ error: "Rejection reason must be 1000 characters or fewer" })
 		return
 	}
-
-	const validatorAddress = req.adminAddress ?? "unknown"
-	const finalReason = reason || "Batch rejected by admin"
+	const sanitizedReason = sanitizeHtml(reasonInput, {
+		allowedTags: [],
+		allowedAttributes: {},
+	})
 
 	try {
-		// 1. Validate all reports exist and are pending
-		const reports = []
-		const failedResults = []
+		const loaded: Array<{ id: number; report: MilestoneReport | null }> = []
 		for (const id of milestoneIds) {
-			const report = await milestoneStore.getReportById(id)
-			if (!report) {
-				failedResults.push({
-					reportId: id,
-					success: false,
-					status: "not_found",
-				})
-				continue
-			}
-			if (report.status !== "pending") {
-				failedResults.push({
-					reportId: id,
-					success: false,
-					status: report.status,
-				})
-				continue
-			}
-			reports.push(report)
+			loaded.push({ id, report: await milestoneStore.getReportById(id) })
 		}
 
-		if (failedResults.some((r) => r.status === "not_found")) {
+		const missing = loaded.filter((x) => !x.report)
+		if (missing.length > 0) {
 			res.status(404).json({
 				error: "One or more milestone reports were not found",
 				data: {
-					results: failedResults.filter((r) => r.status === "not_found"),
+					results: missing.map((m) => ({
+						reportId: m.id,
+						success: false,
+						status: "not_found",
+					})),
 				},
 			})
 			return
 		}
 
-		if (failedResults.length > 0) {
+		const notPending = loaded.filter((x) => x.report!.status !== "pending")
+		if (notPending.length > 0) {
 			res.status(409).json({
 				error: "All milestone reports must be pending before batch processing",
-				data: { results: failedResults },
+				data: {
+					results: notPending.map((x) => ({
+						reportId: x.id,
+						success: false,
+						status: x.report!.status,
+					})),
+				},
 			})
 			return
 		}
 
-		// 2. Process all reports
-		const results = []
-		for (const report of reports) {
+		if (!hasStellarMilestoneCredentials()) {
+			res.status(503).json({ error: "Stellar credentials not configured" })
+			return
+		}
+
+		const results: BatchItemResult[] = []
+		let succeeded = 0
+
+		for (const { id, report } of loaded) {
+			const r = report!
 			try {
-				await stellarContractService.emitRejectionEvent(
-					report.scholar_address,
-					report.course_id,
-					report.milestone_id,
-					finalReason,
+				const contractResult = await stellarContractService.emitRejectionEvent(
+					r.scholar_address,
+					r.course_id,
+					r.milestone_id,
+					sanitizedReason,
 					{ requestId: req.requestId },
 				)
-
-				await milestoneStore.updateReportStatus(report.id, "rejected")
+				await milestoneStore.updateReportStatus(id, "rejected")
+				try {
+					await markEscrowActivity(r.scholar_address, r.course_id)
+				} catch (trackingErr) {
+					console.error("[admin] escrow activity update failed:", trackingErr)
+				}
 				await milestoneStore.addAuditEntry({
-					report_id: report.id,
+					report_id: id,
 					validator_address: validatorAddress,
 					decision: "rejected",
-					rejection_reason: finalReason,
-					contract_tx_hash: "batch_processed",
+					rejection_reason: sanitizedReason,
+					contract_tx_hash: contractResult.txHash,
 				})
 
+				try {
+					if (r.scholar_email) {
+						await emailService.sendNotification({
+							to: r.scholar_email,
+							subject: "Milestone Rejected",
+							template: "milestone-rejected-admin",
+							data: {
+								name: r.scholar_name || "Scholar",
+								courseTitle: r.course_title || `Course ${r.course_id}`,
+								milestoneTitle:
+									r.milestone_title ||
+									`Milestone ${r.milestone_number ?? r.milestone_id}`,
+								milestoneNumber: String(r.milestone_number ?? r.milestone_id),
+								rejectionReason: sanitizedReason,
+								milestoneUrl: `${process.env.FRONTEND_URL || ""}/milestones`,
+								unsubscribeUrl: "#",
+							},
+						})
+					}
+				} catch (emailErr) {
+					console.error(
+						"[admin] rejection email failed (non-blocking):",
+						emailErr,
+					)
+				}
+
+				succeeded++
 				results.push({
-					reportId: report.id,
+					reportId: id,
 					success: true,
 					status: "rejected",
-					reason: finalReason,
+					reason: sanitizedReason,
 				})
 			} catch (err) {
-				results.push({
-					reportId: report.id,
-					success: false,
-					status: "failed",
-					error: err instanceof Error ? err.message : String(err),
-				})
+				console.error("[admin] batchRejectMilestones item error:", err)
+				results.push({ reportId: id, success: false, status: "error" })
 			}
 		}
 
 		res.status(200).json({
 			data: {
-				action: "reject",
-				totalRequested: milestoneIds.length,
-				processed: results.length,
-				succeeded: results.filter((r) => r.success).length,
-				failed: results.filter((r) => !r.success).length,
+				succeeded,
+				failed: results.length - succeeded,
 				results,
 			},
 		})

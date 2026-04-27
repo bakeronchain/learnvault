@@ -4,8 +4,11 @@ import ErrorBoundary from "./components/ErrorBoundary"
 import Footer from "./components/Footer"
 import NavBar from "./components/NavBar"
 import NetworkPreconnect from "./components/NetworkPreconnect"
+import TestnetBanner from "./components/TestnetBanner"
 import { ToastProvider } from "./components/Toast/ToastProvider"
 import { WalletToastWatcher } from "./components/WalletToastWatcher"
+import { useLocalizeDocumentAttributes } from "./hooks/useLocalizeDocumentAttributes"
+import { NetworkProvider } from "./providers/NetworkProvider"
 
 const Admin = lazy(() => import("./pages/Admin"))
 const Community = lazy(() => import("./pages/Community"))
@@ -36,6 +39,8 @@ const renderRoute = (element: ReactNode) => (
 )
 
 function App() {
+	useLocalizeDocumentAttributes()
+
 	return (
 		<ToastProvider>
 			<WalletToastWatcher />
@@ -106,6 +111,7 @@ const AppLayout = () => (
 	// Issue #61 — Theme-aware background using CSS variables + Tailwind dark: variant
 	<div className="min-h-screen flex flex-col pt-24 overflow-x-hidden w-full max-w-full bg-[var(--color-app-bg)] text-[var(--color-app-text)] transition-colors duration-300">
 		<NetworkPreconnect />
+		<TestnetBanner />
 		<NavBar />
 		<main className="flex-1 relative z-10">
 			<Outlet />
@@ -114,4 +120,10 @@ const AppLayout = () => (
 	</div>
 )
 
-export default App
+const AppWithProvider = () => (
+	<NetworkProvider>
+		<App />
+	</NetworkProvider>
+)
+
+export default AppWithProvider

@@ -806,3 +806,38 @@ fn state_persists_after_upgrade() {
     assert_eq!(supply, 100);
     assert_eq!(stored_hash, wasm_hash);
 }
+
+#[test]
+fn benchmark_costs() {
+    let e = Env::default();
+
+    // 1. Benchmark Initialize
+    let admin = Address::generate(&e);
+    let id = e.register(LearnToken, ());
+    e.mock_all_auths();
+    let client = LearnTokenClient::new(&e, &id);
+
+    e.cost_estimate().budget().reset_unlimited();
+    client.initialize(&admin);
+    let init_instr = e.cost_estimate().budget().cpu_instruction_cost();
+    let init_mem = e.cost_estimate().budget().memory_bytes_cost();
+
+    // 2. Benchmark Mint
+    let learner = Address::generate(&e);
+    e.cost_estimate().budget().reset_unlimited();
+    client.mint(&learner, &100);
+    let mint_instr = e.cost_estimate().budget().cpu_instruction_cost();
+    let mint_mem = e.cost_estimate().budget().memory_bytes_cost();
+
+    // 3. Benchmark Reputation Score
+    e.cost_estimate().budget().reset_unlimited();
+    client.reputation_score(&learner);
+    let rep_instr = e.cost_estimate().budget().cpu_instruction_cost();
+    let rep_mem = e.cost_estimate().budget().memory_bytes_cost();
+
+    extern crate std;
+    std::println!("BENCHMARK_RESULTS: learn_token");
+    std::println!("initialize: instr={}, mem={}", init_instr, init_mem);
+    std::println!("mint: instr={}, mem={}", mint_instr, mint_mem);
+    std::println!("reputation_score: instr={}, mem={}", rep_instr, rep_mem);
+}

@@ -10,12 +10,16 @@ export interface MilestoneReport {
 	evidence_description?: string | null
 	status: "pending" | "approved" | "rejected"
 	submitted_at: string
+	resubmission_count: number
 	scholar_email?: string
 	scholar_name?: string
 	course_title?: string
 	milestone_title?: string
 	milestone_number?: number
 	lrn_reward?: number
+	/** Counts from milestone_peer_reviews (informational for admins). */
+	peer_approval_count?: number
+	peer_rejection_count?: number
 }
 
 export interface MilestoneAuditEntry {
@@ -84,7 +88,10 @@ class InMemoryMilestoneStore {
 	}
 
 	async createReport(
-		data: Omit<MilestoneReport, "id" | "status" | "submitted_at">,
+		data: Omit<
+			MilestoneReport,
+			"id" | "status" | "submitted_at" | "resubmission_count"
+		>,
 	): Promise<MilestoneReport> {
 		const existing = this.reports.find(
 			(r) =>
@@ -93,12 +100,23 @@ class InMemoryMilestoneStore {
 				r.milestone_id === data.milestone_id,
 		)
 		if (existing) {
-			throw new Error("DUPLICATE_REPORT")
+			if (existing.status !== "rejected") {
+				throw new Error("DUPLICATE_REPORT")
+			}
+			// Resubmit: update existing
+			existing.evidence_github = data.evidence_github
+			existing.evidence_ipfs_cid = data.evidence_ipfs_cid
+			existing.evidence_description = data.evidence_description
+			existing.status = "pending"
+			existing.submitted_at = new Date().toISOString()
+			existing.resubmission_count += 1
+			return existing
 		}
 		const report: MilestoneReport = {
 			id: this.reportSeq++,
 			status: "pending",
 			submitted_at: new Date().toISOString(),
+			resubmission_count: 0,
 			...data,
 		}
 		this.reports.push(report)
@@ -193,11 +211,14 @@ export const milestoneStore = {
 		const total = Number(totalResult.rows[0]?.total ?? 0)
 		const offset = (page - 1) * pageSize
 		const rowValues = [...values, pageSize, offset]
+		const limitParam = values.length + 1
+		const offsetParam = values.length + 2
 		const dataResult = await pool.query(
 			`SELECT *
 			 FROM milestone_reports
 			 ${whereClause}
 			 ORDER BY submitted_at DESC
+			 LIMIT $${limitParam} OFFSET $${offsetParam}`,
 			 LIMIT $${rowValues.length - 1}
 			 OFFSET $${rowValues.length}`,
 			rowValues,
@@ -249,14 +270,40 @@ export const milestoneStore = {
 	},
 
 	async createReport(
-		data: Omit<MilestoneReport, "id" | "status" | "submitted_at">,
+		data: Omit<
+			MilestoneReport,
+			"id" | "status" | "submitted_at" | "resubmission_count"
+		>,
 	): Promise<MilestoneReport> {
 		if (!isRealPool()) return inMemoryMilestoneStore.createReport(data)
+		// Check for existing
+		const existingResult = await pool.query(
+			`SELECT id, status, resubmission_count FROM milestone_reports WHERE scholar_address = $1 AND course_id = $2 AND milestone_id = $3`,
+			[data.scholar_address, data.course_id, data.milestone_id],
+		)
+		const existing = existingResult.rows[0]
+		if (existing) {
+			if (existing.status !== "rejected") {
+				throw new Error("DUPLICATE_REPORT")
+			}
+			// Resubmit: update
+			const updateResult = await pool.query(
+				`UPDATE milestone_reports SET evidence_github = $1, evidence_ipfs_cid = $2, evidence_description = $3, status = 'pending', submitted_at = NOW(), resubmission_count = resubmission_count + 1 WHERE id = $4 RETURNING *`,
+				[
+					data.evidence_github ?? null,
+					data.evidence_ipfs_cid ?? null,
+					data.evidence_description ?? null,
+					existing.id,
+				],
+			)
+			return updateResult.rows[0]
+		}
+		// Insert new
 		try {
 			const result = await pool.query(
 				`INSERT INTO milestone_reports
-           (scholar_address, course_id, milestone_id, evidence_github, evidence_ipfs_cid, evidence_description)
-         VALUES ($1, $2, $3, $4, $5, $6)
+           (scholar_address, course_id, milestone_id, evidence_github, evidence_ipfs_cid, evidence_description, resubmission_count)
+         VALUES ($1, $2, $3, $4, $5, $6, 0)
          RETURNING *`,
 				[
 					data.scholar_address,

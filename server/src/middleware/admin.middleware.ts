@@ -24,6 +24,7 @@ function getJwtSecret(): string | undefined {
 
 export interface AdminRequest extends Request {
 	adminAddress?: string
+	walletAddress?: string
 }
 
 /**

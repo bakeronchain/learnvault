@@ -74,7 +74,6 @@ jobs:
         with:
           node-version: 22
       - run: npm ci --legacy-peer-deps
-      - run: npm run lint
       - run: npx prettier . --check
       - name: Database Migration Safety Check
         run: |

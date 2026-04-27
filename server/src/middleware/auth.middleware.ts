@@ -1,6 +1,5 @@
 import { type NextFunction, type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
-
 import { type JwtService } from "../services/jwt.service"
 
 // ---------------------------------------------------------------------------
@@ -49,7 +48,6 @@ export interface AuthRequest extends Request {
 	user?: {
 		address: string
 	}
-	walletAddress?: string
 }
 
 export const authMiddleware = (

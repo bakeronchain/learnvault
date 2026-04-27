@@ -3,6 +3,10 @@
  * Uses the in-memory store so no database is required.
  */
 
+// Provide an explicit JWT_SECRET so the admin middleware does not rely on a
+// hardcoded fallback (which was removed as part of the JWT security hardening).
+process.env.JWT_SECRET = "learnvault-secret"
+
 jest.mock("../db/index", () => ({
 	pool: {
 		query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),

@@ -2,7 +2,10 @@ import fs from "fs/promises"
 import path from "path"
 import { type Request, type Response } from "express"
 
+import { logger } from "../lib/logger"
 import { pool } from "../db/index"
+
+const log = logger.child({ module: "credentials" })
 import { pinJsonToIPFS, getGatewayUrl } from "../services/pinata.service"
 
 // ---------------------------------------------------------------------------
@@ -18,7 +21,6 @@ interface CourseMetadata {
 interface NFTAttribute {
 	trait_type: string
 	value: string
-	[key: string]: any
 }
 
 interface NFTMetadata {
@@ -26,9 +28,7 @@ interface NFTMetadata {
 	description: string
 	image: string
 	attributes: NFTAttribute[]
-	[key: string]: any
 }
-
 
 interface CreateMetadataRequest {
 	course_id: string
@@ -173,10 +173,10 @@ export async function createCredentialMetadata(
 
 		// Upload to IPFS via Pinata
 		const metadataName = `${course_id}-${learner_address}-${Date.now()}`
-		const cid = await pinJsonToIPFS(metadata as any, metadataName)
-		if (!cid) {
-			throw new Error("Failed to pin metadata to IPFS")
-		}
+		const cid = await pinJsonToIPFS(
+			metadata as unknown as Record<string, unknown>,
+			metadataName,
+		)
 
 		// Build response
 		const metadataUri = `ipfs://${cid}`
@@ -190,7 +190,7 @@ export async function createCredentialMetadata(
 			},
 		})
 	} catch (error) {
-		console.error("Error creating credential metadata:", error)
+		log.error({ err: error }, "Error creating credential metadata")
 
 		if (
 			error instanceof Error &&
@@ -249,7 +249,7 @@ export async function getCredentialsByAddress(
 
 		res.status(200).json({ data })
 	} catch (error) {
-		console.error("Error fetching credentials by address:", error)
+		log.error({ err: error }, "Error fetching credentials by address")
 		res.status(500).json({
 			error: "Internal server error",
 			message: "Failed to fetch credentials",

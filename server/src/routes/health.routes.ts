@@ -6,6 +6,7 @@ import {
 	resetPoolAlerts,
 } from "../controllers/metrics.controller"
 import { pool } from "../db"
+import { stellarRpcCircuitBreaker } from "../services/stellar-contract.service"
 
 export const healthRouter = Router()
 
@@ -52,6 +53,7 @@ healthRouter.get("/health", async (req, res) => {
 			redis,
 			stellarHorizon,
 		},
+		stellarRpc: stellarRpcCircuitBreaker.getStatus(),
 	})
 })
 

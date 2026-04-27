@@ -304,7 +304,7 @@ export const bookmarkCourseIdParamSchema = z
 
 export const userProfileSchema = z
 	.object({
-		display_name: z.string().trim().max(50).optional(),
+		display_name: z.string().trim().min(2).max(50).optional(),
 		bio: z.string().trim().max(1000).optional(),
 		avatar_url: z.string().trim().url().max(2048).optional(),
 		twitter: z.string().trim().max(255).optional(),

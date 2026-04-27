@@ -87,7 +87,8 @@ export async function getPendingMilestones(
 ): Promise<void> {
 	try {
 		const reports = await milestoneStore.getPendingReports()
-		res.status(200).json({ data: reports })
+		const reportsWithPeerSummaries = await attachPeerSummariesToReports(reports)
+		res.status(200).json({ data: reportsWithPeerSummaries })
 	} catch (err) {
 		log.error({ err }, "getPendingMilestones error")
 		res.status(500).json({ error: "Failed to fetch pending milestones" })
@@ -111,7 +112,11 @@ export async function getMilestoneById(
 			return
 		}
 		const auditLog = await milestoneStore.getAuditForReport(id)
-		res.status(200).json({ data: { ...report, auditLog } })
+		const [reportWithPeerSummary] = await attachPeerSummariesToReports([report])
+		const peerReviews = await listRecentPeerReviewsForReport(id)
+		res.status(200).json({
+			data: { ...reportWithPeerSummary, auditLog, peer_reviews: peerReviews },
+		})
 	} catch (err) {
 		log.error({ err }, "getMilestoneById error")
 		res.status(500).json({ error: "Failed to fetch milestone report" })
@@ -375,6 +380,24 @@ export async function batchApproveMilestones(
 					reportId: id,
 					success: false,
 					status: "not_found",
+				})),
+			},
+		})
+		return
+	}
+
+	const nonPending = reports
+		.map((report, i) => ({ report, id: milestoneIds[i] }))
+		.filter(({ report }) => report && report.status !== "pending")
+
+	if (nonPending.length > 0) {
+		res.status(409).json({
+			error: "All milestone reports must be pending before batch processing",
+			data: {
+				results: nonPending.map(({ report, id }) => ({
+					reportId: id,
+					success: false,
+					status: report!.status,
 				})),
 			},
 		})

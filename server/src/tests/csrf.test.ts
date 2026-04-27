@@ -36,16 +36,19 @@ const testJwtService = {
 		const d = jwt.verify(token, JWT_SECRET) as {
 			sub?: string
 			address?: string
+			jti?: string
 		}
 		const sub = d.sub ?? d.address ?? ""
 		if (!sub) throw new Error("Invalid token")
-		return { sub }
+		return { sub, jti: d.jti ?? "test-jti" }
 	},
 	revokeToken: jest.fn().mockResolvedValue(undefined),
 }
 
 function validToken(address = "GUSER123") {
-	return jwt.sign({ sub: address }, JWT_SECRET, { expiresIn: "1h" })
+	return jwt.sign({ sub: address, jti: "test-jti" }, JWT_SECRET, {
+		expiresIn: "1h",
+	})
 }
 
 /**

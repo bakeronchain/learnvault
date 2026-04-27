@@ -135,8 +135,8 @@ async function withRetry<T>(
 			}
 			const delayMs = 500 * 2 ** (attempt - 1) // 500 ms, 1 s, 2 s, …
 			log.warn(
-				`[stellar] ${label} failed (attempt ${attempt}/${maxAttempts}), retrying in ${delayMs}ms…`,
-				err instanceof Error ? err.message : String(err),
+				{ err, delayMs, attempt, maxAttempts, label },
+				`[stellar] ${label} failed, retrying`,
 			)
 			await new Promise<void>((resolve) => setTimeout(resolve, delayMs))
 		}
@@ -436,7 +436,7 @@ async function callMintScholarNFT(
 			prepared.sign(keypair)
 
 			const result = await server.sendTransaction(prepared)
-			return { txHash: result.hash, simulated: false, tokenId }
+			return { txHash: result.hash, simulated: false }
 		} catch (err) {
 			log.error({ err }, "ScholarNFT mint failed")
 			throw new Error(

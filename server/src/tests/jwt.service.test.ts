@@ -9,6 +9,7 @@ import crypto from "node:crypto"
 
 import jwt from "jsonwebtoken"
 
+import { createTokenStore } from "../db/token-store"
 import {
 	JWT_AUDIENCE,
 	JWT_ISSUER,
@@ -21,7 +22,11 @@ import {
 // ---------------------------------------------------------------------------
 
 const { privateKeyPem, publicKeyPem } = generateEphemeralDevJwtKeys()
-const service = createJwtService(privateKeyPem, publicKeyPem)
+const service = createJwtService(
+	privateKeyPem,
+	publicKeyPem,
+	createTokenStore(undefined),
+)
 
 const TEST_ADDRESS = "GABCDEF1234567890"
 
@@ -30,15 +35,15 @@ const TEST_ADDRESS = "GABCDEF1234567890"
 // ---------------------------------------------------------------------------
 
 describe("JWT algorithm enforcement", () => {
-	it("rejects a token signed with HS256", () => {
+	it("rejects a token signed with HS256", async () => {
 		const hs256Token = jwt.sign({ sub: TEST_ADDRESS }, "some-hmac-secret", {
 			algorithm: "HS256",
 		})
 
-		expect(() => service.verifyWalletToken(hs256Token)).toThrow()
+		await expect(service.verifyWalletToken(hs256Token)).rejects.toThrow()
 	})
 
-	it("rejects a token signed with a different RS256 key pair", () => {
+	it("rejects a token signed with a different RS256 key pair", async () => {
 		const { privateKeyPem: otherPrivate, publicKeyPem: otherPublic } =
 			generateEphemeralDevJwtKeys()
 		void otherPublic
@@ -53,7 +58,7 @@ describe("JWT algorithm enforcement", () => {
 			},
 		)
 
-		expect(() => service.verifyWalletToken(foreignToken)).toThrow()
+		await expect(service.verifyWalletToken(foreignToken)).rejects.toThrow()
 	})
 })
 
@@ -62,7 +67,7 @@ describe("JWT algorithm enforcement", () => {
 // ---------------------------------------------------------------------------
 
 describe("JWT claim validation", () => {
-	it("rejects a token with a wrong issuer", () => {
+	it("rejects a token with a wrong issuer", async () => {
 		const token = jwt.sign(
 			{ sub: TEST_ADDRESS, jti: crypto.randomUUID() },
 			privateKeyPem,
@@ -73,10 +78,10 @@ describe("JWT claim validation", () => {
 			},
 		)
 
-		expect(() => service.verifyWalletToken(token)).toThrow()
+		await expect(service.verifyWalletToken(token)).rejects.toThrow()
 	})
 
-	it("rejects a token with a wrong audience", () => {
+	it("rejects a token with a wrong audience", async () => {
 		const token = jwt.sign(
 			{ sub: TEST_ADDRESS, jti: crypto.randomUUID() },
 			privateKeyPem,
@@ -87,30 +92,30 @@ describe("JWT claim validation", () => {
 			},
 		)
 
-		expect(() => service.verifyWalletToken(token)).toThrow()
+		await expect(service.verifyWalletToken(token)).rejects.toThrow()
 	})
 
-	it("rejects a token missing the jti claim", () => {
+	it("rejects a token missing the jti claim", async () => {
 		const token = jwt.sign({ sub: TEST_ADDRESS }, privateKeyPem, {
 			algorithm: "RS256",
 			issuer: JWT_ISSUER,
 			audience: JWT_AUDIENCE,
 		})
 
-		expect(() => service.verifyWalletToken(token)).toThrow("missing jti")
+		await expect(service.verifyWalletToken(token)).rejects.toThrow("missing jti")
 	})
 
-	it("rejects a token missing the sub claim", () => {
+	it("rejects a token missing the sub claim", async () => {
 		const token = jwt.sign({ jti: crypto.randomUUID() }, privateKeyPem, {
 			algorithm: "RS256",
 			issuer: JWT_ISSUER,
 			audience: JWT_AUDIENCE,
 		})
 
-		expect(() => service.verifyWalletToken(token)).toThrow("missing sub")
+		await expect(service.verifyWalletToken(token)).rejects.toThrow("missing sub")
 	})
 
-	it("rejects an expired token", () => {
+	it("rejects an expired token", async () => {
 		const token = jwt.sign(
 			{ sub: TEST_ADDRESS, jti: crypto.randomUUID() },
 			privateKeyPem,
@@ -122,7 +127,7 @@ describe("JWT claim validation", () => {
 			},
 		)
 
-		expect(() => service.verifyWalletToken(token)).toThrow()
+		await expect(service.verifyWalletToken(token)).rejects.toThrow()
 	})
 })
 
@@ -131,21 +136,21 @@ describe("JWT claim validation", () => {
 // ---------------------------------------------------------------------------
 
 describe("JWT valid token", () => {
-	it("signs and verifies a token returning sub and jti", () => {
+	it("signs and verifies a token returning sub and jti", async () => {
 		const token = service.signWalletToken(TEST_ADDRESS)
-		const { sub, jti } = service.verifyWalletToken(token)
+		const { sub, jti } = await service.verifyWalletToken(token)
 
 		expect(sub).toBe(TEST_ADDRESS)
 		expect(typeof jti).toBe("string")
 		expect(jti.length).toBeGreaterThan(0)
 	})
 
-	it("includes unique jti on every token", () => {
+	it("includes unique jti on every token", async () => {
 		const t1 = service.signWalletToken(TEST_ADDRESS)
 		const t2 = service.signWalletToken(TEST_ADDRESS)
 
-		const { jti: jti1 } = service.verifyWalletToken(t1)
-		const { jti: jti2 } = service.verifyWalletToken(t2)
+		const { jti: jti1 } = await service.verifyWalletToken(t1)
+		const { jti: jti2 } = await service.verifyWalletToken(t2)
 
 		expect(jti1).not.toBe(jti2)
 	})

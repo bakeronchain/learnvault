@@ -5,7 +5,10 @@ import {
 	type DonorData,
 	type DonorContribution,
 	type DonorStats,
+<<<<<<< HEAD
+=======
 	type DonorImpact,
+>>>>>>> main
 	type Vote,
 	type RpcEvent,
 } from "../types/contracts"

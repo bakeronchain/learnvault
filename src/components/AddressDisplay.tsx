@@ -36,9 +36,15 @@ export const AddressDisplay: React.FC<AddressDisplayProps> = ({
 	showExplorerLink = true,
 	fullOnHover = true,
 }) => {
+<<<<<<< HEAD
+	const [copyState, setCopyState] = useState<"idle" | "copied" | "error">(
+		"idle",
+	)
+=======
 	const [copied, setCopied] = useState(false)
 	const [isHovered, setIsHovered] = useState(false)
 	const { network: walletNetwork } = useWallet()
+>>>>>>> main
 	const tooltipId = useId()
 
 	if (!address) return null

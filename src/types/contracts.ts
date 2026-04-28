@@ -9,6 +9,8 @@
 // ---------------------------------------------------------------------------
 // Canonical on-chain / shared contract types (as requested)
 // ---------------------------------------------------------------------------
+<<<<<<< HEAD
+=======
 
 export interface MilestoneReport {
 	id: string
@@ -45,6 +47,7 @@ export interface LearnTokenInfo {
 	reputation_score: bigint
 	total_supply: bigint
 }
+>>>>>>> main
 export type { Proposal, RawContractProposal } from "./governance"
 
 // ---------------------------------------------------------------------------

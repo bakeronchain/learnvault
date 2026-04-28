@@ -269,6 +269,8 @@ fn reclaim_inactive_uses_configured_window_size() {
 }
 
 #[test]
+<<<<<<< HEAD
+=======
 fn reclaim_inactive_emits_event() {
     let (env, contract_id, _token, _admin, _treasury, scholar) = setup();
     let client = MilestoneEscrowClient::new(&env, &contract_id);
@@ -288,6 +290,7 @@ fn reclaim_inactive_emits_event() {
 }
 
 #[test]
+>>>>>>> main
 fn get_escrow_reflects_each_stage_of_the_full_flow() {
     let (env, contract_id, _token, _admin, _treasury, scholar) = setup();
     let client = MilestoneEscrowClient::new(&env, &contract_id);

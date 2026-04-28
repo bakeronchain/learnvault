@@ -1,7 +1,17 @@
 import { type NextFunction, type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
 
+<<<<<<< HEAD
+const JWT_PUBLIC_KEY = process.env.JWT_PUBLIC_KEY?.replace(/\\n/g, "\n").trim()
+const JWT_SECRET = process.env.JWT_SECRET
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY
+const ADMIN_ADDRESSES = (process.env.ADMIN_ADDRESSES ?? "")
+	.split(",")
+	.map((value) => value.trim())
+	.filter(Boolean)
+=======
 import { JWT_AUDIENCE, JWT_ISSUER } from "../services/jwt.service"
+>>>>>>> main
 
 type TokenPayload = {
 	sub?: string
@@ -66,13 +76,25 @@ export function requireCourseAdmin(
 		return
 	}
 
+<<<<<<< HEAD
+	if (!JWT_PUBLIC_KEY && !JWT_SECRET) {
+=======
 	if (!jwtPublicKey && !jwtSecret) {
+>>>>>>> main
 		res.status(500).json({ error: "JWT verification not configured" })
 		return
 	}
 
 	let decoded: TokenPayload
 	try {
+<<<<<<< HEAD
+		if (JWT_PUBLIC_KEY) {
+			decoded = jwt.verify(token, JWT_PUBLIC_KEY, {
+				algorithms: ["RS256"],
+			}) as TokenPayload
+		} else {
+			decoded = jwt.verify(token, JWT_SECRET!) as TokenPayload
+=======
 		if (jwtPublicKey) {
 			decoded = jwt.verify(token, jwtPublicKey, {
 				algorithms: ["RS256"],
@@ -81,6 +103,7 @@ export function requireCourseAdmin(
 			}) as TokenPayload
 		} else {
 			decoded = jwt.verify(token, jwtSecret!) as TokenPayload
+>>>>>>> main
 		}
 	} catch {
 		res.status(401).json({ error: "Unauthorized" })

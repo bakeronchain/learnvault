@@ -13,7 +13,11 @@
 import fs from "node:fs"
 import path from "node:path"
 import dotenv from "dotenv"
+<<<<<<< HEAD
+import { Pool, PoolClient } from "pg"
+=======
 import { Pool, type PoolClient } from "pg"
+>>>>>>> main
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") })
 
@@ -44,9 +48,13 @@ async function migrateUp(): Promise<void> {
 		const { rows: applied } = await client.query<{ filename: string }>(
 			"SELECT filename FROM schema_migrations ORDER BY filename",
 		)
+<<<<<<< HEAD
+		const appliedSet = new Set(applied.map((r: { filename: string }) => r.filename))
+=======
 		const appliedSet = new Set(
 			applied.map((r: { filename: string }) => r.filename),
 		)
+>>>>>>> main
 
 		const files = fs
 			.readdirSync(MIGRATIONS_DIR)
@@ -119,9 +127,16 @@ async function migrateDown(): Promise<void> {
 		await client.query("BEGIN")
 		try {
 			await client.query(sql)
+<<<<<<< HEAD
+			await client.query(
+				"DELETE FROM schema_migrations WHERE filename = $1",
+				[last],
+			)
+=======
 			await client.query("DELETE FROM schema_migrations WHERE filename = $1", [
 				last,
 			])
+>>>>>>> main
 			await client.query("COMMIT")
 			console.log(`\nRolled back: ${last}`)
 		} catch (err) {

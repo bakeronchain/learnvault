@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { Helmet } from "react-helmet"
 import { useSearchParams } from "react-router-dom"
-import ConfirmDialog from "../components/ConfirmDialog"
 import CommentSection from "../components/CommentSection"
+import ConfirmDialog from "../components/ConfirmDialog"
 import Pagination from "../components/Pagination"
 import { NoProposalsEmptyState } from "../components/SkeletonLoader"
 import { ErrorState } from "../components/states/errorState"
+import { useToast } from "../components/Toast/ToastProvider"
 import {
 	type ProposalRecord,
 	useProposal,
@@ -16,7 +17,6 @@ import {
 	getDraftTimestamp,
 	clearProposalDraft,
 } from "../util/proposalDraft"
-import { useToast } from "../components/Toast/ToastProvider"
 
 type FilterType =
 	| "Voting Open"
@@ -234,20 +234,10 @@ const DaoProposals: React.FC = () => {
 		totalVotes > 0n
 			? Number((selectedProposal!.votesAgainst * 100n) / totalVotes)
 			: 0
-<<<<<<< HEAD
-
-	const userHasVoted = selectedProposal ? hasVoted(selectedProposal.id) : false
-	const voteChoice = selectedProposal
-		? getVoteChoice(selectedProposal.id)
-		: null
-	const governanceTokens = votingPower
-	const isTokenHolder = governanceTokens > 0n
-=======
 	const userHasVoted =
 		selectedProposal?.userVoteSupport === true ||
 		selectedProposal?.userVoteSupport === false
 	const voteChoice = selectedProposal?.userVoteSupport ?? null
->>>>>>> main
 	const isWalletConnected = Boolean(walletAddress)
 	const isTokenHolder = votingPower > 0n
 	const voteDisabled =
@@ -504,16 +494,7 @@ const DaoProposals: React.FC = () => {
 
 							{userHasVoted ? (
 								<div className="inline-flex items-center px-4 py-2 rounded-full border border-brand-cyan/30 bg-brand-cyan/10 text-brand-cyan text-xs font-black uppercase tracking-widest">
-<<<<<<< HEAD
-									You voted{" "}
-									{voteChoice === null
-										? "For/Against"
-										: voteChoice
-											? "For"
-											: "Against"}
-=======
 									You voted {voteChoice ? "Yes" : "No"}
->>>>>>> main
 								</div>
 							) : (
 								<div className="flex gap-3">

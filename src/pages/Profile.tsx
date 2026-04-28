@@ -64,7 +64,6 @@ const Profile: React.FC = () => {
 	const { address: walletAddress } = useContext(WalletContext)
 
 	const displayAddress = paramAddress || walletAddress
-	const isOwnProfile = !paramAddress || paramAddress === walletAddress
 
 	const {
 		data: profile,
@@ -98,13 +97,16 @@ const Profile: React.FC = () => {
 			})
 
 			if (!response.ok) {
-				const payload = await response.json().catch(() => ({}))
+				const payload = (await response.json().catch(() => ({}))) as {
+					message?: string
+					error?: string
+				}
 				throw new Error(
 					payload.message || payload.error || "Unable to load credentials",
 				)
 			}
 
-			const data = await response.json()
+			const data = (await response.json()) as { data?: any[] }
 			setNfts(
 				Array.isArray(data.data)
 					? data.data.map((item: any) => ({
@@ -147,12 +149,17 @@ const Profile: React.FC = () => {
 		try {
 			const response = await fetch(`/api/profile/${viewAddress}`)
 			if (!response.ok) {
-				const errorData = await response.json().catch(() => ({}))
+				const errorData = (await response.json().catch(() => ({}))) as {
+					error?: string
+				}
 				throw new Error(errorData.error || "Failed to load profile")
 			}
-			const data = await response.json()
-			setUserProfile(data.profile)
-			setStats(data.stats)
+			const data = (await response.json()) as {
+				profile?: UserProfile
+				stats?: ProfileStats
+			}
+			setUserProfile(data.profile ?? null)
+			setStats(data.stats ?? null)
 		} catch (err) {
 			console.error("[profile] Error loading profile data:", err)
 		}
@@ -161,8 +168,6 @@ const Profile: React.FC = () => {
 	useEffect(() => {
 		void fetchProfileData()
 	}, [fetchProfileData])
-
-
 
 	useEffect(() => {
 		void fetchCredentials()
@@ -196,12 +201,14 @@ const Profile: React.FC = () => {
 				})
 
 				if (!response.ok) {
-					const errorData = await response.json().catch(() => ({}))
+					const errorData = (await response.json().catch(() => ({}))) as {
+						error?: string
+					}
 					throw new Error(errorData.error || "Failed to save profile")
 				}
 
-				const data = await response.json()
-				setUserProfile(data.profile)
+				const data = (await response.json()) as { profile?: UserProfile }
+				setUserProfile(data.profile ?? null)
 				setIsEditing(false)
 			} catch (err) {
 				console.error("[profile] Error saving profile:", err)
@@ -223,7 +230,10 @@ const Profile: React.FC = () => {
 		Object.values(userProfile.socialLinks).some(Boolean)
 
 	const siteUrl = "https://learnvault.app"
-	const lrnBalance = stats?.lrnBalance?.toLocaleString() || profile?.lrn_balance?.toLocaleString() || "0"
+	const lrnBalance =
+		stats?.lrnBalance?.toLocaleString() ||
+		profile?.lrn_balance?.toLocaleString() ||
+		"0"
 	const coursesCompleted = stats?.coursesCompleted ?? nfts.length
 	const title = `${displayName} — ${lrnBalance} LRN · ${coursesCompleted} Course${
 		coursesCompleted !== 1 ? "s" : ""
@@ -336,25 +346,26 @@ const Profile: React.FC = () => {
 						<div className="w-px h-10 bg-white/10 hidden md:block" />
 						<div className="flex flex-wrap gap-4">
 							{displayAddress ? (
-							<ReputationBadge size="md" showBalance />
-						) : (
-							<div className="px-5 py-2 glass rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-white/40">
-								{t("wallet.connect")}
+								<ReputationBadge size="md" showBalance />
+							) : (
+								<div className="px-5 py-2 glass rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-white/40">
+									{t("wallet.connect")}
+								</div>
+							)}
+							<div className="px-5 py-2 glass rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-brand-cyan">
+								Learning Time: {learningTimeLabel}
 							</div>
-						)}
-						<div className="px-5 py-2 glass rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-brand-cyan">
-							Learning Time: {learningTimeLabel}
+							{stats?.reputationRank && (
+								<div className="px-5 py-2 glass rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-brand-purple">
+									Rank #{stats.reputationRank}
+								</div>
+							)}
+							{stats?.percentile && (
+								<div className="px-5 py-2 glass rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-brand-emerald">
+									Top {stats.percentile}%
+								</div>
+							)}
 						</div>
-						{stats?.reputationRank && (
-							<div className="px-5 py-2 glass rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-brand-purple">
-								Rank #{stats.reputationRank}
-							</div>
-						)}
-						{stats?.percentile && (
-							<div className="px-5 py-2 glass rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-brand-emerald">
-								Top {stats.percentile}%
-							</div>
-						)}
 					</div>
 
 					{/* Social Links */}

@@ -150,8 +150,6 @@ export const templates: Record<string, (vars: EmailVariables) => string> = {
   `,
 			vars,
 		),
-<<<<<<< HEAD
-=======
 	"milestone-approved-admin": (vars) =>
 		baseLayout(
 			`
@@ -198,7 +196,6 @@ export const templates: Record<string, (vars: EmailVariables) => string> = {
   `,
 			vars,
 		),
->>>>>>> main
 }
 
 /**

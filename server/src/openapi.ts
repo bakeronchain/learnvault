@@ -38,10 +38,13 @@ export const buildOpenApiSpec = () => {
 				{ name: "Events", description: "Event stream endpoints" },
 				{ name: "Leaderboard", description: "Learner ranking endpoints" },
 				{ name: "Comments", description: "Proposal comment endpoints" },
+<<<<<<< HEAD
+=======
 				{
 					name: "Treasury",
 					description: "Treasury statistics and activity endpoints",
 				},
+>>>>>>> main
 				{ name: "Upload", description: "IPFS file upload endpoints" },
 			],
 			components: {
@@ -126,7 +129,10 @@ export const buildOpenApiSpec = () => {
 								type: "string",
 								enum: ["pending", "approved", "rejected"],
 							},
+<<<<<<< HEAD
+=======
 							cancelled: { type: "boolean" },
+>>>>>>> main
 							deadline: { type: "string", format: "date-time" },
 						},
 						required: ["id", "author_address", "title", "status"],
@@ -216,6 +222,8 @@ export const buildOpenApiSpec = () => {
 						},
 						required: ["id", "courseId", "title", "content", "order"],
 					},
+<<<<<<< HEAD
+=======
 					GovernanceProposalInput: {
 						type: "object",
 						properties: {
@@ -347,6 +355,7 @@ export const buildOpenApiSpec = () => {
 							"revoked",
 						],
 					},
+>>>>>>> main
 				},
 				responses: {
 					BadRequestError: {

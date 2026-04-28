@@ -1,7 +1,10 @@
 import { Router } from "express"
 
 import {
+<<<<<<< HEAD
+=======
 	cancelProposal,
+>>>>>>> main
 	castVote,
 	createGovernanceProposal,
 	getProposalStatus,
@@ -152,6 +155,8 @@ governanceRouter.get("/governance/voting-power/:address", (req, res) => {
 governanceRouter.post("/governance/vote", (req, res) => {
 	void castVote(req, res)
 })
+<<<<<<< HEAD
+=======
 
 /**
  * @openapi
@@ -206,3 +211,4 @@ governanceRouter.get("/proposals/:id/status", (req, res) => {
 governanceRouter.delete("/proposals/:id", requireAdmin, (req, res) => {
 	void cancelProposal(req, res)
 })
+>>>>>>> main

@@ -49,6 +49,11 @@ jobs:
         run: npm run migrate
         working-directory: server
 
+<<<<<<< HEAD
+      - name: Run tests
+        run: npm test
+        working-directory: server
+=======
       - name: Verify migrations (apply, idempotency, rollback)
         run: npm run migrate:verify
         working-directory: server
@@ -64,3 +69,4 @@ jobs:
           files: ./server/coverage/lcov.info
           flags: backend
           fail_ci_if_error: false
+>>>>>>> main

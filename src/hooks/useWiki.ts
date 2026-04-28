@@ -16,15 +16,12 @@ export interface WikiPage {
 export function useWikiPages(category?: string) {
 	return useQuery<WikiPage[]>({
 		queryKey: ["wiki-pages", category],
-		queryFn: async (): Promise<WikiPage[]> => {
+		queryFn: async () => {
 			const url = new URL(`${API_URL}/api/wiki`)
 			if (category) url.searchParams.set("category", category)
 			const response = await fetch(url.toString())
 			if (!response.ok) throw new Error("Failed to fetch wiki pages")
-			const payload = (await response.json()) as
-				| WikiPage[]
-				| { data?: WikiPage[] }
-			return Array.isArray(payload) ? payload : (payload.data ?? [])
+			return response.json()
 		},
 		staleTime: 5 * 60 * 1000, // 5 minutes
 	})
@@ -33,16 +30,11 @@ export function useWikiPages(category?: string) {
 export function useWikiPage(slug: string | undefined) {
 	return useQuery<WikiPage>({
 		queryKey: ["wiki-page", slug],
-		queryFn: async (): Promise<WikiPage> => {
+		queryFn: async () => {
 			if (!slug) throw new Error("Slug is required")
 			const response = await fetch(`${API_URL}/api/wiki/${slug}`)
 			if (!response.ok) throw new Error("Failed to fetch wiki page")
-			const payload = (await response.json()) as WikiPage | { data?: WikiPage }
-			if ("data" in payload) {
-				if (payload.data) return payload.data
-				throw new Error("Wiki page payload was empty")
-			}
-			return payload as WikiPage
+			return response.json()
 		},
 		enabled: !!slug,
 		staleTime: 5 * 60 * 1000,

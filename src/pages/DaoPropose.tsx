@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react"
 import ReactMarkdown from "react-markdown"
 import { useNavigate } from "react-router-dom"
-import ConfirmDialog from "../components/ConfirmDialog"
 import { useToast } from "../components/Toast/ToastProvider"
 import { WalletButton } from "../components/WalletButton"
 import { useProposals } from "../hooks/useProposals"
@@ -15,7 +14,7 @@ import {
 	ProposalDraft,
 } from "../util/proposalDraft"
 
-export type ProposalType = "scholarship" | "parameter_change" | "new_course"
+type ProposalType = "scholarship" | "parameter_change" | "new_course"
 
 interface FormData {
 	title: string
@@ -618,64 +617,63 @@ const DaoPropose: React.FC = () => {
 			)}
 			<div className="p-12 max-w-4xl mx-auto">
 				<header className="mb-12">
-					<div className="flex items-center gap-4 mb-4">
-						<h1 className="text-6xl font-black tracking-tighter text-gradient">
-							Create Proposal
-						</h1>
-						{hasDraft && (
-							<span className="inline-flex items-center gap-2 px-3 py-1 bg-brand-amber/20 border border-brand-amber/40 text-brand-amber text-xs font-black uppercase tracking-widest rounded-full">
-								<span className="w-2 h-2 bg-brand-amber rounded-full animate-pulse" />
-								Draft
-								{draftTimestamp && (
-									<span className="text-brand-amber/60">
-										({formatDraftTime(draftTimestamp)})
-									</span>
-								)}
-							</span>
-						)}
-					</div>
-					<p className="text-white/40 text-lg font-medium max-w-2xl">
-						Submit a governance proposal to the backend API for community review
-						and voting.
-					</p>
-					{hasDraft && !showRestorePrompt && (
-						<button
-							type="button"
-							onClick={() => setShowDeleteDraftConfirm(true)}
-							className="mt-4 text-sm text-white/40 hover:text-red-400 transition-colors"
-						>
-							✕ Delete draft
-						</button>
-					)}
-
-					{showRestorePrompt && (
-						<div className="mt-6 p-4 rounded-xl bg-brand-amber/10 border border-brand-amber/30">
-							<p className="text-sm text-white mb-4">
-								You have an unsaved draft from{" "}
-								<span className="text-brand-amber">
-									{draftTimestamp && formatDraftTime(draftTimestamp)}
+				<div className="flex items-center gap-4 mb-4">
+					<h1 className="text-6xl font-black tracking-tighter text-gradient">
+						Create Proposal
+					</h1>
+					{hasDraft && (
+						<span className="inline-flex items-center gap-2 px-3 py-1 bg-brand-amber/20 border border-brand-amber/40 text-brand-amber text-xs font-black uppercase tracking-widest rounded-full">
+							<span className="w-2 h-2 bg-brand-amber rounded-full animate-pulse" />
+							Draft
+							{draftTimestamp && (
+								<span className="text-brand-amber/60">
+									({formatDraftTime(draftTimestamp)})
 								</span>
-								. Would you like to restore it?
-							</p>
-							<div className="flex gap-3">
-								<button
-									type="button"
-									onClick={handleRestoreDraft}
-									className="px-4 py-2 bg-brand-amber/20 border border-brand-amber/40 text-brand-amber font-black uppercase tracking-widest text-sm rounded-lg hover:bg-brand-amber/30 transition-all"
-								>
-									Restore Draft
-								</button>
-								<button
-									type="button"
-									onClick={() => setShowDeleteDraftConfirm(true)}
-									className="px-4 py-2 bg-white/5 border border-white/10 text-white/60 font-black uppercase tracking-widest text-sm rounded-lg hover:bg-white/10 transition-all"
-								>
-									Discard
-								</button>
-							</div>
-						</div>
+							)}
+						</span>
 					)}
-				</header>
+				</div>
+				<p className="text-white/40 text-lg font-medium max-w-2xl">
+					Submit a governance proposal to the backend API for community review
+					and voting.
+				</p>
+				{hasDraft && !showRestorePrompt && (
+					<button
+						type="button"
+						onClick={() => setShowDeleteDraftConfirm(true)}
+						className="mt-4 text-sm text-white/40 hover:text-red-400 transition-colors"
+					>
+						✕ Delete draft
+					</button>
+				)}
+
+				{showRestorePrompt && (
+					<div className="mt-6 p-4 rounded-xl bg-brand-amber/10 border border-brand-amber/30">
+						<p className="text-sm text-white mb-4">
+							You have an unsaved draft from{" "}
+							<span className="text-brand-amber">
+								{draftTimestamp && formatDraftTime(draftTimestamp)}
+							</span>
+							. Would you like to restore it?
+						</p>
+						<div className="flex gap-3">
+							<button
+								type="button"
+								onClick={handleRestoreDraft}
+								className="px-4 py-2 bg-brand-amber/20 border border-brand-amber/40 text-brand-amber font-black uppercase tracking-widest text-sm rounded-lg hover:bg-brand-amber/30 transition-all"
+							>
+								Restore Draft
+							</button>
+							<button
+								type="button"
+								onClick={() => setShowDeleteDraftConfirm(true)}
+								className="px-4 py-2 bg-white/5 border border-white/10 text-white/60 font-black uppercase tracking-widest text-sm rounded-lg hover:bg-white/10 transition-all"
+							>
+								Discard
+							</button>
+						</div>
+					</div>
+				)}
 
 				<form onSubmit={handleSubmit} className="space-y-8">
 					<div className="glass-card p-8 rounded-[2.5rem] border border-white/5">

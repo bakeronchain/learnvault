@@ -32,7 +32,7 @@ export function useNotifications(token?: string) {
 				headers: { Authorization: `Bearer ${token}` },
 			})
 			if (res.ok) {
-				const data = (await res.json()) as NotificationsState
+				const data: NotificationsState = await res.json()
 				setState(data)
 			}
 		} catch {

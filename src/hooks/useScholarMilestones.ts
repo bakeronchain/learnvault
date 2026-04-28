@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
-import { API_URL } from "../lib/api"
 import { useWallet } from "./useWallet"
+import { API_URL } from "../lib/api"
 
 export interface ScholarMilestone {
 	id: number
@@ -23,9 +23,7 @@ export function useScholarMilestones() {
 			if (!address) return []
 			const response = await fetch(`${API_URL}/scholars/${address}/milestones`)
 			if (!response.ok) throw new Error("Failed to fetch milestones")
-			const data = (await response.json()) as {
-				milestones?: ScholarMilestone[]
-			}
+			const data = await response.json()
 			return data.milestones || []
 		},
 		enabled: !!address,

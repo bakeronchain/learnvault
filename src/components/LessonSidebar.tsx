@@ -6,7 +6,6 @@ interface LessonSidebarProps {
 	courseId: string
 	lessons: Lesson[]
 	completedMilestones: number[]
-	readLessonIds?: number[]
 	currentLessonId: number
 }
 
@@ -14,7 +13,6 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
 	courseId,
 	lessons,
 	completedMilestones,
-	readLessonIds: _readLessonIds,
 	currentLessonId,
 }) => {
 	const totalLessons = lessons.length

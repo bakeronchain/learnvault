@@ -101,7 +101,11 @@ impl LearnToken {
             .instance()
             .set(&SYMBOL_KEY, &String::from_str(&env, "LRN"));
         env.storage().instance().set(&DECIMALS_KEY, &7_u32);
+<<<<<<< HEAD
+        
+=======
 
+>>>>>>> main
         Self::extend_instance(&env);
     }
 
@@ -141,6 +145,10 @@ impl LearnToken {
             .set(&DataKey::TotalSupply, &(supply + amount));
 
         // Extend persistent storage for balance entries
+<<<<<<< HEAD
+        env.storage().persistent().extend_ttl(&bal_key, PERSISTENT_BUMP_THRESHOLD, PERSISTENT_EXTEND_TO);
+        env.storage().persistent().extend_ttl(&DataKey::TotalSupply, PERSISTENT_BUMP_THRESHOLD, PERSISTENT_EXTEND_TO);
+=======
         env.storage().persistent().extend_ttl(
             &bal_key,
             PERSISTENT_BUMP_THRESHOLD,
@@ -151,6 +159,7 @@ impl LearnToken {
             PERSISTENT_BUMP_THRESHOLD,
             PERSISTENT_EXTEND_TO,
         );
+>>>>>>> main
 
         // 5. Emit event
         env.events()
@@ -217,11 +226,15 @@ impl LearnToken {
         Self::extend_instance(&env);
         let key = DataKey::Balance(account);
         if let Some(bal) = env.storage().persistent().get::<_, i128>(&key) {
+<<<<<<< HEAD
+            env.storage().persistent().extend_ttl(&key, PERSISTENT_BUMP_THRESHOLD, PERSISTENT_EXTEND_TO);
+=======
             env.storage().persistent().extend_ttl(
                 &key,
                 PERSISTENT_BUMP_THRESHOLD,
                 PERSISTENT_EXTEND_TO,
             );
+>>>>>>> main
             bal
         } else {
             0
@@ -232,11 +245,15 @@ impl LearnToken {
         Self::extend_instance(&env);
         let key = DataKey::TotalSupply;
         if let Some(supply) = env.storage().persistent().get::<_, i128>(&key) {
+<<<<<<< HEAD
+            env.storage().persistent().extend_ttl(&key, PERSISTENT_BUMP_THRESHOLD, PERSISTENT_EXTEND_TO);
+=======
             env.storage().persistent().extend_ttl(
                 &key,
                 PERSISTENT_BUMP_THRESHOLD,
                 PERSISTENT_EXTEND_TO,
             );
+>>>>>>> main
             supply
         } else {
             0

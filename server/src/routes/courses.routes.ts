@@ -6,6 +6,7 @@ import {
 	getCourseLessonById,
 	getCourses,
 	getLessonVersionDiff,
+	updateLessonVersion,
 	updateCourse,
 } from "../controllers/courses.controller"
 import {
@@ -24,6 +25,12 @@ coursesRouter.get(
 	"/courses/:idOrSlug/lessons/:orderIndex/diff",
 	requireCourseAdmin,
 	getLessonVersionDiff,
+)
+
+coursesRouter.patch(
+	"/courses/:idOrSlug/lessons/:orderIndex",
+	requireCourseAdmin,
+	updateLessonVersion,
 )
 
 coursesRouter.post("/courses", requireCourseAdmin, createCourse)

@@ -234,10 +234,7 @@ const castVoteSchema = z.object({
 })
 
 const castVoteSchema = z.object({
-	proposal_id: z
-		.number()
-		.int()
-		.positive("proposal_id must be a positive integer"),
+	proposal_id: z.number().int().positive("proposal_id must be a positive integer"),
 	voter_address: z
 		.string()
 		.min(56, "voter_address must be a valid Stellar address")
@@ -376,15 +373,25 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 	try {
 		// 1. Check if proposal exists
 		const proposalResult = await pool.query(
+<<<<<<< HEAD
+			"SELECT id, status FROM proposals WHERE id = $1",
+			[proposal_id],
+		)
+
+		if (proposalResult.rows.length === 0) {
+=======
 			"SELECT id, status, deadline, cancelled FROM proposals WHERE id = $1",
 			[proposal_id],
 		)
 
 		if (!proposalResult?.rows || proposalResult.rows.length === 0) {
+>>>>>>> main
 			res.status(404).json({ error: "Proposal not found" })
 			return
 		}
 
+<<<<<<< HEAD
+=======
 		if (proposalResult.rows[0].cancelled) {
 			res.status(400).json({
 				error: "Voting is closed for this proposal",
@@ -392,6 +399,7 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 			return
 		}
 
+>>>>>>> main
 		// 2. Check if proposal is still pending
 		if (proposalResult.rows[0].status !== "pending") {
 			res.status(400).json({
@@ -400,6 +408,8 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 			return
 		}
 
+<<<<<<< HEAD
+=======
 		if (
 			proposalResult.rows[0].deadline &&
 			new Date(proposalResult.rows[0].deadline).getTime() <= Date.now()
@@ -410,18 +420,27 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 			return
 		}
 
+>>>>>>> main
 		// 3. Check if voter already voted
 		const existingVote = await pool.query(
 			"SELECT id FROM votes WHERE proposal_id = $1 AND voter_address = $2",
 			[proposal_id, voter_address],
 		)
 
+<<<<<<< HEAD
+		if (existingVote.rows.length > 0) {
+=======
 		if ((existingVote?.rows ?? []).length > 0) {
+>>>>>>> main
 			res.status(409).json({ error: "You have already voted on this proposal" })
 			return
 		}
 
+<<<<<<< HEAD
+		// 4. Check voter's GOV token balance (voting power)
+=======
 		// 4. Check voter's effective voting power (own balance + any delegated-to-them)
+>>>>>>> main
 		const rawBalance =
 			await stellarContractService.getGovernanceTokenBalance(voter_address)
 		const balanceBigInt = BigInt(rawBalance)
@@ -435,6 +454,13 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 		}
 
 		// 5. Call the on-chain vote contract
+<<<<<<< HEAD
+		const contractResult = await stellarContractService.castVote({
+			voter: voter_address,
+			proposalId: proposal_id,
+			support,
+		})
+=======
 		const contractResult = await stellarContractService.castVote(
 			{
 				voter: voter_address,
@@ -443,6 +469,7 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 			},
 			{ requestId: req.requestId },
 		)
+>>>>>>> main
 
 		// 6. Write to DB after successful contract call
 		const votingPower = balanceBigInt
@@ -478,13 +505,19 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 			votes_against: updatedProposal.rows[0]?.votes_against ?? "0",
 		})
 	} catch (err) {
+<<<<<<< HEAD
+		console.error("[governance] Vote casting failed:", err)
+=======
 		log.error({ err }, "Vote casting failed")
+>>>>>>> main
 		res.status(500).json({
 			error: "Failed to cast vote",
 			message: err instanceof Error ? err.message : String(err),
 		})
 	}
 }
+<<<<<<< HEAD
+=======
 
 export async function getProposalStatus(
 	req: Request,
@@ -606,3 +639,4 @@ export async function getDelegation(
 		res.status(500).json({ error: "Failed to fetch delegation state" })
 	}
 }
+>>>>>>> main

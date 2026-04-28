@@ -1,6 +1,6 @@
 import { Icon } from "@stellar/design-system"
 import React, { useState, useEffect, useRef } from "react"
-import { useNavigate } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { useCourses } from "../hooks/useCourses"
 import { useWikiPages } from "../hooks/useWiki"
 
@@ -12,21 +12,15 @@ const GlobalSearch: React.FC = () => {
 
 	const { courses = [] } = useCourses()
 	const { data: wikiPages = [] } = useWikiPages()
-	const normalizedQuery = query.toLowerCase()
 
-	const results: Array<{
-		id: string
-		title: string
-		category: string
-		link: string
-	}> =
+	const results =
 		query.length >= 2
 			? [
 					...courses
 						.filter(
 							(c) =>
-								c.title.toLowerCase().includes(normalizedQuery) ||
-								c.description.toLowerCase().includes(normalizedQuery),
+								c.title.toLowerCase().includes(query.toLowerCase()) ||
+								c.description.toLowerCase().includes(query.toLowerCase()),
 						)
 						.map((c) => ({
 							id: `course-${c.id}`,
@@ -37,8 +31,8 @@ const GlobalSearch: React.FC = () => {
 					...wikiPages
 						.filter(
 							(p) =>
-								p.title.toLowerCase().includes(normalizedQuery) ||
-								p.content.toLowerCase().includes(normalizedQuery),
+								p.title.toLowerCase().includes(query.toLowerCase()) ||
+								p.content.toLowerCase().includes(query.toLowerCase()),
 						)
 						.map((p) => ({
 							id: `wiki-${p.id}`,

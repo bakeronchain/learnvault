@@ -6,6 +6,17 @@ use soroban_sdk::{
     panic_with_error, symbol_short,
 };
 
+<<<<<<< HEAD
+// ---------------------------------------------------------------------------
+// Storage Constants (assuming ~6s ledger time)
+// ---------------------------------------------------------------------------
+
+const DAY_IN_LEDGERS: u32 = 17_280;
+const INSTANCE_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
+const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30; // 30 days
+const PERSISTENT_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
+const PERSISTENT_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365; // 1 year
+=======
 /// A single entry in a batch verification call.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[contracttype]
@@ -28,6 +39,7 @@ const INSTANCE_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
 const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30;
 const PERSISTENT_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
 const PERSISTENT_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365;
+>>>>>>> main
 
 #[contracttype]
 pub enum DataKey {
@@ -39,7 +51,10 @@ pub enum DataKey {
     EnrolledCourses(Address),
     Course(String),
     CourseIds,
+<<<<<<< HEAD
+=======
     CompletedCount(Address, String),
+>>>>>>> main
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -82,7 +97,13 @@ pub struct EnrolledEventData {
 
 const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
 const LEARN_TOKEN_KEY: Symbol = symbol_short!("LRN_TKN");
+<<<<<<< HEAD
+const PAUSED_KEY: Symbol = symbol_short!("PAUSED"); // ✅ NEW
+const PERSISTENT_TTL_THRESHOLD: u32 = 100;
+const PERSISTENT_TTL_BUMP: u32 = 1_000;
+=======
 const PAUSED_KEY: Symbol = symbol_short!("PAUSED");
+>>>>>>> main
 
 #[contracterror]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -96,6 +117,11 @@ pub enum Error {
     CourseAlreadyComplete = 6,
     InvalidMilestones = 7,
     CourseAlreadyExists = 8,
+<<<<<<< HEAD
+    AlreadyEnrolled = 9,
+    NotEnrolled = 10,
+    DuplicateSubmission = 11,
+=======
     NotEnrolled = 9,
     DuplicateSubmission = 10,
     ContractPaused = 11,
@@ -103,6 +129,7 @@ pub enum Error {
     InvalidState = 13,
     AlreadyCompleted = 14,
     InvalidReward = 15,
+>>>>>>> main
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -140,12 +167,95 @@ impl CourseMilestone {
         }
         admin.require_auth();
         env.storage().instance().set(&ADMIN_KEY, &admin);
+<<<<<<< HEAD
+        env.storage()
+            .instance()
+            .set(&LEARN_TOKEN_KEY, &learn_token_contract);
+    }
+
+    // Design decision: only the initialized admin can create course records.
+    // Design decision: course IDs are unique forever and removed courses stay on-chain as inactive records.
+    // Design decision: milestone_count must be > 0 so course configuration cannot represent an empty track.
+    pub fn add_course(env: Env, admin: Address, course_id: String, milestone_count: u32) {
+        Self::require_initialized(&env);
+        Self::require_admin(&env, &admin);
+
+        if milestone_count == 0 {
+            panic_with_error!(&env, Error::InvalidMilestones);
+        }
+
+        let course_key = DataKey::Course(course_id.clone());
+        if env.storage().persistent().has(&course_key) {
+            panic_with_error!(&env, Error::CourseAlreadyExists);
+        }
+
+        let config = CourseConfig {
+            milestone_count,
+            active: true,
+        };
+        env.storage().persistent().set(&course_key, &config);
+
+        let mut course_ids: Vec<String> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::CourseIds)
+            .unwrap_or_else(|| Vec::new(&env));
+        course_ids.push_back(course_id);
+        env.storage()
+            .persistent()
+            .set(&DataKey::CourseIds, &course_ids);
+    }
+
+    // Design decision: removed courses are marked inactive instead of deleted so historical references remain valid.
+    pub fn remove_course(env: Env, admin: Address, course_id: String) {
+        Self::require_initialized(&env);
+        Self::require_admin(&env, &admin);
+
+        let course_key = DataKey::Course(course_id);
+        let mut config: CourseConfig = env
+            .storage()
+            .persistent()
+            .get(&course_key)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::CourseNotFound));
+        config.active = false;
+        env.storage().persistent().set(&course_key, &config);
+    }
+
+    pub fn get_course(env: Env, course_id: String) -> Option<CourseConfig> {
+        let course_key = DataKey::Course(course_id);
+        env.storage().persistent().get(&course_key)
+    }
+
+    pub fn list_courses(env: Env) -> Vec<String> {
+        let course_ids: Vec<String> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::CourseIds)
+            .unwrap_or_else(|| Vec::new(&env));
+
+        let mut active_courses = Vec::new(&env);
+        let mut i = 0;
+        while i < course_ids.len() {
+            let course_id = course_ids.get(i).unwrap();
+            let course_key = DataKey::Course(course_id.clone());
+            let config: Option<CourseConfig> = env.storage().persistent().get(&course_key);
+            if let Some(current) = config {
+                if current.active {
+                    active_courses.push_back(course_id);
+                }
+            }
+            i += 1;
+        }
+
+        active_courses
+=======
         upgrade::init(&env);
         env.storage()
             .instance()
             .set(&LEARN_TOKEN_KEY, &learn_token_contract);
 
         Self::extend_instance(&env);
+>>>>>>> main
     }
 
     pub fn add_course(env: Env, admin: Address, course_id: String, milestone_count: u32) {
@@ -276,11 +386,23 @@ impl CourseMilestone {
         }
     }
 
+<<<<<<< HEAD
+    fn assert_not_paused(env: &Env) {
+        if Self::is_paused(env.clone()) {
+            panic!("Contract is paused");
+        }
+
+=======
+>>>>>>> main
     pub fn enroll(env: Env, learner: Address, course_id: String) {
         Self::assert_not_paused(&env);
         Self::require_initialized(&env);
         learner.require_auth();
 
+<<<<<<< HEAD
+        // Enrollment is only allowed for registered, active courses.
+=======
+>>>>>>> main
         if !Self::is_course_active(&env, &course_id) {
             panic_with_error!(&env, Error::CourseNotFound);
         }
@@ -305,7 +427,15 @@ impl CourseMilestone {
 
         env.events().publish(
             (symbol_short!("enrolled"),),
+<<<<<<< HEAD
+            SubmittedEventData {
+                learner,
+                course_id,
+                evidence_uri: String::from_str(&env, ""),
+            },
+=======
             EnrolledEventData { learner, course_id },
+>>>>>>> main
         );
     }
 
@@ -313,7 +443,11 @@ impl CourseMilestone {
         let key = DataKey::Enrollment(learner, course_id);
         let enrolled = env.storage().persistent().get(&key).unwrap_or(false);
         if enrolled {
+<<<<<<< HEAD
+            Self::bump_persistent_ttl(&env, &key);
+=======
             Self::extend_persistent(&env, &key);
+>>>>>>> main
         }
         enrolled
     }
@@ -325,7 +459,14 @@ impl CourseMilestone {
         milestone_id: u32,
         evidence_uri: String,
     ) {
+<<<<<<< HEAD
+        if Self::is_paused(env.clone()) {
+            panic_with_error!(&env, Error::ContractPaused);
+        }
+
+=======
         Self::assert_not_paused(&env);
+>>>>>>> main
         Self::require_initialized(&env);
         learner.require_auth();
 
@@ -341,7 +482,11 @@ impl CourseMilestone {
             .unwrap_or(MilestoneStatus::NotStarted);
         Self::bump_persistent_ttl(&env, &state_key);
 
+<<<<<<< HEAD
+        if current_state != MilestoneStatus::NotStarted {
+=======
         if current_state == MilestoneStatus::Pending || current_state == MilestoneStatus::Approved {
+>>>>>>> main
             panic_with_error!(&env, Error::DuplicateSubmission);
         }
 
@@ -397,7 +542,11 @@ impl CourseMilestone {
         let key = DataKey::MilestoneSubmission(learner, course_id, milestone_id);
         let submission: Option<MilestoneSubmission> = env.storage().persistent().get(&key);
         if submission.is_some() {
+<<<<<<< HEAD
+            Self::bump_persistent_ttl(&env, &key);
+=======
             Self::extend_persistent(&env, &key);
+>>>>>>> main
         }
         submission
     }
@@ -409,6 +558,12 @@ impl CourseMilestone {
             .persistent()
             .get(&key)
             .unwrap_or_else(|| Vec::new(&env));
+<<<<<<< HEAD
+        if courses.len() > 0 {
+            Self::bump_persistent_ttl(&env, &key);
+        }
+        courses
+=======
         if !courses.is_empty() {
             Self::extend_persistent(&env, &key);
         }
@@ -501,6 +656,7 @@ impl CourseMilestone {
         let admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap();
         admin.require_auth();
         upgrade::apply(&env, &admin, &new_wasm_hash);
+>>>>>>> main
     }
 
     pub fn get_version(env: Env) -> String {
@@ -522,15 +678,27 @@ impl CourseMilestone {
         Self::require_initialized(&env);
         admin.require_auth();
 
+<<<<<<< HEAD
+        // Verify admin authorization
+=======
+>>>>>>> main
         let stored_admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap();
         if admin != stored_admin {
             panic_with_error!(&env, Error::Unauthorized);
         }
 
+<<<<<<< HEAD
+        // Check if learner is enrolled
+=======
+>>>>>>> main
         if !Self::is_enrolled(env.clone(), learner.clone(), course_id.clone()) {
             panic_with_error!(&env, Error::NotEnrolled);
         }
 
+<<<<<<< HEAD
+        // Check current milestone state
+=======
+>>>>>>> main
         let state_key = DataKey::MilestoneState(learner.clone(), course_id.clone(), milestone_id);
         let current_state = env
             .storage()
@@ -542,16 +710,37 @@ impl CourseMilestone {
             panic_with_error!(&env, Error::InvalidState);
         }
 
+<<<<<<< HEAD
+        // Update milestone state to Approved
+        env.storage()
+            .persistent()
+            .set(&state_key, &MilestoneStatus::Approved);
+
+        // Get learn token contract address and mint tokens
+=======
         env.storage()
             .persistent()
             .set(&state_key, &MilestoneStatus::Approved);
         let completed_key = DataKey::Completed(learner.clone(), course_id.clone(), milestone_id);
         env.storage().persistent().set(&completed_key, &true);
 
+>>>>>>> main
         let learn_token_address: Address = env.storage().instance().get(&LEARN_TOKEN_KEY).unwrap();
         let learn_token_client = LearnTokenClient::new(&env, &learn_token_address);
         learn_token_client.mint(&learner, &tokens_amount);
 
+<<<<<<< HEAD
+        // Emit milestone completed event
+        env.events().publish(
+            symbol_short!("milestone_completed"),
+            MilestoneCompleted {
+                learner: learner.clone(),
+                course_id: course_id.clone().parse::<u32>().unwrap_or(0),
+                milestones_completed: milestone_id,
+                tokens_minted: tokens_amount,
+            },
+        );
+=======
         Self::extend_persistent(&env, &state_key);
         Self::extend_persistent(&env, &completed_key);
 
@@ -653,6 +842,7 @@ impl CourseMilestone {
 
             i += 1;
         }
+>>>>>>> main
     }
 
     pub fn reject_milestone(
@@ -669,19 +859,40 @@ impl CourseMilestone {
         Self::require_initialized(&env);
         admin.require_auth();
 
+<<<<<<< HEAD
+        // Verify admin authorization
+=======
+>>>>>>> main
         let stored_admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap();
         if admin != stored_admin {
             panic_with_error!(&env, Error::Unauthorized);
         }
 
+<<<<<<< HEAD
+        // Check if learner is enrolled
+=======
+>>>>>>> main
         if !Self::is_enrolled(env.clone(), learner.clone(), course_id.clone()) {
             panic_with_error!(&env, Error::NotEnrolled);
         }
 
+<<<<<<< HEAD
+        // Check current milestone state
+=======
+>>>>>>> main
         let state_key = DataKey::MilestoneState(learner.clone(), course_id.clone(), milestone_id);
         let current_state = env
             .storage()
             .persistent()
+<<<<<<< HEAD
+            .get::<_, CourseConfig>(&course_key)
+        {
+            Some(config) => {
+                Self::extend_persistent(env, &course_key);
+                config.active
+            },
+            None => false,
+=======
             .get::<_, MilestoneStatus>(&state_key)
             .unwrap_or(MilestoneStatus::NotStarted);
 
@@ -700,9 +911,12 @@ impl CourseMilestone {
     fn require_initialized(env: &Env) {
         if !env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(env, Error::NotInitialized);
+>>>>>>> main
         }
     }
 
+<<<<<<< HEAD
+=======
     fn require_admin(env: &Env, admin: &Address) {
         admin.require_auth();
         let stored_admin: Address = env
@@ -774,5 +988,6 @@ impl CourseMilestone {
     }
 }
 
+>>>>>>> main
 #[cfg(test)]
 mod test;

@@ -23,11 +23,7 @@ export const FollowButton: React.FC<FollowButtonProps> = ({
 	const isOwnProfile =
 		currentUserAddress?.toLowerCase() === targetAddress.toLowerCase()
 
-	const mutation = useMutation<
-		{ data?: { isFollowing?: boolean } },
-		Error,
-		boolean
-	>({
+	const mutation = useMutation({
 		mutationFn: async (shouldFollow: boolean) => {
 			const method = shouldFollow ? "POST" : "DELETE"
 			const response = await fetch(`/api/scholars/${targetAddress}/follow`, {
@@ -38,18 +34,16 @@ export const FollowButton: React.FC<FollowButtonProps> = ({
 			})
 
 			if (!response.ok) {
-				const error = (await response.json().catch(() => ({}))) as {
-					error?: string
-				}
+				const error = await response.json().catch(() => ({}))
 				throw new Error(
 					error.error || `Failed to ${shouldFollow ? "follow" : "unfollow"}`,
 				)
 			}
 
-			return (await response.json()) as { data?: { isFollowing?: boolean } }
+			return response.json()
 		},
 		onSuccess: (data) => {
-			const isFollowing = Boolean(data.data?.isFollowing)
+			const isFollowing = data.data.isFollowing
 			// Invalidate queries to refresh counts
 			void queryClient.invalidateQueries({
 				queryKey: ["scholarProfile", targetAddress],

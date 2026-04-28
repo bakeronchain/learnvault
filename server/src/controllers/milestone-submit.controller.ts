@@ -1,11 +1,15 @@
 import { type Request, type Response } from "express"
 import sanitizeHtml from "sanitize-html"
 import { milestoneStore } from "../db/milestone-store"
+<<<<<<< HEAD
+import { createEmailService } from "../services/email.service"
+=======
 import { logger } from "../lib/logger"
 
 const log = logger.child({ module: "milestones" })
 import { createEmailService } from "../services/email.service"
 import { markEscrowActivity } from "../services/escrow-timeout.service"
+>>>>>>> main
 
 interface MilestoneSubmitRequestBody {
 	scholarAddress?: string
@@ -77,7 +81,11 @@ export async function submitMilestoneReport(
 				courseId,
 				milestoneId.toString(),
 			)
+<<<<<<< HEAD
+			.catch((err) => console.error("[EmailService] Admin alert failed:", err))
+=======
 			.catch((err) => log.error({ err }, "Admin alert email failed"))
+>>>>>>> main
 		res.status(201).json({ data: report })
 	} catch (err) {
 		if (err instanceof Error && err.message === "DUPLICATE_REPORT") {

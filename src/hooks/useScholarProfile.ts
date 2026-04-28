@@ -26,7 +26,9 @@ export function useScholarProfile(address: string | undefined) {
 			})
 
 			if (!response.ok) {
-				const error = await response.json().catch(() => ({}))
+				const error = (await response.json().catch(() => ({}))) as {
+					error?: string
+				}
 				throw new Error(error.error || "Failed to fetch scholar profile")
 			}
 

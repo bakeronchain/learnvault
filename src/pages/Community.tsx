@@ -20,7 +20,8 @@ const Community: React.FC = () => {
 		fetch("/api/community/events")
 			.then((res) => res.json())
 			.then((data) => {
-				setEvents(data)
+				const events = data as CommunityEvent[] | { data?: CommunityEvent[] }
+				setEvents(Array.isArray(events) ? events : (events.data ?? []))
 				setLoading(false)
 			})
 			.catch((err) => {

@@ -1,6 +1,6 @@
-import { format } from "date-fns"
-import { enUS, es, fr, sw } from "date-fns/locale"
-import i18n from "./i18n"
+import { format, type Locale } from "date-fns"
+import { enUS, es, fr } from "date-fns/locale"
+import i18n from "../i18n"
 
 /**
  * Maps i18next language codes to date-fns locales for locale-aware formatting.
@@ -9,7 +9,7 @@ const localeMap: Record<string, Locale> = {
 	en: enUS,
 	es: es,
 	fr: fr,
-	sw: sw,
+	sw: enUS,
 }
 
 /**

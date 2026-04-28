@@ -16,7 +16,6 @@ import {
 	createRequireAuth,
 	createOptionalAuth,
 } from "../middleware/auth.middleware"
-import { validate } from "../middleware/validation.middleware"
 import { type JwtService } from "../services/jwt.service"
 
 export function createScholarsRouter(jwtService: JwtService): Router {
@@ -32,7 +31,7 @@ export function createScholarsRouter(jwtService: JwtService): Router {
 	 *     summary: Get scholars leaderboard
 	 *     description: Returns a paginated ranking of scholars by LRN balance, with optional search.
 	 */
-	router.get("/scholars/leaderboard", (req, res) => {
+	router.get("/scholars/leaderboard", optionalAuth, (req, res) => {
 		void getScholarsLeaderboard(req, res)
 	})
 
@@ -74,8 +73,6 @@ export function createScholarsRouter(jwtService: JwtService): Router {
 		void getScholarEscrowTimeouts(req, res)
 	})
 
-	// ── Social Following ───────────────────────────────────────────────────────
-
 	/**
 	 * @openapi
 	 * /api/scholars/{address}/follow:
@@ -103,64 +100,5 @@ export function createScholarsRouter(jwtService: JwtService): Router {
 		void getFollowStatus(req as any, res)
 	})
 
-<<<<<<< HEAD
-/**
- * @openapi
- * /api/scholars/leaderboard:
- *   get:
- *     tags: [Scholars]
- *     summary: Get scholars leaderboard
- *     description: Returns a paginated ranking of scholars by LRN balance, with optional search.
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           minimum: 1
- *           default: 1
- *         description: Page number
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           minimum: 1
- *           maximum: 100
- *           default: 50
- *         description: Number of scholars per page
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *         description: Filter scholars by wallet address (partial match)
- *     responses:
- *       200:
- *         description: Paginated scholars leaderboard
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 rankings:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/ScholarRanking'
- *                 total:
- *                   type: integer
- *                 your_rank:
- *                   type: integer
- *                   nullable: true
- *                   description: Current user's rank (null if not authenticated or not ranked)
- *       500:
- *         $ref: '#/components/responses/InternalServerError'
- */
-scholarsRouter.get("/scholars/leaderboard", (req, res) => {
-	void getScholarsLeaderboard(req, res)
-})
-
-scholarsRouter.get("/scholars/:address", (req, res) => {
-	void getScholarProfile(req, res)
-})
-=======
 	return router
 }
->>>>>>> main

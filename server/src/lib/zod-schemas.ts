@@ -290,49 +290,6 @@ export const enrollmentBodySchema = z
 	})
 	.strict()
 
-<<<<<<< HEAD
-const difficultyValues = ["beginner", "intermediate", "advanced"] as const
-
-const courseImportRowSchema = z
-	.object({
-		title: requiredString("title"),
-		slug: requiredString("slug").regex(
-			/^[a-zA-Z0-9-_]+$/,
-			"slug may contain only letters, numbers, hyphens, and underscores",
-		),
-		track: requiredString("track"),
-		difficulty: z
-			.string()
-			.trim()
-			.transform((value) => value.toLowerCase())
-			.refine(
-				(value) => difficultyValues.includes(value as typeof difficultyValues[number]),
-				`difficulty must be one of: ${difficultyValues.join(", ")}`,
-			),
-		description: z.string().optional(),
-		coverImage: z
-			.string()
-			.trim()
-			.min(1)
-			.optional()
-			.nullable(),
-		published: z.boolean().optional(),
-	})
-	.strict()
-
-export const courseBulkImportBodySchema = z.union([
-	z.object({
-		courses: z.array(courseImportRowSchema).min(1, "courses are required"),
-		preview: z.boolean().optional(),
-	}).strict(),
-	z.object({
-		csv: z.string().min(1, "csv is required"),
-		preview: z.boolean().optional(),
-	}).strict(),
-])
-
-export { difficultyValues }
-=======
 export const userProfileSchema = z
 	.object({
 		display_name: optionalTrimmedString("display_name", 50),
@@ -369,4 +326,3 @@ export const bookmarkCourseIdParamSchema = z
 		courseId: requiredString("courseId", 100),
 	})
 	.strict()
->>>>>>> main

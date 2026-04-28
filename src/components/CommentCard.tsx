@@ -1,13 +1,9 @@
 import { formatDistanceToNow } from "date-fns"
-import React, { useState } from "react"
-import SafeMarkdown from "./SafeMarkdown"
 import React, { useId, useState } from "react"
-import ReactMarkdown from "react-markdown"
-import ConfirmDialog from "./ConfirmDialog"
 import { useWallet } from "../hooks/useWallet"
 import { getAuthToken } from "../util/auth"
-
-const API_BASE = import.meta.env.VITE_SERVER_URL ?? "http://localhost:4000"
+import ConfirmDialog from "./ConfirmDialog"
+import SafeMarkdown from "./SafeMarkdown"
 
 export interface Comment {
 	id: number
@@ -123,7 +119,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 				setIsReplying(false)
 				onUpdate?.()
 			} else {
-				const err = await res.json().catch(() => ({}))
+				const err = (await res.json().catch(() => ({}))) as { error?: string }
 				setReplyError(err.error || "Reply failed.")
 			}
 		} catch (err) {
@@ -245,8 +241,6 @@ const CommentCard: React.FC<CommentCardProps> = ({
 
 			<div className="prose prose-invert prose-sm max-w-none text-white/60 leading-relaxed font-medium mb-8">
 				<SafeMarkdown content={comment.content} />
-			<div className="prose prose-invert prose-sm max-w-none text-white/80 leading-relaxed font-medium mb-8">
-				<ReactMarkdown>{comment.content}</ReactMarkdown>
 			</div>
 
 			<footer className="flex items-center gap-6">

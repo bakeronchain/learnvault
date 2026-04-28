@@ -10,6 +10,9 @@ export interface CourseLesson {
 	order: number
 	estimatedMinutes: number
 	isMilestone: boolean
+	version?: number
+	isLatest?: boolean
+	changeSummary?: string | null
 }
 
 export interface CourseSummary {
@@ -29,5 +32,8 @@ export interface CourseSummary {
 }
 
 export interface CourseDetail extends CourseSummary {
+	enrollmentContentVersion?: number | null
+	latestContentVersion?: number
+	hasUpdatedContent?: boolean
 	lessons: CourseLesson[]
 }

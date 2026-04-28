@@ -163,7 +163,12 @@ export async function getScholarsLeaderboard(
 			rankingsValues,
 		)
 
-		const currentAddress = req.walletAddress
+		const viewerAddress =
+			typeof req.query.viewer_address === "string"
+				? req.query.viewer_address.trim()
+				: ""
+		const currentAddress =
+			(req.walletAddress && req.walletAddress.trim()) || viewerAddress || ""
 		let yourRank: number | null = null
 
 		if (currentAddress) {

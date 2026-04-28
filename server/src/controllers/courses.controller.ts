@@ -24,6 +24,9 @@ type LessonRow = {
 	order_index: number
 	estimated_minutes: number
 	is_milestone: boolean
+	version: number
+	is_active: boolean
+	change_summary: string | null
 	created_at: string
 	updated_at: string
 	quiz: Array<{
@@ -55,12 +58,39 @@ const toLesson = (row: LessonRow) => ({
 	order: row.order_index,
 	estimatedMinutes: Number(row.estimated_minutes ?? 10),
 	isMilestone: row.is_milestone,
+	version: Number(row.version ?? 1),
+	isLatest: Boolean(row.is_active),
+	changeSummary: row.change_summary,
 	quiz: row.quiz ?? [],
 	createdAt: row.created_at,
 	updatedAt: row.updated_at,
 })
 
 const difficultyValues = new Set(["beginner", "intermediate", "advanced"])
+
+function parseOptionalLearnerAddress(req: Request): string | null {
+	const learnerAddress =
+		typeof req.query.learner_address === "string"
+			? req.query.learner_address.trim()
+			: ""
+	return learnerAddress.length > 0 ? learnerAddress : null
+}
+
+function buildSimpleLineDiff(before: string, after: string): {
+	addedLines: string[]
+	removedLines: string[]
+} {
+	const beforeLines = before.split(/\r?\n/)
+	const afterLines = after.split(/\r?\n/)
+
+	const beforeSet = new Set(beforeLines)
+	const afterSet = new Set(afterLines)
+
+	const removedLines = beforeLines.filter((line) => !afterSet.has(line))
+	const addedLines = afterLines.filter((line) => !beforeSet.has(line))
+
+	return { addedLines, removedLines }
+}
 
 export const getCourses = async (
 	req: Request,
@@ -222,8 +252,48 @@ export const getCourse = async (req: Request, res: Response): Promise<void> => {
 			return
 		}
 
+		const latestVersionResult = (await pool.query(
+			`SELECT COALESCE(MAX(version), 1)::int AS latest_version
+			 FROM lessons
+			 WHERE course_id = $1`,
+			[course.id],
+		)) as { rows: Array<{ latest_version: number }> }
+
+		const latestContentVersion = Number(
+			latestVersionResult.rows[0]?.latest_version ?? 1,
+		)
+		const learnerAddress = parseOptionalLearnerAddress(req)
+		let enrollmentContentVersion: number | null = null
+
+		if (learnerAddress) {
+			const enrollmentVersionResult = (await pool.query(
+				`SELECT content_version
+				 FROM enrollments
+				 WHERE learner_address = $1
+				   AND course_id = $2
+				 LIMIT 1`,
+				[learnerAddress, course.slug],
+			)) as { rows: Array<{ content_version: number | null }> }
+
+			const maybeVersion = enrollmentVersionResult.rows[0]?.content_version
+			if (typeof maybeVersion === "number" && Number.isFinite(maybeVersion)) {
+				enrollmentContentVersion = maybeVersion
+			}
+		}
+
+		const effectiveVersion = enrollmentContentVersion ?? latestContentVersion
+
 		const lessonResult = (await pool.query(
-			`SELECT
+			`WITH selected_lessons AS (
+				SELECT
+					order_index,
+					MAX(version)::int AS version
+				FROM lessons
+				WHERE course_id = $1
+				  AND version <= $2
+				GROUP BY order_index
+			)
+			 SELECT
 				l.id,
 				l.course_id,
 				l.title,
@@ -231,6 +301,9 @@ export const getCourse = async (req: Request, res: Response): Promise<void> => {
 				l.order_index,
 				l.estimated_minutes,
 				BOOL_OR(m.id IS NOT NULL) AS is_milestone,
+				l.version,
+				l.is_active,
+				l.change_summary,
 				l.created_at,
 				l.updated_at,
 				COALESCE(
@@ -245,17 +318,25 @@ export const getCourse = async (req: Request, res: Response): Promise<void> => {
 					'[]'::json
 				) AS quiz
 			 FROM lessons l
+			 INNER JOIN selected_lessons sl
+			   ON sl.order_index = l.order_index
+			  AND sl.version = l.version
 			 LEFT JOIN milestones m ON m.lesson_id = l.id
 			 LEFT JOIN quizzes q ON q.lesson_id = l.id
 			 LEFT JOIN quiz_questions qq ON qq.quiz_id = q.id
 			 WHERE l.course_id = $1
 			 GROUP BY l.id
 			 ORDER BY l.order_index ASC`,
-			[course.id],
+			[course.id, effectiveVersion],
 		)) as { rows: LessonRow[] }
 
 		res.status(200).json({
 			...toCourse(course),
+			enrollmentContentVersion,
+			latestContentVersion,
+			hasUpdatedContent:
+				enrollmentContentVersion !== null &&
+				enrollmentContentVersion < latestContentVersion,
 			lessons: lessonResult.rows.map(toLesson),
 		})
 	} catch {
@@ -286,6 +367,9 @@ export const getCourseLessonById = async (
 				l.order_index,
 				l.estimated_minutes,
 				BOOL_OR(m.id IS NOT NULL) AS is_milestone,
+				l.version,
+				l.is_active,
+				l.change_summary,
 				l.created_at,
 				l.updated_at,
 				COALESCE(
@@ -319,6 +403,105 @@ export const getCourseLessonById = async (
 		}
 
 		res.status(200).json(toLesson(lesson))
+	} catch {
+		res.status(500).json({ error: "Internal server error" })
+	}
+}
+
+export const getLessonVersionDiff = async (
+	req: Request,
+	res: Response,
+): Promise<void> => {
+	try {
+		const idOrSlug = req.params.idOrSlug
+		const orderIndex = Number.parseInt(req.params.orderIndex, 10)
+		const fromVersion = Number.parseInt(String(req.query.fromVersion ?? ""), 10)
+		const toVersion = Number.parseInt(String(req.query.toVersion ?? ""), 10)
+
+		if (
+			!Number.isInteger(orderIndex) ||
+			orderIndex < 1 ||
+			!Number.isInteger(fromVersion) ||
+			fromVersion < 1 ||
+			!Number.isInteger(toVersion) ||
+			toVersion < 1
+		) {
+			res.status(400).json({
+				error:
+					"orderIndex path param and fromVersion/toVersion query params must be positive integers",
+			})
+			return
+		}
+
+		const isNumericId = /^\d+$/.test(idOrSlug)
+		const courseResult = (await pool.query(
+			`SELECT id, slug
+			 FROM courses
+			 WHERE ${isNumericId ? "id = $1" : "slug = $1"}
+			 LIMIT 1`,
+			[isNumericId ? Number.parseInt(idOrSlug, 10) : idOrSlug],
+		)) as { rows: Array<{ id: number; slug: string }> }
+
+		const course = courseResult.rows[0]
+		if (!course) {
+			res.status(404).json({ error: "Course not found" })
+			return
+		}
+
+		const [fromResult, toResult] = await Promise.all([
+			pool.query(
+				`SELECT id, title, content_markdown, version, change_summary
+				 FROM lessons
+				 WHERE course_id = $1
+				   AND order_index = $2
+				   AND version = $3
+				 LIMIT 1`,
+				[course.id, orderIndex, fromVersion],
+			),
+			pool.query(
+				`SELECT id, title, content_markdown, version, change_summary
+				 FROM lessons
+				 WHERE course_id = $1
+				   AND order_index = $2
+				   AND version = $3
+				 LIMIT 1`,
+				[course.id, orderIndex, toVersion],
+			),
+		])
+
+		const fromLesson = fromResult.rows[0]
+		const toLesson = toResult.rows[0]
+
+		if (!fromLesson || !toLesson) {
+			res.status(404).json({ error: "One or both lesson versions were not found" })
+			return
+		}
+
+		const { addedLines, removedLines } = buildSimpleLineDiff(
+			String(fromLesson.content_markdown ?? ""),
+			String(toLesson.content_markdown ?? ""),
+		)
+
+		res.status(200).json({
+			course_id: course.slug,
+			order_index: orderIndex,
+			from: {
+				version: fromLesson.version,
+				title: fromLesson.title,
+				change_summary: fromLesson.change_summary,
+			},
+			to: {
+				version: toLesson.version,
+				title: toLesson.title,
+				change_summary: toLesson.change_summary,
+			},
+			diff: {
+				added_lines: addedLines,
+				removed_lines: removedLines,
+				added_count: addedLines.length,
+				removed_count: removedLines.length,
+			},
+		})
 	} catch {
 		res.status(500).json({ error: "Internal server error" })
 	}

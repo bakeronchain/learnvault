@@ -2,6 +2,7 @@ import { Button } from "@stellar/design-system"
 import React, { useEffect, useMemo, useState } from "react"
 import { useParams } from "react-router-dom"
 import { CourseForum } from "../components/forum/CourseForum"
+
 import LessonContent from "../components/LessonContent"
 import LessonSidebar from "../components/LessonSidebar"
 import MilestoneSubmitPanel from "../components/MilestoneSubmitPanel"
@@ -196,7 +197,7 @@ const LessonView: React.FC = () => {
 					</p>
 					<button
 						onClick={() => window.history.back()}
-						className="px-6 py-2 border border-white/10 bg-white/[0.03] text-white rounded-xl hover:bg-white/[0.08]"
+						className="px-6 py-2 border border-white/10 bg-white/3 text-white rounded-xl hover:bg-white/8"
 					>
 						Go Back
 					</button>
@@ -398,13 +399,15 @@ const LessonView: React.FC = () => {
 						/>
 					)}
 
-					{lesson?.isMilestone && !isLoadingCourse && !isLoadingContent && (
-						<div className="mt-12 animate-in fade-in slide-in-from-top-4 duration-1000">
-							<MilestoneSubmitPanel
-								courseId={course.slug}
-								milestoneId={lesson.id}
-							/>
-						</div>
+							{lesson?.isMilestone && !isLoadingCourse && !isLoadingContent && (
+								<div className="mt-12 animate-in fade-in slide-in-from-top-4 duration-1000">
+									<MilestoneSubmitPanel
+										courseId={course.slug}
+										milestoneId={lesson.id}
+									/>
+								</div>
+							)}
+						</>
 					)}
 				</div>
 			</div>

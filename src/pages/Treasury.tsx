@@ -3,6 +3,7 @@ import { Helmet } from "react-helmet"
 import {
 	EmptyState,
 	DashboardStatsSkeleton,
+	ActivityFeedSkeleton,
 } from "../components/SkeletonLoader"
 import { ErrorState } from "../components/states/errorState"
 import { useToast } from "../components/Toast/ToastProvider"

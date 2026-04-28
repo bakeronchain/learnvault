@@ -48,12 +48,7 @@ jobs:
       - name: Run migrations
         run: npm run migrate
         working-directory: server
-
-<<<<<<< HEAD
-      - name: Run tests
-        run: npm test
-        working-directory: server
-=======
+ 
       - name: Verify migrations (apply, idempotency, rollback)
         run: npm run migrate:verify
         working-directory: server
@@ -68,5 +63,4 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./server/coverage/lcov.info
           flags: backend
-          fail_ci_if_error: false
->>>>>>> main
+          fail_ci_if_error: false 

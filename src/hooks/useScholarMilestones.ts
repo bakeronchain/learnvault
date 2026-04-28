@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
-import { useWallet } from "./useWallet"
 import { API_URL } from "../lib/api"
+import { useWallet } from "./useWallet"
 
 export interface ScholarMilestone {
 	id: number

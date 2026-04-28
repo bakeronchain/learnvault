@@ -52,8 +52,8 @@ export const ProfileLinkedWallets: React.FC = () => {
 					</p>
 				</div>
 				<p className="text-xs text-white/40 mb-4">
-					To add another Stellar key, sign a login nonce for that key, then call the
-					link action from the same session as this wallet.
+					To add another Stellar key, sign a login nonce for that key, then call
+					the link action from the same session as this wallet.
 				</p>
 				<ul className="space-y-3">
 					{wallets.map((w) => (

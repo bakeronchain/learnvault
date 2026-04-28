@@ -234,20 +234,10 @@ const DaoProposals: React.FC = () => {
 		totalVotes > 0n
 			? Number((selectedProposal!.votesAgainst * 100n) / totalVotes)
 			: 0
-<<<<<<< HEAD
-
-	const userHasVoted = selectedProposal ? hasVoted(selectedProposal.id) : false
-	const voteChoice = selectedProposal
-		? getVoteChoice(selectedProposal.id)
-		: null
-	const governanceTokens = votingPower
-	const isTokenHolder = governanceTokens > 0n
-=======
 	const userHasVoted =
 		selectedProposal?.userVoteSupport === true ||
 		selectedProposal?.userVoteSupport === false
 	const voteChoice = selectedProposal?.userVoteSupport ?? null
->>>>>>> main
 	const isWalletConnected = Boolean(walletAddress)
 	const isTokenHolder = votingPower > 0n
 	const voteDisabled =
@@ -504,16 +494,7 @@ const DaoProposals: React.FC = () => {
 
 							{userHasVoted ? (
 								<div className="inline-flex items-center px-4 py-2 rounded-full border border-brand-cyan/30 bg-brand-cyan/10 text-brand-cyan text-xs font-black uppercase tracking-widest">
-<<<<<<< HEAD
-									You voted{" "}
-									{voteChoice === null
-										? "For/Against"
-										: voteChoice
-											? "For"
-											: "Against"}
-=======
 									You voted {voteChoice ? "Yes" : "No"}
->>>>>>> main
 								</div>
 							) : (
 								<div className="flex gap-3">

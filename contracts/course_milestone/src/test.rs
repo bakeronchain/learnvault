@@ -1,13 +1,6 @@
 extern crate std;
 
 use soroban_sdk::{
-<<<<<<< HEAD
-    Address, Env, String,
-    testutils::{Address as _, Ledger, LedgerInfo},
-};
-
-use crate::{CourseConfig, CourseMilestone, CourseMilestoneClient, DataKey, Error, MilestoneStatus};
-=======
     Address, BytesN, Env, IntoVal, String, Symbol, Val, Vec, contract, contractimpl, contracttype,
     symbol_short,
     testutils::{Address as _, Events as _, MockAuth, MockAuthInvoke},
@@ -41,19 +34,11 @@ impl MockLearnToken {
             .unwrap_or(0_i128)
     }
 }
->>>>>>> main
 
 fn sid(env: &Env, value: &str) -> String {
     String::from_str(env, value)
 }
 
-<<<<<<< HEAD
-fn setup() -> (Env, Address, Address, Address, CourseMilestoneClient<'static>) {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let learn_token = Address::generate(&env);
-    let learn_token_address = Address::generate(&env);
-=======
 fn authorize<T>(env: &Env, address: &Address, contract: &Address, fn_name: &'static str, args: T)
 where
     T: IntoVal<Env, Vec<Val>>,
@@ -80,14 +65,9 @@ fn setup() -> (
     let env = Env::default();
     let admin = Address::generate(&env);
     let learn_token_id = env.register(MockLearnToken, ());
->>>>>>> main
     let contract_id = env.register(CourseMilestone, ());
 
     let client = CourseMilestoneClient::new(&env, &contract_id);
-<<<<<<< HEAD
-    client.initialize(&admin, &learn_token_contract);
-    (env, contract_id, admin, client)
-=======
     let token_client = MockLearnTokenClient::new(&env, &learn_token_id);
 
     authorize(
@@ -166,7 +146,23 @@ fn submit_milestone(
         ),
     );
     client.submit_milestone(learner, course_id, &milestone_id, evidence_uri);
->>>>>>> main
+}
+
+// =======================
+// ✅ ENROLL TESTS
+// =======================
+
+fn set_ledger_sequence(env: &Env, sequence_number: u32) {
+    env.ledger().set(LedgerInfo {
+        timestamp: 1_700_000_000,
+        protocol_version: 23,
+        sequence_number,
+        network_id: Default::default(),
+        base_reserve: 10,
+        min_temp_entry_ttl: 16,
+        min_persistent_entry_ttl: 16,
+        max_entry_ttl: 6312000,
+    });
 }
 
 // =======================
@@ -211,75 +207,20 @@ fn enrolls_learner_in_active_course() {
     let learner = Address::generate(&env);
     let course_id = sid(&env, "rust-101");
 
-<<<<<<< HEAD
-    client.add_course(&admin, &course_id, &10);
-    client.enroll(&learner, &course_id);
-=======
     add_course(&env, &contract_id, &admin, &client, &course_id, 3);
     enroll(&env, &contract_id, &learner, &client, &course_id);
->>>>>>> main
 
     assert!(client.is_enrolled(&learner, &course_id));
 }
 
 #[test]
 fn duplicate_enroll_fails() {
-<<<<<<< HEAD
-    let (env, _contract_id, _admin, _learn_token_address, client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-
-    client.enroll(&learner, &course_id);
-
-    let result = client.try_enroll(&learner, &course_id);
-    assert_eq!(
-        result.err(),
-        Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::Unauthorized as u32
-        )))
-    );
-}
-
-#[test]
-fn enroll_fails_when_not_initialized() {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let learn_token_address = Address::generate(&env);
-    let contract_id = env.register(CourseMilestone, ());
-    let client = CourseMilestoneClient::new(&env, &contract_id);
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-
-    let result = client.try_enroll(&learner, &course_id);
-    assert_eq!(
-        result.err(),
-        Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::NotInitialized as u32
-        )))
-    );
-}
-
-// =======================
-// ✅ SUBMIT MILESTONE TESTS
-// =======================
-
-#[test]
-fn enrolled_learner_can_submit_once_and_submission_is_stored() {
-    let (env, _contract_id, _admin, client) = setup();
-=======
     let (env, contract_id, admin, _token_id, client, _token_client) = setup();
->>>>>>> main
     let learner = Address::generate(&env);
     let course_id = sid(&env, "rust-101");
 
-<<<<<<< HEAD
-    client.add_course(&admin, &course_id, &5);
-    client.enroll(&learner, &course_id);
-    client.submit_milestone(&learner, &course_id, &1, &evidence_uri);
-=======
     add_course(&env, &contract_id, &admin, &client, &course_id, 3);
     enroll(&env, &contract_id, &learner, &client, &course_id);
->>>>>>> main
 
     authorize(
         &env,
@@ -329,13 +270,8 @@ fn submit_milestone_stores_pending_submission() {
 }
 
 #[test]
-<<<<<<< HEAD
-fn non_enrolled_learner_cannot_submit() {
-    let (env, _contract_id, _admin, _learn_token_address, client) = setup();
-=======
 fn verify_milestone_mints_lrn_and_marks_completion() {
     let (env, contract_id, admin, _token_id, client, token_client) = setup();
->>>>>>> main
     let learner = Address::generate(&env);
     let course_id = sid(&env, "rust-101");
     let evidence_uri = sid(&env, "ipfs://proof");
@@ -722,14 +658,8 @@ fn complete_milestone_fails_without_admin_auth() {
     let attacker = Address::generate(&env);
     let course_id = sid(&env, "rust-101");
 
-<<<<<<< HEAD
-    client.add_course(&admin, &course_id, &8);
-    client.enroll(&learner, &course_id);
-    client.submit_milestone(&learner, &course_id, &7, &evidence_uri);
-=======
     add_course(&env, &contract_id, &admin, &client, &course_id, 3);
     enroll(&env, &contract_id, &learner, &client, &course_id);
->>>>>>> main
 
     authorize(
         &env,
@@ -1042,221 +972,6 @@ fn state_persists_after_upgrade() {
     let learner = Address::generate(&env);
     let course_id = sid(&env, "soroban-101");
 
-<<<<<<< HEAD
-    let status = client.get_milestone_state(&learner, &course_id, &1);
-    assert_eq!(status, MilestoneStatus::NotStarted);
-}
-
-#[test]
-fn get_milestone_status_returns_pending_after_submission() {
-    let (env, _contract_id, admin, client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-    let evidence = sid(&env, "ipfs://bafy-proof");
-
-    client.add_course(&admin, &course_id, &4);
-    client.enroll(&learner, &course_id);
-    client.submit_milestone(&learner, &course_id, &1, &evidence);
-
-    let status = client.get_milestone_state(&learner, &course_id, &1);
-    assert_eq!(status, MilestoneStatus::Pending);
-}
-
-#[test]
-fn get_milestone_status_returns_approved_after_verification() {
-    let (env, _contract_id, admin, _learn_token_address, client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-    let evidence = sid(&env, "ipfs://bafy-proof");
-
-    client.enroll(&learner, &course_id);
-    client.submit_milestone(&learner, &course_id, &1, &evidence);
-    client.verify_milestone(&admin, &learner, &course_id, &1, &100);
-
-    let status = client.get_milestone_status(&learner, &course_id, &1);
-    assert_eq!(status, MilestoneStatus::Approved);
-}
-
-#[test]
-fn get_milestone_status_returns_rejected_after_rejection() {
-    let (env, _contract_id, admin, _learn_token_address, client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-    let evidence = sid(&env, "ipfs://bafy-proof");
-
-    client.enroll(&learner, &course_id);
-    client.submit_milestone(&learner, &course_id, &1, &evidence);
-    client.reject_milestone(&admin, &learner, &course_id, &1);
-
-    let status = client.get_milestone_status(&learner, &course_id, &1);
-    assert_eq!(status, MilestoneStatus::Rejected);
-}
-
-#[test]
-fn get_milestone_status_not_started_for_unsubmitted_milestone() {
-    let (env, _contract_id, admin, client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-    let evidence = sid(&env, "ipfs://bafy-proof");
-
-    client.add_course(&admin, &course_id, &4);
-    client.enroll(&learner, &course_id);
-    client.submit_milestone(&learner, &course_id, &1, &evidence);
-
-    let status = client.get_milestone_state(&learner, &course_id, &2);
-    assert_eq!(status, MilestoneStatus::NotStarted);
-}
-
-// =======================
-// ✅ LRN MINTING INTEGRATION TESTS
-// =======================
-
-#[test]
-fn verify_milestone_mints_lrn_tokens() {
-    let (env, _contract_id, admin, learn_token_address, client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-    let evidence_uri = sid(&env, "ipfs://bafy-proof");
-
-    client.enroll(&learner, &course_id);
-    client.submit_milestone(&learner, &course_id, &1, &evidence_uri);
-
-    // This would require a mock learn token contract for full testing
-    // For now, we just verify the function call succeeds
-    client.verify_milestone(&admin, &learner, &course_id, &1, &100);
-
-    let status = client.get_milestone_status(&learner, &course_id, &1);
-    assert_eq!(status, MilestoneStatus::Approved);
-}
-
-// =======================
-// ✅ ENROLLED COURSES TESTS
-// =======================
-
-#[test]
-fn get_enrolled_courses_returns_empty_for_new_learner() {
-    let (env, _contract_id, _admin, _learn_token_address, client) = setup();
-    let learner = Address::generate(&env);
-
-    let courses = client.get_enrolled_courses(&learner);
-    assert_eq!(courses.len(), 0);
-}
-
-#[test]
-fn get_enrolled_courses_returns_enrolled_courses() {
-    let (env, _contract_id, _admin, client) = setup();
-    let learner = Address::generate(&env);
-
-    client.add_course(&admin, &sid(&env, "rust-101"), &3);
-    client.add_course(&admin, &sid(&env, "defi-201"), &6);
-    client.enroll(&learner, &sid(&env, "rust-101"));
-    client.enroll(&learner, &sid(&env, "defi-201"));
-
-    let courses = client.get_enrolled_courses(&learner);
-    assert_eq!(courses.len(), 2);
-    assert_eq!(courses.get(0).unwrap(), sid(&env, "rust-101"));
-    assert_eq!(courses.get(1).unwrap(), sid(&env, "defi-201"));
-}
-
-#[test]
-fn get_enrolled_courses_is_per_learner() {
-    let (env, _contract_id, _admin, client) = setup();
-    let learner_a = Address::generate(&env);
-    let learner_b = Address::generate(&env);
-
-    client.add_course(&admin, &sid(&env, "rust-101"), &3);
-    client.add_course(&admin, &sid(&env, "defi-201"), &6);
-    client.enroll(&learner_a, &sid(&env, "rust-101"));
-    client.enroll(&learner_a, &sid(&env, "defi-201"));
-    client.enroll(&learner_b, &sid(&env, "rust-101"));
-
-    assert_eq!(client.get_enrolled_courses(&learner_a).len(), 2);
-    assert_eq!(client.get_enrolled_courses(&learner_b).len(), 1);
-}
-
-// =======================
-// ✅ VERSION TESTS
-// =======================
-
-#[test]
-fn get_version_returns_semver() {
-    let (env, _contract_id, _admin, _learn_token_address, client) = setup();
-    assert_eq!(client.get_version(), String::from_str(&env, "1.0.0"));
-}
-
-#[test]
-fn add_course_and_get_course_work() {
-    let (env, _contract_id, admin, client) = setup();
-    let course_id = sid(&env, "soroban-101");
-
-    client.add_course(&admin, &course_id, &12);
-
-    let course = client
-        .get_course(&course_id)
-        .expect("course should be stored after add");
-    assert_eq!(
-        course,
-        CourseConfig {
-            milestone_count: 12,
-            active: true,
-        }
-    );
-}
-
-#[test]
-fn list_courses_returns_empty_when_none_exist() {
-    let (_env, _contract_id, _admin, client) = setup();
-    assert_eq!(client.list_courses().len(), 0);
-}
-
-#[test]
-fn list_courses_returns_only_active_courses() {
-    let (env, _contract_id, admin, client) = setup();
-    let course_a = sid(&env, "rust-101");
-    let course_b = sid(&env, "defi-201");
-
-    client.add_course(&admin, &course_a, &5);
-    client.add_course(&admin, &course_b, &7);
-    client.remove_course(&admin, &course_b);
-
-    let courses = client.list_courses();
-    assert_eq!(courses.len(), 1);
-    assert_eq!(courses.get(0).unwrap(), course_a);
-}
-
-#[test]
-fn remove_course_marks_course_inactive() {
-    let (env, _contract_id, admin, client) = setup();
-    let course_id = sid(&env, "rust-101");
-    let learner = Address::generate(&env);
-
-    client.add_course(&admin, &course_id, &4);
-    client.remove_course(&admin, &course_id);
-
-    let stored = client
-        .get_course(&course_id)
-        .expect("course should remain stored");
-    assert_eq!(stored.active, false);
-
-    let result = client.try_enroll(&learner, &course_id);
-    assert_eq!(
-        result.err(),
-        Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::CourseNotFound as u32
-        )))
-    );
-}
-
-#[test]
-fn pause_blocks_enroll() {
-    let (env, _contract_id, admin, client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-
-    client.pause(&admin);
-
-    let result = client.try_enroll(&learner, &course_id);
-=======
     add_course(&env, &contract_id, &admin, &client, &course_id, 3);
     enroll(&env, &contract_id, &learner, &client, &course_id);
 
@@ -1276,7 +991,6 @@ fn pause_blocks_enroll() {
             .unwrap_or(false)
     });
     let stored_hash = env.as_contract(&contract_id, || crate::upgrade::current_hash(&env));
->>>>>>> main
 
     assert_eq!(
         stored_course,
@@ -1295,17 +1009,11 @@ fn benchmark_costs() {
     let learner = Address::generate(&env);
     let course_id = sid(&env, "rust-101");
 
-<<<<<<< HEAD
-    client.add_course(&admin, &course_id, &1);
-    client.enroll(&learner, &course_id);
-    client.pause(&admin);
-=======
     // 1. Benchmark add_course
     env.cost_estimate().budget().reset_unlimited();
     add_course(&env, &contract_id, &admin, &client, &course_id, 3);
     let add_instr = env.cost_estimate().budget().cpu_instruction_cost();
     let add_mem = env.cost_estimate().budget().memory_bytes_cost();
->>>>>>> main
 
     // 2. Benchmark enroll
     env.cost_estimate().budget().reset_unlimited();
@@ -1332,7 +1040,6 @@ fn benchmark_costs() {
     std::println!("enroll: instr={}, mem={}", enroll_instr, enroll_mem);
     std::println!("complete_milestone: instr={}, mem={}", comp_instr, comp_mem);
 }
-<<<<<<< HEAD
 
 #[test]
 fn unpause_restores_functionality() {
@@ -1348,5 +1055,3 @@ fn unpause_restores_functionality() {
 
     assert!(client.is_enrolled(&learner, &course_id));
 }
-=======
->>>>>>> main

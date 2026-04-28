@@ -3,7 +3,9 @@ import sanitizeHtml from "sanitize-html"
 import { getPeerReviewQueue, submitPeerReview } from "../db/peer-review-store"
 import { type AuthRequest } from "../middleware/auth.middleware"
 
-export async function getPeerReviewQueueHandler(
+const logger = createLogger("peer-review")
+
+export async function getPeerReviewQueueHandler (
 	req: AuthRequest,
 	res: Response,
 ): Promise<void> {
@@ -17,12 +19,12 @@ export async function getPeerReviewQueueHandler(
 		const queue = await getPeerReviewQueue(address)
 		res.status(200).json({ data: queue })
 	} catch (err) {
-		console.error("[peer-review] queue error:", err)
+		logger.error("Queue error", { error: err, address })
 		res.status(500).json({ error: "Failed to load peer review queue" })
 	}
 }
 
-export async function submitPeerReviewHandler(
+export async function submitPeerReviewHandler (
 	req: AuthRequest,
 	res: Response,
 ): Promise<void> {
@@ -92,7 +94,7 @@ export async function submitPeerReviewHandler(
 			},
 		})
 	} catch (err) {
-		console.error("[peer-review] submit error:", err)
+		logger.error("Submit error", { error: err, address, reportId: id })
 		res.status(500).json({ error: "Failed to submit peer review" })
 	}
 }

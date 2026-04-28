@@ -26,22 +26,24 @@ const getBodyWalletValue = (
 
 const createWalletKeyGenerator =
 	(bodyKeys: string[]) =>
-	(req: Request): string => {
-		const headerWallet = req.headers["x-wallet-address"]
-		if (typeof headerWallet === "string" && headerWallet.trim().length > 0) {
-			return headerWallet
-		}
+		(req: Request): string => {
+			const headerWallet = req.headers["x-wallet-address"]
+			if (typeof headerWallet === "string" && headerWallet.trim().length > 0) {
+				return headerWallet
+			}
 
-<<<<<<< HEAD
-		return getBodyWalletValue(req, bodyKeys) ?? ipKeyGenerator(req.ip ?? "unknown") ?? "unknown"
-=======
-		return (
-			getBodyWalletValue(req, bodyKeys) ??
-			ipKeyGenerator(req.ip ?? "unknown") ??
-			"unknown"
-		)
->>>>>>> main
-	}
+			return (
+				getBodyWalletValue(req, bodyKeys) ??
+				ipKeyGenerator(req.ip ?? "unknown") ??
+				"unknown"
+			)
+
+			return (
+				getBodyWalletValue(req, bodyKeys) ??
+				ipKeyGenerator(req.ip ?? "unknown") ??
+				"unknown"
+			)
+		}
 
 const getKeyForRequest = (req: Request): string => {
 	return (req.headers["x-wallet-address"] as string) || req.ip || "unknown"
@@ -70,12 +72,7 @@ export const uploadLimiter = rateLimit({
 export const milestoneReportLimiter = rateLimit({
 	windowMs: 60 * 60 * 1000,
 	limit: 3,
-<<<<<<< HEAD
-	keyGenerator: (req: Request) =>
-		(req.headers["x-wallet-address"] as string) ?? ipKeyGenerator(req.ip ?? "unknown") ?? "unknown",
-=======
 	keyGenerator: getKeyForRequest,
->>>>>>> main
 	standardHeaders: "draft-7",
 	legacyHeaders: false,
 	validate: false,
@@ -87,12 +84,7 @@ export const milestoneReportLimiter = rateLimit({
 export const proposalSubmissionLimiter = rateLimit({
 	windowMs: 24 * 60 * 60 * 1000,
 	limit: 1,
-<<<<<<< HEAD
-	keyGenerator: (req: Request) =>
-		(req.headers["x-wallet-address"] as string) ?? ipKeyGenerator(req.ip ?? "unknown") ?? "unknown",
-=======
 	keyGenerator: getKeyForRequest,
->>>>>>> main
 	standardHeaders: "draft-7",
 	legacyHeaders: false,
 	validate: false,

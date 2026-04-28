@@ -1,8 +1,9 @@
-import { Icon } from "@stellar/design-system"
-import React, { lazy, Suspense } from "react"
-import { Helmet } from "react-helmet"
-import { Link } from "react-router-dom"
+import React, { Suspense, lazy } from "react"
+
 import DeferredSection from "../components/DeferredSection"
+import { Helmet } from "react-helmet"
+import { Icon } from "@stellar/design-system"
+import { Link } from "react-router-dom"
 import { useEnrolledCourses } from "../hooks/useCourses"
 
 const MilestoneTracker = lazy(() =>
@@ -87,52 +88,12 @@ const Home: React.FC = () => {
 				<div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-brand-purple/10 blur-[160px] rounded-full" />
 			</div>
 
-<<<<<<< HEAD
-				{showOnboarding ? (
-					<Suspense fallback={<SectionSkeleton className="mb-20 min-h-64" />}>
-						<OnboardingWizard />
-					</Suspense>
-				) : (
-					<section className="mb-16 w-full max-w-6xl rounded-[2rem] border border-white/10 bg-black/20 px-6 py-8 shadow-2xl backdrop-blur-xl md:px-8">
-						<div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-							<div className="max-w-3xl">
-								<p className="text-xs uppercase tracking-[0.35em] text-brand-cyan/80">
-									New Learner Flow
-								</p>
-								<h2 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">
-									Launch the guided wallet-and-enrollment setup only when you
-									need it.
-								</h2>
-								<p className="mt-3 text-base leading-relaxed text-white/60">
-									The onboarding assistant is still available, but it now loads
-									on demand so the dashboard shell reaches first paint faster on
-									mobile data.
-								</p>
-							</div>
-							<Button
-								size="lg"
-								variant="primary"
-								onClick={() => setShowOnboarding(true)}
-							>
-								Start guided setup
-							</Button>
-						</div>
-					</section>
-				)}
-
-				<header className="text-center max-w-4xl mx-auto mb-24">
-					<div className="inline-block mb-10 animate-in fade-in zoom-in duration-1000">
-						<div className="w-24 h-24 bg-linear-to-br from-brand-cyan to-brand-blue rounded-[2.5rem] flex items-center justify-center font-black text-3xl shadow-2xl shadow-brand-cyan/30 rotate-12 hover:rotate-0 transition-transform duration-500">
-							LV
-						</div>
-=======
 			<div className="w-full max-w-6xl mx-auto px-6 sm:px-8 flex flex-col gap-24 pb-32">
 				{/* ── HERO ─────────────────────────────────────────────────────── */}
 				<section className="text-center pt-12 pb-4 flex flex-col items-center gap-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
 					{/* Logo mark */}
 					<div className="w-20 h-20 bg-linear-to-br from-brand-cyan to-brand-blue rounded-3xl flex items-center justify-center font-black text-2xl shadow-2xl shadow-brand-cyan/30">
 						LV
->>>>>>> main
 					</div>
 
 					{/* Headline */}
@@ -182,22 +143,6 @@ const Home: React.FC = () => {
 					</div>
 				</div>
 
-<<<<<<< HEAD
-				<main className="w-full max-w-6xl flex flex-col gap-12 relative z-10 animate-in slide-in-from-bottom-12 duration-1000 delay-800">
-					<div className="iridescent-border p-[1px] rounded-[3.5rem] shadow-2xl">
-						<div className="glass-card p-12 rounded-[3.5rem] border border-white/5">
-							<div className="flex flex-col md:flex-row gap-12 items-start">
-								<div className="md:w-1/3">
-									<h2 className="text-3xl font-black mb-4 flex items-center gap-4">
-										<Icon.Trophy01 size="lg" className="text-brand-cyan" />
-										{t("home.courseProgress.title")}
-									</h2>
-									<p className="text-white/40 leading-relaxed">
-										{t("home.courseProgress.desc")}
-									</p>
-								</div>
-								<div className="md:w-2/3 w-full">
-=======
 				{/* ── HOW IT WORKS ─────────────────────────────────────────────── */}
 				<section className="flex flex-col gap-10 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-300">
 					<div className="flex items-center gap-3">
@@ -252,7 +197,6 @@ const Home: React.FC = () => {
 											style={{ width: `${course.progressPercent}%` }}
 										/>
 									</div>
->>>>>>> main
 									<DeferredSection
 										fallback={<SectionSkeleton className="min-h-40" />}
 									>
@@ -290,16 +234,6 @@ const Home: React.FC = () => {
 								<p className="text-white/40 text-sm leading-relaxed">
 									{description}
 								</p>
-<<<<<<< HEAD
-								<DeferredSection
-									fallback={<SectionSkeleton className="min-h-40" />}
-								>
-									<Suspense fallback={<SectionSkeleton className="min-h-40" />}>
-										<GuessTheNumber />
-									</Suspense>
-								</DeferredSection>
-=======
->>>>>>> main
 							</div>
 						))}
 					</div>

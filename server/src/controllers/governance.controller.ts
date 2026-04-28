@@ -14,7 +14,7 @@ type ProposalPublicState = "open" | "closed" | "cancelled" | "executed"
 
 const stellarAddressSchema = z.string().min(56).max(56).startsWith("G")
 
-function parseStatus(value: unknown): ProposalStatus | undefined {
+function parseStatus (value: unknown): ProposalStatus | undefined {
 	if (typeof value !== "string") return undefined
 	const normalized = value.trim().toLowerCase()
 	if (
@@ -27,21 +27,21 @@ function parseStatus(value: unknown): ProposalStatus | undefined {
 	return undefined
 }
 
-function parsePositiveInt(value: unknown, fallback: number): number {
+function parsePositiveInt (value: unknown, fallback: number): number {
 	if (typeof value !== "string") return fallback
 	const parsed = Number.parseInt(value, 10)
 	if (Number.isNaN(parsed) || parsed < 1) return fallback
 	return parsed
 }
 
-function parseProposalId(value: unknown): number | null {
+function parseProposalId (value: unknown): number | null {
 	if (typeof value !== "string") return null
 	const parsed = Number.parseInt(value, 10)
 	if (Number.isNaN(parsed) || parsed < 1) return null
 	return parsed
 }
 
-function deriveProposalState(proposal: {
+function deriveProposalState (proposal: {
 	status: string
 	cancelled?: boolean | null
 	deadline?: Date | string | null
@@ -60,14 +60,14 @@ function deriveProposalState(proposal: {
 	return "open"
 }
 
-function parseViewerAddress(value: unknown): string | null {
+function parseViewerAddress (value: unknown): string | null {
 	if (typeof value !== "string") return null
 	const trimmed = value.trim()
 	const validation = stellarAddressSchema.safeParse(trimmed)
 	return validation.success ? validation.data : null
 }
 
-function buildProposalSelect(viewerParamIndex?: number) {
+function buildProposalSelect (viewerParamIndex?: number) {
 	const viewerVoteSelect = viewerParamIndex
 		? ", uv.support AS user_vote_support"
 		: ", NULL::boolean AS user_vote_support"
@@ -91,7 +91,7 @@ function buildProposalSelect(viewerParamIndex?: number) {
 		FROM proposals p${viewerJoin}`
 }
 
-export async function getGovernanceProposals(
+export async function getGovernanceProposals (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -144,7 +144,7 @@ export async function getGovernanceProposals(
 	}
 }
 
-export async function getGovernanceProposalById(
+export async function getGovernanceProposalById (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -181,7 +181,7 @@ export async function getGovernanceProposalById(
 const GOV_DECIMALS = 7
 const GOV_DIVISOR = 10n ** BigInt(GOV_DECIMALS)
 
-export async function getVotingPower(
+export async function getVotingPower (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -220,20 +220,6 @@ const createProposalSchema = z.object({
 })
 
 const castVoteSchema = z.object({
-	proposal_id: z
-		.number()
-		.int()
-		.positive("proposal_id must be a positive integer"),
-	voter_address: z
-		.string()
-		.min(56, "voter_address must be a valid Stellar address")
-		.max(56, "voter_address must be a valid Stellar address")
-		.startsWith("G", "voter_address must be a valid Stellar address"),
-	support: z.boolean(),
-	signature: z.string().optional(),
-})
-
-const castVoteSchema = z.object({
 	proposal_id: z.number().int().positive("proposal_id must be a positive integer"),
 	voter_address: z
 		.string()
@@ -244,7 +230,7 @@ const castVoteSchema = z.object({
 	signature: z.string().optional(),
 })
 
-export async function createGovernanceProposal(
+export async function createGovernanceProposal (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -341,7 +327,10 @@ export async function createGovernanceProposal(
 					scholarAddress: author_address,
 				})
 			} catch (trackingErr) {
-				console.error("[governance] escrow tracking failed:", trackingErr)
+				logger.error("escrow tracking failed", {
+					error: trackingErr,
+					proposalId: proposal_id,
+				})
 			}
 		}
 
@@ -358,7 +347,7 @@ export async function createGovernanceProposal(
 	}
 }
 
-export async function castVote(req: Request, res: Response): Promise<void> {
+export async function castVote (req: Request, res: Response): Promise<void> {
 	const validation = castVoteSchema.safeParse(req.body)
 	if (!validation.success) {
 		res.status(400).json({
@@ -373,25 +362,15 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 	try {
 		// 1. Check if proposal exists
 		const proposalResult = await pool.query(
-<<<<<<< HEAD
-			"SELECT id, status FROM proposals WHERE id = $1",
-			[proposal_id],
-		)
-
-		if (proposalResult.rows.length === 0) {
-=======
 			"SELECT id, status, deadline, cancelled FROM proposals WHERE id = $1",
 			[proposal_id],
 		)
 
 		if (!proposalResult?.rows || proposalResult.rows.length === 0) {
->>>>>>> main
 			res.status(404).json({ error: "Proposal not found" })
 			return
 		}
 
-<<<<<<< HEAD
-=======
 		if (proposalResult.rows[0].cancelled) {
 			res.status(400).json({
 				error: "Voting is closed for this proposal",
@@ -399,7 +378,6 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 			return
 		}
 
->>>>>>> main
 		// 2. Check if proposal is still pending
 		if (proposalResult.rows[0].status !== "pending") {
 			res.status(400).json({
@@ -408,8 +386,6 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 			return
 		}
 
-<<<<<<< HEAD
-=======
 		if (
 			proposalResult.rows[0].deadline &&
 			new Date(proposalResult.rows[0].deadline).getTime() <= Date.now()
@@ -420,27 +396,18 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 			return
 		}
 
->>>>>>> main
 		// 3. Check if voter already voted
 		const existingVote = await pool.query(
 			"SELECT id FROM votes WHERE proposal_id = $1 AND voter_address = $2",
 			[proposal_id, voter_address],
 		)
 
-<<<<<<< HEAD
-		if (existingVote.rows.length > 0) {
-=======
 		if ((existingVote?.rows ?? []).length > 0) {
->>>>>>> main
 			res.status(409).json({ error: "You have already voted on this proposal" })
 			return
 		}
 
-<<<<<<< HEAD
-		// 4. Check voter's GOV token balance (voting power)
-=======
 		// 4. Check voter's effective voting power (own balance + any delegated-to-them)
->>>>>>> main
 		const rawBalance =
 			await stellarContractService.getGovernanceTokenBalance(voter_address)
 		const balanceBigInt = BigInt(rawBalance)
@@ -454,13 +421,6 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 		}
 
 		// 5. Call the on-chain vote contract
-<<<<<<< HEAD
-		const contractResult = await stellarContractService.castVote({
-			voter: voter_address,
-			proposalId: proposal_id,
-			support,
-		})
-=======
 		const contractResult = await stellarContractService.castVote(
 			{
 				voter: voter_address,
@@ -469,7 +429,6 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 			},
 			{ requestId: req.requestId },
 		)
->>>>>>> main
 
 		// 6. Write to DB after successful contract call
 		const votingPower = balanceBigInt
@@ -505,21 +464,16 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 			votes_against: updatedProposal.rows[0]?.votes_against ?? "0",
 		})
 	} catch (err) {
-<<<<<<< HEAD
-		console.error("[governance] Vote casting failed:", err)
-=======
 		log.error({ err }, "Vote casting failed")
->>>>>>> main
 		res.status(500).json({
 			error: "Failed to cast vote",
 			message: err instanceof Error ? err.message : String(err),
 		})
 	}
 }
-<<<<<<< HEAD
-=======
 
-export async function getProposalStatus(
+
+export async function getProposalStatus (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -554,7 +508,7 @@ export async function getProposalStatus(
 	}
 }
 
-export async function cancelProposal(
+export async function cancelProposal (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -605,7 +559,7 @@ export async function cancelProposal(
 	}
 }
 
-export async function getDelegation(
+export async function getDelegation (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -635,8 +589,7 @@ export async function getDelegation(
 			voting_power: rawVotingPower,
 		})
 	} catch (err) {
-		console.error("[governance] getDelegation error:", err)
+		logger.error("getDelegation failed", { error: err, address })
 		res.status(500).json({ error: "Failed to fetch delegation state" })
 	}
 }
->>>>>>> main

@@ -1,7 +1,10 @@
 import { type Request, type Response } from "express"
 
 import { pool } from "../db/index"
+import { createLogger } from "../lib/logger"
 import { type AuthRequest } from "../middleware/auth.middleware"
+
+const logger = createLogger("notifications")
 
 /**
  * GET /api/notifications
@@ -34,7 +37,7 @@ export async function getNotifications(
 			unread_count: unreadCount,
 		})
 	} catch (err) {
-		console.error("[notifications] getNotifications error:", err)
+		logger.error("getNotifications failed", { error: err, address })
 		res.status(500).json({ error: "Failed to fetch notifications" })
 	}
 }
@@ -64,7 +67,7 @@ export async function markAllRead(
 
 		res.status(200).json({ updated: result.rowCount ?? 0 })
 	} catch (err) {
-		console.error("[notifications] markAllRead error:", err)
+		logger.error("markAllRead failed", { error: err, address })
 		res.status(500).json({ error: "Failed to mark notifications as read" })
 	}
 }
@@ -105,7 +108,7 @@ export async function markOneRead(
 
 		res.status(200).json({ updated: 1 })
 	} catch (err) {
-		console.error("[notifications] markOneRead error:", err)
+		logger.error("markOneRead failed", { error: err, address, id })
 		res.status(500).json({ error: "Failed to mark notification as read" })
 	}
 }

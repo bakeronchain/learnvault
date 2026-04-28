@@ -42,7 +42,7 @@ const testJwtService: JwtService = {
 		sub: "GSCHOLAR1",
 		jti: "test-jti",
 	}),
-	revokeToken: async () => {},
+	revokeToken: async () => { },
 }
 
 const buildApp = (): express.Express => {

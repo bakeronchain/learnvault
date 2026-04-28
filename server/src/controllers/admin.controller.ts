@@ -10,7 +10,7 @@ const LEARN_TOKEN_CONTRACT_ID = process.env.LEARN_TOKEN_CONTRACT_ID ?? ""
 const SCHOLARSHIP_TREASURY_CONTRACT_ID =
 	process.env.SCHOLARSHIP_TREASURY_CONTRACT_ID ?? ""
 
-async function queryContractI128(
+async function queryContractI128 (
 	contractId: string,
 	method: string,
 ): Promise<string> {
@@ -62,7 +62,7 @@ async function queryContractI128(
 	}
 }
 
-export async function getAdminStats(
+export async function getAdminStats (
 	_req: Request,
 	res: Response,
 ): Promise<void> {

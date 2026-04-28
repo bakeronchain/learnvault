@@ -1,36 +1,31 @@
-<<<<<<< HEAD
-import path from "path"
-import cors from "cors"
-import dotenv from "dotenv"
-import path from "path"
-
-// Load server/.env whether you run from repo root or from server/
-dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
-
-import cors from "cors"
-import express from "express"
-import morgan from "morgan"
-=======
+// Initialize Sentry FIRST before any other imports that might throw
 import { createPublicKey } from "node:crypto"
 import path from "path"
 import cors from "cors"
 import dotenv from "dotenv"
+
+// Load server/.env whether you run from repo root or from server/
+dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
+
 import express, {
 	type Request,
 	type Response,
 	type NextFunction,
 } from "express"
 import helmet from "helmet"
->>>>>>> main
+import morgan from "morgan"
+
 import swaggerUi from "swagger-ui-express"
 import YAML from "yaml"
 import { z } from "zod"
-
+import { allowedOrigins } from "./config/cors-config"
 import { initDb } from "./db/index"
 import { createNonceStore } from "./db/nonce-store"
 import { createTokenStore } from "./db/token-store"
 import { logger } from "./lib/logger"
 import { setupConsoleRequestTracing } from "./lib/request-context"
+import { initSentry, sentryRequestHandler } from "./lib/sentry"
+
 import { createRequireTrustedOrigin } from "./middleware/csrf.middleware"
 import { errorHandler } from "./middleware/error.middleware"
 import { globalLimiter } from "./middleware/rate-limit.middleware"
@@ -65,14 +60,22 @@ import {
 	generateEphemeralDevJwtKeys,
 } from "./services/jwt.service"
 
-<<<<<<< HEAD
+// Load server/.env whether you run from repo root or from server/
+dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
+
+initSentry({
+	dsn: process.env.SENTRY_DSN,
+	environment: process.env.NODE_ENV || "development",
+	release: process.env.SENTRY_RELEASE || process.env.GIT_COMMIT_HASH,
+	tracesSampleRate: env.NODE_ENV === "production" ? 0.1 : 1.0,
+	profilesSampleRate: env.NODE_ENV === "production" ? 0.1 : 1.0,
+})
+
 const pemString = z
 	.string()
 	.min(1)
 	.transform((s) => s.replace(/\\n/g, "\n").trim())
-=======
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
->>>>>>> main
 
 const envSchema = z.object({
 	PORT: z.coerce.number().int().positive().default(4000),
@@ -194,7 +197,7 @@ if (!isProduction) {
 
 app.use(errorHandler)
 
-async function start() {
+async function start () {
 	if (process.env.SKIP_DB !== "true") {
 		await initDb()
 	}

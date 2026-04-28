@@ -46,8 +46,6 @@ export interface CastVoteParams {
 	support: boolean
 }
 
-<<<<<<< HEAD
-=======
 export interface CancelProposalParams {
 	proposalId: number
 }
@@ -56,18 +54,17 @@ interface RequestTraceOptions {
 	requestId?: string
 }
 
-function resolveRequestId(options?: RequestTraceOptions): string | undefined {
+function resolveRequestId (options?: RequestTraceOptions): string | undefined {
 	return options?.requestId ?? getRequestId()
 }
 
-function buildRequestMemoValue(requestId?: string): string | null {
+function buildRequestMemoValue (requestId?: string): string | null {
 	if (!requestId) return null
 	const compact = requestId.replace(/-/g, "").slice(0, 24)
 	if (!compact) return null
 	return `rid:${compact}`
 }
 
->>>>>>> main
 // --- Admin Validation Cache ---
 let cachedAdminAddress: string | null = null
 let lastAdminCheckTime: number = 0
@@ -79,7 +76,7 @@ const ADMIN_CACHE_TTL = 5 * 60 * 1000 // 5 minutes in milliseconds
  * Determines whether an error is transient and safe to retry.
  * Non-retryable errors: contract reverts, auth failures, missing config.
  */
-function isRetryableError(err: unknown): boolean {
+function isRetryableError (err: unknown): boolean {
 	const msg = (err instanceof Error ? err.message : String(err)).toLowerCase()
 	// Non-retryable: config missing, auth / access-control, contract logic errors
 	const nonRetryablePatterns = [
@@ -122,7 +119,7 @@ function isRetryableError(err: unknown): boolean {
  * @param maxAttempts  Maximum total attempts (default 3)
  * @param label  Human-readable label used in log messages
  */
-async function withRetry<T>(
+async function withRetry<T> (
 	operation: () => Promise<T>,
 	maxAttempts = 3,
 	label = "Stellar contract call",
@@ -155,7 +152,7 @@ async function withRetry<T>(
 	throw wrapped
 }
 
-async function ensureAdminRole(): Promise<void> {
+async function ensureAdminRole (): Promise<void> {
 	if (!STELLAR_SECRET_KEY) {
 		throw new Error(
 			"STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction",
@@ -227,11 +224,11 @@ async function ensureAdminRole(): Promise<void> {
 	}
 }
 
-async function callVerifyMilestone(
+async function callVerifyMilestone (
 	scholarAddress: string,
 	courseId: string,
 	milestoneId: number,
-	options: RequestTraceOptions = {},
+	_options: RequestTraceOptions = {},
 ): Promise<ContractCallResult> {
 	if (!STELLAR_SECRET_KEY) {
 		throw new Error(
@@ -300,7 +297,7 @@ async function callVerifyMilestone(
 				log.error({ err }, "Contract call failed")
 				throw new Error(
 					"Contract call failed: " +
-						(err instanceof Error ? err.message : String(err)),
+					(err instanceof Error ? err.message : String(err)),
 				)
 			}
 		},
@@ -309,12 +306,12 @@ async function callVerifyMilestone(
 	)
 }
 
-async function emitRejectionEvent(
+async function emitRejectionEvent (
 	scholarAddress: string,
 	courseId: string,
 	milestoneId: number,
 	reason: string,
-	options: RequestTraceOptions = {},
+	_options: RequestTraceOptions = {},
 ): Promise<ContractCallResult> {
 	if (!STELLAR_SECRET_KEY) {
 		throw new Error(
@@ -383,7 +380,7 @@ async function emitRejectionEvent(
 				log.error({ err }, "Rejection event failed")
 				throw new Error(
 					"Rejection event failed: " +
-						(err instanceof Error ? err.message : String(err)),
+					(err instanceof Error ? err.message : String(err)),
 				)
 			}
 		},
@@ -392,7 +389,7 @@ async function emitRejectionEvent(
 	)
 }
 
-async function callMintScholarNFT(
+async function callMintScholarNFT (
 	scholarAddress: string,
 	metadataUri: string,
 ): Promise<ContractCallResult & { tokenId?: number }> {
@@ -465,7 +462,7 @@ async function callMintScholarNFT(
 /**
  * Check if a learner is enrolled in a course on-chain.
  */
-async function isEnrolled(
+async function isEnrolled (
 	learnerAddress: string,
 	courseId: number,
 	_options: RequestTraceOptions = {},
@@ -535,9 +532,9 @@ async function isEnrolled(
 	}
 }
 
-async function submitScholarshipProposal(
+async function submitScholarshipProposal (
 	params: ScholarshipProposalParams,
-	options: RequestTraceOptions = {},
+	_options: RequestTraceOptions = {},
 ): Promise<ContractCallResult & { proposalId: string | null }> {
 	if (!STELLAR_SECRET_KEY) {
 		throw new Error(
@@ -604,7 +601,7 @@ async function submitScholarshipProposal(
 				log.error({ err }, "Scholarship proposal submission failed")
 				throw new Error(
 					"Scholarship proposal submission failed: " +
-						(err instanceof Error ? err.message : String(err)),
+					(err instanceof Error ? err.message : String(err)),
 				)
 			}
 		},
@@ -613,7 +610,7 @@ async function submitScholarshipProposal(
 	)
 }
 
-async function castVote(
+async function castVote (
 	params: CastVoteParams,
 	options: RequestTraceOptions = {},
 ): Promise<ContractCallResult> {
@@ -686,7 +683,7 @@ async function castVote(
 	}
 }
 
-async function cancelProposal(
+async function cancelProposal (
 	params: CancelProposalParams,
 	options: RequestTraceOptions = {},
 ): Promise<ContractCallResult> {
@@ -753,12 +750,12 @@ async function cancelProposal(
 		log.error({ err }, "Cancel proposal failed")
 		throw new Error(
 			"Cancel proposal failed: " +
-				(err instanceof Error ? err.message : String(err)),
+			(err instanceof Error ? err.message : String(err)),
 		)
 	}
 }
 
-async function reclaimInactiveEscrow(
+async function reclaimInactiveEscrow (
 	proposalId: number,
 	options: RequestTraceOptions = {},
 ): Promise<ContractCallResult> {
@@ -824,12 +821,12 @@ async function reclaimInactiveEscrow(
 		log.error({ err }, "reclaim_inactive failed")
 		throw new Error(
 			"reclaim_inactive failed: " +
-				(err instanceof Error ? err.message : String(err)),
+			(err instanceof Error ? err.message : String(err)),
 		)
 	}
 }
 
-async function castVote(params: CastVoteParams): Promise<ContractCallResult> {
+async function castVote (params: CastVoteParams): Promise<ContractCallResult> {
 	if (!STELLAR_SECRET_KEY) {
 		throw new Error(
 			"STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction",
@@ -889,12 +886,12 @@ async function castVote(params: CastVoteParams): Promise<ContractCallResult> {
 		console.error("[stellar] Cast vote failed:", err)
 		throw new Error(
 			"Cast vote failed: " +
-				(err instanceof Error ? err.message : String(err)),
+			(err instanceof Error ? err.message : String(err)),
 		)
 	}
 }
 
-async function getLearnTokenBalance(address: string): Promise<string> {
+async function getLearnTokenBalance (address: string): Promise<string> {
 	if (!LEARN_TOKEN_CONTRACT_ID) {
 		log.warn("LEARN_TOKEN_CONTRACT_ID not set — simulating balance")
 		return "10000000000" // 1000 LRN
@@ -939,7 +936,7 @@ async function getLearnTokenBalance(address: string): Promise<string> {
 	}
 }
 
-async function getGovernanceTokenBalance(address: string): Promise<string> {
+async function getGovernanceTokenBalance (address: string): Promise<string> {
 	if (!GOVERNANCE_TOKEN_CONTRACT_ID) {
 		log.warn("GOVERNANCE_TOKEN_CONTRACT_ID not set — simulating balance")
 		return "1250000000"
@@ -984,7 +981,7 @@ async function getGovernanceTokenBalance(address: string): Promise<string> {
 	}
 }
 
-async function getGovernanceVotingPower(address: string): Promise<string> {
+async function getGovernanceVotingPower (address: string): Promise<string> {
 	if (!GOVERNANCE_TOKEN_CONTRACT_ID) {
 		log.warn(
 			"[stellar] GOVERNANCE_TOKEN_CONTRACT_ID not set — simulating voting power",
@@ -1033,7 +1030,7 @@ async function getGovernanceVotingPower(address: string): Promise<string> {
 	}
 }
 
-async function getGovernanceDelegation(
+async function getGovernanceDelegation (
 	address: string,
 ): Promise<string | null> {
 	if (!GOVERNANCE_TOKEN_CONTRACT_ID) return null
@@ -1081,7 +1078,7 @@ async function getGovernanceDelegation(
 	}
 }
 
-async function getEnrolledCourses(address: string): Promise<string[]> {
+async function getEnrolledCourses (address: string): Promise<string[]> {
 	if (!COURSE_MILESTONE_CONTRACT_ID) {
 		log.warn("COURSE_MILESTONE_CONTRACT_ID not set — simulating enrollments")
 		return ["stellar-basics", "defi-101"]
@@ -1089,7 +1086,7 @@ async function getEnrolledCourses(address: string): Promise<string[]> {
 	return ["stellar-basics", "defi-101"]
 }
 
-async function getScholarCredentials(address: string): Promise<any[]> {
+async function getScholarCredentials (address: string): Promise<any[]> {
 	try {
 		const result = await pool.query(
 			`SELECT 
@@ -1135,11 +1132,8 @@ export const stellarContractService = {
 	isEnrolled,
 	submitScholarshipProposal,
 	castVote,
-<<<<<<< HEAD
-=======
 	cancelProposal,
 	reclaimInactiveEscrow,
->>>>>>> main
 	getLearnTokenBalance,
 	getGovernanceTokenBalance,
 	getGovernanceVotingPower,

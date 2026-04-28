@@ -1,6 +1,7 @@
 import { Button, Card } from "@stellar/design-system"
 import { useEffect, useRef, useState } from "react"
 import { Link } from "react-router-dom"
+import AddressDisplay from "../components/AddressDisplay"
 import { useScholarshipApplication } from "../hooks/useScholarshipApplication"
 import { useWallet } from "../hooks/useWallet"
 import {

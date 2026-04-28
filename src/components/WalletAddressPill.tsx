@@ -1,9 +1,9 @@
-import { motion, AnimatePresence } from "framer-motion"
-import { useState } from "react"
-import { stellarNetwork } from "../contracts/util"
+import { AnimatePresence, motion } from "framer-motion"
 
-import { useWallet } from "../hooks/useWallet"
 import { shortenAddress } from "../util/contract"
+import { stellarNetwork } from "../contracts/util"
+import { useState } from "react"
+import { useWallet } from "../hooks/useWallet"
 
 interface Props {
 	address: string

@@ -8,7 +8,7 @@ const STELLAR_NETWORK = process.env.STELLAR_NETWORK ?? "testnet"
 const SCHOLARSHIP_TREASURY_CONTRACT_ID =
 	process.env.SCHOLARSHIP_TREASURY_CONTRACT_ID ?? ""
 
-function parsePositiveInt(value: unknown, fallback: number): number {
+function parsePositiveInt (value: unknown, fallback: number): number {
 	if (typeof value !== "string") return fallback
 	const parsed = Number.parseInt(value, 10)
 	if (Number.isNaN(parsed) || parsed < 0) return fallback

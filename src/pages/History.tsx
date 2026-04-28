@@ -1,9 +1,5 @@
-import { useQuery } from "@tanstack/react-query"
-import { format } from "date-fns"
 import React, { useMemo } from "react"
-import { Link } from "react-router-dom"
-import { stellarNetwork } from "../contracts/util"
-import { useWallet } from "../hooks/useWallet"
+
 import { API_URL } from "../lib/api"
 
 type ApiEvent = {

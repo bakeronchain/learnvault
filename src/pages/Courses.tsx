@@ -5,14 +5,10 @@ import BookmarkButton from "../components/BookmarkButton"
 import { CourseFilter } from "../components/CourseFilter"
 import Pagination from "../components/Pagination"
 import { CourseCardSkeleton } from "../components/skeletons/CourseCardSkeleton"
-<<<<<<< HEAD
-import { courses } from "../data/courses"
-=======
 import { EmptyState } from "../components/states/emptyState"
 import { ErrorState } from "../components/states/errorState"
 import { useCourses } from "../hooks/useCourses"
 import { type CourseSummary } from "../types/courses"
->>>>>>> main
 
 const levelStyles: Record<CourseSummary["level"], string> = {
 	Beginner: "bg-brand-emerald/20 text-brand-emerald border-brand-emerald/20",
@@ -240,7 +236,11 @@ const Courses: React.FC = () => {
 										<span>{course.track}</span>
 										<Link
 											to={`/courses/${course.slug}/lessons/1`}
-											id={paginatedCourses.indexOf(course) === 0 ? "course-card-0" : undefined}
+											id={
+												paginatedCourses.indexOf(course) === 0
+													? "course-card-0"
+													: undefined
+											}
 											className="iridescent-border w-full sm:w-auto text-center px-4 py-2 rounded-xl font-semibold text-white hover:scale-105 transition-transform"
 										>
 											Open course

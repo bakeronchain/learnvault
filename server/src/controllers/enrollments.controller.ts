@@ -5,6 +5,7 @@ import { logger } from "../lib/logger"
 const log = logger.child({ module: "enrollments" })
 import { stellarContractService } from "../services/stellar-contract.service"
 
+
 const COURSE_MILESTONE_CONTRACT_ID =
 	process.env.COURSE_MILESTONE_CONTRACT_ID ?? ""
 

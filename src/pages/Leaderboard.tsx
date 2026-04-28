@@ -13,6 +13,8 @@ const Leaderboard: React.FC = () => {
 	const { address: currentUserAddress } = useWallet()
 
 <<<<<<< HEAD
+=======
+<<<<<<< HEAD
 	useEffect(() => {
 		const fetchLeaderboard = async () => {
 			try {
@@ -48,14 +50,13 @@ const Leaderboard: React.FC = () => {
 				setIsLoading(false)
 			}
 		}
-=======
+		
 	const {
 		data: result,
 		isLoading,
 		error,
 		refetch,
 	} = useLeaderboard(currentUserAddress)
->>>>>>> main
 
 	const leaders = useMemo(() => {
 		const rankings = Array.isArray(result?.rankings) ? result.rankings : []

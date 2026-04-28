@@ -291,6 +291,9 @@ export const enrollmentBodySchema = z
 	.strict()
 
 <<<<<<< HEAD
+
+=======
+<<<<<<< HEAD
 const difficultyValues = ["beginner", "intermediate", "advanced"] as const
 
 const courseImportRowSchema = z
@@ -332,7 +335,7 @@ export const courseBulkImportBodySchema = z.union([
 ])
 
 export { difficultyValues }
-=======
+
 export const userProfileSchema = z
 	.object({
 		display_name: optionalTrimmedString("display_name", 50),
@@ -369,4 +372,3 @@ export const bookmarkCourseIdParamSchema = z
 		courseId: requiredString("courseId", 100),
 	})
 	.strict()
->>>>>>> main

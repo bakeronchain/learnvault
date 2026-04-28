@@ -1,5 +1,9 @@
-import { renderHook, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { renderHook, waitFor } from "@testing-library/react"
+
+import { useContractIds } from "./useContractIds"
+import { useDonor } from "./useDonor"
+import { useWallet } from "./useWallet"
 
 const mockShowError = vi.fn()
 
@@ -14,10 +18,6 @@ vi.mock("./useContractIds", () => ({ useContractIds: vi.fn() }))
 vi.mock("../components/Toast/ToastProvider", () => ({
 	useToast: () => ({ showError: mockShowError }),
 }))
-
-import { useContractIds } from "./useContractIds"
-import { useDonor } from "./useDonor"
-import { useWallet } from "./useWallet"
 
 const mockUseWallet = vi.mocked(useWallet)
 const mockUseContractIds = vi.mocked(useContractIds)
@@ -62,11 +62,7 @@ describe("useDonor", () => {
 			...baseContracts,
 			scholarshipTreasury: undefined,
 			governanceToken: undefined,
-<<<<<<< HEAD
-			isDeployed: () => false,
-=======
 			isDeployed: (_id: string | undefined): _id is string => false,
->>>>>>> main
 		} as ReturnType<typeof useContractIds>)
 
 		const { result } = renderHook(() => useDonor())
@@ -74,11 +70,7 @@ describe("useDonor", () => {
 		await waitFor(() => expect(result.current.isLoading).toBe(false))
 
 		expect(result.current.contributions).toHaveLength(0)
-<<<<<<< HEAD
-		expect(result.current.stats.totalContributed).toBe(0)
-=======
 		expect(result.current.stats.total_contributed).toBe(0)
->>>>>>> main
 		expect(result.current.isEmpty).toBe(true)
 	})
 
@@ -105,11 +97,7 @@ describe("useDonor", () => {
 		await waitFor(() => expect(result.current.isLoading).toBe(false))
 
 		expect(result.current.contributions.length).toBeGreaterThan(0)
-<<<<<<< HEAD
-		expect(result.current.stats.totalContributed).toBeGreaterThan(0)
-=======
 		expect(result.current.stats.total_contributed).toBeGreaterThan(0)
->>>>>>> main
 	})
 
 	it("handles fetch errors gracefully", async () => {

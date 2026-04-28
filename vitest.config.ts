@@ -1,5 +1,5 @@
-import react from "@vitejs/plugin-react"
 import { defineConfig } from "vitest/config"
+import react from "@vitejs/plugin-react"
 
 export default defineConfig({
 	plugins: [react()],
@@ -9,10 +9,7 @@ export default defineConfig({
 		setupFiles: ["./src/test/setup.ts"],
 		include: ["src/**/*.test.{ts,tsx}"],
 		env: {
-<<<<<<< HEAD
-=======
 			NODE_ENV: "development",
->>>>>>> main
 			PUBLIC_SCHOLARSHIP_TREASURY_CONTRACT:
 				"CSCHOL1234567890ABCDEFGHIJKLMN9876543210ZYXWVUTSRQPO",
 			PUBLIC_GOVERNANCE_TOKEN_CONTRACT:

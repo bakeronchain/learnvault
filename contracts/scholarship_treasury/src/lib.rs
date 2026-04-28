@@ -6,13 +6,10 @@ use soroban_sdk::{
     contractimpl, contracttype, panic_with_error, symbol_short,
 };
 
-<<<<<<< HEAD
-=======
 use learnvault_shared::upgrade;
 
 pub use upgrade::ContractUpgraded;
 
->>>>>>> main
 // ---------------------------------------------------------------------------
 // Storage Constants (assuming ~6s ledger time)
 // ---------------------------------------------------------------------------
@@ -48,8 +45,6 @@ pub enum DataKey {
     Scholar(Address),
     VoteCast(u32, Address), // (proposal_id, voter) -> bool
     FinalizedProposal(u32), // proposal_id -> ProposalStatus (set by finalize_proposal)
-<<<<<<< HEAD
-=======
 }
 
 #[contractevent(topics = ["proposal_executed"])]
@@ -67,7 +62,6 @@ pub struct ProposalCancelled {
     #[topic]
     pub proposal_id: u32,
     pub cancelled_by: Address,
->>>>>>> main
 }
 
 #[derive(Clone)]
@@ -205,10 +199,6 @@ impl ScholarshipTreasury {
         env.storage().instance().set(&SCHOLARS_KEY, &0_u32);
         env.storage().instance().set(&DONORS_KEY, &0_u32);
         env.storage().instance().set(&PAUSED_KEY, &false);
-<<<<<<< HEAD
-        
-        Self::extend_instance(&env);
-=======
         env.storage()
             .instance()
             .set(&MIN_LRN_TO_PROPOSE_KEY, &0_i128);
@@ -253,7 +243,6 @@ impl ScholarshipTreasury {
             panic_with_error!(&env, Error::InvalidAmount);
         }
         env.storage().instance().set(&APPROVAL_BPS_KEY, &new_bps);
->>>>>>> main
     }
 
     pub fn pause(env: Env) {
@@ -609,11 +598,6 @@ impl ScholarshipTreasury {
         env.storage()
             .persistent()
             .set(&applicant_key, &proposal_ids);
-<<<<<<< HEAD
-        
-=======
-
->>>>>>> main
         Self::extend_persistent(&env, &applicant_key);
         env.storage()
             .instance()
@@ -776,12 +760,6 @@ impl ScholarshipTreasury {
         }
 
         let total_votes = proposal.yes_votes + proposal.no_votes;
-<<<<<<< HEAD
-        let quorum_met = total_gov > 0
-            && total_votes
-                .checked_mul(10_000)
-                .map(|tv| tv / total_gov >= MIN_QUORUM_BPS)
-=======
         let quorum_threshold = Self::get_quorum(env.clone());
         let approval_bps = Self::get_approval_bps(env.clone());
 
@@ -791,7 +769,6 @@ impl ScholarshipTreasury {
                 .yes_votes
                 .checked_mul(10_000)
                 .map(|v| (v / total_votes) as u32 > approval_bps)
->>>>>>> main
                 .unwrap_or(false);
 
         let status = if passed {

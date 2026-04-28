@@ -1,16 +1,17 @@
-import { rpc } from "@stellar/stellar-sdk" // dynamic later
 import { INDEXER_CONFIG, getPollingTargets } from "../lib/event-config"
-import { logger } from "../lib/logger"
 import {
-	indexEventsBatch,
 	getLastIndexedLedger,
+	indexEventsBatch,
 } from "../services/event-indexer.service"
+
+import { logger } from "../lib/logger"
+import { rpc } from "@stellar/stellar-sdk" // dynamic later
 
 const log = logger.child({ module: "poller" })
 
 let pollInterval: NodeJS.Timeout | null = null
 
-export async function startEventPoller(): Promise<void> {
+export async function startEventPoller (): Promise<void> {
 	log.info("Starting event indexer")
 
 	// Get global latest ledger
@@ -52,7 +53,7 @@ export async function startEventPoller(): Promise<void> {
 	)
 }
 
-export function stopEventPoller(): void {
+export function stopEventPoller (): void {
 	if (pollInterval) {
 		clearInterval(pollInterval)
 		pollInterval = null

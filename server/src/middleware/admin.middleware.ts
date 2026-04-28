@@ -3,27 +3,21 @@ import jwt from "jsonwebtoken"
 
 import { JWT_AUDIENCE, JWT_ISSUER } from "../services/jwt.service"
 
-<<<<<<< HEAD
-const JWT_SECRET = process.env.JWT_SECRET ?? process.env.JWT_PRIVATE_KEY
-if (!JWT_SECRET) {
-	throw new Error("JWT_SECRET environment variable is required")
-=======
-function getAdminAddresses(): string[] {
+function getAdminAddresses (): string[] {
 	return (process.env.ADMIN_ADDRESSES ?? "")
 		.split(",")
 		.map((a) => a.trim())
 		.filter(Boolean)
 }
 
-function getJwtPublicKey(): string | undefined {
+function getJwtPublicKey (): string | undefined {
 	return process.env.JWT_PUBLIC_KEY?.replace(/\\n/g, "\n").trim()
 }
 
-function getJwtSecret(): string | undefined {
+function getJwtSecret (): string | undefined {
 	// HS256 fallback is development-only; production must use RS256 via JWT_PUBLIC_KEY.
 	if (process.env.NODE_ENV === "production") return undefined
 	return process.env.JWT_SECRET?.trim()
->>>>>>> main
 }
 
 export interface AdminRequest extends Request {
@@ -38,7 +32,7 @@ export interface AdminRequest extends Request {
  * In dev mode (no ADMIN_ADDRESSES set) any valid JWT is accepted so the
  * API remains usable without extra config.
  */
-export function requireAdmin(
+export function requireAdmin (
 	req: AdminRequest,
 	res: Response,
 	next: NextFunction,
@@ -66,22 +60,15 @@ export function requireAdmin(
 	}
 
 	try {
-<<<<<<< HEAD
-		decoded = jwt.verify(token, JWT_SECRET!) as {
-			address?: string
-			sub?: string
-		}
-=======
 		decoded = (
 			jwtPublicKey
 				? jwt.verify(token, jwtPublicKey, {
-						algorithms: ["RS256"],
-						issuer: JWT_ISSUER,
-						audience: JWT_AUDIENCE,
-					})
+					algorithms: ["RS256"],
+					issuer: JWT_ISSUER,
+					audience: JWT_AUDIENCE,
+				})
 				: jwt.verify(token, jwtSecret!)
 		) as { address?: string; sub?: string }
->>>>>>> main
 	} catch {
 		res.status(401).json({ error: "Invalid or expired token" })
 		return

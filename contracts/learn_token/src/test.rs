@@ -843,4 +843,3 @@ fn benchmark_costs() {
     std::println!("mint: instr={}, mem={}", mint_instr, mint_mem);
     std::println!("reputation_score: instr={}, mem={}", rep_instr, rep_mem);
 }
->>>>>>> main

@@ -3,6 +3,10 @@ import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import ConnectWalletGuard from "../components/ConnectWalletGuard"
 import MilestoneReportForm from "../components/MilestoneReportForm"
+import {
+	useScholarMilestones,
+	type ScholarMilestone,
+} from "../hooks/useScholarMilestones"
 import { useWallet } from "../hooks/useWallet"
 import { getIpfsUrl, isCid, normaliseCid } from "../lib/ipfs"
 import {

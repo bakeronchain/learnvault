@@ -1,5 +1,8 @@
 import { type Request, type Response } from "express"
 import { milestoneStore } from "../db/milestone-store"
+import { createLogger } from "../lib/logger"
+
+const logger = createLogger("milestone-resubmit")
 
 interface MilestoneResubmitRequestBody {
 	id: number
@@ -49,7 +52,7 @@ export async function resubmitMilestoneReport(
 
 		res.status(200).json({ data: updated })
 	} catch (err) {
-		console.error("[milestones] resubmitMilestoneReport error:", err)
+		logger.error("resubmitMilestoneReport failed", { error: err, id })
 		res.status(500).json({ error: "Failed to resubmit milestone report" })
 	}
 }

@@ -1,10 +1,11 @@
-import { rpc as StellarRpc } from "@stellar/stellar-sdk"
-import { Pool } from "pg"
 import {
-	SOROBAN_RPC_URL,
 	INDEXER_CONFIG,
+	SOROBAN_RPC_URL,
 	getPollingTargets,
 } from "../lib/event-config"
+
+import { Pool } from "pg"
+import { rpc as StellarRpc } from "@stellar/stellar-sdk"
 import { leaderboardEmitter } from "../lib/leaderboard-emitter"
 import { logger } from "../lib/logger"
 
@@ -27,7 +28,7 @@ export interface IndexedEvent {
  * Extract transaction hash from event ID or data
  * Event ID format: "<ledger_sequence>-<tx_hash>-<event_index>"
  */
-function extractTxHash(eventId: string): string | undefined {
+function extractTxHash (eventId: string): string | undefined {
 	// Event IDs are typically formatted as: "0000428575-250fd482f34ac0d5387a77e62ae696126f22cb09377b8038cd1cf011c62dcbd-0"
 	const parts = eventId.split("-")
 	if (parts.length >= 2) {
@@ -39,7 +40,7 @@ function extractTxHash(eventId: string): string | undefined {
 /**
  * Extract event index from event ID
  */
-function extractEventIndex(eventId: string): number | undefined {
+function extractEventIndex (eventId: string): number | undefined {
 	const parts = eventId.split("-")
 	if (parts.length >= 3) {
 		const index = Number.parseInt(parts[2], 10)
@@ -55,7 +56,7 @@ function extractEventIndex(eventId: string): number | undefined {
  * @param startLedger - Starting ledger (config or last indexed)
  * @param endLedger - Latest ledger to check
  */
-export async function indexEventsBatch(
+export async function indexEventsBatch (
 	startLedger: number,
 	endLedger: number,
 ): Promise<void> {
@@ -141,7 +142,7 @@ export async function indexEventsBatch(
 /**
  * Update indexer state with last processed ledger for a contract
  */
-export async function updateIndexerState(
+export async function updateIndexerState (
 	contract: string,
 	lastLedger: number,
 ): Promise<void> {
@@ -160,7 +161,7 @@ export async function updateIndexerState(
  * Get last indexed ledger per contract from indexer_state table
  * Falls back to events table max if no state exists
  */
-export async function getLastIndexedLedger(contract: string): Promise<number> {
+export async function getLastIndexedLedger (contract: string): Promise<number> {
 	// First check indexer_state table
 	const stateRes = await pool.query(
 		"SELECT last_processed_ledger FROM indexer_state WHERE contract = $1",
@@ -183,7 +184,7 @@ export async function getLastIndexedLedger(contract: string): Promise<number> {
 /**
  * Get all indexer state entries
  */
-export async function getAllIndexerState(): Promise<
+export async function getAllIndexerState (): Promise<
 	Array<{
 		contract: string
 		last_processed_ledger: number

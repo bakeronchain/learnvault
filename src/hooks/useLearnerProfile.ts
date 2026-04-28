@@ -10,7 +10,7 @@ export interface LearnerProfile {
  * Returns the profile data (currently just wallet address, but extensible).
  * Automatically disabled if no wallet is connected.
  */
-export function useLearnerProfile() {
+export function useLearnerProfile () {
 	const { address } = useWallet()
 
 	const { data, isLoading, error } = useQuery<LearnerProfile>({

@@ -1,15 +1,12 @@
 import { type Request, type Response } from "express"
 import sanitizeHtml from "sanitize-html"
 import { milestoneStore } from "../db/milestone-store"
-<<<<<<< HEAD
-import { createEmailService } from "../services/email.service"
-=======
 import { logger } from "../lib/logger"
 
 const log = logger.child({ module: "milestones" })
 import { createEmailService } from "../services/email.service"
+
 import { markEscrowActivity } from "../services/escrow-timeout.service"
->>>>>>> main
 
 interface MilestoneSubmitRequestBody {
 	scholarAddress?: string
@@ -25,7 +22,7 @@ interface MilestoneSubmitRequestBody {
 }
 const emailService = createEmailService(process.env.EMAIL_API_KEY || "")
 
-export async function submitMilestoneReport(
+export async function submitMilestoneReport (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -72,7 +69,11 @@ export async function submitMilestoneReport(
 		try {
 			await markEscrowActivity(scholarAddress, courseId)
 		} catch (trackingErr) {
-			console.error("[milestones] escrow activity update failed:", trackingErr)
+			logger.error("Escrow activity update failed", {
+				error: trackingErr,
+				scholarAddress,
+				courseId,
+			})
 		}
 
 		emailService
@@ -81,11 +82,8 @@ export async function submitMilestoneReport(
 				courseId,
 				milestoneId.toString(),
 			)
-<<<<<<< HEAD
-			.catch((err) => console.error("[EmailService] Admin alert failed:", err))
-=======
 			.catch((err) => log.error({ err }, "Admin alert email failed"))
->>>>>>> main
+			.catch((err) => log.error({ err }, "Admin alert email failed"))
 		res.status(201).json({ data: report })
 	} catch (err) {
 		if (err instanceof Error && err.message === "DUPLICATE_REPORT") {

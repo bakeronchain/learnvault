@@ -5,6 +5,7 @@ import { CourseForum } from "../components/forum/CourseForum"
 import LessonContent from "../components/LessonContent"
 import LessonSidebar from "../components/LessonSidebar"
 import MilestoneSubmitPanel from "../components/MilestoneSubmitPanel"
+import SponsorLogosForTrack from "../components/SponsorLogosForTrack"
 import { LessonListSkeleton } from "../components/skeletons/LessonListSkeleton"
 import { useCourse } from "../hooks/useCourse"
 import { useCourseDetail } from "../hooks/useCourses"
@@ -43,7 +44,7 @@ const LessonView: React.FC = () => {
 		course,
 		isLoading: isLoadingCourse,
 		error: courseError,
-	} = useCourseDetail(courseId)
+	} = useCourseDetail(courseId, address)
 
 	const [isLoadingContent, setIsLoadingContent] = useState(true)
 	const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -237,11 +238,19 @@ const LessonView: React.FC = () => {
 					</span>
 					<span className="text-white/40 text-sm">{course.title}</span>
 				</div>
+				{course.hasUpdatedContent && (
+					<div className="mb-4 rounded-2xl border border-amber-300/30 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
+						Updated content is available. You are currently on version{" "}
+						<strong>{course.enrollmentContentVersion ?? 1}</strong>, while the
+						latest is <strong>{course.latestContentVersion ?? 1}</strong>.
+					</div>
+				)}
 				<div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
 					<h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
 						{currentTab === "forum" ? "Community Forum" : lesson.title}
 					</h1>
 				</div>
+				<SponsorLogosForTrack track={course.track} />
 			</header>
 
 			{/* Course progress bar */}

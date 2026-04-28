@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion"
-import { useState, useId } from "react"
+import { useState } from "react"
 import { useWallet } from "../hooks/useWallet"
 import { stellarNetwork } from "../contracts/util"
 
@@ -39,7 +39,6 @@ export const AddressDisplay: React.FC<AddressDisplayProps> = ({
 	const [copied, setCopied] = useState(false)
 	const [isHovered, setIsHovered] = useState(false)
 	const { network: walletNetwork } = useWallet()
-	const tooltipId = useId()
 
 	if (!address) return null
 

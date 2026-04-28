@@ -72,11 +72,22 @@ export const createEnrollment = async (
 		}
 
 		// Insert enrollment record
+		const versionResult = await pool.query(
+			`SELECT COALESCE(MAX(l.version), 1)::int AS content_version
+			 FROM lessons l
+			 INNER JOIN courses c ON c.id = l.course_id
+			 WHERE c.slug = $1 OR c.id::text = $1`,
+			[course_id],
+		)
+		const contentVersion = Number(
+			versionResult.rows[0]?.content_version ?? 1,
+		)
+
 		const result = await pool.query(
-			`INSERT INTO enrollments (learner_address, course_id, tx_hash)
-       VALUES ($1, $2, $3)
-       RETURNING id, enrolled_at`,
-			[learner_address, course_id, tx_hash],
+			`INSERT INTO enrollments (learner_address, course_id, tx_hash, content_version)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, enrolled_at, content_version`,
+			[learner_address, course_id, tx_hash, contentVersion],
 		)
 
 		const enrollment = result.rows[0]
@@ -84,6 +95,7 @@ export const createEnrollment = async (
 		res.status(201).json({
 			enrollment_id: enrollment.id,
 			enrolled_at: enrollment.enrolled_at,
+			content_version: enrollment.content_version,
 		})
 	} catch (error) {
 		log.error({ err: error }, "Error creating enrollment")
@@ -112,7 +124,7 @@ export const getEnrollments = async (
 		}
 
 		const result = await pool.query(
-			`SELECT id, learner_address, course_id, tx_hash, enrolled_at
+			`SELECT id, learner_address, course_id, tx_hash, enrolled_at, content_version
        FROM enrollments
        WHERE learner_address = $1
        ORDER BY enrolled_at DESC`,
@@ -125,6 +137,7 @@ export const getEnrollments = async (
 				course_id: row.course_id,
 				tx_hash: row.tx_hash,
 				enrolled_at: row.enrolled_at,
+				content_version: row.content_version,
 			})),
 		})
 	} catch (error) {

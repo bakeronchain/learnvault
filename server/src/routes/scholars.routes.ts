@@ -16,7 +16,6 @@ import {
 	createRequireAuth,
 	createOptionalAuth,
 } from "../middleware/auth.middleware"
-import { validate } from "../middleware/validation.middleware"
 import { type JwtService } from "../services/jwt.service"
 
 export function createScholarsRouter(jwtService: JwtService): Router {
@@ -32,7 +31,7 @@ export function createScholarsRouter(jwtService: JwtService): Router {
 	 *     summary: Get scholars leaderboard
 	 *     description: Returns a paginated ranking of scholars by LRN balance, with optional search.
 	 */
-	router.get("/scholars/leaderboard", (req, res) => {
+	router.get("/scholars/leaderboard", optionalAuth, (req, res) => {
 		void getScholarsLeaderboard(req, res)
 	})
 
@@ -73,8 +72,6 @@ export function createScholarsRouter(jwtService: JwtService): Router {
 	router.get("/scholars/:address/escrow-timeouts", (req, res) => {
 		void getScholarEscrowTimeouts(req, res)
 	})
-
-	// ── Social Following ───────────────────────────────────────────────────────
 
 	/**
 	 * @openapi

@@ -1,14 +1,13 @@
 /**
- * Consolidated contract-related TypeScript interfaces used across the
- * frontend. This file intentionally includes both the existing runtime-lean
- * helper types (DonorData, Vote, etc.) as well as the new canonical
- * on-chain shapes requested in the issue so other modules can import a
- * single source of truth.
+ * Consolidated contract-related TypeScript interfaces used across the frontend.
  */
 
-// ---------------------------------------------------------------------------
-// Canonical on-chain / shared contract types (as requested)
-// ---------------------------------------------------------------------------
+export type { Proposal, RawContractProposal } from "./governance"
+
+export type {
+	MilestoneReportFormValues,
+	SubmittedMilestoneReport,
+} from "./milestone"
 
 export interface MilestoneReport {
 	id: string
@@ -45,23 +44,7 @@ export interface LearnTokenInfo {
 	reputation_score: bigint
 	total_supply: bigint
 }
-export type { Proposal, RawContractProposal } from "./governance"
 
-// ---------------------------------------------------------------------------
-// Milestone types (on-chain CourseMilestone)
-// ---------------------------------------------------------------------------
-export type {
-	MilestoneReportFormValues,
-	SubmittedMilestoneReport,
-} from "./milestone"
-
-// ---------------------------------------------------------------------------
-// Existing app-specific helper types kept for backward compatibility with
-// current hooks and components in the repo. These mirror the previous
-// contents of this file so consumers that expect `DonorData`, `Vote`, etc.
-// continue to function while we migrate other modules to the canonical
-// interfaces above.
-// ---------------------------------------------------------------------------
 export interface DonorContribution {
 	txHash: string
 	amount: number

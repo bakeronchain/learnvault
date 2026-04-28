@@ -40,6 +40,11 @@ type ApiLesson = {
 	estimated_minutes?: number
 	isMilestone?: boolean
 	is_milestone?: boolean
+	version?: number
+	isLatest?: boolean
+	is_latest?: boolean
+	changeSummary?: string | null
+	change_summary?: string | null
 }
 
 const defaultAccentClassName =
@@ -126,6 +131,12 @@ const normalizeLesson = (
 			? lesson.estimatedMinutes
 			: Number(lesson.estimated_minutes ?? 10),
 	isMilestone: Boolean(lesson.isMilestone ?? lesson.is_milestone),
+	version:
+		typeof lesson.version === "number"
+			? lesson.version
+			: Number.parseInt(String(lesson.version ?? "1"), 10),
+	isLatest: Boolean(lesson.isLatest ?? lesson.is_latest ?? true),
+	changeSummary: lesson.changeSummary ?? lesson.change_summary ?? null,
 })
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -242,13 +253,27 @@ export function useEnrolledCourses() {
 	}
 }
 
-export function useCourseDetail(idOrSlug: string | undefined) {
+export function useCourseDetail(
+	idOrSlug: string | undefined,
+	learnerAddress?: string,
+) {
 	const query = useQuery({
-		queryKey: ["course", idOrSlug],
+		queryKey: ["course", idOrSlug, learnerAddress],
 		queryFn: async (): Promise<CourseDetail> => {
-			const response = await fetchJson<ApiCourse & { lessons?: ApiLesson[] }>(
-				`/api/courses/${idOrSlug}`,
-			)
+			const params = new URLSearchParams()
+			if (learnerAddress) params.set("learner_address", learnerAddress)
+			const url = `/api/courses/${idOrSlug}${params.toString() ? `?${params.toString()}` : ""}`
+			const response = await fetchJson<
+				ApiCourse & {
+					lessons?: ApiLesson[]
+					enrollmentContentVersion?: number | null
+					enrollment_content_version?: number | null
+					latestContentVersion?: number
+					latest_content_version?: number
+					hasUpdatedContent?: boolean
+					has_updated_content?: boolean
+				}
+			>(url)
 			const course = normalizeCourse(response)
 			const lessons = (response.lessons ?? [])
 				.map((lesson) => normalizeLesson(lesson, course.slug))
@@ -256,6 +281,14 @@ export function useCourseDetail(idOrSlug: string | undefined) {
 
 			return {
 				...course,
+				enrollmentContentVersion:
+					response.enrollmentContentVersion ??
+					response.enrollment_content_version ??
+					null,
+				latestContentVersion:
+					response.latestContentVersion ?? response.latest_content_version ?? 1,
+				hasUpdatedContent:
+					response.hasUpdatedContent ?? response.has_updated_content ?? false,
 				lessons,
 			}
 		},

@@ -1,9 +1,21 @@
+<<<<<<< HEAD
 import { useState, useCallback } from "react"
+=======
+import { useCallback, useRef, useState } from "react"
+import { apiFetchJson, buildApiUrl, createAuthHeaders } from "../lib/api"
+>>>>>>> main
 
 export interface AdminStats {
 	pendingMilestones: number
 	approvedToday: number
 	rejectedToday: number
+<<<<<<< HEAD
+=======
+	totalScholars: number
+	totalLrnMinted: string
+	openProposals: number
+	treasuryBalanceUsdc: string
+>>>>>>> main
 }
 
 export interface MilestoneSubmission {
@@ -22,6 +34,99 @@ export interface PaginatedMilestones {
 	pageSize: number
 }
 
+export interface BatchMilestoneResult {
+	reportId: string
+	success: boolean
+	status: "approved" | "rejected" | "failed" | "not_found"
+	error?: string
+	contractTxHash?: string
+	reason?: string
+}
+
+export interface BatchMilestoneResponse {
+	action: "approve" | "reject"
+	totalRequested: number
+	processed: number
+	succeeded: number
+	failed: number
+	results: BatchMilestoneResult[]
+}
+
+type AdminStatsResponse = {
+	pending_milestones: number
+	approved_milestones_today: number
+	rejected_milestones_today: number
+	total_scholars: number
+	total_lrn_minted: string
+	open_proposals: number
+	treasury_balance_usdc: string
+}
+
+type MilestoneSubmissionApi = {
+	id: number
+	scholar_address: string
+	course_id: string
+	evidence_github?: string | null
+	evidence_ipfs_cid?: string | null
+	evidence_description?: string | null
+	submitted_at: string
+	status: "pending" | "approved" | "rejected"
+}
+
+type PaginatedMilestonesApi = {
+	data: MilestoneSubmissionApi[]
+	total: number
+	page: number
+	pageSize: number
+}
+
+type BatchMilestoneResultApi = {
+	reportId: number
+	success: boolean
+	status: "approved" | "rejected" | "failed" | "not_found"
+	error?: string
+	contractTxHash?: string
+	reason?: string
+}
+
+type BatchMilestoneResponseApi = {
+	data: {
+		action: "approve" | "reject"
+		totalRequested: number
+		processed: number
+		succeeded: number
+		failed: number
+		results: BatchMilestoneResultApi[]
+	}
+	error?: string
+}
+
+const mapMilestoneSubmission = (
+	milestone: MilestoneSubmissionApi,
+): MilestoneSubmission => ({
+	id: String(milestone.id),
+	learnerAddress: milestone.scholar_address,
+	course: milestone.course_id,
+	evidenceLink:
+		milestone.evidence_github ??
+		milestone.evidence_ipfs_cid ??
+		milestone.evidence_description ??
+		"",
+	submittedAt: milestone.submitted_at,
+	status: milestone.status,
+})
+
+const mapBatchMilestoneResult = (
+	result: BatchMilestoneResultApi,
+): BatchMilestoneResult => ({
+	reportId: String(result.reportId),
+	success: result.success,
+	status: result.status,
+	error: result.error,
+	contractTxHash: result.contractTxHash,
+	reason: result.reason,
+})
+
 export function useAdminStats() {
 	const [stats, setStats] = useState<AdminStats | null>(null)
 	const [loading, setLoading] = useState(false)
@@ -31,10 +136,25 @@ export function useAdminStats() {
 		setLoading(true)
 		setError(null)
 		try {
+<<<<<<< HEAD
 			const res = await fetch("/api/admin/stats")
 			if (!res.ok) throw new Error("Failed to fetch admin stats")
 			const data: AdminStats = await res.json()
 			setStats(data)
+=======
+			const data = await apiFetchJson<AdminStatsResponse>("/api/admin/stats", {
+				auth: true,
+			})
+			setStats({
+				pendingMilestones: Number(data.pending_milestones ?? 0),
+				approvedToday: Number(data.approved_milestones_today ?? 0),
+				rejectedToday: Number(data.rejected_milestones_today ?? 0),
+				totalScholars: Number(data.total_scholars ?? 0),
+				totalLrnMinted: data.total_lrn_minted ?? "0",
+				openProposals: Number(data.open_proposals ?? 0),
+				treasuryBalanceUsdc: data.treasury_balance_usdc ?? "0",
+			})
+>>>>>>> main
 		} catch (err: unknown) {
 			setError(err instanceof Error ? err.message : "Unknown error")
 		} finally {
@@ -51,6 +171,11 @@ export function useAdminMilestones() {
 	const [page, setPage] = useState(1)
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+<<<<<<< HEAD
+=======
+	const filtersRef = useRef<{ course?: string; status?: string }>({})
+	const pageRef = useRef(1)
+>>>>>>> main
 
 	const PAGE_SIZE = 10
 
@@ -61,6 +186,11 @@ export function useAdminMilestones() {
 		) => {
 			setLoading(true)
 			setError(null)
+<<<<<<< HEAD
+=======
+			filtersRef.current = filters
+			pageRef.current = pageNum
+>>>>>>> main
 			try {
 				const params = new URLSearchParams({
 					page: String(pageNum),
@@ -68,10 +198,20 @@ export function useAdminMilestones() {
 					...(filters.course ? { course: filters.course } : {}),
 					...(filters.status ? { status: filters.status } : {}),
 				})
+<<<<<<< HEAD
 				const res = await fetch(`/api/admin/milestones?${params.toString()}`)
 				if (!res.ok) throw new Error("Failed to fetch milestones")
 				const result: PaginatedMilestones = await res.json()
 				setMilestones(result.data)
+=======
+				const result = await apiFetchJson<PaginatedMilestonesApi>(
+					`/api/admin/milestones?${params.toString()}`,
+					{
+						auth: true,
+					},
+				)
+				setMilestones(result.data.map(mapMilestoneSubmission))
+>>>>>>> main
 				setTotal(result.total)
 				setPage(result.page)
 			} catch (err: unknown) {
@@ -83,6 +223,7 @@ export function useAdminMilestones() {
 		[],
 	)
 
+<<<<<<< HEAD
 	const approveMilestone = useCallback(async (id: string): Promise<boolean> => {
 		// Optimistic update
 		setMilestones((prev) =>
@@ -125,6 +266,133 @@ export function useAdminMilestones() {
 		}
 	}, [])
 
+=======
+	const refreshMilestones = useCallback(async () => {
+		await fetchMilestones(pageRef.current, filtersRef.current)
+	}, [fetchMilestones])
+
+	const approveMilestone = useCallback(
+		async (id: string): Promise<boolean> => {
+			setError(null)
+			try {
+				await apiFetchJson(`/api/admin/milestones/${id}/approve`, {
+					method: "POST",
+					auth: true,
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({}),
+				})
+				await refreshMilestones()
+				return true
+			} catch (err: unknown) {
+				setMilestones((prev) =>
+					prev.map((m) => (m.id === id ? { ...m, status: "pending" } : m)),
+				)
+				setError(err instanceof Error ? err.message : "Approval failed")
+				return false
+			}
+		},
+		[refreshMilestones],
+	)
+
+	const rejectMilestone = useCallback(
+		async (id: string): Promise<boolean> => {
+			setMilestones((prev) =>
+				prev.map((m) => (m.id === id ? { ...m, status: "rejected" } : m)),
+			)
+			try {
+				await apiFetchJson(`/api/admin/milestones/${id}/reject`, {
+					method: "POST",
+					auth: true,
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({
+						reason: "Rejected from the admin panel",
+					}),
+				})
+				await refreshMilestones()
+				return true
+			} catch (err: unknown) {
+				setMilestones((prev) =>
+					prev.map((m) => (m.id === id ? { ...m, status: "pending" } : m)),
+				)
+				setError(err instanceof Error ? err.message : "Rejection failed")
+				return false
+			}
+		},
+		[refreshMilestones],
+	)
+
+	const runBatchMilestones = useCallback(
+		async (
+			path:
+				| "/api/admin/milestones/batch-approve"
+				| "/api/admin/milestones/batch-reject",
+			body: { milestoneIds: number[]; reason?: string },
+		): Promise<BatchMilestoneResponse | null> => {
+			setError(null)
+
+			const response = await fetch(buildApiUrl(path), {
+				method: "POST",
+				headers: createAuthHeaders({
+					"Content-Type": "application/json",
+				}),
+				body: JSON.stringify(body),
+			})
+
+			const payload = (await response
+				.json()
+				.catch(() => ({}))) as BatchMilestoneResponseApi
+
+			if (!payload.data) {
+				const message = payload.error || `Request failed for ${path}`
+				setError(message)
+				throw new Error(message)
+			}
+
+			const result = {
+				action: payload.data.action,
+				totalRequested: payload.data.totalRequested,
+				processed: payload.data.processed,
+				succeeded: payload.data.succeeded,
+				failed: payload.data.failed,
+				results: payload.data.results.map(mapBatchMilestoneResult),
+			}
+
+			if (!response.ok) {
+				setError(payload.error || `Request failed for ${path}`)
+				return result
+			}
+
+			await refreshMilestones()
+			return result
+		},
+		[refreshMilestones],
+	)
+
+	const batchApproveMilestones = useCallback(
+		async (ids: string[]): Promise<BatchMilestoneResponse | null> =>
+			runBatchMilestones("/api/admin/milestones/batch-approve", {
+				milestoneIds: ids.map((id) => Number(id)),
+			}),
+		[runBatchMilestones],
+	)
+
+	const batchRejectMilestones = useCallback(
+		async (
+			ids: string[],
+			reason: string = "Rejected from the admin panel",
+		): Promise<BatchMilestoneResponse | null> =>
+			runBatchMilestones("/api/admin/milestones/batch-reject", {
+				milestoneIds: ids.map((id) => Number(id)),
+				reason,
+			}),
+		[runBatchMilestones],
+	)
+
+>>>>>>> main
 	return {
 		milestones,
 		total,
@@ -135,5 +403,10 @@ export function useAdminMilestones() {
 		fetchMilestones,
 		approveMilestone,
 		rejectMilestone,
+<<<<<<< HEAD
+=======
+		batchApproveMilestones,
+		batchRejectMilestones,
+>>>>>>> main
 	}
 }

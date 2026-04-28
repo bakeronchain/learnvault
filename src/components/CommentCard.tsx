@@ -1,6 +1,13 @@
 import { formatDistanceToNow } from "date-fns"
+import React, { useState } from "react"
+import SafeMarkdown from "./SafeMarkdown"
 import React, { useId, useState } from "react"
 import ReactMarkdown from "react-markdown"
+import ConfirmDialog from "./ConfirmDialog"
+import { useWallet } from "../hooks/useWallet"
+import { getAuthToken } from "../util/auth"
+
+const API_BASE = import.meta.env.VITE_SERVER_URL ?? "http://localhost:4000"
 
 export interface Comment {
 	id: number
@@ -19,8 +26,15 @@ interface CommentCardProps {
 	isAuthor?: boolean
 	isReply?: boolean
 	canPin?: boolean
+	canDelete?: boolean
 	onUpdate?: () => void
 }
+
+const API_URL = (
+	(import.meta.env.VITE_API_URL as string | undefined) ??
+	(import.meta.env.VITE_SERVER_URL as string | undefined) ??
+	""
+).replace(/\/$/, "")
 
 const shortenAddress = (address: string) => {
 	if (!address) return ""
@@ -32,6 +46,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 	isAuthor,
 	isReply,
 	canPin,
+	canDelete,
 	onUpdate,
 }) => {
 	const [isReplying, setIsReplying] = useState(false)
@@ -44,19 +59,17 @@ const CommentCard: React.FC<CommentCardProps> = ({
 	const authorId = `comment-${comment.id}-author`
 
 	const handleVote = async (type: "upvote" | "downvote") => {
-		const token = localStorage.getItem("auth_token") || "mock-token"
+		const token = getAuthToken()
+		if (!token) return
 		try {
-			const res = await fetch(
-				`${import.meta.env.VITE_SERVER_URL}/api/comments/${comment.id}/vote`,
-				{
-					method: "PUT",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${token}`,
-					},
-					body: JSON.stringify({ type }),
+			const res = await fetch(`${API_URL}/api/comments/${comment.id}/vote`, {
+				method: "PUT",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
 				},
-			)
+				body: JSON.stringify({ type }),
+			})
 			if (res.ok) onUpdate?.()
 		} catch (err) {
 			console.error("Vote failed", err)
@@ -64,17 +77,15 @@ const CommentCard: React.FC<CommentCardProps> = ({
 	}
 
 	const handlePin = async () => {
-		const token = localStorage.getItem("auth_token") || "mock-token"
+		const token = getAuthToken()
+		if (!token) return
 		try {
-			const res = await fetch(
-				`${import.meta.env.VITE_SERVER_URL}/api/comments/${comment.id}/pin`,
-				{
-					method: "PUT",
-					headers: {
-						Authorization: `Bearer ${token}`,
-					},
+			const res = await fetch(`${API_URL}/api/comments/${comment.id}/pin`, {
+				method: "PUT",
+				headers: {
+					Authorization: `Bearer ${token}`,
 				},
-			)
+			})
 			if (res.ok) onUpdate?.()
 		} catch (err) {
 			console.error("Pin failed", err)
@@ -87,25 +98,26 @@ const CommentCard: React.FC<CommentCardProps> = ({
 			return
 		}
 
-		const token = localStorage.getItem("auth_token") || "mock-token"
+		const token = getAuthToken()
+		if (!token) {
+			setReplyError("Sign in to reply.")
+			return
+		}
 		setReplyError(null)
 
 		try {
-			const res = await fetch(
-				`${import.meta.env.VITE_SERVER_URL}/api/comments`,
-				{
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${token}`,
-					},
-					body: JSON.stringify({
-						proposalId: comment.proposal_id,
-						content: replyText,
-						parentId: comment.id,
-					}),
+			const res = await fetch(`${API_URL}/api/comments`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
 				},
-			)
+				body: JSON.stringify({
+					proposalId: comment.proposal_id,
+					content: replyText,
+					parentId: comment.id,
+				}),
+			})
 			if (res.ok) {
 				setReplyText("")
 				setIsReplying(false)
@@ -125,6 +137,28 @@ const CommentCard: React.FC<CommentCardProps> = ({
 		setReplyError(null)
 	}
 
+	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+	const handleDelete = async () => {
+		const token = getAuthToken()
+		if (!token) return
+		try {
+			const res = await fetch(`${API_URL}/api/comments/${comment.id}`, {
+				method: "DELETE",
+				headers: {
+					Authorization: `Bearer ${token}`,
+				},
+			})
+			if (res.ok) {
+				onUpdate?.()
+			}
+		} catch (err) {
+			console.error("Delete failed", err)
+		} finally {
+			setShowDeleteConfirm(false)
+		}
+	}
+
 	const replyDescriptionIds = [
 		replyHintId,
 		replyError ? replyErrorId : undefined,
@@ -137,6 +171,17 @@ const CommentCard: React.FC<CommentCardProps> = ({
 			className={`glass-card p-6 rounded-3xl border border-white/5 relative ${comment.is_pinned ? "border-brand-cyan/30 bg-brand-cyan/5" : ""}`}
 			aria-labelledby={authorId}
 		>
+			{showDeleteConfirm && (
+				<ConfirmDialog
+					title="Delete Comment"
+					description="Are you sure you want to delete this comment? This action is permanent and cannot be undone."
+					confirmLabel="Delete"
+					cancelLabel="Keep Comment"
+					onConfirm={() => void handleDelete()}
+					onCancel={() => setShowDeleteConfirm(false)}
+					isDestructive
+				/>
+			)}
 			{comment.is_pinned && (
 				<div className="absolute -top-3 left-6 px-3 py-1 bg-brand-cyan text-black text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-1 shadow-xl">
 					Pinned by Author
@@ -175,6 +220,15 @@ const CommentCard: React.FC<CommentCardProps> = ({
 							Pin
 						</button>
 					)}
+					{canDelete && (
+						<button
+							type="button"
+							onClick={() => setShowDeleteConfirm(true)}
+							className="text-[10px] font-black uppercase text-red-400/70 hover:text-red-400 transition-colors"
+						>
+							Delete
+						</button>
+					)}
 					{!isReply && (
 						<button
 							type="button"
@@ -189,6 +243,8 @@ const CommentCard: React.FC<CommentCardProps> = ({
 				</div>
 			</header>
 
+			<div className="prose prose-invert prose-sm max-w-none text-white/60 leading-relaxed font-medium mb-8">
+				<SafeMarkdown content={comment.content} />
 			<div className="prose prose-invert prose-sm max-w-none text-white/80 leading-relaxed font-medium mb-8">
 				<ReactMarkdown>{comment.content}</ReactMarkdown>
 			</div>

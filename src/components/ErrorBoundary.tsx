@@ -1,4 +1,5 @@
 import React, { Component, type ErrorInfo, type ReactNode } from "react"
+import { logger } from "../utils/logger"
 
 interface Props {
 	children?: ReactNode
@@ -29,9 +30,8 @@ export default class ErrorBoundary extends Component<Props, State> {
 	}
 
 	private handleReport = () => {
-		// In a real app this would send to Sentry or similar service.
-		// For now we just log it and alert the user.
-		console.log("Error reported:", this.state.error)
+		// Keep local diagnostics in development until a real reporting service lands.
+		logger.info("Error reported:", this.state.error)
 		alert("Error has been reported to the team. Thank you!")
 	}
 

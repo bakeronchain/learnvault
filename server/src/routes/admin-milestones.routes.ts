@@ -1,13 +1,18 @@
 import { Router } from "express"
 import {
+	listMilestones,
 	getPendingMilestones,
 	getMilestoneById,
 	approveMilestone,
+	batchApproveMilestones,
+	batchRejectMilestones,
 	rejectMilestone,
 } from "../controllers/admin-milestones.controller"
 import { submitMilestoneReport } from "../controllers/milestone-submit.controller"
 import {
 	approveMilestoneBodySchema,
+	batchApproveMilestonesBodySchema,
+	batchRejectMilestonesBodySchema,
 	legacyMilestoneSubmitBodySchema,
 	milestoneReportIdParamSchema,
 	milestoneSubmitBodySchema,
@@ -18,6 +23,8 @@ import { milestoneSubmissionLimiter } from "../middleware/rate-limit.middleware"
 import { validate } from "../middleware/validate.middleware"
 
 export const adminMilestonesRouter = Router()
+
+adminMilestonesRouter.get("/admin/milestones", requireAdmin, listMilestones)
 
 /**
  * @openapi
@@ -108,6 +115,15 @@ adminMilestonesRouter.post(
 	approveMilestone,
 )
 
+adminMilestonesRouter.post(
+	"/admin/milestones/batch-approve",
+	requireAdmin,
+	validate({
+		body: batchApproveMilestonesBodySchema,
+	}),
+	batchApproveMilestones,
+)
+
 /**
  * @openapi
  * /api/admin/milestones/{id}/reject:
@@ -153,6 +169,15 @@ adminMilestonesRouter.post(
 		body: rejectMilestoneBodySchema,
 	}),
 	rejectMilestone,
+)
+
+adminMilestonesRouter.post(
+	"/admin/milestones/batch-reject",
+	requireAdmin,
+	validate({
+		body: batchRejectMilestonesBodySchema,
+	}),
+	batchRejectMilestones,
 )
 
 /**

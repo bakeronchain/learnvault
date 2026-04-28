@@ -1,5 +1,5 @@
-import { milestoneStore } from "../db/milestone-store"
 import { pool } from "../db/index"
+import { milestoneStore } from "../db/milestone-store"
 import { pinJsonToIPFS } from "./pinata.service"
 import {
 	stellarContractService,

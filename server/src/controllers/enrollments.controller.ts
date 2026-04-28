@@ -1,5 +1,8 @@
 import { type Request, type Response } from "express"
 import { pool } from "../db/index"
+import { logger } from "../lib/logger"
+
+const log = logger.child({ module: "enrollments" })
 import { stellarContractService } from "../services/stellar-contract.service"
 
 const COURSE_MILESTONE_CONTRACT_ID =
@@ -35,6 +38,7 @@ export const createEnrollment = async (
 				const isEnrolledOnChain = await stellarContractService.isEnrolled(
 					learner_address,
 					courseIdNum,
+					{ requestId: req.requestId },
 				)
 
 				if (!isEnrolledOnChain) {
@@ -47,14 +51,15 @@ export const createEnrollment = async (
 				// course_id is a string slug (e.g., "stellar-basics")
 				// Skip on-chain validation - mapping from slug to contract ID
 				// would require additional database logic
-				console.warn(
-					`[enrollments] course_id "${course_id}" is not numeric, skipping on-chain validation`,
+				log.warn(
+					{ courseId: course_id },
+					"course_id is not numeric, skipping on-chain validation",
 				)
 			}
 		} else {
 			// If no contract configured, allow enrollment (development mode)
-			console.warn(
-				"[enrollments] No COURSE_MILESTONE_CONTRACT_ID configured, skipping on-chain validation",
+			log.warn(
+				"No COURSE_MILESTONE_CONTRACT_ID configured, skipping on-chain validation",
 			)
 		}
 
@@ -86,7 +91,7 @@ export const createEnrollment = async (
 			enrolled_at: enrollment.enrolled_at,
 		})
 	} catch (error) {
-		console.error("[enrollments] Error creating enrollment:", error)
+		log.error({ err: error }, "Error creating enrollment")
 		res.status(500).json({
 			error: "Failed to create enrollment",
 		})
@@ -128,7 +133,7 @@ export const getEnrollments = async (
 			})),
 		})
 	} catch (error) {
-		console.error("[enrollments] Error fetching enrollments:", error)
+		log.error({ err: error }, "Error fetching enrollments")
 		res.status(500).json({
 			error: "Failed to fetch enrollments",
 		})

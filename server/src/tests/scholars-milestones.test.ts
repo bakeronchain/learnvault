@@ -5,7 +5,25 @@
 
 jest.mock("../db/index", () => ({
 	pool: {
-		query: jest.fn(),
+		query: jest.fn().mockImplementation((sql: string) => {
+			if (sql.includes("milestone_audit_log")) {
+				return Promise.resolve({
+					rows: [
+						{
+							report_id: 1,
+							contract_tx_hash: "abc123",
+							decided_at: new Date().toISOString(),
+						},
+						{
+							report_id: 3,
+							contract_tx_hash: "tx_reject_1",
+							decided_at: new Date().toISOString(),
+						},
+					],
+				})
+			}
+			return Promise.resolve({ rows: [] })
+		}),
 		connect: jest.fn(),
 	},
 }))
@@ -15,12 +33,22 @@ import request from "supertest"
 
 import { inMemoryMilestoneStore } from "../db/milestone-store"
 import { errorHandler } from "../middleware/error.middleware"
-import { scholarsRouter } from "../routes/scholars.routes"
+import { createScholarsRouter } from "../routes/scholars.routes"
+import { type JwtService } from "../services/jwt.service"
 
-function buildApp() {
+const testJwtService: JwtService = {
+	signWalletToken: () => "mock-token",
+	verifyWalletToken: async (_token: string) => ({
+		sub: "GSCHOLAR1",
+		jti: "test-jti",
+	}),
+	revokeToken: async () => {},
+}
+
+const buildApp = (): express.Express => {
 	const app = express()
 	app.use(express.json())
-	app.use("/api", scholarsRouter)
+	app.use("/api", createScholarsRouter(testJwtService))
 	app.use(errorHandler)
 	return app
 }

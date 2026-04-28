@@ -51,6 +51,7 @@ export function createUploadRouter(jwtService: JwtService): Router {
 	 *       401:
 	 *         $ref: '#/components/responses/UnauthorizedError'
 	 */
+<<<<<<< HEAD
 	/**
 	 * @openapi
 	 * /api/upload:
@@ -94,20 +95,27 @@ export function createUploadRouter(jwtService: JwtService): Router {
 	 *       401:
 	 *         $ref: '#/components/responses/UnauthorizedError'
 	 */
+=======
+>>>>>>> main
 	router.post("/upload", requireAuth, upload.single("file"), uploadFile)
- *               properties:
- *                 cid:
- *                   type: string
- *                 gatewayUrl:
- *                   type: string
- *                 tokenUri:
- *                   type: string
- *                   example: ipfs://bafybei...
- *       400:
- *         $ref: '#/components/responses/BadRequestError'
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
- */
+
+	/**
+	 * Pin NFT metadata (JSON) to IPFS
+	 * @openapi
+	 * /api/upload/nft-metadata:
+	 *   post:
+	 *     tags: [Upload]
+	 *     summary: Pin NFT metadata to IPFS
+	 *     security:
+	 *       - bearerAuth: []
+	 *     responses:
+	 *       201:
+	 *         description: Metadata pinned successfully
+	 *       400:
+	 *         $ref: '#/components/responses/BadRequestError'
+	 *       401:
+	 *         $ref: '#/components/responses/UnauthorizedError'
+	 */
 	router.post("/upload/nft-metadata", requireAuth, pinNftMetadata)
 
 	return router

@@ -1,24 +1,18 @@
-import React, { useEffect, useMemo, useState } from "react"
+import { Trophy } from "lucide-react"
+import React, { useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import AddressDisplay from "../components/AddressDisplay"
+import { EmptyState } from "../components/states/emptyState"
+import { ErrorState } from "../components/states/errorState"
+import { useLeaderboard } from "../hooks/useLeaderboard"
 import { useWallet } from "../hooks/useWallet"
 import { type LeaderboardEntry } from "../util/mockLeaderboardData"
-
-type LeaderboardApiEntry = {
-	rank: number
-	address: string
-	lrn_balance: string
-	courses_completed: number
-}
 
 const Leaderboard: React.FC = () => {
 	const { t } = useTranslation()
 	const { address: currentUserAddress } = useWallet()
-	const [leaders, setLeaders] = useState<LeaderboardEntry[]>([])
-	const [myRank, setMyRank] = useState<number | null>(null)
-	const [isLoading, setIsLoading] = useState(true)
-	const [error, setError] = useState<string | null>(null)
 
+<<<<<<< HEAD
 	useEffect(() => {
 		const fetchLeaderboard = async () => {
 			try {
@@ -54,9 +48,32 @@ const Leaderboard: React.FC = () => {
 				setIsLoading(false)
 			}
 		}
+=======
+	const {
+		data: result,
+		isLoading,
+		error,
+		refetch,
+	} = useLeaderboard(currentUserAddress)
+>>>>>>> main
 
-		fetchLeaderboard().catch(console.error)
-	}, [])
+	const leaders = useMemo(() => {
+		const rankings = Array.isArray(result?.rankings) ? result.rankings : []
+		return rankings.map((item, index) => ({
+			id: `leader-${item.address}-${item.rank}-${index}`,
+			address: item.address,
+			lrnBalance: Number(item.lrn_balance ?? 0),
+			coursesCompleted: item.courses_completed ?? 0,
+			joinedDate: new Date(),
+			lastActive: new Date(),
+			rank: item.rank,
+			balance: item.lrn_balance ?? "0",
+			completedCourses: item.courses_completed ?? 0,
+			fullAddress: item.address,
+		}))
+	}, [result?.rankings])
+
+	const myRank = result?.your_rank ?? null
 
 	const leaderboardRows = useMemo(
 		() =>
@@ -94,44 +111,25 @@ const Leaderboard: React.FC = () => {
 			</header>
 
 			{isLoading ? (
-				<div className="glass-card p-20 rounded-[4rem] text-center border border-white/5">
-					<div className="text-6xl mb-8 animate-bounce">Trophy</div>
-					<h2 className="text-3xl font-black mb-4">Synchronizing Data</h2>
-					<p className="text-white/40 max-w-md mx-auto mb-10 leading-relaxed font-medium">
-						Retrieving real-time scholar rankings from the Stellar network...
-					</p>
-					<div className="flex justify-center gap-3">
-						<div className="w-3 h-3 bg-brand-cyan rounded-full animate-pulse" />
-						<div className="w-3 h-3 bg-brand-blue rounded-full animate-pulse delay-75" />
-						<div className="w-3 h-3 bg-brand-purple rounded-full animate-pulse delay-150" />
-					</div>
+				<div className="space-y-4">
+					{[...Array(3)].map((_, i) => (
+						<div
+							key={i}
+							className="h-24 rounded-[2.5rem] bg-white/5 animate-pulse"
+						/>
+					))}
 				</div>
 			) : error ? (
-				<div className="glass-card p-20 rounded-[4rem] text-center border border-red-500/20 bg-red-500/5">
-					<div className="text-6xl mb-8">Warning</div>
-					<h2 className="text-3xl font-black mb-4 text-red-400">
-						Connection Error
-					</h2>
-					<p className="text-white/60 max-w-md mx-auto mb-6 font-medium">
-						{error}
-					</p>
-					<button
-						type="button"
-						onClick={() => window.location.reload()}
-						className="px-8 py-3 bg-white/10 hover:bg-white/20 rounded-full font-bold transition-all"
-					>
-						Try Again
-					</button>
-				</div>
+				<ErrorState
+					message={error instanceof Error ? error.message : String(error)}
+					onRetry={() => void refetch()}
+				/>
 			) : leaderboardRows.length === 0 ? (
-				<div className="glass-card p-20 rounded-[4rem] text-center border border-white/5">
-					<div className="text-6xl mb-8">Empty</div>
-					<h2 className="text-3xl font-black mb-4">Empty Leaderboard</h2>
-					<p className="text-white/40 max-w-md mx-auto font-medium">
-						No scholars have earned LRN tokens yet. Be the first to complete a
-						course!
-					</p>
-				</div>
+				<EmptyState
+					icon={Trophy}
+					title="No scholars yet"
+					description="No scholars have earned LRN tokens yet. Be the first to complete a course!"
+				/>
 			) : (
 				<div className="glass-card overflow-hidden rounded-[2.5rem] border border-white/5 shadow-2xl">
 					<table className="w-full text-left border-collapse">

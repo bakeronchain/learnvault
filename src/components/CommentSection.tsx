@@ -1,6 +1,15 @@
+<<<<<<< HEAD
 import { useEffect, useId, useState, useCallback } from "react"
+=======
+import { useEffect, useId, useState } from "react"
+import { formatDistanceToNow } from "date-fns"
+>>>>>>> main
 import { useTranslation } from "react-i18next"
+import { useWallet } from "../hooks/useWallet"
+import { getAuthToken } from "../util/auth"
 import CommentCard from "./CommentCard"
+
+const API_BASE = import.meta.env.VITE_SERVER_URL ?? "http://localhost:4000"
 
 export interface Comment {
 	id: number
@@ -19,11 +28,25 @@ interface CommentSectionProps {
 	proposalAuthor?: string
 }
 
+<<<<<<< HEAD
 function CommentSection({
+=======
+const API_URL = (
+	(import.meta.env.VITE_API_URL as string | undefined) ??
+	(import.meta.env.VITE_SERVER_URL as string | undefined) ??
+	""
+).replace(/\/$/, "")
+
+const CommentSection: React.FC<CommentSectionProps> = ({
+>>>>>>> main
 	proposalId,
 	proposalAuthor,
 }: CommentSectionProps) {
 	const { t } = useTranslation()
+<<<<<<< HEAD
+=======
+	const { address } = useWallet()
+>>>>>>> main
 	const pollInterval = Number(import.meta.env.VITE_COMMENT_POLL_MS) || 15000
 	const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
 	const commentInputId = useId()
@@ -37,6 +60,7 @@ function CommentSection({
 	const [submissionError, setSubmissionError] = useState<string | null>(null)
 	const [submissionStatus, setSubmissionStatus] = useState<string | null>(null)
 
+<<<<<<< HEAD
 	const fetchComments = useCallback(
 		async (isSilent = false) => {
 			if (!isSilent) setLoading(true)
@@ -67,6 +91,31 @@ function CommentSection({
 		void safeFetch(false)
 
 		const interval = setInterval(() => void safeFetch(true), pollInterval)
+=======
+	const fetchComments = async () => {
+		setLoading(true)
+		try {
+			const res = await fetch(`${API_URL}/api/proposals/${proposalId}/comments`)
+			const data = await res.json()
+			setComments(data)
+		} catch (err) {
+			console.error("Failed to fetch comments", err)
+		} finally {
+			setLoading(false)
+		}
+	}
+
+	useEffect(() => {
+		let isMounted = true
+		const safeFetch = async () => {
+			if (!isMounted) return
+			await fetchComments()
+		}
+
+		void safeFetch()
+
+		const interval = setInterval(() => void safeFetch(), pollInterval)
+>>>>>>> main
 		return () => {
 			isMounted = false
 			clearInterval(interval)
@@ -80,26 +129,28 @@ function CommentSection({
 			return
 		}
 
-		const token = localStorage.getItem("auth_token") || "mock-token"
+		const token = getAuthToken()
+		if (!token) {
+			setSubmissionError("Sign in to post a comment.")
+			setSubmissionStatus(null)
+			return
+		}
 		setSubmissionError(null)
 		setSubmissionStatus(null)
 
 		try {
-			const res = await fetch(
-				`${import.meta.env.VITE_SERVER_URL}/api/comments`,
-				{
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${token}`,
-					},
-					body: JSON.stringify({
-						proposalId,
-						content: newComment,
-						parentId,
-					}),
+			const res = await fetch(`${API_URL}/api/comments`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
 				},
-			)
+				body: JSON.stringify({
+					proposalId,
+					content: newComment,
+					parentId,
+				}),
+			})
 
 			if (res.ok) {
 				setNewComment("")
@@ -239,7 +290,8 @@ function CommentSection({
 							<CommentCard
 								comment={comment}
 								isAuthor={comment.author_address === proposalAuthor}
-								canPin={proposalAuthor === "CURRENT_USER_ADDRESS"}
+								canPin={proposalAuthor === address}
+								canDelete={comment.author_address === address}
 								onUpdate={fetchComments}
 							/>
 							<div className="ml-12 mt-6 space-y-6 border-l border-white/5 pl-8">
@@ -248,6 +300,7 @@ function CommentSection({
 										key={reply.id}
 										comment={reply}
 										isReply
+										canDelete={reply.author_address === address}
 										onUpdate={fetchComments}
 									/>
 								))}

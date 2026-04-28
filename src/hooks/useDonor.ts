@@ -5,6 +5,10 @@ import {
 	type DonorData,
 	type DonorContribution,
 	type DonorStats,
+<<<<<<< HEAD
+=======
+	type DonorImpact,
+>>>>>>> main
 	type Vote,
 	type RpcEvent,
 } from "../types/contracts"
@@ -14,21 +18,21 @@ import { useWallet } from "./useWallet"
 export type {
 	DonorContribution,
 	DonorStats,
+	DonorImpact,
 	Vote,
 	Scholar,
 	DonorData,
 } from "../types/contracts"
 
 const emptyStats: DonorStats = {
-	totalContributed: 0,
-	governanceBalance: 0,
-	governancePercentage: 0,
-	proposalsVoted: 0,
-	scholarsFunded: 0,
+	total_contributed: 0n,
+	votes_cast: 0,
+	scholars_funded: 0,
 }
 
 const makeEmptyData = (): DonorData => ({
 	stats: emptyStats,
+	impact: null,
 	contributions: [],
 	votes: [],
 	scholars: [],
@@ -52,6 +56,16 @@ const extractNumber = (value: unknown): number => {
 	const text = stringify(value)
 	const match = text.match(/(\d{1,18})/)
 	return match ? Number.parseInt(match[1] ?? "0", 10) : 0
+}
+
+const fetchDonorImpact = async (address: string): Promise<DonorImpact | null> => {
+	try {
+		const response = await fetch(`/api/donors/${address}/impact`)
+		if (!response.ok) return null
+		return await response.json()
+	} catch {
+		return null
+	}
 }
 
 const readContractEvents = async (
@@ -105,7 +119,10 @@ export const useDonor = (): DonorData => {
 				const contractIds = [scholarshipTreasury, governanceToken].filter(
 					(id): id is string => Boolean(id),
 				)
-				const events = await readContractEvents(contractIds, address)
+				const [events, impact] = await Promise.all([
+					readContractEvents(contractIds, address),
+					fetchDonorImpact(address),
+				])
 				const contributions: DonorContribution[] = events
 					.filter((evt) =>
 						stringify({
@@ -152,12 +169,11 @@ export const useDonor = (): DonorData => {
 
 				const next: DonorData = {
 					stats: {
-						totalContributed,
-						governanceBalance: totalContributed,
-						governancePercentage: 0,
-						proposalsVoted: votes.length,
-						scholarsFunded,
+						total_contributed: BigInt(totalContributed),
+						votes_cast: votes.length,
+						scholars_funded: scholarsFunded,
 					},
+					impact,
 					contributions,
 					votes,
 					scholars: [],

@@ -21,6 +21,7 @@ playwright-report/
 
 # dependencies
 node_modules/
+server/node_modules
 
 # logs
 logs
@@ -52,4 +53,5 @@ src/contracts/*
 !src/contracts/util.ts
 
 # test coverage
-coverage/
+coverage/target_local/
+target_local/

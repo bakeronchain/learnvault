@@ -1,21 +1,111 @@
-import { useId, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
+import { useCallback, useEffect, useId, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { NavLink } from "react-router-dom"
+import { fetchCourses } from "../hooks/useCourses"
+import { fetchLeaderboard } from "../hooks/useLeaderboard"
+import { fetchProposals } from "../hooks/useProposals"
+import {
+	fetchTreasuryActivityPage,
+	fetchTreasuryStats,
+} from "../hooks/useTreasury"
+import { useWallet } from "../hooks/useWallet"
+import { fetchHistory } from "../pages/History"
+import GlobalSearch from "./GlobalSearch"
+import { LanguageSelector } from "./LanguageSelector"
+import NetworkIndicator from "./NetworkIndicator"
+import { NotificationBell } from "./NotificationBell"
 import { ReputationBadge } from "./ReputationBadge"
+import { ThemeToggle } from "./ThemeToggle"
 import { WalletButton } from "./WalletButton"
+import { getAuthToken } from "../util/auth"
 
 export default function NavBar() {
 	const [menuOpen, setMenuOpen] = useState(false)
-	const menuId = useId()
+	const mobileMenuId = useId()
 	const { t } = useTranslation()
+
+	useEffect(() => {
+		if (typeof document === "undefined") return
+		const previousOverflow = document.body.style.overflow
+		document.body.style.overflow = menuOpen ? "hidden" : previousOverflow
+		return () => {
+			document.body.style.overflow = previousOverflow
+		}
+	}, [menuOpen])
 
 	const navLinks = [
 		{ to: "/courses", label: t("nav.learn") },
+		{ to: "/peer-review", label: "Peer review" },
 		{ to: "/dao", label: t("nav.dao") },
+		{ to: "/community", label: "Community" },
 		{ to: "/leaderboard", label: t("nav.leaderboard") },
+		{ to: "/history", label: "Activity" },
+		{ to: "/wiki", label: t("nav.docs") },
 		{ to: "/donor", label: "Donor" },
 		{ to: "/treasury", label: t("nav.treasury") },
 	]
+
+	const closeMenu = () => setMenuOpen(false)
+
+	// Close mobile menu on Escape key
+	useEffect(() => {
+		if (!menuOpen) return
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === "Escape") {
+				e.preventDefault()
+				closeMenu()
+			}
+		}
+		document.addEventListener("keydown", handleKeyDown)
+		return () => document.removeEventListener("keydown", handleKeyDown)
+	}, [menuOpen])
+
+	const queryClient = useQueryClient()
+	const { address } = useWallet()
+	const token = getAuthToken()
+
+	const handlePrefetch = useCallback(
+		(to: string) => {
+			if (to === "/courses") {
+				void queryClient.prefetchQuery({
+					queryKey: ["courses"],
+					queryFn: fetchCourses,
+					staleTime: 60 * 1000,
+				})
+			} else if (to === "/dao") {
+				void queryClient.prefetchQuery({
+					queryKey: ["proposals", address],
+					queryFn: () => fetchProposals(address),
+					staleTime: 60 * 1000,
+				})
+			} else if (to === "/leaderboard") {
+				void queryClient.prefetchQuery({
+					queryKey: ["leaderboard", address],
+					queryFn: () => fetchLeaderboard(address),
+					staleTime: 300 * 1000,
+				})
+			} else if (to === "/history" && address) {
+				void queryClient.prefetchQuery({
+					queryKey: ["history", address],
+					queryFn: () => fetchHistory(address),
+					staleTime: 30 * 1000,
+				})
+			} else if (to === "/treasury") {
+				void queryClient.prefetchQuery({
+					queryKey: ["treasury", "stats"],
+					queryFn: fetchTreasuryStats,
+					staleTime: 60 * 1000,
+				})
+				void queryClient.prefetchQuery({
+					queryKey: ["treasury", "activity"],
+					queryFn: () => fetchTreasuryActivityPage(10, 0),
+					staleTime: 60 * 1000,
+				})
+			}
+		},
+		[queryClient, address],
+	)
 
 	return (
 		<header className="fixed top-0 left-0 w-full z-50 px-4 sm:px-6 py-4">
@@ -34,23 +124,22 @@ export default function NavBar() {
 				</NavLink>
 
 				<nav
-					id={menuId}
 					aria-label="Primary"
-					className={`${menuOpen ? "flex" : "hidden"} md:flex absolute md:relative top-full left-0 w-full md:w-auto mt-4 md:mt-0 flex-col md:flex-row glass md:bg-transparent rounded-2xl p-6 md:p-0 gap-2 md:gap-8 border border-white/5 md:border-none shadow-2xl md:shadow-none animate-in fade-in slide-in-from-top-4 md:animate-none`}
+					className="hidden md:flex items-center gap-2 lg:gap-6"
 				>
 					{navLinks.map(({ to, label }) => (
 						<NavLink
 							key={to}
 							to={to}
-							onClick={() => setMenuOpen(false)}
-							className={({ isActive }) => `
-								px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all
-								${
+							id={to === "/courses" ? "courses-nav-link" : undefined}
+							onMouseEnter={() => handlePrefetch(to)}
+							className={({ isActive }) =>
+								`px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
 									isActive
 										? "text-brand-cyan bg-brand-cyan/5 shadow-[0_0_20px_rgba(0,210,255,0.1)]"
-										: "text-white/70 hover:text-white hover:bg-white/5"
-								}
-							`}
+										: "text-slate-700 dark:text-white/70 hover:text-brand-blue dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
+								}`
+							}
 						>
 							{label}
 						</NavLink>
@@ -58,19 +147,31 @@ export default function NavBar() {
 				</nav>
 
 				<div className="flex items-center gap-3 md:gap-4">
+					<div className="hidden lg:block">
+						<GlobalSearch />
+					</div>
+					<div className="hidden md:flex items-center">
+						<LanguageSelector />
+					</div>
+					<ThemeToggle />
+					<div className="hidden xl:block">
+						<NetworkIndicator />
+					</div>
+
 					<ReputationBadge
-						className="hidden sm:inline-flex shrink-0"
+						className="hidden lg:inline-flex shrink-0"
 						size="sm"
 						showBalance
 					/>
-					<div className="hidden sm:block scale-90">
+					<NotificationBell token={token} />
+					<div className="hidden md:block scale-90 [&_button]:dark:text-black [&_button]:dark:bg-white">
 						<WalletButton />
 					</div>
 					<button
 						type="button"
 						onClick={() => setMenuOpen((current) => !current)}
-						className="md:hidden w-10 h-10 glass flex items-center justify-center rounded-xl text-white/70 hover:text-white transition-colors border border-white/10"
-						aria-controls={menuId}
+						className="md:hidden w-10 h-10 glass flex items-center justify-center rounded-xl text-slate-700 dark:text-white/70 hover:text-black dark:hover:text-white transition-colors border border-white/10"
+						aria-controls={mobileMenuId}
 						aria-expanded={menuOpen}
 						aria-label={
 							menuOpen ? "Close navigation menu" : "Open navigation menu"
@@ -89,6 +190,78 @@ export default function NavBar() {
 						</div>
 					</button>
 				</div>
+			</div>
+
+			<div
+				className={`md:hidden ${menuOpen ? "pointer-events-auto" : "pointer-events-none"}`}
+			>
+				<button
+					type="button"
+					onClick={closeMenu}
+					aria-label="Close mobile menu backdrop"
+					className={`fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${
+						menuOpen ? "opacity-100" : "opacity-0"
+					}`}
+				/>
+
+				<nav
+					id={mobileMenuId}
+					aria-label="Mobile primary"
+					className={`fixed top-0 right-0 z-50 h-full w-[min(24rem,92vw)] glass border-l border-white/10 shadow-2xl p-8 flex flex-col gap-6 transition-transform duration-500 ease-out ${
+						menuOpen ? "translate-x-0" : "translate-x-full"
+					}`}
+				>
+					<div className="flex items-center justify-between">
+						<span className="text-xs font-black uppercase tracking-[0.25em] text-slate-500 dark:text-white/40">
+							Menu
+						</span>
+						<button
+							type="button"
+							onClick={closeMenu}
+							className="w-9 h-9 rounded-xl border border-white/10 text-slate-700 dark:text-white/70 hover:text-black dark:hover:text-white hover:border-white/20"
+							aria-label="Close mobile navigation menu"
+						>
+							×
+						</button>
+					</div>
+
+					<ReputationBadge className="w-full" size="sm" showBalance />
+					<div className="w-full [&_button]:dark:text-black [&_button]:dark:bg-white">
+						<WalletButton />
+					</div>
+					<div className="w-full flex justify-center py-2">
+						<NetworkIndicator showLabel />
+					</div>
+
+					<div className="h-px bg-slate-200 dark:bg-white/10 my-1" />
+
+					<div className="flex items-center justify-between">
+						<span className="text-xs font-black uppercase tracking-[0.25em] text-slate-500 dark:text-white/40">
+							Language
+						</span>
+						<LanguageSelector />
+					</div>
+
+					<div className="h-px bg-slate-200 dark:bg-white/10 my-1" />
+
+					{navLinks.map(({ to, label }) => (
+						<NavLink
+							key={to}
+							to={to}
+							onClick={closeMenu}
+							onMouseEnter={() => handlePrefetch(to)}
+							className={({ isActive }) =>
+								`block w-full px-6 py-4 rounded-2xl text-sm font-black uppercase tracking-widest transition-all ${
+									isActive
+										? "text-brand-cyan bg-brand-cyan/10 border border-brand-cyan/20 shadow-[0_0_20px_rgba(0,210,255,0.1)]"
+										: "text-slate-700 dark:text-white/70 border border-slate-200 dark:border-white/10 hover:text-black dark:hover:text-white hover:bg-white/5"
+								}`
+							}
+						>
+							{label}
+						</NavLink>
+					))}
+				</nav>
 			</div>
 		</header>
 	)

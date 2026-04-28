@@ -1,6 +1,6 @@
 import React from "react"
 import { Link } from "react-router-dom"
-import { type Lesson } from "../data/lessons"
+import { type CourseLesson as Lesson } from "../types/courses"
 
 interface LessonSidebarProps {
 	courseId: string
@@ -109,9 +109,14 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
 											<span className="text-[10px] font-bold">{index + 1}</span>
 										)}
 									</div>
-									<span className="text-sm font-medium pt-1 leading-snug">
-										{l.title}
-									</span>
+									<div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+										<span className="text-sm font-medium pt-1 leading-snug">
+											{l.title}
+										</span>
+										<span className="shrink-0 rounded-full border border-brand-cyan/20 bg-brand-cyan/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-cyan">
+											~{Math.max(1, l.estimatedMinutes)}m
+										</span>
+									</div>
 								</Link>
 							)}
 						</li>

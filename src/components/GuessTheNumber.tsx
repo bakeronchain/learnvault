@@ -71,28 +71,36 @@ export const GuessTheNumber = () => {
 
 		setResult("loading")
 
-		// TODO: Create a transaction using the contract client
-		// const tx = await game.guess(
-		// 	{ a_number: BigInt(guess), guesser: address },
-		// 	// @ts-expect-error js-stellar-sdk has bad typings; publicKey is, in fact, allowed
-		// 	{ publicKey: address },
-		// )
+		// Create a transaction using the contract client
+		const game = await loadGuessClient()
+		if (!game) {
+			setErrorMessage(missingClientMessage)
+			setResult("failure")
+			return
+		}
 
-		// // Send the transaction to the current network
-		// const { result } = await tx.signAndSend({ signTransaction })
+		try {
+			const tx = await game.guess(
+				{ a_number: BigInt(guess), guesser: address },
+				{ publicKey: address },
+			)
 
-		// // Handle result and update wallet balance
-		// if (result.isErr()) {
-		// 	console.error(result.unwrapErr())
-		// } else {
-		// 	setResult(result.unwrap() ? "success" : "failure")
-		// 	await updateBalances()
-		// }
+			// Send the transaction to the current network
+			const { result: txResult } = await tx.signAndSend({ signTransaction })
 
-		// Placeholder: simulate success
-		setTimeout(() => {
-			setResult(Math.random() > 0.5 ? "success" : "failure")
-		}, 1000)
+			// Handle result and update wallet balance
+			if (txResult.isErr()) {
+				console.error(txResult.unwrapErr())
+				setResult("failure")
+			} else {
+				setResult(txResult.unwrap() ? "success" : "failure")
+				await updateBalances()
+			}
+		} catch (error) {
+			console.error("Error submitting guess:", error)
+			setErrorMessage("An error occurred while submitting your guess.")
+			setResult("failure")
+		}
 	}
 
 	const reset = () => {

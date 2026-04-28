@@ -1,9 +1,12 @@
-import sgMail from "@sendgrid/mail"
+import { Resend } from "resend"
+import { logger } from "../lib/logger"
 import {
 	templates,
 	toPlainText,
 	type EmailVariables,
 } from "../templates/email-templates"
+
+const log = logger.child({ module: "email" })
 
 export interface EmailOptions {
 	to: string
@@ -13,9 +16,14 @@ export interface EmailOptions {
 }
 
 export class EmailService {
-	constructor(apiKey: string) {
-		if (apiKey) {
-			sgMail.setApiKey(apiKey)
+	private readonly from: string
+	private readonly resendClient?: Resend
+
+	constructor(apiKey?: string) {
+		this.from = process.env.EMAIL_FROM || "notifications@learnvault.xyz"
+		const resendApiKey = process.env.RESEND_API_KEY || apiKey
+		if (resendApiKey) {
+			this.resendClient = new Resend(resendApiKey)
 		}
 	}
 
@@ -26,7 +34,7 @@ export class EmailService {
 		const templateFn = templates[templateName]
 
 		if (!templateFn) {
-			console.warn(`[EmailService] Template not found: ${templateName}`)
+			log.warn({ templateName }, "Email template not found")
 			return { html: "", text: "" }
 		}
 
@@ -37,30 +45,29 @@ export class EmailService {
 	}
 
 	async sendNotification(options: EmailOptions): Promise<boolean> {
-		if (!process.env.EMAIL_API_KEY) {
-			console.log(
-				`[EmailService] MOCK SEND to ${options.to}: ${options.subject}`,
-			)
+		const { html, text } = await this.render(options.template, options.data)
+
+		if (!this.resendClient) {
+			log.debug({ subject: options.subject }, "MOCK email send")
 			return true
 		}
 
 		try {
-			const { html, text } = await this.render(options.template, options.data)
-
-			await sgMail.send({
+			await this.resendClient.emails.send({
+				from: this.from,
 				to: options.to,
-				from: process.env.EMAIL_FROM || "notifications@learnvault.xyz",
 				subject: options.subject,
-				text,
 				html,
+				text,
 			})
 
 			return true
 		} catch (error) {
-			console.error("[EmailService] Error sending email:", error)
+			log.error({ err: error }, "Error sending email")
 			return false
 		}
 	}
+
 	async sendAdminMilestoneNotification(
 		scholarName: string,
 		courseSlug: string,
@@ -69,9 +76,7 @@ export class EmailService {
 		const adminEmails = process.env.ADMIN_EMAILS
 
 		if (!adminEmails) {
-			console.warn(
-				"[EmailService] ADMIN_EMAILS not set, skipping notification.",
-			)
+			log.warn("ADMIN_EMAILS not set, skipping admin notification")
 			return false
 		}
 
@@ -98,6 +103,42 @@ export class EmailService {
 
 		return allSent
 	}
+
+	async sendAdminFlagNotification(
+		contentType: string,
+		contentId: number,
+		reason: string,
+		reporterAddress: string,
+	): Promise<boolean> {
+		const adminEmails = process.env.ADMIN_EMAILS
+
+		if (!adminEmails) {
+			log.warn("ADMIN_EMAILS not set, skipping admin flag notification")
+			return false
+		}
+
+		const adminLink = `${process.env.FRONTEND_URL || "http://localhost:3000"}/admin/moderation`
+		const body = `Content flagged: ${contentType} #${contentId}\nReporter: ${reporterAddress}\nReason: ${reason}\nReview: ${adminLink}`
+
+		const emails = adminEmails.split(",").map((email) => email.trim())
+
+		let allSent = true
+		for (const email of emails) {
+			const success = await this.sendNotification({
+				to: email,
+				subject: "Content Flagged",
+				template: "admin-alert",
+				data: {
+					body,
+					adminUrl: adminLink,
+					unsubscribeUrl: "#",
+				},
+			})
+			if (!success) allSent = false
+		}
+
+		return allSent
+	}
 }
 
-export const createEmailService = (apiKey: string) => new EmailService(apiKey)
+export const createEmailService = (apiKey?: string) => new EmailService(apiKey)

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { useState, useCallback } from "react"
 import { rpcUrl, stellarNetwork } from "../contracts/util"
+import { useContractIds } from "./useContractIds"
 
 export type ActivityEventType =
 	| "lrn_minted"
@@ -10,7 +11,7 @@ export type ActivityEventType =
 	| "vote_cast"
 	| "funds_disbursed"
 
-export type ActivityEventFilter = "deposit" | "disburse" | "all"
+export type ActivityEventFilter = "deposit" | "disburse" | "followed" | "all"
 
 export interface ActivityEvent {
 	id: string
@@ -28,19 +29,6 @@ interface RpcEvent {
 	topics?: unknown[]
 	value?: unknown
 	txHash?: string
-}
-
-const readEnv = (key: string): string | undefined => {
-	const value = (import.meta.env as Record<string, unknown>)[key]
-	return typeof value === "string" && value.length > 0 ? value : undefined
-}
-
-const contractIds = {
-	learnToken: readEnv("PUBLIC_LEARN_TOKEN_CONTRACT"),
-	courseMilestone: readEnv("PUBLIC_COURSE_MILESTONE_CONTRACT"),
-	scholarNft: readEnv("PUBLIC_SCHOLAR_NFT_CONTRACT"),
-	scholarshipGov: readEnv("PUBLIC_SCHOLARSHIP_GOVERNANCE_CONTRACT"),
-	milestoneEscrow: readEnv("VITE_MILESTONE_ESCROW_CONTRACT_ID"),
 }
 
 function classifyEvent(event: RpcEvent): ActivityEventType {
@@ -96,75 +84,85 @@ async function fetchActivityEvents(
 	limit: number,
 	filter?: ActivityEventFilter,
 ): Promise<ActivityEvent[]> {
-	const ids = [
-		contractIds.learnToken,
-		contractIds.courseMilestone,
-		contractIds.scholarNft,
-		contractIds.scholarshipGov,
-		contractIds.milestoneEscrow,
-	].filter((v): v is string => Boolean(v))
+	const params = new URLSearchParams()
+	params.append("limit", limit.toString())
 
-	if (!ids.length) return []
+	if (walletAddress && filter !== "followed") {
+		params.append("address", walletAddress)
+	}
 
-	const response = await fetch(rpcUrl, {
-		method: "POST",
-		headers: { "content-type": "application/json" },
-		body: JSON.stringify({
-			jsonrpc: "2.0",
-			id: "activity-feed",
-			method: "getEvents",
-			params: {
-				filters: [{ type: "contract", contractIds: ids }],
-				pagination: { limit: 100 },
-			},
-		}),
+	if (filter === "followed") {
+		params.append("followed_only", "true")
+	}
+
+	if (filter === "deposit") {
+		params.append("type", "LearnToken::Mint") // Example, backend might need adjustment if more types
+	}
+
+	const response = await fetch(`/api/events?${params.toString()}`, {
+		headers: {
+			Authorization: `Bearer ${localStorage.getItem("authToken") || ""}`,
+		},
 	})
 
 	if (!response.ok) return []
 
 	const payload = (await response.json()) as {
-		result?: { events?: RpcEvent[] }
+		data?: Array<{
+			id: number
+			contract: string
+			event_type: string
+			data: any
+			ledger_sequence: string
+			created_at: string
+			tx_hash: string | null
+		}>
 	}
-	const events = payload.result?.events ?? []
+	const events = payload.data ?? []
 
-	const relevant = walletAddress
-		? events.filter((e) =>
-				JSON.stringify({
-					topic: e.topics ?? e.topic,
-					value: e.value,
-				})
-					.toLowerCase()
-					.includes(walletAddress.toLowerCase()),
-			)
-		: events
-
-	// Apply filter by event type
-	let filtered = relevant
-	if (filter && filter !== "all") {
-		filtered = relevant.filter((e) => {
-			const type = classifyEvent(e)
-			if (filter === "deposit") {
-				// Deposits are token mint/transfer events
-				return type === "lrn_minted"
-			}
-			if (filter === "disburse") {
-				// Disbursements are funds_disbursed events
-				return type === "funds_disbursed"
-			}
-			return true
-		})
-	}
-
-	return filtered.slice(0, limit).map((event, idx) => {
-		const type = classifyEvent(event)
+	return events.map((event) => {
+		const type = classifyBackendEvent(event.event_type, event.data)
 		return {
-			id: event.id ?? `activity-${idx}`,
+			id: String(event.id),
 			type,
-			description: describeEvent(type, event),
-			timestamp: event.ledgerCloseTime ?? new Date().toISOString(),
-			txHash: event.txHash,
+			description: describeBackendEvent(type, event.data),
+			timestamp: event.created_at,
+			txHash: event.tx_hash || undefined,
 		}
 	})
+}
+
+function classifyBackendEvent(eventType: string, data: any): ActivityEventType {
+	const text = (eventType + JSON.stringify(data)).toLowerCase()
+	if (text.includes("mint") && text.includes("nft")) return "scholar_nft_minted"
+	if (text.includes("mint") || text.includes("transfer")) return "lrn_minted"
+	if (text.includes("enroll")) return "course_enrolled"
+	if (text.includes("complete") || text.includes("milestone"))
+		return "milestone_completed"
+	if (text.includes("vote")) return "vote_cast"
+	if (text.includes("disburse") || text.includes("escrow"))
+		return "funds_disbursed"
+	return "lrn_minted"
+}
+
+function describeBackendEvent(type: ActivityEventType, data: any): string {
+	const text = JSON.stringify(data).toLowerCase()
+	switch (type) {
+		case "lrn_minted":
+			return "Earned LRN for completing a lesson"
+		case "course_enrolled":
+			return "Enrolled in a new course"
+		case "milestone_completed":
+			return "Completed a milestone"
+		case "scholar_nft_minted":
+			return "Earned a ScholarNFT credential"
+		case "vote_cast":
+			return "Cast a governance vote"
+		case "funds_disbursed":
+			return "Received scholarship funds"
+		default:
+			return "Activity recorded"
+	}
 }
 
 export function useActivityFeed(
@@ -173,6 +171,13 @@ export function useActivityFeed(
 	filter: ActivityEventFilter = "all",
 ) {
 	const [displayCount, setDisplayCount] = useState(limit)
+	const {
+		learnToken,
+		courseMilestone,
+		scholarNft,
+		governanceToken,
+		milestoneEscrow,
+	} = useContractIds()
 
 	const { data, isLoading, error } = useQuery({
 		queryKey: ["activity-feed", address, filter],

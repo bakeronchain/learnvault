@@ -195,7 +195,7 @@ const Leaderboard: React.FC = () => {
 					<div className="p-6 bg-white/5 border-t border-white/5 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
 						<div className="text-sm font-medium text-white/40">
 							Showing {leaderboardRows.length} scholars
-							{currentUserAddress ? (
+							{currentUserAddress || myRank !== null ? (
 								<span data-testid="leaderboard-your-rank">
 									{" "}
 									| Your rank: {myRank ? `#${myRank}` : "Unranked"}

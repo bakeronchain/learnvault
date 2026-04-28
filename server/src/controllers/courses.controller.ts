@@ -76,7 +76,10 @@ function parseOptionalLearnerAddress(req: Request): string | null {
 	return learnerAddress.length > 0 ? learnerAddress : null
 }
 
-function buildSimpleLineDiff(before: string, after: string): {
+function buildSimpleLineDiff(
+	before: string,
+	after: string,
+): {
 	addedLines: string[]
 	removedLines: string[]
 } {
@@ -408,6 +411,271 @@ export const getCourseLessonById = async (
 	}
 }
 
+export const updateLessonVersion = async (
+	req: Request,
+	res: Response,
+): Promise<void> => {
+	const orderIndex = Number.parseInt(req.params.orderIndex, 10)
+	if (!Number.isInteger(orderIndex) || orderIndex < 1) {
+		res.status(400).json({ error: "orderIndex must be a positive integer" })
+		return
+	}
+
+	const body = req.body as {
+		title?: unknown
+		content?: unknown
+		content_markdown?: unknown
+		estimatedMinutes?: unknown
+		estimated_minutes?: unknown
+		changeSummary?: unknown
+		change_summary?: unknown
+		isMilestone?: unknown
+		is_milestone?: unknown
+	}
+
+	const nextTitle =
+		typeof body.title === "string"
+			? sanitizeHtml(body.title.trim(), {
+					allowedTags: [],
+					allowedAttributes: {},
+				})
+			: undefined
+	const nextContent =
+		typeof body.content_markdown === "string"
+			? body.content_markdown
+			: typeof body.content === "string"
+				? body.content
+				: undefined
+	const nextEstimatedMinutesRaw =
+		body.estimated_minutes ?? body.estimatedMinutes
+	const nextEstimatedMinutes =
+		typeof nextEstimatedMinutesRaw === "number" &&
+		Number.isInteger(nextEstimatedMinutesRaw) &&
+		nextEstimatedMinutesRaw > 0
+			? nextEstimatedMinutesRaw
+			: undefined
+	const nextChangeSummaryRaw = body.change_summary ?? body.changeSummary
+	const nextChangeSummary =
+		typeof nextChangeSummaryRaw === "string"
+			? nextChangeSummaryRaw.trim()
+			: nextChangeSummaryRaw === null
+				? null
+				: undefined
+	const nextIsMilestoneRaw = body.is_milestone ?? body.isMilestone
+	const nextIsMilestone =
+		typeof nextIsMilestoneRaw === "boolean" ? nextIsMilestoneRaw : undefined
+
+	if (
+		nextTitle === undefined &&
+		nextContent === undefined &&
+		nextEstimatedMinutes === undefined &&
+		nextChangeSummary === undefined &&
+		nextIsMilestone === undefined
+	) {
+		res.status(400).json({
+			error:
+				"Provide at least one field to version: title, content/content_markdown, estimatedMinutes/estimated_minutes, changeSummary/change_summary, or isMilestone/is_milestone",
+		})
+		return
+	}
+
+	if (nextTitle !== undefined && nextTitle.length === 0) {
+		res.status(400).json({ error: "title cannot be empty" })
+		return
+	}
+
+	const idOrSlug = req.params.idOrSlug
+	const isNumericId = /^\d+$/.test(idOrSlug)
+
+	const client = await pool.connect()
+	try {
+		await client.query("BEGIN")
+
+		const courseResult = (await client.query(
+			`SELECT id, slug
+			 FROM courses
+			 WHERE ${isNumericId ? "id = $1" : "slug = $1"}
+			 LIMIT 1`,
+			[isNumericId ? Number.parseInt(idOrSlug, 10) : idOrSlug],
+		)) as { rows: Array<{ id: number; slug: string }> }
+
+		const course = courseResult.rows[0]
+		if (!course) {
+			await client.query("ROLLBACK")
+			res.status(404).json({ error: "Course not found" })
+			return
+		}
+
+		const currentLessonResult = (await client.query(
+			`SELECT id, title, content_markdown, estimated_minutes, version, order_index
+			 FROM lessons
+			 WHERE course_id = $1
+			   AND order_index = $2
+			   AND is_active = TRUE
+			 ORDER BY version DESC
+			 LIMIT 1
+			 FOR UPDATE`,
+			[course.id, orderIndex],
+		)) as {
+			rows: Array<{
+				id: number
+				title: string
+				content_markdown: string
+				estimated_minutes: number
+				version: number
+				order_index: number
+			}>
+		}
+
+		const currentLesson = currentLessonResult.rows[0]
+		if (!currentLesson) {
+			await client.query("ROLLBACK")
+			res.status(404).json({ error: "Active lesson version not found" })
+			return
+		}
+
+		const milestoneRows = (await client.query(
+			`SELECT id
+			 FROM milestones
+			 WHERE course_id = $1
+			   AND lesson_id = $2
+			 ORDER BY id ASC`,
+			[course.id, currentLesson.id],
+		)) as { rows: Array<{ id: number }> }
+
+		const resolvedIsMilestone = nextIsMilestone ?? milestoneRows.rows.length > 0
+
+		await client.query(
+			`UPDATE lessons
+			 SET is_active = FALSE,
+			     superseded_at = CURRENT_TIMESTAMP
+			 WHERE id = $1`,
+			[currentLesson.id],
+		)
+
+		const insertedLessonResult = (await client.query(
+			`INSERT INTO lessons (
+				course_id,
+				order_index,
+				title,
+				content_markdown,
+				estimated_minutes,
+				version,
+				is_active,
+				change_summary
+			 )
+			 VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7)
+			 RETURNING
+				id,
+				course_id,
+				title,
+				content_markdown,
+				order_index,
+				estimated_minutes,
+				version,
+				is_active,
+				change_summary,
+				created_at,
+				updated_at`,
+			[
+				course.id,
+				orderIndex,
+				nextTitle ?? currentLesson.title,
+				nextContent ?? currentLesson.content_markdown,
+				nextEstimatedMinutes ?? currentLesson.estimated_minutes,
+				Number(currentLesson.version) + 1,
+				nextChangeSummary === undefined ? null : nextChangeSummary,
+			],
+		)) as { rows: LessonRow[] }
+
+		const insertedLesson = insertedLessonResult.rows[0]
+
+		await client.query(
+			`UPDATE lessons
+			 SET superseded_by = $1
+			 WHERE id = $2`,
+			[insertedLesson.id, currentLesson.id],
+		)
+
+		if (resolvedIsMilestone && milestoneRows.rows.length > 0) {
+			await client.query(
+				`UPDATE milestones
+				 SET lesson_id = $1
+				 WHERE course_id = $2
+				   AND lesson_id = $3`,
+				[insertedLesson.id, course.id, currentLesson.id],
+			)
+		} else if (!resolvedIsMilestone && milestoneRows.rows.length > 0) {
+			await client.query(
+				`UPDATE milestones
+				 SET lesson_id = NULL
+				 WHERE course_id = $1
+				   AND lesson_id = $2`,
+				[course.id, currentLesson.id],
+			)
+		}
+
+		const quizResult = (await client.query(
+			`SELECT id, passing_score
+			 FROM quizzes
+			 WHERE lesson_id = $1
+			 LIMIT 1`,
+			[currentLesson.id],
+		)) as { rows: Array<{ id: number; passing_score: number }> }
+		const existingQuiz = quizResult.rows[0]
+
+		if (existingQuiz) {
+			const insertedQuizResult = (await client.query(
+				`INSERT INTO quizzes (lesson_id, passing_score)
+				 VALUES ($1, $2)
+				 RETURNING id`,
+				[insertedLesson.id, existingQuiz.passing_score],
+			)) as { rows: Array<{ id: number }> }
+			const insertedQuizId = insertedQuizResult.rows[0]?.id
+
+			if (insertedQuizId) {
+				await client.query(
+					`INSERT INTO quiz_questions (
+						quiz_id,
+						question_text,
+						options,
+						correct_index,
+						explanation
+					 )
+					 SELECT
+						$1,
+						question_text,
+						options,
+						correct_index,
+						explanation
+					 FROM quiz_questions
+					 WHERE quiz_id = $2
+					 ORDER BY id ASC`,
+					[insertedQuizId, existingQuiz.id],
+				)
+			}
+		}
+
+		await client.query("COMMIT")
+
+		res.status(200).json({
+			course_id: course.slug,
+			order_index: orderIndex,
+			superseded_version: currentLesson.version,
+			lesson: toLesson({
+				...insertedLesson,
+				quiz: [],
+				is_milestone: resolvedIsMilestone,
+			}),
+		})
+	} catch {
+		await client.query("ROLLBACK")
+		res.status(500).json({ error: "Internal server error" })
+	} finally {
+		client.release()
+	}
+}
+
 export const getLessonVersionDiff = async (
 	req: Request,
 	res: Response,
@@ -473,7 +741,9 @@ export const getLessonVersionDiff = async (
 		const toLesson = toResult.rows[0]
 
 		if (!fromLesson || !toLesson) {
-			res.status(404).json({ error: "One or both lesson versions were not found" })
+			res
+				.status(404)
+				.json({ error: "One or both lesson versions were not found" })
 			return
 		}
 

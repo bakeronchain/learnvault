@@ -35,7 +35,8 @@ async function fulfillJson(route: Route, body: unknown, status = 200) {
 
 async function installLeaderboardMocks(page: Page) {
 	const rankings = buildRankings(13)
-	const yourRank = rankings.find((entry) => entry.address === E2E_WALLET_ADDRESS)?.rank ?? 7
+	const yourRank =
+		rankings.find((entry) => entry.address === E2E_WALLET_ADDRESS)?.rank ?? 7
 
 	await page.route("**/api/scholars/leaderboard**", async (route) => {
 		const url = new URL(route.request().url())
@@ -52,6 +53,28 @@ async function installLeaderboardMocks(page: Page) {
 	})
 }
 
+async function ensureWalletConnected(page: Page) {
+	const connectedRank = page.getByTestId("leaderboard-your-rank")
+	if ((await connectedRank.count()) > 0) return
+
+	await page.evaluate(
+		({ address }) => {
+			const networkPassphrase = "Test SDF Network ; September 2015"
+			localStorage.setItem("walletId", JSON.stringify("hot-wallet"))
+			localStorage.setItem("walletType", JSON.stringify("hot-wallet"))
+			localStorage.setItem("walletAddress", JSON.stringify(address))
+			localStorage.setItem("walletNetwork", JSON.stringify("TESTNET"))
+			localStorage.setItem(
+				"networkPassphrase",
+				JSON.stringify(networkPassphrase),
+			)
+		},
+		{ address: E2E_WALLET_ADDRESS },
+	)
+
+	await page.reload()
+}
+
 test.describe("Leaderboard page", () => {
 	test.beforeEach(async ({ page }) => {
 		await installMockFreighter(page)
@@ -63,6 +86,7 @@ test.describe("Leaderboard page", () => {
 		page,
 	}) => {
 		await page.goto("/leaderboard")
+		await ensureWalletConnected(page)
 
 		await expect(
 			page.getByRole("heading", { name: /leaderboard/i }),

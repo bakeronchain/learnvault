@@ -17,6 +17,9 @@
  *     - returns only pending reports
  */
 
+// Provide JWT_SECRET explicitly — no hardcoded fallback exists anymore.
+process.env.JWT_SECRET = "learnvault-secret"
+
 // Must be declared before any imports so Jest hoisting works correctly.
 jest.mock("../db/index", () => ({
 	pool: {
@@ -71,15 +74,14 @@ const pendingReport = {
 	evidence_ipfs_cid: null,
 	evidence_description: "Completed all exercises",
 	status: "pending" as const,
-	resubmission_count: 0,
 	submitted_at: new Date().toISOString(),
-	resubmission_count: 0,
 	scholar_email: "scholar@example.com",
 	scholar_name: "Test Scholar",
 	course_title: "Test Course",
 	milestone_title: "Test Milestone",
 	milestone_number: 1,
 	lrn_reward: 100,
+	resubmission_count: 0,
 }
 
 const approvedAuditEntry = {
@@ -92,11 +94,11 @@ const approvedAuditEntry = {
 	decided_at: new Date().toISOString(),
 }
 
-function makeAdminToken(address = "GADMIN123") {
+function makeAdminToken (address = "GADMIN123") {
 	return jwt.sign({ address }, JWT_SECRET, { expiresIn: "1h" })
 }
 
-function buildApp() {
+function buildApp () {
 	const app = express()
 	app.use(express.json())
 	app.use("/api", adminMilestonesRouter)

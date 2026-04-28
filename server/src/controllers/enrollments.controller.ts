@@ -1,9 +1,10 @@
 import { type Request, type Response } from "express"
 import { pool } from "../db/index"
-import { createLogger } from "../lib/logger"
+import { logger } from "../lib/logger"
+
+const log = logger.child({ module: "enrollments" })
 import { stellarContractService } from "../services/stellar-contract.service"
 
-const logger = createLogger("enrollments")
 
 const COURSE_MILESTONE_CONTRACT_ID =
 	process.env.COURSE_MILESTONE_CONTRACT_ID ?? ""
@@ -51,13 +52,14 @@ export const createEnrollment = async (
 				// course_id is a string slug (e.g., "stellar-basics")
 				// Skip on-chain validation - mapping from slug to contract ID
 				// would require additional database logic
-				logger.warn("Skipping on-chain validation for non-numeric course_id", {
-					courseId: course_id,
-				})
+				log.warn(
+					{ courseId: course_id },
+					"course_id is not numeric, skipping on-chain validation",
+				)
 			}
 		} else {
 			// If no contract configured, allow enrollment (development mode)
-			logger.warn(
+			log.warn(
 				"No COURSE_MILESTONE_CONTRACT_ID configured, skipping on-chain validation",
 			)
 		}
@@ -90,7 +92,7 @@ export const createEnrollment = async (
 			enrolled_at: enrollment.enrolled_at,
 		})
 	} catch (error) {
-		logger.error("createEnrollment failed", { error })
+		log.error({ err: error }, "Error creating enrollment")
 		res.status(500).json({
 			error: "Failed to create enrollment",
 		})
@@ -132,7 +134,7 @@ export const getEnrollments = async (
 			})),
 		})
 	} catch (error) {
-		logger.error("getEnrollments failed", { error })
+		log.error({ err: error }, "Error fetching enrollments")
 		res.status(500).json({
 			error: "Failed to fetch enrollments",
 		})

@@ -3,18 +3,18 @@ import sanitizeHtml from "sanitize-html"
 import { z } from "zod"
 
 import { pool } from "../db/index"
-import { createLogger } from "../lib/logger"
+import { logger } from "../lib/logger"
 import { trackEscrowTimeout } from "../services/escrow-timeout.service"
-import { stellarContractService } from "../services/stellar-contract.service"
 
-const logger = createLogger("governance")
+const log = logger.child({ module: "governance" })
+import { stellarContractService } from "../services/stellar-contract.service"
 
 type ProposalStatus = "pending" | "approved" | "rejected"
 type ProposalPublicState = "open" | "closed" | "cancelled" | "executed"
 
 const stellarAddressSchema = z.string().min(56).max(56).startsWith("G")
 
-function parseStatus(value: unknown): ProposalStatus | undefined {
+function parseStatus (value: unknown): ProposalStatus | undefined {
 	if (typeof value !== "string") return undefined
 	const normalized = value.trim().toLowerCase()
 	if (
@@ -27,21 +27,21 @@ function parseStatus(value: unknown): ProposalStatus | undefined {
 	return undefined
 }
 
-function parsePositiveInt(value: unknown, fallback: number): number {
+function parsePositiveInt (value: unknown, fallback: number): number {
 	if (typeof value !== "string") return fallback
 	const parsed = Number.parseInt(value, 10)
 	if (Number.isNaN(parsed) || parsed < 1) return fallback
 	return parsed
 }
 
-function parseProposalId(value: unknown): number | null {
+function parseProposalId (value: unknown): number | null {
 	if (typeof value !== "string") return null
 	const parsed = Number.parseInt(value, 10)
 	if (Number.isNaN(parsed) || parsed < 1) return null
 	return parsed
 }
 
-function deriveProposalState(proposal: {
+function deriveProposalState (proposal: {
 	status: string
 	cancelled?: boolean | null
 	deadline?: Date | string | null
@@ -60,14 +60,14 @@ function deriveProposalState(proposal: {
 	return "open"
 }
 
-function parseViewerAddress(value: unknown): string | null {
+function parseViewerAddress (value: unknown): string | null {
 	if (typeof value !== "string") return null
 	const trimmed = value.trim()
 	const validation = stellarAddressSchema.safeParse(trimmed)
 	return validation.success ? validation.data : null
 }
 
-function buildProposalSelect(viewerParamIndex?: number) {
+function buildProposalSelect (viewerParamIndex?: number) {
 	const viewerVoteSelect = viewerParamIndex
 		? ", uv.support AS user_vote_support"
 		: ", NULL::boolean AS user_vote_support"
@@ -91,7 +91,7 @@ function buildProposalSelect(viewerParamIndex?: number) {
 		FROM proposals p${viewerJoin}`
 }
 
-export async function getGovernanceProposals(
+export async function getGovernanceProposals (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -134,15 +134,17 @@ export async function getGovernanceProposals(
 		)
 
 		res.status(200).json({
-			data: proposalsResult.rows,
-			pagination: { page, limit, total },
+			proposals: proposalsResult.rows,
+			total,
+			page,
+			totalPages: Math.ceil(total / limit),
 		})
 	} catch {
 		res.status(500).json({ error: "Failed to fetch governance proposals" })
 	}
 }
 
-export async function getGovernanceProposalById(
+export async function getGovernanceProposalById (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -165,7 +167,7 @@ export async function getGovernanceProposalById(
 			values,
 		)
 
-		if (result.rows.length === 0) {
+		if (!result?.rows || result.rows.length === 0) {
 			res.status(404).json({ error: "Proposal not found" })
 			return
 		}
@@ -179,7 +181,7 @@ export async function getGovernanceProposalById(
 const GOV_DECIMALS = 7
 const GOV_DIVISOR = 10n ** BigInt(GOV_DECIMALS)
 
-export async function getVotingPower(
+export async function getVotingPower (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -191,7 +193,7 @@ export async function getVotingPower(
 
 	try {
 		const rawBalance =
-			await stellarContractService.getGovernanceVotingPower(address)
+			await stellarContractService.getGovernanceTokenBalance(address)
 		const balanceBigInt = BigInt(rawBalance)
 		const whole = balanceBigInt / GOV_DIVISOR
 		const frac = balanceBigInt % GOV_DIVISOR
@@ -204,7 +206,7 @@ export async function getVotingPower(
 			can_vote: balanceBigInt > 0n,
 		})
 	} catch (err) {
-		logger.error("getVotingPower failed", { error: err, address })
+		log.error({ err }, "getVotingPower error")
 		res.status(500).json({ error: "Failed to fetch voting power" })
 	}
 }
@@ -231,7 +233,18 @@ const castVoteSchema = z.object({
 	signature: z.string().optional(),
 })
 
-export async function createGovernanceProposal(
+const castVoteSchema = z.object({
+	proposal_id: z.number().int().positive("proposal_id must be a positive integer"),
+	voter_address: z
+		.string()
+		.min(56, "voter_address must be a valid Stellar address")
+		.max(56, "voter_address must be a valid Stellar address")
+		.startsWith("G", "voter_address must be a valid Stellar address"),
+	support: z.boolean(),
+	signature: z.string().optional(),
+})
+
+export async function createGovernanceProposal (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -340,7 +353,7 @@ export async function createGovernanceProposal(
 			tx_hash: contractResult.txHash,
 		})
 	} catch (err) {
-		logger.error("Proposal creation failed", { error: err, title })
+		log.error({ err }, "Proposal creation failed")
 		res.status(500).json({
 			error: "Failed to create governance proposal",
 			message: err instanceof Error ? err.message : String(err),
@@ -348,7 +361,7 @@ export async function createGovernanceProposal(
 	}
 }
 
-export async function castVote(req: Request, res: Response): Promise<void> {
+export async function castVote (req: Request, res: Response): Promise<void> {
 	const validation = castVoteSchema.safeParse(req.body)
 	if (!validation.success) {
 		res.status(400).json({
@@ -367,7 +380,7 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 			[proposal_id],
 		)
 
-		if (proposalResult.rows.length === 0) {
+		if (!proposalResult?.rows || proposalResult.rows.length === 0) {
 			res.status(404).json({ error: "Proposal not found" })
 			return
 		}
@@ -403,14 +416,14 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 			[proposal_id, voter_address],
 		)
 
-		if (existingVote.rows.length > 0) {
+		if ((existingVote?.rows ?? []).length > 0) {
 			res.status(409).json({ error: "You have already voted on this proposal" })
 			return
 		}
 
 		// 4. Check voter's effective voting power (own balance + any delegated-to-them)
 		const rawBalance =
-			await stellarContractService.getGovernanceVotingPower(voter_address)
+			await stellarContractService.getGovernanceTokenBalance(voter_address)
 		const balanceBigInt = BigInt(rawBalance)
 
 		if (balanceBigInt <= 0n) {
@@ -466,14 +479,14 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 		})
 	} catch (err) {
 		logger.error("Vote casting failed", { error: err, proposal_id })
+		log.error({ err }, "Vote casting failed")
 		res.status(500).json({
 			error: "Failed to cast vote",
 			message: err instanceof Error ? err.message : String(err),
 		})
 	}
 }
-
-export async function getProposalStatus(
+export async function getProposalStatus (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -503,12 +516,12 @@ export async function getProposalStatus(
 			deadline: proposal.deadline ?? null,
 		})
 	} catch (err) {
-		logger.error("Get proposal status failed", { error: err, proposalId })
+		log.error({ err }, "Get proposal status failed")
 		res.status(500).json({ error: "Failed to fetch proposal status" })
 	}
 }
 
-export async function cancelProposal(
+export async function cancelProposal (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -551,7 +564,7 @@ export async function cancelProposal(
 
 		res.status(204).end()
 	} catch (err) {
-		logger.error("Cancel proposal failed", { error: err, proposalId })
+		log.error({ err }, "Cancel proposal failed")
 		res.status(500).json({
 			error: "Failed to cancel proposal",
 			message: err instanceof Error ? err.message : String(err),
@@ -559,7 +572,7 @@ export async function cancelProposal(
 	}
 }
 
-export async function getDelegation(
+export async function getDelegation (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -571,7 +584,7 @@ export async function getDelegation(
 
 	try {
 		const [rawVotingPower, rawOwnBalance, delegatee] = await Promise.all([
-			stellarContractService.getGovernanceVotingPower(address),
+			stellarContractService.getGovernanceTokenBalance(address),
 			stellarContractService.getGovernanceTokenBalance(address),
 			stellarContractService.getGovernanceDelegation(address),
 		])

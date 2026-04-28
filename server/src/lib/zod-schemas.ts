@@ -284,49 +284,46 @@ export const createCredentialMetadataBodySchema = z
 
 export const enrollmentBodySchema = z
 	.object({
-		learner_address: requiredString("learner_address", 100),
-		course_id: requiredString("course_id", 100),
-		tx_hash: requiredString("tx_hash", 200),
+		learner_address: requiredString("learner_address"),
+		course_id: requiredString("course_id"),
+		tx_hash: requiredString("tx_hash"),
 	})
 	.strict()
 
+
 export const userProfileSchema = z
 	.object({
-		display_name: z
-			.string()
-			.trim()
-			.min(3, "Display name must be at least 3 characters")
-			.max(50, "Display name cannot exceed 50 characters")
-			.optional()
-			.nullable(),
-		bio: z
-			.string()
-			.max(2000, "Bio cannot exceed 2000 characters")
-			.optional()
-			.nullable(),
+		display_name: optionalTrimmedString("display_name", 50),
+		bio: optionalTrimmedString("bio", 2000),
 		avatar_url: z
-			.string()
-			.url("Avatar must be a valid URL")
-			.max(2048, "URL is too long")
-			.optional()
-			.nullable(),
-		twitter: z
-			.string()
+			.string({
+				invalid_type_error: "avatar_url must be a string",
+			})
 			.trim()
-			.max(255, "Twitter handle/URL is too long")
-			.optional()
-			.nullable(),
-		github: z
-			.string()
-			.trim()
-			.max(255, "GitHub username/URL is too long")
-			.optional()
-			.nullable(),
+			.url("avatar_url must be a valid URL")
+			.max(2048, "avatar_url must be 2048 characters or fewer")
+			.optional(),
+		twitter: optionalTrimmedString("twitter", 255),
+		github: optionalTrimmedString("github", 255),
 		website: z
-			.string()
-			.url("Website must be a valid URL")
-			.max(2048, "URL is too long")
-			.optional()
-			.nullable(),
+			.string({
+				invalid_type_error: "website must be a string",
+			})
+			.trim()
+			.url("website must be a valid URL")
+			.max(2048, "website must be 2048 characters or fewer")
+			.optional(),
+	})
+	.strict()
+
+export const bookmarkBodySchema = z
+	.object({
+		course_id: requiredString("course_id", 100),
+	})
+	.strict()
+
+export const bookmarkCourseIdParamSchema = z
+	.object({
+		courseId: requiredString("courseId", 100),
 	})
 	.strict()

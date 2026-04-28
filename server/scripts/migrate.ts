@@ -47,9 +47,7 @@ async function migrateUp(): Promise<void> {
 		const { rows: applied } = await client.query<{ filename: string }>(
 			"SELECT filename FROM schema_migrations ORDER BY filename",
 		)
-		const appliedSet = new Set(
-			applied.map((r: { filename: string }) => r.filename),
-		)
+		const appliedSet = new Set(applied.map((r: { filename: string }) => r.filename))
 
 		const files = fs
 			.readdirSync(MIGRATIONS_DIR)

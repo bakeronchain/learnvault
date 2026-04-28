@@ -1,7 +1,7 @@
 import { type NextFunction, type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
 
-const DEFAULT_NON_PROD_JWT_SECRET = "learnvault-secret"
+import { JWT_AUDIENCE, JWT_ISSUER } from "../services/jwt.service"
 
 type TokenPayload = {
 	sub?: string
@@ -10,38 +10,36 @@ type TokenPayload = {
 	isAdmin?: boolean
 }
 
-function getJwtPublicKey(): string | undefined {
+function getJwtPublicKey (): string | undefined {
 	return process.env.JWT_PUBLIC_KEY?.replace(/\\n/g, "\n").trim()
 }
 
-function getJwtSecret(): string | undefined {
-	const secret = process.env.JWT_SECRET?.trim()
-	if (secret) return secret
+function getJwtSecret (): string | undefined {
+	// HS256 fallback is development-only; production must use RS256 via JWT_PUBLIC_KEY.
 	if (process.env.NODE_ENV === "production") return undefined
-
-	return DEFAULT_NON_PROD_JWT_SECRET
+	return process.env.JWT_SECRET?.trim()
 }
 
-function getAdminApiKey(): string | undefined {
+function getAdminApiKey (): string | undefined {
 	const apiKey = process.env.ADMIN_API_KEY?.trim()
 	return apiKey || undefined
 }
 
-function getAdminAddresses(): string[] {
+function getAdminAddresses (): string[] {
 	return (process.env.ADMIN_ADDRESSES ?? "")
 		.split(",")
 		.map((value) => value.trim())
 		.filter(Boolean)
 }
 
-function wantsUnpublishedCourses(req: Request): boolean {
+function wantsUnpublishedCourses (req: Request): boolean {
 	const rawValue = req.query.includeUnpublished
 	if (typeof rawValue !== "string") return false
 
 	return ["1", "true", "yes"].includes(rawValue.trim().toLowerCase())
 }
 
-export function requireCourseAdmin(
+export function requireCourseAdmin (
 	req: Request,
 	res: Response,
 	next: NextFunction,
@@ -78,6 +76,8 @@ export function requireCourseAdmin(
 		if (jwtPublicKey) {
 			decoded = jwt.verify(token, jwtPublicKey, {
 				algorithms: ["RS256"],
+				issuer: JWT_ISSUER,
+				audience: JWT_AUDIENCE,
 			}) as TokenPayload
 		} else {
 			decoded = jwt.verify(token, jwtSecret!) as TokenPayload
@@ -100,7 +100,7 @@ export function requireCourseAdmin(
 	next()
 }
 
-export function requireCourseAdminIfRequested(
+export function requireCourseAdminIfRequested (
 	req: Request,
 	res: Response,
 	next: NextFunction,

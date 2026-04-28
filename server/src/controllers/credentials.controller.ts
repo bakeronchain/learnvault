@@ -3,10 +3,11 @@ import path from "path"
 import { type Request, type Response } from "express"
 
 import { pool } from "../db/index"
-import { createLogger } from "../lib/logger"
+import { logger } from "../lib/logger"
+
+const log = logger.child({ module: "credentials" })
 import { pinJsonToIPFS, getGatewayUrl } from "../services/pinata.service"
 
-const logger = createLogger("credentials")
 
 // ---------------------------------------------------------------------------
 // Types
@@ -21,7 +22,6 @@ interface CourseMetadata {
 interface NFTAttribute {
 	trait_type: string
 	value: string
-	[key: string]: any
 }
 
 interface NFTMetadata {
@@ -29,7 +29,6 @@ interface NFTMetadata {
 	description: string
 	image: string
 	attributes: NFTAttribute[]
-	[key: string]: any
 }
 
 interface CreateMetadataRequest {
@@ -44,12 +43,12 @@ interface CreateMetadataRequest {
 
 let coursesCache: CourseMetadata[] | null = null
 
-async function loadCourses(): Promise<CourseMetadata[]> {
+async function loadCourses (): Promise<CourseMetadata[]> {
 	if (coursesCache) return coursesCache
 
 	const coursesPath = path.resolve(
-		__dirname,
-		"../../content/courses/index.json",
+		process.cwd(),
+		"content/courses/index.json",
 	)
 	const coursesData = await fs.readFile(coursesPath, "utf-8")
 	const courses = JSON.parse(coursesData) as Array<{
@@ -83,19 +82,19 @@ const DEFAULT_IMAGE = "scholar-nft-base.png"
 const IMAGE_CID_MAP: Record<string, string> = {
 	"scholar-nft-stellar.png":
 		process.env.BADGE_CID_STELLAR ??
-		"bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+		"bafybeiaby2ip2h3s675n4bw5rtw6dlatwapfo2zzztvo56q4shpatk2ffe",
 	"scholar-nft-soroban.png":
 		process.env.BADGE_CID_SOROBAN ??
-		"bafybeihvvlkvjkbxy6qxzjzqxzqxzqxzqxzqxzqxzqxzqxzqxzqxzqxzqx",
+		"bafybeih6o2ug36stpo6rqx35xubs736zclfgvkzv7xb5feahm55oouu5sm",
 	"scholar-nft-defi.png":
 		process.env.BADGE_CID_DEFI ??
-		"bafybeidefi123456789abcdefghijklmnopqrstuvwxyz1234567890abc",
+		"bafybeic6c5o6jusf24nms2s5s2vmjemyh5niyjetve455575pf3kha42xu",
 	"scholar-nft-base.png":
 		process.env.BADGE_CID_BASE ??
-		"bafybeiabc123456789defghijklmnopqrstuvwxyz1234567890abcdef",
+		"bafybeid2g5mt6wttyselah5xt32wepgsg24rfhdr4i2tzi25s5ngegawmy",
 }
 
-function getImageCID(courseId: string): string {
+function getImageCID (courseId: string): string {
 	const imageName = COURSE_IMAGE_MAP[courseId] || DEFAULT_IMAGE
 	return IMAGE_CID_MAP[imageName] || IMAGE_CID_MAP[DEFAULT_IMAGE]
 }
@@ -104,7 +103,7 @@ function getImageCID(courseId: string): string {
 // Metadata Generation
 // ---------------------------------------------------------------------------
 
-function generateMetadata(
+function generateMetadata (
 	course: CourseMetadata,
 	learnerAddress: string,
 	completedAt: string,
@@ -150,7 +149,7 @@ function generateMetadata(
  * Generate NFT metadata for a course completion credential and upload to IPFS.
  * Returns the ipfs:// URI for use in scholar_nft.mint().
  */
-export async function createCredentialMetadata(
+export async function createCredentialMetadata (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -175,10 +174,10 @@ export async function createCredentialMetadata(
 
 		// Upload to IPFS via Pinata
 		const metadataName = `${course_id}-${learner_address}-${Date.now()}`
-		const cid = await pinJsonToIPFS(metadata as any, metadataName)
-		if (!cid) {
-			throw new Error("Failed to pin metadata to IPFS")
-		}
+		const cid = await pinJsonToIPFS(
+			metadata as unknown as Record<string, unknown>,
+			metadataName,
+		)
 
 		// Build response
 		const metadataUri = `ipfs://${cid}`
@@ -192,7 +191,7 @@ export async function createCredentialMetadata(
 			},
 		})
 	} catch (error) {
-		logger.error("Error creating credential metadata", { error })
+		log.error({ err: error }, "Error creating credential metadata")
 
 		if (
 			error instanceof Error &&
@@ -221,7 +220,7 @@ type CredentialRow = {
 	revoked: boolean
 }
 
-export async function getCredentialsByAddress(
+export async function getCredentialsByAddress (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -251,7 +250,7 @@ export async function getCredentialsByAddress(
 
 		res.status(200).json({ data })
 	} catch (error) {
-		logger.error("Error fetching credentials by address", { error, address })
+		log.error({ err: error }, "Error fetching credentials by address")
 		res.status(500).json({
 			error: "Internal server error",
 			message: "Failed to fetch credentials",

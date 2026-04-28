@@ -1,27 +1,27 @@
 import { rpc } from "@stellar/stellar-sdk" // dynamic later
 import { INDEXER_CONFIG, getPollingTargets } from "../lib/event-config"
-import { createLogger } from "../lib/logger"
+import { logger } from "../lib/logger"
 import {
 	getLastIndexedLedger,
 	indexEventsBatch,
 } from "../services/event-indexer.service"
 
-const logger = createLogger("event-poller")
+const log = logger.child({ module: "poller" })
 
 let pollInterval: NodeJS.Timeout | null = null
 
-export async function startEventPoller(): Promise<void> {
-	logger.info("Starting event indexer")
+export async function startEventPoller (): Promise<void> {
+	log.info("Starting event indexer")
 
 	// Get global latest ledger
 	const network = new rpc.Server(process.env.SOROBAN_RPC_URL!)
-	const info = await network.getNetwork()
-	let currentLedger = Number(await network.getLatestLedger())
+	const info = await network.getLatestLedger()
+	let currentLedger = Number(info.sequence)
 
 	pollInterval = setInterval(async () => {
 		try {
-			const newInfo = await network.getNetwork()
-			const latestLedger = Number(await network.getLatestLedger())
+			const newInfo = await network.getLatestLedger()
+			const latestLedger = Number(newInfo.sequence)
 
 			if (currentLedger >= latestLedger) return
 
@@ -38,23 +38,26 @@ export async function startEventPoller(): Promise<void> {
 
 			currentLedger = latestLedger
 		} catch (err) {
-			logger.error("Poll failed", { error: err })
+			log.error({ err }, "Poll failed")
 		}
 	}, INDEXER_CONFIG.pollIntervalMs)
 
-	logger.info("Event poller running", {
-		pollIntervalMs: INDEXER_CONFIG.pollIntervalMs,
-		batchSize: INDEXER_CONFIG.batchSize,
-		startingLedger: INDEXER_CONFIG.startingLedger,
-	})
+	log.info(
+		{
+			intervalMs: INDEXER_CONFIG.pollIntervalMs,
+			batchSize: INDEXER_CONFIG.batchSize,
+			startingLedger: INDEXER_CONFIG.startingLedger,
+		},
+		"Poller running",
+	)
 }
 
-export function stopEventPoller(): void {
+export function stopEventPoller (): void {
 	if (pollInterval) {
 		clearInterval(pollInterval)
 		pollInterval = null
 	}
-	logger.info("Stopped")
+	log.info("Poller stopped")
 }
 
 // Graceful shutdown

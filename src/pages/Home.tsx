@@ -1,8 +1,9 @@
-import { Icon } from "@stellar/design-system"
-import React, { lazy, Suspense } from "react"
-import { Helmet } from "react-helmet"
-import { Link } from "react-router-dom"
+import React, { Suspense, lazy } from "react"
+
 import DeferredSection from "../components/DeferredSection"
+import { Helmet } from "react-helmet"
+import { Icon } from "@stellar/design-system"
+import { Link } from "react-router-dom"
 import { useEnrolledCourses } from "../hooks/useCourses"
 
 const MilestoneTracker = lazy(() =>

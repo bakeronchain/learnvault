@@ -1,12 +1,15 @@
+
+import pino from "pino"
 type LogLevel = "info" | "warn" | "error"
 
 type LogMeta = Record<string, unknown>
 
-function isProduction(): boolean {
+const isTest = process.env.NODE_ENV === "test"
+function isProduction (): boolean {
 	return process.env.NODE_ENV === "production"
 }
 
-function sanitizeError(
+function sanitizeError (
 	error: Error,
 	seen: WeakSet<object>,
 ): Record<string, unknown> {
@@ -48,7 +51,7 @@ function sanitizeError(
 	return serialized
 }
 
-export function sanitizeForLogging(
+export function sanitizeForLogging (
 	value: unknown,
 	seen: WeakSet<object> = new WeakSet<object>(),
 ): unknown {
@@ -87,7 +90,7 @@ export function sanitizeForLogging(
 	return value
 }
 
-function writeLog(
+function writeLog (
 	level: LogLevel,
 	scope: string,
 	message: string,
@@ -106,21 +109,50 @@ function writeLog(
 }
 
 export type Logger = {
-	info(message: string, meta?: LogMeta): void
-	warn(message: string, meta?: LogMeta): void
-	error(message: string, meta?: LogMeta): void
+	info (message: string, meta?: LogMeta): void
+	warn (message: string, meta?: LogMeta): void
+	error (message: string, meta?: LogMeta): void
 }
 
-export function createLogger(scope: string): Logger {
+export function createLogger (scope: string): Logger {
 	return {
-		info(message, meta) {
+		info (message, meta) {
 			writeLog("info", scope, message, meta)
 		},
-		warn(message, meta) {
+		warn (message, meta) {
 			writeLog("warn", scope, message, meta)
 		},
-		error(message, meta) {
+		error (message, meta) {
 			writeLog("error", scope, message, meta)
 		},
 	}
+}
+
+
+function buildTransport () {
+	if (isTest) return undefined
+	if (!isProduction()) {
+		return {
+			target: "pino-pretty",
+			options: { colorize: true, translateTime: "SYS:standard" },
+		}
+	}
+	return undefined
+}
+
+export const logger = pino({
+	level: isTest
+		? "silent"
+		: (process.env.LOG_LEVEL ?? (isProduction() ? "info" : "debug")),
+	transport: buildTransport(),
+})
+
+/**
+ * Truncates a Stellar wallet address for safe logging — never log full addresses
+ * as they can be used as PII fingerprints. Shows first 4 + last 4 characters.
+ * e.g. "GABC...WXYZ"
+ */
+export function maskAddress (address: string): string {
+	if (!address || address.length <= 8) return address
+	return `${address.slice(0, 4)}...${address.slice(-4)}`
 }

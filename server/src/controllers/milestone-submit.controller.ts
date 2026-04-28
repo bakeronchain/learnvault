@@ -1,10 +1,11 @@
 import { type Request, type Response } from "express"
 import sanitizeHtml from "sanitize-html"
 import { milestoneStore } from "../db/milestone-store"
-import { createLogger } from "../lib/logger"
+import { logger } from "../lib/logger"
+
+const log = logger.child({ module: "milestones" })
 import { createEmailService } from "../services/email.service"
 
-const logger = createLogger("milestone-submit")
 import { markEscrowActivity } from "../services/escrow-timeout.service"
 
 interface MilestoneSubmitRequestBody {
@@ -21,7 +22,7 @@ interface MilestoneSubmitRequestBody {
 }
 const emailService = createEmailService(process.env.EMAIL_API_KEY || "")
 
-export async function submitMilestoneReport(
+export async function submitMilestoneReport (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -81,14 +82,7 @@ export async function submitMilestoneReport(
 				courseId,
 				milestoneId.toString(),
 			)
-			.catch((error) => {
-				logger.error("Admin milestone alert failed", {
-					error,
-					scholarAddress,
-					courseId,
-					milestoneId,
-				})
-			})
+			.catch((err) => log.error({ err }, "Admin alert email failed"))
 		res.status(201).json({ data: report })
 	} catch (err) {
 		if (err instanceof Error && err.message === "DUPLICATE_REPORT") {
@@ -97,7 +91,7 @@ export async function submitMilestoneReport(
 			})
 			return
 		}
-		logger.error("submitMilestoneReport failed", { error: err })
+		log.error({ err }, "submitMilestoneReport error")
 		res.status(500).json({ error: "Failed to submit milestone report" })
 	}
 }

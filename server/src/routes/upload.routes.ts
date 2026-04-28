@@ -4,7 +4,7 @@ import { createRequireAuth } from "../middleware/auth.middleware"
 import { upload } from "../middleware/upload.middleware"
 import { type JwtService } from "../services/jwt.service"
 
-export function createUploadRouter(jwtService: JwtService): Router {
+export function createUploadRouter (jwtService: JwtService): Router {
 	const router = Router()
 	const requireAuth = createRequireAuth(jwtService)
 

@@ -385,19 +385,19 @@ const LessonView: React.FC = () => {
 							<CourseForum courseId={course.slug} />
 						</div>
 					) : (
-						<>
-							<LessonContent
-								lesson={lesson ?? loadingLesson}
-								isLoading={isLoadingCourse || isLoadingContent}
-								isCompleted={isCompleted}
-								isCompleting={isCompletingMilestone}
-								timeSpentLabel={timeSpentLabel}
-								onMarkComplete={handleMarkComplete}
-								onScrolledToBottom={() => markLessonRead(lessonId)}
-								prevLessonId={prevLessonId}
-								nextLessonId={nextLessonId}
-								isNextLocked={isNextLocked}
-							/>
+						<LessonContent
+							lesson={lesson ?? loadingLesson}
+							isLoading={isLoadingCourse || isLoadingContent}
+							isCompleted={isCompleted}
+							isCompleting={isCompletingMilestone}
+							timeSpentLabel={timeSpentLabel}
+							onMarkComplete={handleMarkComplete}
+							onScrolledToBottom={() => markLessonRead(lessonId)}
+							prevLessonId={prevLessonId}
+							nextLessonId={nextLessonId}
+							isNextLocked={isNextLocked}
+						/>
+					)}
 
 							{lesson?.isMilestone && !isLoadingCourse && !isLoadingContent && (
 								<div className="mt-12 animate-in fade-in slide-in-from-top-4 duration-1000">

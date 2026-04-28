@@ -1,12 +1,8 @@
 import { useQuery } from "@tanstack/react-query"
 import { useWallet } from "./useWallet"
 
-export type LinkedWalletInfo = { address: string; isPrimary: boolean }
-
 export interface LearnerProfile {
 	address: string
-	/** Stellar keys tied to the same app account; primary is the canonical id. */
-	wallets: LinkedWalletInfo[]
 }
 
 /**
@@ -14,7 +10,7 @@ export interface LearnerProfile {
  * Returns the profile data (currently just wallet address, but extensible).
  * Automatically disabled if no wallet is connected.
  */
-export function useLearnerProfile() {
+export function useLearnerProfile () {
 	const { address } = useWallet()
 
 	const { data, isLoading, error } = useQuery<LearnerProfile>({
@@ -37,14 +33,7 @@ export function useLearnerProfile() {
 				throw new Error(error.error || "Failed to fetch learner profile")
 			}
 
-			const json = (await response.json()) as LearnerProfile & {
-				wallets?: LinkedWalletInfo[]
-			}
-			const wallets =
-				Array.isArray(json.wallets) && json.wallets.length > 0
-					? json.wallets
-					: [{ address: json.address, isPrimary: true }]
-			return { address: json.address, wallets }
+			return response.json() as Promise<LearnerProfile>
 		},
 		enabled: !!address,
 		staleTime: 5 * 60 * 1000, // 5 minutes

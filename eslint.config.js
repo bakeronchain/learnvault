@@ -10,7 +10,9 @@ export default [
 		"target/packages",
 		"**/contracts/*",
 		"!src/contracts/util.ts",
+		"contracts/**",
 		"**/*.yml",
+		"**/*.yaml",
 	]),
 	...config,
 	{

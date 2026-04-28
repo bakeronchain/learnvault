@@ -1,14 +1,15 @@
-import { Button } from "@stellar/design-system"
-import { useQueryClient } from "@tanstack/react-query"
 import React, { useState } from "react"
-import ReactMarkdown from "react-markdown"
 import {
 	deleteReply,
 	deleteThread,
 	replyToThread,
 	useForumThreadDetail,
 } from "../../hooks/useForum"
+
+import { Button } from "@stellar/design-system"
+import ReactMarkdown from "react-markdown"
 import { WalletAddressPill } from "../WalletAddressPill"
+import { useQueryClient } from "@tanstack/react-query"
 
 interface ThreadDetailProps {
 	courseId: string
@@ -109,8 +110,10 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 				>
 					<span>←</span> Back to Discussions
 				</button>
+
 				<div className="flex justify-between items-start gap-4 mb-6">
 					<h2 className="text-3xl font-bold text-white">{thread.title}</h2>
+
 					{(isAdmin || currentAddress === thread.author_address) && (
 						<button
 							type="button"
@@ -121,6 +124,7 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 						</button>
 					)}
 				</div>
+
 				<div className="flex items-center gap-3 text-sm text-white/50 mb-8 border-b border-white/10 pb-6">
 					<WalletAddressPill address={thread.author_address} />
 					<span>•</span>
@@ -154,12 +158,14 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 										<span>•</span>
 										<span>{new Date(reply.created_at).toLocaleString()}</span>
 									</div>
+
 									{(isAdmin || currentAddress === reply.author_address) && (
 										<button
 											type="button"
 											className="text-white/30 hover:text-red-400 transition-colors px-2 py-1"
 											onClick={() => handleDeleteReply(reply.id)}
 											title="Delete reply"
+											aria-label="Delete reply"
 										>
 											×
 										</button>

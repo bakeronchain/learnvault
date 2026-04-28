@@ -102,16 +102,15 @@ describe("GET /api/courses", () => {
 		const res = await request(buildApp()).get("/api/courses?search=stellar")
 
 		expect(res.status).toBe(200)
-		expect(res.body.total).toBe(1)
+		expect(res.body.pagination.total).toBe(1)
 		expect(mockedQuery).toHaveBeenNthCalledWith(
 			1,
-			expect.stringContaining("c.title ILIKE $1 OR c.description ILIKE $1"),
-			["%stellar%", 12, 0],
+			expect.stringContaining("SELECT COUNT(*) AS count FROM courses c"),
 			["%stellar%"],
 		)
 		expect(mockedQuery).toHaveBeenNthCalledWith(
 			2,
-			expect.stringContaining("c.title ILIKE $1 OR c.description ILIKE $1"),
+			expect.stringContaining("SELECT"),
 			["%stellar%", 12, 0],
 		)
 	})

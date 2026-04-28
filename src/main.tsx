@@ -1,39 +1,22 @@
-import {
-	QueryClient,
-	QueryClientProvider,
-	QueryCache,
-	MutationCache,
-} from "@tanstack/react-query"
-import { StrictMode } from "react"
-import { createRoot } from "react-dom/client"
-import { BrowserRouter } from "react-router-dom"
 import "@stellar/design-system/build/styles.min.css"
 import "./index.css"
-import App from "./App.tsx"
-import { initSentry } from "./lib/sentry"
-import { NotificationProvider } from "./providers/NotificationProvider.tsx"
-import { WalletProvider } from "./providers/WalletProvider.tsx"
 import "./i18n"
-import { parseError } from "./util/error"
 
-// Initialize Sentry for error monitoring
-initSentry({
-	dsn: import.meta.env.VITE_SENTRY_DSN,
-	environment: import.meta.env.VITE_SENTRY_ENVIRONMENT || "development",
-	release:
-		import.meta.env.VITE_SENTRY_RELEASE || import.meta.env.VITE_GIT_COMMIT_HASH,
-	tracesSampleRate: import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE
-		? parseFloat(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE)
-		: 0.1,
-	replaysSessionSampleRate: import.meta.env
-		.VITE_SENTRY_REPLAYS_SESSION_SAMPLE_RATE
-		? parseFloat(import.meta.env.VITE_SENTRY_REPLAYS_SESSION_SAMPLE_RATE)
-		: 0.1,
-	replaysOnErrorSampleRate: import.meta.env
-		.VITE_SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE
-		? parseFloat(import.meta.env.VITE_SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE)
-		: 1.0,
-})
+import {
+	MutationCache,
+	QueryCache,
+	QueryClient,
+	QueryClientProvider,
+} from "@tanstack/react-query"
+
+import App from "./App.tsx"
+import { BrowserRouter } from "react-router-dom"
+import { NotificationProvider } from "./providers/NotificationProvider.tsx"
+import { StrictMode } from "react"
+import { WalletProvider } from "./providers/WalletProvider.tsx"
+import { createRoot } from "react-dom/client"
+import { initSentry } from "./lib/sentry"
+import { parseError } from "./util/error"
 
 // Issue #61 — FOUC prevention: apply theme before first render
 ;(function () {

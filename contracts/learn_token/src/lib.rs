@@ -34,6 +34,16 @@ const PERSISTENT_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
 const PERSISTENT_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365; // 1 year
 
 // ---------------------------------------------------------------------------
+// Storage Constants (assuming ~6s ledger time)
+// ---------------------------------------------------------------------------
+
+const DAY_IN_LEDGERS: u32 = 17_280;
+const INSTANCE_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
+const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30; // 30 days
+const PERSISTENT_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
+const PERSISTENT_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365; // 1 year
+
+// ---------------------------------------------------------------------------
 // Errors
 // ---------------------------------------------------------------------------
 
@@ -91,7 +101,6 @@ impl LearnToken {
             .instance()
             .set(&SYMBOL_KEY, &String::from_str(&env, "LRN"));
         env.storage().instance().set(&DECIMALS_KEY, &7_u32);
-
         Self::extend_instance(&env);
     }
 

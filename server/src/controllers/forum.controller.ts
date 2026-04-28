@@ -3,8 +3,6 @@ import { pool } from "../db"
 import { createLogger } from "../lib/logger"
 import { createEmailService } from "../services/email.service"
 
-const logger = createLogger("forum")
-
 export const listForumThreads = async (
 	req: Request,
 	res: Response,
@@ -22,7 +20,7 @@ export const listForumThreads = async (
 			isNumericId ? Number.parseInt(idOrSlug, 10) : idOrSlug,
 		])
 
-		if (courseResult.rowCount === 0) {
+		if ((courseResult as any).rowCount === 0) {
 			res.status(404).json({ error: "Course not found" })
 			return
 		}
@@ -68,7 +66,7 @@ export const createForumThread = async (
 			[isNumericId ? Number.parseInt(idOrSlug, 10) : idOrSlug],
 		)
 
-		if (courseResult.rowCount === 0) {
+		if ((courseResult as any).rowCount === 0) {
 			res.status(404).json({ error: "Course not found" })
 			return
 		}
@@ -120,7 +118,7 @@ export const getForumThread = async (
 			[threadId],
 		)
 
-		if (threadResult.rowCount === 0) {
+		if ((threadResult as any).rowCount === 0) {
 			res.status(404).json({ error: "Thread not found" })
 			return
 		}
@@ -174,7 +172,7 @@ export const replyToForumThread = async (
 			[threadId],
 		)
 
-		if (threadResult.rowCount === 0) {
+		if ((threadResult as any).rowCount === 0) {
 			res.status(404).json({ error: "Thread not found" })
 			return
 		}
@@ -194,10 +192,9 @@ export const replyToForumThread = async (
 			// Wait, we can fetch email if it was stored, but since it's not uniformly stored,
 			// we will simulate the EmailService call to log it.
 			const emailService = createEmailService(process.env.RESEND_API_KEY || "")
-			logger.info("Sending reply notification to thread owner", {
-				threadOwner: thread.author_address,
-				threadId,
-			})
+			console.log(
+				`[Forum] Sending reply notification to thread owner: ${thread.author_address}`,
+			)
 
 			// For now, let's use a dummy email based on wallet to simulate since we don't store actual emails universally
 			const targetEmail = `${thread.author_address}@example.com` // Mock email

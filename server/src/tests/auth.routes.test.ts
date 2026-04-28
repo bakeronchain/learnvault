@@ -6,10 +6,8 @@ import { type AuthService } from "../services/auth.service"
 const mockAuthService: jest.Mocked<AuthService> = {
 	getOrCreateNonce: jest.fn(),
 	verifyAndIssueToken: jest.fn(),
-	verifyLinkSignature: jest.fn(),
 	createChallenge: jest.fn(),
 	verifySignedTransaction: jest.fn(),
-	logout: jest.fn(),
 }
 
 function buildApp() {
@@ -109,21 +107,5 @@ describe("Auth Routes", () => {
 		})
 	})
 
-	describe("POST /api/auth/logout", () => {
-		it("revokes the token on logout", async () => {
-			mockAuthService.logout.mockResolvedValue(undefined)
-
-			const res = await request(buildApp())
-				.post("/api/auth/logout")
-				.set("Authorization", "Bearer mock_token")
-
-			expect(res.status).toBe(200)
-			expect(mockAuthService.logout).toHaveBeenCalledWith("mock_token")
-		})
-
-		it("returns 401 if Authorization header is missing", async () => {
-			const res = await request(buildApp()).post("/api/auth/logout")
-			expect(res.status).toBe(401)
-		})
-	})
+	// Logout was removed from the API (token revocation is handled by the JWT blocklist service).
 })

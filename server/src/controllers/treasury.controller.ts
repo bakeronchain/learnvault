@@ -1,14 +1,14 @@
 import { rpc } from "@stellar/stellar-sdk"
 import { type Request, type Response } from "express"
-import { createLogger } from "../lib/logger"
+import { logger } from "../lib/logger"
 
-const logger = createLogger("treasury")
+const log = logger.child({ module: "treasury" })
 
 const STELLAR_NETWORK = process.env.STELLAR_NETWORK ?? "testnet"
 const SCHOLARSHIP_TREASURY_CONTRACT_ID =
 	process.env.SCHOLARSHIP_TREASURY_CONTRACT_ID ?? ""
 
-function parsePositiveInt(value: unknown, fallback: number): number {
+function parsePositiveInt (value: unknown, fallback: number): number {
 	if (typeof value !== "string") return fallback
 	const parsed = Number.parseInt(value, 10)
 	if (Number.isNaN(parsed) || parsed < 0) return fallback
@@ -39,8 +39,10 @@ export const getTreasuryStats = async (
 
 		// Fetch events from the ScholarshipTreasury contract
 		const response = await server.getEvents({
-			filters: [{ contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] }],
-			startLedger: parseInt(process.env.STARTING_LEDGER || "460000000", 10),
+			filters: [
+				{ type: "contract", contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] },
+			],
+			startLedger: Number(process.env.STARTING_LEDGER ?? "460000000"),
 			limit: 1000,
 		})
 
@@ -80,7 +82,7 @@ export const getTreasuryStats = async (
 			donors_count: donors.size,
 		})
 	} catch (err) {
-		logger.error("Failed to fetch treasury stats", { error: err })
+		log.error({ err }, "Failed to fetch stats")
 		res.status(500).json({
 			error: "Failed to fetch treasury statistics",
 		})
@@ -106,10 +108,7 @@ export const getTreasuryActivity = async (
 		1,
 		Math.min(parsePositiveInt(req.query.limit, 20), 100),
 	)
-	const pageParam = parsePositiveInt(req.query.page, 1)
-	const offsetParam = parsePositiveInt(req.query.offset, -1)
-	const offset = offsetParam >= 0 ? offsetParam : (pageParam - 1) * limit
-	const page = offsetParam >= 0 ? Math.floor(offset / limit) + 1 : pageParam
+	const offset = Math.max(0, parsePositiveInt(req.query.offset, 0))
 
 	try {
 		const server = new rpc.Server(
@@ -120,8 +119,10 @@ export const getTreasuryActivity = async (
 
 		// Fetch events from the ScholarshipTreasury contract
 		const response = await server.getEvents({
-			filters: [{ contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] }],
-			startLedger: parseInt(process.env.STARTING_LEDGER || "460000000", 10),
+			filters: [
+				{ type: "contract", contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] },
+			],
+			startLedger: Number(process.env.STARTING_LEDGER ?? "460000000"),
 			limit: 1000,
 		})
 
@@ -170,18 +171,12 @@ export const getTreasuryActivity = async (
 
 		// Apply pagination
 		const paginatedEvents = events.slice(offset, offset + limit)
-		const total = events.length
 
 		res.status(200).json({
-			data: paginatedEvents,
-			pagination: { page, limit, total },
+			events: paginatedEvents,
 		})
 	} catch (err) {
-		logger.error("Failed to fetch treasury activity", {
-			error: err,
-			limit,
-			offset,
-		})
+		log.error({ err }, "Failed to fetch activity")
 		res.status(500).json({
 			error: "Failed to fetch treasury activity",
 		})

@@ -1,6 +1,5 @@
 import { type NextFunction, type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
-
 import { type JwtService } from "../services/jwt.service"
 
 // ---------------------------------------------------------------------------
@@ -38,6 +37,30 @@ export function createRequireAuth(jwtService: JwtService) {
 	}
 }
 
+export function createOptionalAuth(jwtService: JwtService) {
+	return async function optionalAuth(
+		req: Request,
+		_res: Response,
+		next: NextFunction,
+	): Promise<void> {
+		const header = req.headers.authorization
+		if (header?.startsWith("Bearer ")) {
+			const token = header.slice("Bearer ".length).trim()
+			if (token) {
+				try {
+					const { sub } = await jwtService.verifyWalletToken(token)
+					req.walletAddress = sub
+					;(req as AuthRequest).user = { address: sub }
+				} catch {
+					// Ignore invalid tokens for optional auth
+				}
+			}
+		}
+
+		next()
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Standalone auth (used by self-contained routers, e.g. upload, comments)
 // ---------------------------------------------------------------------------
@@ -49,7 +72,6 @@ export interface AuthRequest extends Request {
 	user?: {
 		address: string
 	}
-	walletAddress?: string
 }
 
 export const authMiddleware = (

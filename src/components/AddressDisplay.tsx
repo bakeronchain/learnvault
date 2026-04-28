@@ -1,5 +1,6 @@
-import { motion, AnimatePresence } from "framer-motion"
-import { useState, useId } from "react"
+import { AnimatePresence, motion } from "framer-motion"
+import { useId, useState } from "react"
+
 import { stellarNetwork } from "../contracts/util"
 import { useWallet } from "../hooks/useWallet"
 
@@ -62,8 +63,8 @@ export const AddressDisplay: React.FC<AddressDisplayProps> = ({
 			activeNetwork.includes("public") || activeNetwork.includes("mainnet")
 				? "https://stellar.expert/explorer/public/account/"
 				: activeNetwork.includes("futurenet")
-					? "https://futurenet.stellar.expert/explorer/futurenet/account/"
-					: "https://testnet.stellar.expert/explorer/testnet/account/"
+				? "https://futurenet.stellar.expert/explorer/futurenet/account/"
+				: "https://testnet.stellar.expert/explorer/testnet/account/"
 		return `${baseUrl}${address}`
 	}
 
@@ -151,6 +152,7 @@ export const AddressDisplay: React.FC<AddressDisplayProps> = ({
 					rel="noopener noreferrer"
 					className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-colors text-white/50 hover:text-brand-cyan"
 					title="View on Stellar Expert"
+					aria-label="View on Stellar Expert"
 				>
 					<svg
 						viewBox="0 0 24 24"

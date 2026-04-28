@@ -67,7 +67,7 @@ export async function getFlagDetails(
 export async function actionOnFlag(req: Request, res: Response): Promise<void> {
 	const { flagId } = req.params
 	const body = req.body as ModerationActionRequest
-	const adminAddress = (req as any).user?.address || (req as any).adminAddress
+	const adminAddress = (req as any).user?.address
 
 	const { action, adminNotes } = body
 

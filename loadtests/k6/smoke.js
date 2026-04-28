@@ -1,3 +1,4 @@
+/* global __ENV */
 import { check, group, sleep } from "k6"
 
 import http from "k6/http"
@@ -9,9 +10,9 @@ const healthDur = new Trend("duration_health", true)
 const coursesDur = new Trend("duration_courses", true)
 const authDur = new Trend("duration_auth_proxy", true)
 
-// eslint-disable-next-line no-undef
+
 const base = __ENV.BASE_URL || "http://localhost:4000"
-// eslint-disable-next-line no-undef
+
 const jwt = __ENV.K6_JWT || ""
 
 export const options = {
@@ -23,7 +24,7 @@ export const options = {
 	},
 }
 
-function req(method, path, body = null, withAuth = false) {
+function req (method, path, body = null, withAuth = false) {
 	const params = { headers: { "Content-Type": "application/json" } }
 	if (withAuth && jwt) {
 		params.headers.Authorization = `Bearer ${jwt}`

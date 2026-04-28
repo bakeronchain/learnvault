@@ -32,24 +32,26 @@ import * as pinataService from "../services/pinata.service"
 const JWT_SECRET = "learnvault-secret"
 
 const testJwtService = {
-	signWalletToken: (addr: string) => jwt.sign({ sub: addr }, JWT_SECRET),
+	signWalletToken: (addr: string) =>
+		jwt.sign({ sub: addr, jti: "test-jti" }, JWT_SECRET),
 	verifyWalletToken: async (token: string) => {
 		const d = jwt.verify(token, JWT_SECRET) as {
 			sub?: string
 			address?: string
+			jti?: string
 		}
 		const sub = d.sub ?? d.address ?? ""
 		if (!sub) throw new Error("Invalid token")
-		return { sub }
+		return { sub, jti: d.jti ?? "test-jti" }
 	},
-	revokeToken: async () => {},
+	revokeToken: jest.fn().mockResolvedValue(undefined),
 }
 
-function makeToken(address = "GUSER123") {
-	return jwt.sign({ address }, JWT_SECRET, { expiresIn: "1h" })
+function makeToken (address = "GUSER123") {
+	return jwt.sign({ address, jti: "test-jti" }, JWT_SECRET, { expiresIn: "1h" })
 }
 
-function buildApp() {
+function buildApp () {
 	const app = express()
 	app.use(express.json())
 	app.use("/api", createUploadRouter(testJwtService))
@@ -134,7 +136,7 @@ describe("POST /api/upload", () => {
 	})
 
 	it("returns 500 when Pinata throws", async () => {
-		;(pinataService.pinFileToIPFS as jest.Mock).mockRejectedValueOnce(
+		; (pinataService.pinFileToIPFS as jest.Mock).mockRejectedValueOnce(
 			new Error("Pinata API error"),
 		)
 

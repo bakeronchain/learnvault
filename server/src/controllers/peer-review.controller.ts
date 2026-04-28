@@ -6,7 +6,7 @@ import { type AuthRequest } from "../middleware/auth.middleware"
 
 const logger = createLogger("peer-review")
 
-export async function getPeerReviewQueueHandler(
+export async function getPeerReviewQueueHandler (
 	req: AuthRequest,
 	res: Response,
 ): Promise<void> {
@@ -25,7 +25,7 @@ export async function getPeerReviewQueueHandler(
 	}
 }
 
-export async function submitPeerReviewHandler(
+export async function submitPeerReviewHandler (
 	req: AuthRequest,
 	res: Response,
 ): Promise<void> {
@@ -45,9 +45,9 @@ export async function submitPeerReviewHandler(
 	const comment =
 		typeof rawComment === "string"
 			? sanitizeHtml(rawComment, {
-					allowedTags: [],
-					allowedAttributes: {},
-				}).trim() || null
+				allowedTags: [],
+				allowedAttributes: {},
+			}).trim() || null
 			: null
 
 	const verdict = req.body?.verdict as "approve" | "reject"

@@ -5,7 +5,7 @@ import PinataClient from "@pinata/sdk"
 // Client
 // ---------------------------------------------------------------------------
 
-function createClient(): PinataClient | null {
+function createClient (): PinataClient | null {
 	const apiKey = process.env.PINATA_API_KEY
 	const secret = process.env.PINATA_SECRET
 	if (!apiKey || !secret) return null
@@ -15,16 +15,9 @@ function createClient(): PinataClient | null {
 // Lazily created so the service can be imported even when env vars are absent
 // (e.g. in tests that stub the module).
 let _client: PinataClient | null | undefined
-function getClient(): PinataClient {
+function getClient (): PinataClient {
 	if (_client === undefined) _client = createClient()
 	if (!_client) {
-		// Allow tests to proceed without Pinata configuration
-		if (
-			process.env.NODE_ENV === "test" ||
-			process.env.JWT_SECRET === "learnvault-secret"
-		) {
-			throw new Error("Pinata not configured for test - this should be mocked")
-		}
 		throw new Error(
 			"Pinata is not configured. Set PINATA_API_KEY and PINATA_SECRET in server/.env",
 		)
@@ -40,7 +33,7 @@ function getClient(): PinataClient {
  * Pin a file buffer to IPFS via Pinata.
  * Returns the IPFS CIDv1.
  */
-export async function pinFileToIPFS(
+export async function pinFileToIPFS (
 	buffer: Buffer,
 	filename: string,
 ): Promise<string> {
@@ -65,7 +58,7 @@ export async function pinFileToIPFS(
  * standard (name, description, image, attributes).
  * Returns the IPFS CIDv1.
  */
-export async function pinJsonToIPFS(
+export async function pinJsonToIPFS (
 	json: Record<string, unknown>,
 	name: string,
 ): Promise<string> {
@@ -83,7 +76,7 @@ export async function pinJsonToIPFS(
  * Build a public HTTP URL for a CID using the configured gateway.
  * Defaults to the Pinata dedicated gateway; override with IPFS_GATEWAY_URL.
  */
-export function getGatewayUrl(cid: string): string {
+export function getGatewayUrl (cid: string): string {
 	const base =
 		process.env.IPFS_GATEWAY_URL?.replace(/\/$/, "") ??
 		"https://gateway.pinata.cloud/ipfs"

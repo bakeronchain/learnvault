@@ -180,7 +180,7 @@ export const flaggedContentStore = {
 
 		// Create new flag
 		const result = await pool.query(
-			`INSERT INTO flagged_content (content_type, content_id, reporter_address, reason) 
+			`INSERT INTO flagged_content (content_type, content_id, reporter_address, reason)
 			 VALUES ($1, $2, $3, $4) RETURNING *`,
 			[contentType, contentId, reporterAddress, reason],
 		)

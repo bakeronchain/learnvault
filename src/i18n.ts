@@ -6,12 +6,14 @@ import en from "./locales/en.json"
 import es from "./locales/es.json"
 import fr from "./locales/fr.json"
 import sw from "./locales/sw.json"
+import ps from "./locales/ps.json"
 
 const resources = {
 	en: { translation: en },
 	es: { translation: es },
 	fr: { translation: fr },
 	sw: { translation: sw },
+	ps: { translation: ps },
 }
 
 void i18n

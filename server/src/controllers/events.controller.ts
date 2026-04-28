@@ -1,6 +1,7 @@
 import { type Request, type Response } from "express"
-import { logger } from "../lib/logger"
 import { pool } from "../db/index"
+import { socialStore } from "../db/social-store"
+import { logger } from "../lib/logger"
 
 const log = logger.child({ module: "events" })
 
@@ -61,16 +62,12 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
 		1,
 		Math.min(parsePositiveInt(req.query.limit, 50), 100),
 	)
-	const pageParam = parsePositiveInt(req.query.page, 1)
-	const offsetQueryParam = parsePositiveInt(req.query.offset, -1)
-	const offset = offsetQueryParam >= 0 ? offsetQueryParam : (pageParam - 1) * limit
-	const page = offsetQueryParam >= 0 ? Math.floor(offset / limit) + 1 : pageParam
+	const offset = Math.max(0, parsePositiveInt(req.query.offset, 0))
 
 	let query = `
 		SELECT id, contract, event_type, data, ledger_sequence, created_at
 		FROM events
 	`
-	let countQuery = `SELECT COUNT(*)::int as total FROM events`
 	const conditions: string[] = []
 	const params: unknown[] = []
 
@@ -89,10 +86,22 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
 		conditions.push(`LOWER(data::text) LIKE $${params.length}`)
 	}
 
+	const followedOnly = req.query.followed_only === "true"
+	const currentUser = (req as any).user?.address
+	if (followedOnly && currentUser) {
+		const followed = await socialStore.getFollowedAddresses(currentUser)
+		if (followed.length === 0) {
+			res.status(200).json({ data: [] })
+			return
+		}
+		// Match any of the followed addresses in the data text
+		const pattern = followed.map((a) => a.toLowerCase()).join("|")
+		params.push(pattern)
+		conditions.push(`data::text ~* $${params.length}`)
+	}
+
 	if (conditions.length > 0) {
-		const whereClause = ` WHERE ${conditions.join(" AND ")}`
-		query += whereClause
-		countQuery += whereClause
+		query += ` WHERE ${conditions.join(" AND ")}`
 	}
 
 	const limitParam = params.length + 1
@@ -101,18 +110,12 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
 	params.push(limit, offset)
 
 	try {
-		const countResult = await pool.query(countQuery, params.slice(0, params.length - 2))
-		const total = countResult.rows[0]?.total || 0
-
 		const result = await pool.query(query, params)
 		const data = result.rows.map((row) => ({
 			...row,
 			tx_hash: extractTxHash(row.data),
 		}))
-		res.status(200).json({ 
-			data,
-			pagination: { page, limit, total },
-		})
+		res.status(200).json({ data })
 	} catch (err) {
 		log.error({ err }, "Query failed")
 		res.status(500).json({ error: "Failed to fetch events" })

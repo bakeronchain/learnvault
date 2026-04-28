@@ -1,5 +1,9 @@
+<<<<<<< HEAD
+import { useEffect, useId, useState, useCallback } from "react"
+=======
 import { useEffect, useId, useState } from "react"
 import { formatDistanceToNow } from "date-fns"
+>>>>>>> main
 import { useTranslation } from "react-i18next"
 import { useWallet } from "../hooks/useWallet"
 import { getAuthToken } from "../util/auth"
@@ -24,6 +28,9 @@ interface CommentSectionProps {
 	proposalAuthor?: string
 }
 
+<<<<<<< HEAD
+function CommentSection({
+=======
 const API_URL = (
 	(import.meta.env.VITE_API_URL as string | undefined) ??
 	(import.meta.env.VITE_SERVER_URL as string | undefined) ??
@@ -31,11 +38,15 @@ const API_URL = (
 ).replace(/\/$/, "")
 
 const CommentSection: React.FC<CommentSectionProps> = ({
+>>>>>>> main
 	proposalId,
 	proposalAuthor,
-}) => {
+}: CommentSectionProps) {
 	const { t } = useTranslation()
+<<<<<<< HEAD
+=======
 	const { address } = useWallet()
+>>>>>>> main
 	const pollInterval = Number(import.meta.env.VITE_COMMENT_POLL_MS) || 15000
 	const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
 	const commentInputId = useId()
@@ -49,6 +60,38 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 	const [submissionError, setSubmissionError] = useState<string | null>(null)
 	const [submissionStatus, setSubmissionStatus] = useState<string | null>(null)
 
+<<<<<<< HEAD
+	const fetchComments = useCallback(
+		async (isSilent = false) => {
+			if (!isSilent) setLoading(true)
+			try {
+				const res = await fetch(
+					`${import.meta.env.VITE_SERVER_URL}/api/proposals/${proposalId}/comments`,
+				)
+				if (!res.ok) throw new Error("Failed to fetch comments")
+				const data = await res.json()
+				setComments(data)
+				setLastUpdated(new Date())
+			} catch (err) {
+				console.error("Failed to fetch comments", err)
+			} finally {
+				if (!isSilent) setLoading(false)
+			}
+		},
+		[proposalId],
+	)
+
+	useEffect(() => {
+		let isMounted = true
+		const safeFetch = async (silent: boolean) => {
+			if (!isMounted) return
+			await fetchComments(silent)
+		}
+
+		void safeFetch(false)
+
+		const interval = setInterval(() => void safeFetch(true), pollInterval)
+=======
 	const fetchComments = async () => {
 		setLoading(true)
 		try {
@@ -72,6 +115,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 		void safeFetch()
 
 		const interval = setInterval(() => void safeFetch(), pollInterval)
+>>>>>>> main
 		return () => {
 			isMounted = false
 			clearInterval(interval)

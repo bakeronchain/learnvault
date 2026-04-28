@@ -9,7 +9,10 @@ on:
       - "package.json"
       - "package-lock.json"
       - "vite.config.ts"
+<<<<<<< HEAD
+=======
       - "vitest.config.ts"
+>>>>>>> main
       - "tsconfig*.json"
       - "eslint.config.js"
 
@@ -33,9 +36,19 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      - name: Type check
+        run: npm run typecheck
+
       - name: Lint
         run: npm run lint
 
+<<<<<<< HEAD
+      - name: i18n scan
+        run: npm run i18n:scan
+
+      - name: Test
+        run: npm run test:frontend
+=======
       - name: Test with coverage
         run: npm run test:coverage
 
@@ -46,6 +59,7 @@ jobs:
           files: ./coverage/lcov.info
           flags: frontend
           fail_ci_if_error: false
+>>>>>>> main
 
       - name: Build
         run: npm run build

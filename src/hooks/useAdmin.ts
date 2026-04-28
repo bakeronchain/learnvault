@@ -1,28 +1,21 @@
+<<<<<<< HEAD
+import { useState, useCallback } from "react"
+=======
 import { useCallback, useRef, useState } from "react"
 import { apiFetchJson, buildApiUrl, createAuthHeaders } from "../lib/api"
+>>>>>>> main
 
 export interface AdminStats {
 	pendingMilestones: number
 	approvedToday: number
 	rejectedToday: number
+<<<<<<< HEAD
+=======
 	totalScholars: number
 	totalLrnMinted: string
 	openProposals: number
 	treasuryBalanceUsdc: string
-}
-
-export interface ValidatorAnalytics {
-	validatorAddress: string
-	milestonesReviewed: number
-	averageReviewTimeSeconds: number
-	approvalRate: number
-	appealReversalRate: number
-}
-
-export interface ValidatorReviewQueue {
-	pendingReviews: number
-	threshold: number
-	exceeded: boolean
+>>>>>>> main
 }
 
 export interface MilestoneSubmission {
@@ -32,9 +25,6 @@ export interface MilestoneSubmission {
 	evidenceLink: string
 	submittedAt: string
 	status: "pending" | "approved" | "rejected"
-	/** Non-binding peer review counts (inform admin decisions). */
-	peerApprovalCount: number
-	peerRejectionCount: number
 }
 
 export interface PaginatedMilestones {
@@ -72,23 +62,6 @@ type AdminStatsResponse = {
 	treasury_balance_usdc: string
 }
 
-type ValidatorAnalyticsApi = {
-	validator_address: string
-	milestones_reviewed: number
-	average_review_time_seconds: number
-	approval_rate: number
-	appeal_reversal_rate: number
-}
-
-type ValidatorAnalyticsResponse = {
-	validators: ValidatorAnalyticsApi[]
-	review_queue: {
-		pending_reviews: number
-		threshold: number
-		exceeded: boolean
-	}
-}
-
 type MilestoneSubmissionApi = {
 	id: number
 	scholar_address: string
@@ -98,8 +71,6 @@ type MilestoneSubmissionApi = {
 	evidence_description?: string | null
 	submitted_at: string
 	status: "pending" | "approved" | "rejected"
-	peer_approval_count?: number
-	peer_rejection_count?: number
 }
 
 type PaginatedMilestonesApi = {
@@ -143,8 +114,6 @@ const mapMilestoneSubmission = (
 		"",
 	submittedAt: milestone.submitted_at,
 	status: milestone.status,
-	peerApprovalCount: milestone.peer_approval_count ?? 0,
-	peerRejectionCount: milestone.peer_rejection_count ?? 0,
 })
 
 const mapBatchMilestoneResult = (
@@ -167,6 +136,12 @@ export function useAdminStats() {
 		setLoading(true)
 		setError(null)
 		try {
+<<<<<<< HEAD
+			const res = await fetch("/api/admin/stats")
+			if (!res.ok) throw new Error("Failed to fetch admin stats")
+			const data: AdminStats = await res.json()
+			setStats(data)
+=======
 			const data = await apiFetchJson<AdminStatsResponse>("/api/admin/stats", {
 				auth: true,
 			})
@@ -179,6 +154,7 @@ export function useAdminStats() {
 				openProposals: Number(data.open_proposals ?? 0),
 				treasuryBalanceUsdc: data.treasury_balance_usdc ?? "0",
 			})
+>>>>>>> main
 		} catch (err: unknown) {
 			setError(err instanceof Error ? err.message : "Unknown error")
 		} finally {
@@ -189,66 +165,17 @@ export function useAdminStats() {
 	return { stats, loading, error, fetchStats }
 }
 
-export function useValidatorAnalytics() {
-	const [analytics, setAnalytics] = useState<ValidatorAnalytics[]>([])
-	const [reviewQueue, setReviewQueue] = useState<ValidatorReviewQueue | null>(
-		null,
-	)
-	const [loading, setLoading] = useState(false)
-	const [error, setError] = useState<string | null>(null)
-
-	const fetchAnalytics = useCallback(async () => {
-		setLoading(true)
-		setError(null)
-		try {
-			const data = await apiFetchJson<ValidatorAnalyticsResponse>(
-				"/api/admin/validators/analytics",
-				{
-					auth: true,
-				},
-			)
-
-			setAnalytics(
-				(data.validators ?? []).map((item) => ({
-					validatorAddress: item.validator_address,
-					milestonesReviewed: Number(item.milestones_reviewed ?? 0),
-					averageReviewTimeSeconds: Number(
-						item.average_review_time_seconds ?? 0,
-					),
-					approvalRate: Number(item.approval_rate ?? 0),
-					appealReversalRate: Number(item.appeal_reversal_rate ?? 0),
-				})),
-			)
-
-			setReviewQueue({
-				pendingReviews: Number(data.review_queue?.pending_reviews ?? 0),
-				threshold: Number(data.review_queue?.threshold ?? 0),
-				exceeded: Boolean(data.review_queue?.exceeded),
-			})
-		} catch (err: unknown) {
-			setError(err instanceof Error ? err.message : "Unknown error")
-		} finally {
-			setLoading(false)
-		}
-	}, [])
-
-	return {
-		analytics,
-		reviewQueue,
-		loading,
-		error,
-		fetchAnalytics,
-	}
-}
-
 export function useAdminMilestones() {
 	const [milestones, setMilestones] = useState<MilestoneSubmission[]>([])
 	const [total, setTotal] = useState(0)
 	const [page, setPage] = useState(1)
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+<<<<<<< HEAD
+=======
 	const filtersRef = useRef<{ course?: string; status?: string }>({})
 	const pageRef = useRef(1)
+>>>>>>> main
 
 	const PAGE_SIZE = 10
 
@@ -259,8 +186,11 @@ export function useAdminMilestones() {
 		) => {
 			setLoading(true)
 			setError(null)
+<<<<<<< HEAD
+=======
 			filtersRef.current = filters
 			pageRef.current = pageNum
+>>>>>>> main
 			try {
 				const params = new URLSearchParams({
 					page: String(pageNum),
@@ -268,6 +198,12 @@ export function useAdminMilestones() {
 					...(filters.course ? { course: filters.course } : {}),
 					...(filters.status ? { status: filters.status } : {}),
 				})
+<<<<<<< HEAD
+				const res = await fetch(`/api/admin/milestones?${params.toString()}`)
+				if (!res.ok) throw new Error("Failed to fetch milestones")
+				const result: PaginatedMilestones = await res.json()
+				setMilestones(result.data)
+=======
 				const result = await apiFetchJson<PaginatedMilestonesApi>(
 					`/api/admin/milestones?${params.toString()}`,
 					{
@@ -275,6 +211,7 @@ export function useAdminMilestones() {
 					},
 				)
 				setMilestones(result.data.map(mapMilestoneSubmission))
+>>>>>>> main
 				setTotal(result.total)
 				setPage(result.page)
 			} catch (err: unknown) {
@@ -286,6 +223,50 @@ export function useAdminMilestones() {
 		[],
 	)
 
+<<<<<<< HEAD
+	const approveMilestone = useCallback(async (id: string): Promise<boolean> => {
+		// Optimistic update
+		setMilestones((prev) =>
+			prev.map((m) => (m.id === id ? { ...m, status: "approved" } : m)),
+		)
+		try {
+			const res = await fetch(`/api/admin/milestones/${id}/approve`, {
+				method: "POST",
+			})
+			if (!res.ok) throw new Error("Approval failed")
+			return true
+		} catch (err: unknown) {
+			// Rollback on failure
+			setMilestones((prev) =>
+				prev.map((m) => (m.id === id ? { ...m, status: "pending" } : m)),
+			)
+			setError(err instanceof Error ? err.message : "Approval failed")
+			return false
+		}
+	}, [])
+
+	const rejectMilestone = useCallback(async (id: string): Promise<boolean> => {
+		// Optimistic update
+		setMilestones((prev) =>
+			prev.map((m) => (m.id === id ? { ...m, status: "rejected" } : m)),
+		)
+		try {
+			const res = await fetch(`/api/admin/milestones/${id}/reject`, {
+				method: "POST",
+			})
+			if (!res.ok) throw new Error("Rejection failed")
+			return true
+		} catch (err: unknown) {
+			// Rollback on failure
+			setMilestones((prev) =>
+				prev.map((m) => (m.id === id ? { ...m, status: "pending" } : m)),
+			)
+			setError(err instanceof Error ? err.message : "Rejection failed")
+			return false
+		}
+	}, [])
+
+=======
 	const refreshMilestones = useCallback(async () => {
 		await fetchMilestones(pageRef.current, filtersRef.current)
 	}, [fetchMilestones])
@@ -411,6 +392,7 @@ export function useAdminMilestones() {
 		[runBatchMilestones],
 	)
 
+>>>>>>> main
 	return {
 		milestones,
 		total,
@@ -421,7 +403,10 @@ export function useAdminMilestones() {
 		fetchMilestones,
 		approveMilestone,
 		rejectMilestone,
+<<<<<<< HEAD
+=======
 		batchApproveMilestones,
 		batchRejectMilestones,
+>>>>>>> main
 	}
 }

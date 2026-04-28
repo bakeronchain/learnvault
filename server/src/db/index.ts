@@ -1,7 +1,7 @@
 import { Pool } from "pg"
 
-import { poolMonitor } from "../services/pool-monitor.service"
 import { logger } from "../lib/logger"
+import { poolMonitor } from "../services/pool-monitor.service"
 
 const log = logger.child({ module: "db" })
 
@@ -53,12 +53,12 @@ const getPoolConfig = () => {
 class MockPool {
 	async connect() {
 		return {
-			query: async () => ({ rows: [] }),
+			query: async () => ({ rows: [], rowCount: 0 }),
 			release: () => {},
 		}
 	}
 	async query(_text: string, _params?: any[]) {
-		return { rows: [] }
+		return { rows: [], rowCount: 0 }
 	}
 }
 
@@ -68,7 +68,12 @@ try {
 	const poolConfig = getPoolConfig()
 	activePool = new Pool(poolConfig)
 	log.info(
-		{ max: poolConfig.max, min: poolConfig.min, idleTimeoutMillis: poolConfig.idleTimeoutMillis, connectionTimeoutMillis: poolConfig.connectionTimeoutMillis },
+		{
+			max: poolConfig.max,
+			min: poolConfig.min,
+			idleTimeoutMillis: poolConfig.idleTimeoutMillis,
+			connectionTimeoutMillis: poolConfig.connectionTimeoutMillis,
+		},
 		"Pool configured",
 	)
 

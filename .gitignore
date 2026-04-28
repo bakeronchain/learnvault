@@ -53,4 +53,5 @@ src/contracts/*
 !src/contracts/util.ts
 
 # test coverage
-coverage/
+coverage/target_local/
+target_local/

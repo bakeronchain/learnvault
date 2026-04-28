@@ -1,16 +1,24 @@
 import crypto from "node:crypto"
-
 import jwt from "jsonwebtoken"
-
 import { type TokenStore } from "../db/token-store"
 
 const JWT_EXPIRY = "24h"
+const DEFAULT_REVOKE_TTL_SECONDS = 24 * 60 * 60
 
 export const JWT_ISSUER = "learnvault"
 export const JWT_AUDIENCE = "learnvault-api"
 
 function normalizePem(pem: string): string {
 	return pem.replace(/\\n/g, "\n").trim()
+}
+
+function computeRevocationTtlSeconds(token: string): number {
+	const decoded = jwt.decode(token) as { exp?: number } | null
+	if (decoded && typeof decoded.exp === "number") {
+		const now = Math.floor(Date.now() / 1000)
+		return Math.max(0, decoded.exp - now)
+	}
+	return DEFAULT_REVOKE_TTL_SECONDS
 }
 
 /** In-memory RSA pair for local dev when JWT_* env vars are unset (not for production). */
@@ -54,7 +62,9 @@ export function createJwtService(
 			)
 		},
 
-		async verifyWalletToken(token: string): Promise<{ sub: string; jti: string }> {
+		async verifyWalletToken(
+			token: string,
+		): Promise<{ sub: string; jti: string }> {
 			const isRevoked = await tokenStore.isRevoked(token)
 			if (isRevoked) {
 				throw new Error("Token has been revoked")
@@ -77,14 +87,7 @@ export function createJwtService(
 		},
 
 		async revokeToken(token: string): Promise<void> {
-			const decoded = jwt.decode(token) as { exp?: number }
-			const nowSeconds = Math.floor(Date.now() / 1000)
-			const ttl = (decoded?.exp ?? nowSeconds + 86400) - nowSeconds
-
-			if (ttl > 0) {
-				await tokenStore.revoke(token, ttl)
-			}
+			await tokenStore.revoke(token, computeRevocationTtlSeconds(token))
 		},
 	}
 }
-

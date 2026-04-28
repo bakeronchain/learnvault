@@ -69,7 +69,7 @@ export const getWikiPageBySlug = async (
 			[slug],
 		)
 
-		if ((result as any).rowCount === 0) {
+		if (result.rowCount === 0) {
 			res.status(404).json({ error: "Wiki page not found" })
 			return
 		}
@@ -132,7 +132,7 @@ export const updateWikiPage = async (
 			[title, slug, content, category, isPublished, id],
 		)
 
-		if ((result as any).rowCount === 0) {
+		if (result.rowCount === 0) {
 			res.status(404).json({ error: "Wiki page not found" })
 			return
 		}
@@ -158,7 +158,7 @@ export const deleteWikiPage = async (
 			id,
 		])
 
-		if ((result as any).rowCount === 0) {
+		if (result.rowCount === 0) {
 			res.status(404).json({ error: "Wiki page not found" })
 			return
 		}

@@ -14,8 +14,13 @@
 //! Implements: https://github.com/bakeronchain/learnvault/issues/11
 
 use soroban_sdk::{
+<<<<<<< HEAD
+    Address, Env, String, Symbol, contract, contracterror, contractevent, contractimpl, contracttype,
+    panic_with_error, symbol_short,
+=======
     Address, BytesN, Env, String, Symbol, contract, contracterror, contractevent, contractimpl,
     contracttype, panic_with_error, symbol_short,
+>>>>>>> main
 };
 
 use learnvault_shared::upgrade;
@@ -31,6 +36,18 @@ const INSTANCE_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
 const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30; // 30 days
 const PERSISTENT_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
 const PERSISTENT_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365; // 1 year
+
+// ---------------------------------------------------------------------------
+// Storage Constants (assuming ~6s ledger time)
+// ---------------------------------------------------------------------------
+
+const DAY_IN_LEDGERS: u32 = 17_280;
+const INSTANCE_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
+const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30; // 30 days
+const PERSISTENT_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
+const PERSISTENT_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365; // 1 year
+const TEMP_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
+const TEMP_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365; // 1 year
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -81,6 +98,8 @@ pub struct GOVBurned {
     pub amount: i128,
 }
 
+<<<<<<< HEAD
+=======
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GOVPaused {
@@ -116,21 +135,7 @@ pub struct GOVApproved {
     pub amount: i128,
 }
 
-/// Emitted when a token holder changes their delegation to a new address.
-#[contractevent]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DelegateChanged {
-    pub delegator: Address,
-    pub delegatee: Address,
-}
-
-/// Emitted when a token holder removes their delegation entirely.
-#[contractevent]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DelegateRemoved {
-    pub delegator: Address,
-}
-
+>>>>>>> main
 // ---------------------------------------------------------------------------
 // Contract
 // ---------------------------------------------------------------------------
@@ -154,9 +159,13 @@ impl GovernanceToken {
             .set(&NAME_KEY, &String::from_str(&env, "LearnVault Governance"));
         env.storage()
             .instance()
-            .set(&SYMBOL_KEY, &String::from_str(&env, "GOV"));
+            .set(&SYMBOL_KEY, &symbol_short!("GOV"));
         env.storage().instance().set(&DECIMALS_KEY, &7_u32);
+<<<<<<< HEAD
+        
+=======
 
+>>>>>>> main
         Self::extend_instance(&env);
     }
 
@@ -166,7 +175,10 @@ impl GovernanceToken {
 
     /// Mint `amount` GOV to `to`. Admin only.
     pub fn mint(env: Env, to: Address, amount: i128) {
+<<<<<<< HEAD
+=======
         Self::assert_not_paused(&env);
+>>>>>>> main
         Self::extend_instance(&env);
         let admin: Address = env
             .storage()
@@ -208,6 +220,52 @@ impl GovernanceToken {
     /// Burn `amount` from the caller's own balance.
     pub fn burn(env: Env, from: Address, amount: i128) {
         Self::assert_not_paused(&env);
+        Self::extend_instance(&env);
+        from.require_auth();
+        if amount <= 0 {
+            panic_with_error!(&env, GOVError::ZeroAmount);
+        }
+        Self::_debit(&env, &from, amount);
+        // reduce total supply
+        let supply: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::TotalSupply)
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&DataKey::TotalSupply, &(supply - amount));
+        GOVBurned { from, amount }.publish(&env);
+    }
+
+    /// Administrative burn for slashing.
+    pub fn admin_burn_from(env: Env, from: Address, amount: i128) {
+        Self::extend_instance(&env);
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&ADMIN_KEY)
+            .unwrap_or_else(|| panic_with_error!(&env, GOVError::NotInitialized));
+        admin.require_auth();
+
+        if amount <= 0 {
+            panic_with_error!(&env, GOVError::ZeroAmount);
+        }
+        Self::_debit(&env, &from, amount);
+
+        let supply: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::TotalSupply)
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&DataKey::TotalSupply, &(supply - amount));
+        GOVBurned { from, amount }.publish(&env);
+    }
+
+    /// Burn `amount` from the caller's own balance.
+    pub fn burn(env: Env, from: Address, amount: i128) {
         Self::extend_instance(&env);
         from.require_auth();
         if amount <= 0 {
@@ -325,7 +383,10 @@ impl GovernanceToken {
 
     /// Transfer `amount` GOV from `from` to `to`. Requires `from` auth.
     pub fn transfer(env: Env, from: Address, to: Address, amount: i128) {
+<<<<<<< HEAD
+=======
         Self::assert_not_paused(&env);
+>>>>>>> main
         Self::extend_instance(&env);
         from.require_auth();
         if amount <= 0 {
@@ -347,6 +408,13 @@ impl GovernanceToken {
     ) {
         Self::assert_not_paused(&env);
         owner.require_auth();
+<<<<<<< HEAD
+        let key = DataKey::Allowance(owner, spender);
+        env.storage()
+            .temporary()
+            .set(&key, &amount);
+        env.storage().temporary().extend_ttl(&key, TEMP_BUMP_THRESHOLD, TEMP_EXTEND_TO);
+=======
         let current_ledger = env.ledger().sequence();
         if expiration_ledger < current_ledger {
             panic_with_error!(&env, GOVError::InvalidExpiration);
@@ -364,6 +432,7 @@ impl GovernanceToken {
             amount,
         }
         .publish(&env);
+>>>>>>> main
     }
 
     /// Transfer `amount` from `from` to `to` using `spender`'s allowance.
@@ -375,6 +444,16 @@ impl GovernanceToken {
 
         let current_ledger = env.ledger().sequence();
         let allow_key = DataKey::Allowance(from.clone(), spender.clone());
+<<<<<<< HEAD
+        let allowance: i128 = env.storage().temporary().get(&allow_key).unwrap_or(0);
+        if allowance < amount {
+            panic_with_error!(&env, GOVError::InsufficientFunds);
+        }
+        env.storage()
+            .temporary()
+            .set(&allow_key, &(allowance - amount));
+        env.storage().temporary().extend_ttl(&allow_key, TEMP_BUMP_THRESHOLD, TEMP_EXTEND_TO);
+=======
         let (allowance, expiration_ledger): (i128, u32) =
             env.storage().persistent().get(&allow_key).unwrap_or((0, 0));
 
@@ -396,6 +475,7 @@ impl GovernanceToken {
             Self::extend_persistent(&env, &allow_key);
         }
 
+>>>>>>> main
         Self::_debit(&env, &from, amount);
         Self::_credit(&env, &to, amount);
 
@@ -430,18 +510,12 @@ impl GovernanceToken {
             env.storage().persistent().set(&key, &(current + bal));
             env.storage()
                 .persistent()
-                .set(&DataKey::Delegate(delegator.clone()), &delegatee.clone());
-            DelegateChanged {
-                delegator,
-                delegatee,
-            }
-            .publish(&env);
+                .set(&DataKey::Delegate(delegator), &delegatee);
         } else {
             // Delegating to self is same as undelegating
             env.storage()
                 .persistent()
-                .remove(&DataKey::Delegate(delegator.clone()));
-            DelegateRemoved { delegator }.publish(&env);
+                .remove(&DataKey::Delegate(delegator));
         }
     }
 
@@ -457,8 +531,7 @@ impl GovernanceToken {
 
             env.storage()
                 .persistent()
-                .remove(&DataKey::Delegate(delegator.clone()));
-            DelegateRemoved { delegator }.publish(&env);
+                .remove(&DataKey::Delegate(delegator));
         }
     }
 
@@ -494,6 +567,11 @@ impl GovernanceToken {
 
     pub fn allowance(env: Env, owner: Address, spender: Address) -> i128 {
         let key = DataKey::Allowance(owner, spender);
+<<<<<<< HEAD
+        if let Some(allowance) = env.storage().temporary().get::<_, i128>(&key) {
+            env.storage().temporary().extend_ttl(&key, TEMP_BUMP_THRESHOLD, TEMP_EXTEND_TO);
+            allowance
+=======
         if let Some((allowance, expiration_ledger)) =
             env.storage().persistent().get::<_, (i128, u32)>(&key)
         {
@@ -503,6 +581,7 @@ impl GovernanceToken {
                 Self::extend_persistent(&env, &key);
                 allowance
             }
+>>>>>>> main
         } else {
             0
         }
@@ -578,6 +657,8 @@ impl GovernanceToken {
         }
     }
 
+<<<<<<< HEAD
+=======
     fn assert_not_paused(env: &Env) {
         let paused: bool = env.storage().instance().get(&PAUSED_KEY).unwrap_or(false);
         if paused {
@@ -585,6 +666,7 @@ impl GovernanceToken {
         }
     }
 
+>>>>>>> main
     fn extend_instance(env: &Env) {
         env.storage()
             .instance()
@@ -1128,6 +1210,8 @@ mod test {
         assert_eq!(client.allowance(&alice, &bob), 0);
     }
 
+<<<<<<< HEAD
+=======
     #[test]
     fn approve_rejects_past_expiration() {
         let e = Env::default();
@@ -1189,6 +1273,7 @@ mod test {
         assert_eq!(client.allowance(&alice, &bob), 15);
     }
 
+>>>>>>> main
     // --- burning ---
 
     #[test]
@@ -1256,6 +1341,8 @@ mod test {
         client.burn(&alice, &40);
         assert_eq!(client.get_voting_power(&bob), 60);
     }
+<<<<<<< HEAD
+=======
 
     // --- pause / unpause ---
 
@@ -1395,4 +1482,5 @@ mod test {
         std::println!("mint: instr={}, mem={}", mint_instr, mint_mem);
         std::println!("transfer: instr={}, mem={}", xfer_instr, xfer_mem);
     }
+>>>>>>> main
 }

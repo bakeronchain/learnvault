@@ -6,10 +6,13 @@ use soroban_sdk::{
     contractimpl, contracttype, panic_with_error, symbol_short,
 };
 
+<<<<<<< HEAD
+=======
 use learnvault_shared::upgrade;
 
 pub use upgrade::ContractUpgraded;
 
+>>>>>>> main
 // ---------------------------------------------------------------------------
 // Storage Constants (assuming ~6s ledger time)
 // ---------------------------------------------------------------------------
@@ -45,6 +48,8 @@ pub enum DataKey {
     Scholar(Address),
     VoteCast(u32, Address), // (proposal_id, voter) -> bool
     FinalizedProposal(u32), // proposal_id -> ProposalStatus (set by finalize_proposal)
+<<<<<<< HEAD
+=======
 }
 
 #[contractevent(topics = ["proposal_executed"])]
@@ -62,6 +67,7 @@ pub struct ProposalCancelled {
     #[topic]
     pub proposal_id: u32,
     pub cancelled_by: Address,
+>>>>>>> main
 }
 
 #[derive(Clone)]
@@ -182,7 +188,9 @@ impl ScholarshipTreasury {
         }
         admin.require_auth();
 
-        Self::validate_quorum_threshold(&env, quorum_threshold);
+        if quorum_threshold < 0 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
         if approval_bps > 10_000 {
             panic_with_error!(&env, Error::InvalidAmount);
         }
@@ -197,6 +205,10 @@ impl ScholarshipTreasury {
         env.storage().instance().set(&SCHOLARS_KEY, &0_u32);
         env.storage().instance().set(&DONORS_KEY, &0_u32);
         env.storage().instance().set(&PAUSED_KEY, &false);
+<<<<<<< HEAD
+        
+        Self::extend_instance(&env);
+=======
         env.storage()
             .instance()
             .set(&MIN_LRN_TO_PROPOSE_KEY, &0_i128);
@@ -209,10 +221,6 @@ impl ScholarshipTreasury {
         Self::extend_instance(&env);
     }
 
-    /// Returns the configured quorum as an absolute minimum vote count.
-    ///
-    /// This is a hard threshold (not basis points), so proposals require
-    /// `yes_votes + no_votes >= quorum_threshold` to be eligible to pass.
     pub fn get_quorum(env: Env) -> i128 {
         Self::extend_instance(&env);
         env.storage()
@@ -232,7 +240,9 @@ impl ScholarshipTreasury {
     pub fn set_quorum(env: Env, new_quorum: i128) {
         let admin = Self::admin(&env);
         admin.require_auth();
-        Self::validate_quorum_threshold(&env, new_quorum);
+        if new_quorum < 0 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
         env.storage().instance().set(&QUORUM_KEY, &new_quorum);
     }
 
@@ -243,6 +253,7 @@ impl ScholarshipTreasury {
             panic_with_error!(&env, Error::InvalidAmount);
         }
         env.storage().instance().set(&APPROVAL_BPS_KEY, &new_bps);
+>>>>>>> main
     }
 
     pub fn pause(env: Env) {
@@ -319,6 +330,8 @@ impl ScholarshipTreasury {
         env.storage()
             .persistent()
             .set(&donor_key, &(current + amount));
+        
+        Self::extend_persistent(&env, &donor_key);
 
         Self::extend_persistent(&env, &donor_key);
 
@@ -503,9 +516,6 @@ impl ScholarshipTreasury {
             .unwrap_or(0)
     }
 
-    /// Sets the minimum LRN (governance token) balance an applicant must hold to submit
-    /// a proposal. The value must be **strictly positive**; use [`clear_min_lrn_to_propose`]
-    /// to remove the requirement (same effect as the default: no minimum).
     pub fn set_min_lrn_to_propose(env: Env, admin: Address, min_lrn: i128) {
         Self::assert_initialized(&env);
 
@@ -513,26 +523,13 @@ impl ScholarshipTreasury {
         if admin != Self::admin(&env) {
             panic_with_error!(&env, Error::Unauthorized);
         }
-        if min_lrn <= 0 {
+        if min_lrn < 0 {
             panic_with_error!(&env, Error::InvalidAmount);
         }
 
         env.storage()
             .instance()
             .set(&MIN_LRN_TO_PROPOSE_KEY, &min_lrn);
-    }
-
-    /// Removes the minimum LRN requirement so any holder can submit (subject to other
-    /// proposal rules). This is the explicit admin path to "no minimum"; `set_min_lrn_to_propose(0)` is rejected.
-    pub fn clear_min_lrn_to_propose(env: Env, admin: Address) {
-        Self::assert_initialized(&env);
-
-        admin.require_auth();
-        if admin != Self::admin(&env) {
-            panic_with_error!(&env, Error::Unauthorized);
-        }
-
-        env.storage().instance().remove(&MIN_LRN_TO_PROPOSE_KEY);
     }
 
     pub fn get_min_lrn_to_propose(env: Env) -> i128 {
@@ -597,6 +594,8 @@ impl ScholarshipTreasury {
         env.storage()
             .persistent()
             .set(&DataKey::Proposal(proposal_id), &proposal);
+        
+        Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
 
         Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
 
@@ -610,7 +609,11 @@ impl ScholarshipTreasury {
         env.storage()
             .persistent()
             .set(&applicant_key, &proposal_ids);
+<<<<<<< HEAD
+        
+=======
 
+>>>>>>> main
         Self::extend_persistent(&env, &applicant_key);
         env.storage()
             .instance()
@@ -773,6 +776,12 @@ impl ScholarshipTreasury {
         }
 
         let total_votes = proposal.yes_votes + proposal.no_votes;
+<<<<<<< HEAD
+        let quorum_met = total_gov > 0
+            && total_votes
+                .checked_mul(10_000)
+                .map(|tv| tv / total_gov >= MIN_QUORUM_BPS)
+=======
         let quorum_threshold = Self::get_quorum(env.clone());
         let approval_bps = Self::get_approval_bps(env.clone());
 
@@ -782,6 +791,7 @@ impl ScholarshipTreasury {
                 .yes_votes
                 .checked_mul(10_000)
                 .map(|v| (v / total_votes) as u32 > approval_bps)
+>>>>>>> main
                 .unwrap_or(false);
 
         let status = if passed {
@@ -793,6 +803,8 @@ impl ScholarshipTreasury {
         env.storage()
             .persistent()
             .set(&DataKey::FinalizedProposal(proposal_id), &status.clone());
+        
+        Self::extend_persistent(&env, &DataKey::FinalizedProposal(proposal_id));
 
         Self::extend_persistent(&env, &DataKey::FinalizedProposal(proposal_id));
 
@@ -901,13 +913,6 @@ impl ScholarshipTreasury {
             .instance()
             .get(&ADMIN_KEY)
             .unwrap_or_else(|| panic_with_error!(env, Error::NotInitialized))
-    }
-
-    fn validate_quorum_threshold(env: &Env, quorum_threshold: i128) {
-        // Quorum is an absolute vote-count floor, so it must be strictly positive.
-        if quorum_threshold <= 0 {
-            panic_with_error!(env, Error::InvalidAmount);
-        }
     }
 
     /// Replace the current contract WASM with a new uploaded hash. Admin only.

@@ -1,19 +1,20 @@
+<<<<<<< HEAD
+import React, { useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
+=======
 import { useQuery } from "@tanstack/react-query"
 import React, { useEffect, useMemo, useState } from "react"
 import ReactMarkdown from "react-markdown"
+>>>>>>> main
 import { useNavigate } from "react-router-dom"
-import {
-	RadialBarChart,
-	RadialBar,
-	Legend,
-	ResponsiveContainer,
-	Tooltip,
-} from "recharts"
-import AddressDisplay from "../components/AddressDisplay"
 import TxHashLink from "../components/TxHashLink"
 import {
 	useAdminStats,
 	useAdminMilestones,
+<<<<<<< HEAD
+	type MilestoneSubmission,
+} from "../hooks/useAdmin"
+=======
 	type BatchMilestoneResponse,
 	type MilestoneSubmission,
 } from "../hooks/useAdmin"
@@ -32,20 +33,106 @@ import {
 import { apiFetchJson } from "../lib/api"
 import { getAuthToken } from "../util/auth"
 import { shortenContractId } from "../util/contract"
-
-const API_BASE = import.meta.env.VITE_SERVER_URL || "http://localhost:4000"
+>>>>>>> main
 
 type AdminSection =
 	| "courses"
 	| "milestones"
 	| "users"
+<<<<<<< HEAD
+=======
 	| "wiki"
+>>>>>>> main
 	| "treasury"
-	| "scholarships"
 	| "contracts"
 type CourseStatus = "draft" | "published"
 
 interface AdminCourse {
+<<<<<<< HEAD
+	id: number
+	title: string
+	status: CourseStatus
+	students: number
+}
+
+interface UserProfilePreview {
+	address: string
+	balance: string
+	enrollment: string
+	tier: string
+}
+
+interface ContractRecord {
+	name: string
+	tag: string
+	address: string
+	updated: string
+}
+
+interface CourseImportRow {
+	title: string
+	slug: string
+	track: string
+	difficulty: string
+	description?: string
+	coverImage?: string | null
+	published?: boolean
+}
+
+interface BulkImportResult {
+	row: number
+	slug: string
+	success: boolean
+	errors: string[]
+}
+
+const initialCourses: AdminCourse[] = [
+	{ id: 1, title: "Soroban Basics", status: "published", students: 84 },
+	{ id: 2, title: "Stellar Security", status: "draft", students: 0 },
+]
+
+const contractRecords: ContractRecord[] = [
+	{
+		name: "Scholarship Treasury",
+		tag: "prod",
+		address: "CXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+		updated: "2026-03-20",
+	},
+	{
+		name: "Governance Token",
+		tag: "prod",
+		address: "CYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY",
+		updated: "2026-03-20",
+	},
+]
+
+const COURSES = [
+	"All",
+	"Soroban Basics",
+	"Stellar Security",
+	"Web3 Dev",
+	"DeFi",
+	"Frontend Dev",
+]
+const STATUSES = ["pending", "approved", "rejected"]
+
+// ---------------------------------------------------------------------------
+// Confirmation dialog
+// ---------------------------------------------------------------------------
+interface ConfirmDialogProps {
+	action: "approve" | "reject"
+	milestone: MilestoneSubmission
+	onConfirm: () => void
+	onCancel: () => void
+}
+
+const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
+	action,
+	milestone,
+	onConfirm,
+	onCancel,
+}) => (
+=======
 	id: string
 	slug: string
 	title: string
@@ -85,30 +172,9 @@ const sectionDescriptions: Record<AdminSection, string> = {
 	milestones: "Review milestone reports and approvals.",
 	users: "Lookup learner profiles by wallet address.",
 	wiki: "Create and edit platform documentation and guides.",
-	treasury: "Monitor and manage treasury controls.",
-	scholarships: "View scholarship program health metrics.",
-	contracts: "Inspect deployed on-chain contract records.",
+	treasury: "Monitor and manage live treasury controls.",
+	contracts: "Inspect deployed contract addresses and on-chain state.",
 }
-
-const initialCourses: AdminCourse[] = [
-	{ id: 1, title: "Soroban Basics", status: "published", students: 84 },
-	{ id: 2, title: "Stellar Security", status: "draft", students: 0 },
-]
-
-const contractRecords: ContractRecord[] = [
-	{
-		name: "Scholarship Treasury",
-		tag: "prod",
-		address: "CXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-		updated: "2026-03-20",
-	},
-	{
-		name: "Governance Token",
-		tag: "prod",
-		address: "CYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY",
-		updated: "2026-03-20",
-	},
-]
 
 const STATUSES = ["pending", "approved", "rejected"] as const
 
@@ -127,18 +193,6 @@ const formatDate = (value: string | undefined): string => {
 
 const formatCount = (value: number): string =>
 	value.toLocaleString("en-US", { maximumFractionDigits: 0 })
-
-const formatPercent = (value: number): string => {
-	if (!Number.isFinite(value)) return "0.0%"
-	return `${value.toFixed(1)}%`
-}
-
-const formatReviewTime = (seconds: number): string => {
-	if (!Number.isFinite(seconds) || seconds < 0) return "-"
-	if (seconds < 60) return `${Math.round(seconds)}s`
-	if (seconds < 3600) return `${(seconds / 60).toFixed(1)}m`
-	return `${(seconds / 3600).toFixed(1)}h`
-}
 
 const renderAddress = (value: string | undefined) =>
 	value ? shortenContractId(value, 6, 6) : "Not available"
@@ -176,6 +230,7 @@ const ConfirmDialog: React.FC<{
 	onConfirm: () => void
 	onCancel: () => void
 }> = ({ action, milestone, onConfirm, onCancel }) => (
+>>>>>>> main
 	<div
 		role="dialog"
 		aria-modal="true"
@@ -189,10 +244,7 @@ const ConfirmDialog: React.FC<{
 			<p className="text-sm text-white/60 mb-1">
 				Learner:{" "}
 				<span className="font-mono text-white/90">
-					<AddressDisplay
-						address={milestone.learnerAddress}
-						showExplorerLink={false}
-					/>
+					{milestone.learnerAddress}
 				</span>
 			</p>
 			<p className="text-sm text-white/60 mb-4">
@@ -205,7 +257,11 @@ const ConfirmDialog: React.FC<{
 				>
 					{action}
 				</strong>{" "}
+<<<<<<< HEAD
+				this submission? This action cannot be undone.
+=======
 				this submission?
+>>>>>>> main
 			</p>
 			<div className="flex gap-3 justify-end">
 				<button
@@ -257,10 +313,16 @@ const MilestoneStatsBar: React.FC = () => {
 	]
 
 	return (
+<<<<<<< HEAD
+		<div className="grid grid-cols-3 gap-3 mb-6">
+			{error && (
+				<p className="col-span-3 text-xs text-red-400">
+=======
 		<div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
 			{error && (
 				<p className="md:col-span-3 text-xs text-red-400">
-					Could not load stats — {error}. Refresh the page to try again.
+>>>>>>> main
+					Failed to load stats: {error}
 				</p>
 			)}
 			{items.map((item) => (
@@ -283,6 +345,8 @@ const MilestoneStatsBar: React.FC = () => {
 		</div>
 	)
 }
+<<<<<<< HEAD
+=======
 
 const EvidenceLink: React.FC<{ value: string }> = ({ value }) => {
 	if (!value) {
@@ -304,8 +368,26 @@ const EvidenceLink: React.FC<{ value: string }> = ({ value }) => {
 
 	return <TxHashLink hash={value} />
 }
+>>>>>>> main
 
 const Admin: React.FC = () => {
+<<<<<<< HEAD
+	const { t } = useTranslation()
+	const [activeSection, setActiveSection] = useState<AdminSection>("courses")
+	const [isAdmin, setIsAdmin] = useState(false)
+	const navigate = useNavigate()
+
+	useEffect(() => {
+		const token = localStorage.getItem("admin_token")
+		if (token === "mock-admin-jwt") {
+			setIsAdmin(true)
+			return
+		}
+		void navigate("/")
+	}, [navigate])
+
+	if (!isAdmin) return null
+=======
 	const [activeSection, setActiveSection] = useState<AdminSection>("courses")
 	const navigate = useNavigate()
 	const authToken = getAuthToken()
@@ -317,21 +399,25 @@ const Admin: React.FC = () => {
 	}, [authToken, navigate])
 
 	if (!authToken) return null
+>>>>>>> main
 
 	return (
 		<div className="flex min-h-screen text-white">
 			<aside className="w-72 glass border-r border-white/5 p-8 flex flex-col gap-8">
 				<nav className="flex flex-col gap-2">
 					{(
+<<<<<<< HEAD
+						["courses", "milestones", "users", "treasury", "contracts"] as const
+=======
 						[
 							"courses",
 							"milestones",
 							"users",
 							"wiki",
 							"treasury",
-							"scholarships",
 							"contracts",
 						] as const
+>>>>>>> main
 					).map((section) => (
 						<button
 							key={section}
@@ -343,6 +429,54 @@ const Admin: React.FC = () => {
 							}`}
 							onClick={() => setActiveSection(section)}
 						>
+<<<<<<< HEAD
+						{t(`admin.sections.${section}`)}
+					</button>
+				))}
+			</nav>
+			<p className="text-sm text-white/70">
+				{t(`admin.sectionDescriptions.${activeSection}`)}
+// CourseManagement — unchanged
+// ---------------------------------------------------------------------------
+const parseCsvText = (csvText: string): CourseImportRow[] => {
+	const rows = csvText
+		.trim()
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter(Boolean)
+
+	if (rows.length < 2) {
+		return []
+	}
+
+	const headers = rows[0].split(",").map((header) => header.trim())
+
+	return rows.slice(1).map((line) => {
+		const values = line.split(",").map((value) => value.trim())
+		const record: Record<string, string> = {}
+		headers.forEach((header, index) => {
+			record[header] = values[index] ?? ""
+		})
+		return {
+			title: record.title || record.Title || "",
+			slug: record.slug || record.Slug || "",
+			track: record.track || record.Track || "",
+			difficulty: record.difficulty || record.Difficulty || "",
+			description: record.description || record.Description || "",
+			coverImage: record.coverImage || record.CoverImage || null,
+			published:
+				(record.published || record.Published || "").toLowerCase() === "true",
+		}
+	})
+}
+
+const isCourseRowValid = (row: CourseImportRow) => {
+	return (
+		row.title.trim().length > 0 &&
+		row.slug.trim().length > 0 &&
+		row.track.trim().length > 0 &&
+		row.difficulty.trim().length > 0
+=======
 							{section}
 						</button>
 					))}
@@ -358,15 +492,211 @@ const Admin: React.FC = () => {
 				{activeSection === "users" && <UserLookup />}
 				{activeSection === "wiki" && <WikiManagement />}
 				{activeSection === "treasury" && <TreasuryControls />}
-				{activeSection === "wiki" && <WikiManagement />}
-				{activeSection === "scholarships" && <ScholarshipMetrics />}
 				{activeSection === "contracts" && <ContractInfo />}
 			</main>
 		</div>
+>>>>>>> main
 	)
 }
 
 const CourseManagement: React.FC = () => {
+<<<<<<< HEAD
+	const { t } = useTranslation()
+	const [courses, setCourses] = useState<AdminCourse[]>(initialCourses)
+	const [fileName, setFileName] = useState("")
+	const [previewRows, setPreviewRows] = useState<CourseImportRow[]>([])
+	const [previewErrors, setPreviewErrors] = useState<string[]>([])
+	const [importResults, setImportResults] = useState<BulkImportResult[]>([])
+	const [isSubmitting, setIsSubmitting] = useState(false)
+	const [alertMessage, setAlertMessage] = useState<string | null>(null)
+
+	const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+		setImportResults([])
+		setAlertMessage(null)
+		const file = event.target.files?.[0]
+		if (!file) {
+			return
+		}
+
+		setFileName(file.name)
+		const contents = await file.text()
+		let rows: CourseImportRow[] = []
+		if (file.name.toLowerCase().endsWith(".json")) {
+			try {
+				const parsed = JSON.parse(contents)
+				rows = Array.isArray(parsed) ? parsed : parsed.courses ?? []
+			} catch {
+				setPreviewErrors([t("admin.import.invalidJson")])
+				return
+			}
+		} else {
+			rows = parseCsvText(contents)
+		}
+
+		const errors: string[] = []
+		const normalizedRows = rows.map((row, index) => {
+			const normalized = {
+				...row,
+				title: row.title?.trim() ?? "",
+				slug: row.slug?.trim() ?? "",
+				track: row.track?.trim() ?? "",
+				difficulty: row.difficulty?.trim() ?? "",
+				description: row.description?.trim(),
+				coverImage: row.coverImage?.trim() || null,
+				published: Boolean(row.published),
+			}
+
+			if (!isCourseRowValid(normalized)) {
+				errors.push(`${t("admin.import.invalidRow")} ${index + 1}`)
+			}
+
+			return normalized
+		})
+
+		setPreviewRows(normalizedRows)
+		setPreviewErrors(errors)
+	}
+
+	const handleImport = async () => {
+		setIsSubmitting(true)
+		setImportResults([])
+		setAlertMessage(null)
+		const token = localStorage.getItem("admin_token") ?? ""
+
+		try {
+			const response = await fetch("/api/admin/courses/bulk-import", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
+				},
+				body: JSON.stringify({ courses: previewRows }),
+			})
+
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}))
+				throw new Error(errorData.error || t("admin.import.importFailed"))
+			}
+
+			const data = (await response.json()) as {
+				results: BulkImportResult[]
+				total: number
+				imported: number
+			}
+			setImportResults(data.results)
+			setAlertMessage(t("admin.import.importSuccess", { count: data.imported }))
+		} catch (error) {
+			setAlertMessage(String(error))
+		} finally {
+			setIsSubmitting(false)
+		}
+	}
+
+	return (
+		<section className="space-y-6">
+			<div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+				<div>
+					<h1 className="text-2xl font-semibold text-white">
+						{t("admin.import.title")}
+					</h1>
+					<p className="text-sm text-white/60 mt-2 max-w-2xl">
+						{t("admin.import.description")}
+					</p>
+				</div>
+			</div>
+
+			<div className="glass border border-white/10 rounded-3xl p-6">
+				<label className="block text-sm font-medium text-white/80 mb-3">
+					{t("admin.import.uploadLabel")}
+				</label>
+				<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+					<input
+						aria-label={t("admin.import.uploadLabel")}
+						onChange={handleFileUpload}
+						type="file"
+						accept=".csv,.json"
+						className="block w-full max-w-xs text-sm text-white/80 file:mr-4 file:rounded-full file:border-0 file:bg-white/10 file:px-4 file:py-2 file:text-sm file:text-white hover:file:bg-white/20"
+					/>
+					<span className="text-sm text-white/50">{fileName || t("admin.import.noFileSelected")}</span>
+				</div>
+				{previewErrors.length > 0 && (
+					<div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-100">
+						{previewErrors.map((error) => (
+							<p key={error}>{error}</p>
+						))}
+					</div>
+				)}
+				{previewRows.length > 0 && (
+					<div className="mt-6 space-y-4">
+						<div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+							<p className="text-sm text-white/70">
+								{t("admin.import.previewHeader", { count: previewRows.length })}
+							</p>
+							<div className="overflow-x-auto mt-4 rounded-2xl border border-white/10">
+								<table className="min-w-full text-left text-sm text-white/80">
+									<thead>
+										<tr className="bg-white/5 text-white/60 uppercase tracking-wider">
+											<th className="px-4 py-3">{t("admin.import.table.title")}</th>
+											<th className="px-4 py-3">{t("admin.import.table.slug")}</th>
+											<th className="px-4 py-3">{t("admin.import.table.track")}</th>
+											<th className="px-4 py-3">{t("admin.import.table.difficulty")}</th>
+											<th className="px-4 py-3">{t("admin.import.table.published")}</th>
+										</tr>
+									</thead>
+									<tbody>
+										{previewRows.map((row, index) => (
+											<tr key={`${row.slug}-${index}`} className="border-t border-white/5">
+												<td className="px-4 py-3">{row.title}</td>
+												<td className="px-4 py-3 font-mono text-white/70">{row.slug}</td>
+												<td className="px-4 py-3">{row.track}</td>
+												<td className="px-4 py-3">{row.difficulty}</td>
+												<td className="px-4 py-3">{row.published ? t("admin.import.yes") : t("admin.import.no")}</td>
+											</tr>
+										))}
+									</tbody>
+								</table>
+							</div>
+						</div>
+						<div className="flex flex-wrap gap-3">
+							<button
+								type="button"
+								onClick={handleImport}
+								disabled={isSubmitting || previewErrors.length > 0}
+								className="rounded-2xl bg-brand-cyan px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-40"
+							>
+								{isSubmitting ? t("admin.import.importing") : t("admin.import.importButton")}
+							</button>
+							<span className="text-sm text-white/50">{t("admin.import.confirmPreview")}</span>
+						</div>
+					</div>
+				)}
+				{alertMessage && (
+					<div className="mt-4 rounded-2xl border border-white/10 bg-emerald-500/10 p-4 text-sm text-emerald-100">
+						{alertMessage}
+					</div>
+				)}
+				{importResults.length > 0 && (
+					<div className="mt-6 rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+						<p className="text-sm text-white/70 mb-3">
+							{t("admin.import.resultsHeader")}
+						</p>
+						<ul className="space-y-2 text-sm text-white/80">
+							{importResults.map((result) => (
+								<li key={`${result.slug}-${result.row}`}> 
+									<strong>{t("admin.import.rowLabel", { row: result.row })}</strong>: {result.success ? t("admin.import.rowSuccess") : t("admin.import.rowFailure")}
+									{result.errors.length > 0 && (
+										<ul className="mt-1 list-disc pl-5 text-red-200">
+											{result.errors.map((error) => (
+												<li key={error}>{error}</li>
+											))}
+										</ul>
+									)}
+								</li>
+							))}
+						</ul>
+					</div>
+				)}
+=======
 	const {
 		data: courses = [],
 		isLoading,
@@ -395,8 +725,7 @@ const CourseManagement: React.FC = () => {
 
 			{errorMessage && (
 				<p className="text-sm text-red-400 mb-4">
-					Could not load courses — {errorMessage}. Use the Refresh button above
-					to retry.
+					Failed to load courses: {errorMessage}
 				</p>
 			)}
 
@@ -457,21 +786,18 @@ const CourseManagement: React.FC = () => {
 						</div>
 					</div>
 				))}
+>>>>>>> main
 			</div>
 		</section>
 	)
 }
 
 const MilestoneQueue: React.FC = () => {
+<<<<<<< HEAD
+=======
 	const { data: courseOptionsData = [], error: courseOptionsError } =
 		useAdminCoursesList()
-	const {
-		analytics,
-		reviewQueue,
-		loading: analyticsLoading,
-		error: analyticsError,
-		fetchAnalytics,
-	} = useValidatorAnalytics()
+>>>>>>> main
 	const {
 		milestones,
 		total,
@@ -482,14 +808,11 @@ const MilestoneQueue: React.FC = () => {
 		fetchMilestones,
 		approveMilestone,
 		rejectMilestone,
+<<<<<<< HEAD
 	} = useAdminMilestones()
-	const courseOptions = useMemo(
-		() => ["All", ...courseOptionsData.map((course) => course.slug)],
-		[courseOptionsData],
-	)
+
 	const [courseFilter, setCourseFilter] = useState("All")
-	const [statusFilter, setStatusFilter] =
-		useState<(typeof STATUSES)[number]>("pending")
+	const [statusFilter, setStatusFilter] = useState("pending")
 	const [dialog, setDialog] = useState<{
 		action: "approve" | "reject"
 		milestone: MilestoneSubmission
@@ -502,9 +825,255 @@ const MilestoneQueue: React.FC = () => {
 		})
 	}, [courseFilter, statusFilter, fetchMilestones])
 
+	const handlePageChange = (newPage: number) => {
+		void fetchMilestones(newPage, {
+			course: courseFilter !== "All" ? courseFilter : undefined,
+			status: statusFilter,
+		})
+	}
+
+	const handleConfirm = async () => {
+		if (!dialog) return
+		const { action, milestone } = dialog
+		setDialog(null)
+		if (action === "approve") await approveMilestone(milestone.id)
+		else await rejectMilestone(milestone.id)
+	}
+
+	const totalPages = Math.ceil(total / pageSize)
+
+	return (
+		<section>
+			{/* Stats bar */}
+			<MilestoneStatsBar />
+
+			{/* Filters */}
+			<div className="flex flex-wrap gap-3 mb-4 items-center">
+				<div className="flex items-center gap-2">
+					<label
+						htmlFor="course-filter"
+						className="text-xs text-white/40 uppercase tracking-widest"
+					>
+						Course
+					</label>
+					<select
+						id="course-filter"
+						value={courseFilter}
+						onChange={(e) => setCourseFilter(e.target.value)}
+						className="glass border border-white/10 text-white/80 text-sm rounded-xl px-3 py-1.5 bg-transparent focus:outline-none focus:border-white/20"
+					>
+						{COURSES.map((c) => (
+							<option key={c} className="bg-gray-900">
+								{c}
+							</option>
+						))}
+					</select>
+				</div>
+				<div className="flex items-center gap-2">
+					<label
+						htmlFor="status-filter"
+						className="text-xs text-white/40 uppercase tracking-widest"
+					>
+						Status
+					</label>
+					<select
+						id="status-filter"
+						value={statusFilter}
+						onChange={(e) => setStatusFilter(e.target.value)}
+						className="glass border border-white/10 text-white/80 text-sm rounded-xl px-3 py-1.5 bg-transparent focus:outline-none focus:border-white/20"
+					>
+						{STATUSES.map((s) => (
+							<option key={s} className="bg-gray-900">
+								{s}
+							</option>
+						))}
+					</select>
+				</div>
+			</div>
+
+			{/* Error */}
+			{error && (
+				<p className="text-xs text-red-400 mb-4">
+					Error loading milestones: {error}
+				</p>
+			)}
+
+			{/* Table */}
+			<div className="overflow-x-auto rounded-2xl border border-white/5 glass">
+				<table className="w-full text-left">
+					<thead>
+						<tr className="border-b border-white/5 text-xs uppercase tracking-widest text-white/40">
+							<th className="py-3 px-4 font-medium">Learner</th>
+							<th className="py-3 px-4 font-medium">Course</th>
+							<th className="py-3 px-4 font-medium">Submitted</th>
+							<th className="py-3 px-4 font-medium">Evidence</th>
+							<th className="py-3 px-4 font-medium">Status</th>
+							<th className="py-3 px-4 font-medium">Actions</th>
+						</tr>
+					</thead>
+					<tbody>
+						{loading && (
+							<tr>
+								<td
+									colSpan={6}
+									className="py-12 text-center text-sm text-white/40 animate-pulse"
+								>
+									Loading milestones…
+								</td>
+							</tr>
+						)}
+
+						{!loading && milestones.length === 0 && (
+							<tr>
+								<td colSpan={6} className="py-12 text-center">
+									<p className="text-white/40 text-sm">
+										No milestone submissions found.
+									</p>
+									<p className="text-white/20 text-xs mt-1">
+										Try adjusting your filters or check back later.
+									</p>
+								</td>
+							</tr>
+						)}
+
+						{!loading &&
+							milestones.map((m) => {
+								const statusStyles: Record<
+									MilestoneSubmission["status"],
+									string
+								> = {
+									pending:
+										"text-yellow-400 bg-yellow-400/10 border-yellow-400/30",
+									approved:
+										"text-emerald-400 bg-emerald-400/10 border-emerald-400/30",
+									rejected: "text-red-400 bg-red-400/10 border-red-400/30",
+								}
+								return (
+									<tr
+										key={m.id}
+										className="border-b border-white/5 hover:bg-white/3 transition-colors"
+									>
+										<td className="py-3 px-4">
+											<span className="font-mono text-xs text-white/50">
+												{m.learnerAddress.slice(0, 8)}…
+												{m.learnerAddress.slice(-4)}
+											</span>
+										</td>
+										<td className="py-3 px-4 text-sm text-white/80">
+											{m.course}
+										</td>
+										<td className="py-3 px-4 text-sm text-white/50">
+											{new Date(m.submittedAt).toLocaleDateString("en-GB", {
+												day: "2-digit",
+												month: "short",
+												year: "numeric",
+											})}
+										</td>
+										<td className="py-3 px-4">
+											<TxHashLink hash={m.evidenceLink} />
+										</td>
+										<td className="py-3 px-4">
+											<span
+												className={`text-xs px-2 py-0.5 rounded-full border ${statusStyles[m.status]}`}
+											>
+												{m.status}
+											</span>
+										</td>
+										<td className="py-3 px-4">
+											{m.status === "pending" && (
+												<div className="flex gap-2">
+													<button
+														type="button"
+														onClick={() =>
+															setDialog({ action: "approve", milestone: m })
+														}
+														aria-label={`Approve milestone for ${m.learnerAddress}`}
+														className="px-3 py-1 text-xs font-medium rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors"
+													>
+														Approve
+													</button>
+													<button
+														type="button"
+														onClick={() =>
+															setDialog({ action: "reject", milestone: m })
+														}
+														aria-label={`Reject milestone for ${m.learnerAddress}`}
+														className="px-3 py-1 text-xs font-medium rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-colors"
+													>
+														Reject
+													</button>
+												</div>
+											)}
+										</td>
+									</tr>
+								)
+							})}
+					</tbody>
+				</table>
+			</div>
+
+			{/* Pagination */}
+			{totalPages > 1 && (
+				<div className="flex items-center justify-between mt-4 text-sm text-white/40">
+					<span>
+						Page {page} of {totalPages} ({total} total)
+					</span>
+					<div className="flex gap-2">
+						<button
+							type="button"
+							disabled={page <= 1}
+							onClick={() => handlePageChange(page - 1)}
+							className="px-3 py-1 rounded-xl border border-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+						>
+							← Prev
+						</button>
+						<button
+							type="button"
+							disabled={page >= totalPages}
+							onClick={() => handlePageChange(page + 1)}
+							className="px-3 py-1 rounded-xl border border-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+						>
+							Next →
+						</button>
+					</div>
+				</div>
+			)}
+
+			{/* Confirmation dialog */}
+=======
+		batchApproveMilestones,
+		batchRejectMilestones,
+	} = useAdminMilestones()
+	const courseOptions = useMemo(
+		() => ["All", ...courseOptionsData.map((course) => course.slug)],
+		[courseOptionsData],
+	)
+	const [courseFilter, setCourseFilter] = useState("All")
+	const [statusFilter, setStatusFilter] =
+		useState<(typeof STATUSES)[number]>("pending")
+	const [dialog, setDialog] = useState<{
+		action: "approve" | "reject"
+		milestone: MilestoneSubmission
+	} | null>(null)
+	const [selectedMilestoneIds, setSelectedMilestoneIds] = useState<string[]>([])
+	const [batchState, setBatchState] = useState<{
+		action: "approve" | "reject"
+		total: number
+		inProgress: boolean
+		results: BatchMilestoneResponse | null
+	}>({
+		action: "approve",
+		total: 0,
+		inProgress: false,
+		results: null,
+	})
+
 	useEffect(() => {
-		void fetchAnalytics()
-	}, [fetchAnalytics])
+		void fetchMilestones(1, {
+			course: courseFilter !== "All" ? courseFilter : undefined,
+			status: statusFilter,
+		})
+	}, [courseFilter, statusFilter, fetchMilestones])
 
 	const handlePageChange = (newPage: number) => {
 		void fetchMilestones(newPage, {
@@ -522,7 +1091,6 @@ const MilestoneQueue: React.FC = () => {
 		} else {
 			await rejectMilestone(milestone.id)
 		}
-		await fetchAnalytics()
 	}
 
 	const pendingMilestones = milestones.filter(
@@ -609,85 +1177,6 @@ const MilestoneQueue: React.FC = () => {
 		<section>
 			<MilestoneStatsBar />
 
-			{reviewQueue?.exceeded && (
-				<div className="mb-4 rounded-xl border border-yellow-500/40 bg-yellow-500/10 px-4 py-3">
-					<p className="text-sm font-medium text-yellow-300">
-						Validator review queue is above threshold
-					</p>
-					<p className="mt-1 text-xs text-yellow-100/80">
-						Pending: {formatCount(reviewQueue.pendingReviews)} | Threshold: {formatCount(reviewQueue.threshold)}
-					</p>
-				</div>
-			)}
-
-			<div className="mb-6 overflow-x-auto rounded-2xl border border-white/5 glass">
-				<div className="flex items-center justify-between px-4 pt-4">
-					<h2 className="text-sm font-medium uppercase tracking-widest text-white/50">
-						Validator Performance
-					</h2>
-				</div>
-				{analyticsError && (
-					<p className="px-4 py-2 text-xs text-red-400">
-						Failed to load validator analytics: {analyticsError}
-					</p>
-				)}
-				<table className="w-full text-left">
-					<thead>
-						<tr className="border-b border-white/5 text-xs uppercase tracking-widest text-white/40">
-							<th className="py-3 px-4 font-medium">Validator</th>
-							<th className="py-3 px-4 font-medium">Reviewed</th>
-							<th className="py-3 px-4 font-medium">Avg Review Time</th>
-							<th className="py-3 px-4 font-medium">Approval Rate</th>
-							<th className="py-3 px-4 font-medium">Appeal Reversal Rate</th>
-						</tr>
-					</thead>
-					<tbody>
-						{analyticsLoading && (
-							<tr>
-								<td
-									colSpan={5}
-									className="py-8 text-center text-sm text-white/40 animate-pulse"
-								>
-									Loading validator analytics...
-								</td>
-							</tr>
-						)}
-
-						{!analyticsLoading && analytics.length === 0 && (
-							<tr>
-								<td colSpan={5} className="py-8 text-center text-sm text-white/40">
-									No validator analytics available.
-								</td>
-							</tr>
-						)}
-
-						{!analyticsLoading &&
-							analytics.map((row) => (
-								<tr
-									key={row.validatorAddress}
-									className="border-b border-white/5 hover:bg-white/3 transition-colors"
-								>
-									<td className="py-3 px-4 font-mono text-xs text-white/60">
-										{shortenContractId(row.validatorAddress, 8, 4)}
-									</td>
-									<td className="py-3 px-4 text-sm text-white/80">
-										{formatCount(row.milestonesReviewed)}
-									</td>
-									<td className="py-3 px-4 text-sm text-white/80">
-										{formatReviewTime(row.averageReviewTimeSeconds)}
-									</td>
-									<td className="py-3 px-4 text-sm text-emerald-300">
-										{formatPercent(row.approvalRate)}
-									</td>
-									<td className="py-3 px-4 text-sm text-amber-200">
-										{formatPercent(row.appealReversalRate)}
-									</td>
-								</tr>
-							))}
-					</tbody>
-				</table>
-			</div>
-
 			<div className="flex flex-wrap gap-3 mb-4 items-center">
 				<div className="flex items-center gap-2">
 					<label
@@ -735,14 +1224,13 @@ const MilestoneQueue: React.FC = () => {
 
 			{coursesErrorMessage && (
 				<p className="text-xs text-red-400 mb-2">
-					Could not load course filters — {coursesErrorMessage}. Filters may be
-					incomplete.
+					Failed to load course filters: {coursesErrorMessage}
 				</p>
 			)}
 
 			{error && (
 				<p className="text-xs text-red-400 mb-4">
-					Could not load milestones — {error}. Try refreshing the page.
+					Error loading milestones: {error}
 				</p>
 			)}
 
@@ -754,7 +1242,6 @@ const MilestoneQueue: React.FC = () => {
 							<th className="py-3 px-4 font-medium">Course</th>
 							<th className="py-3 px-4 font-medium">Submitted</th>
 							<th className="py-3 px-4 font-medium">Evidence</th>
-							<th className="py-3 px-4 font-medium">Peer signals</th>
 							<th className="py-3 px-4 font-medium">Status</th>
 							<th className="py-3 px-4 font-medium">Actions</th>
 						</tr>
@@ -763,7 +1250,7 @@ const MilestoneQueue: React.FC = () => {
 						{loading && (
 							<tr>
 								<td
-									colSpan={7}
+									colSpan={6}
 									className="py-12 text-center text-sm text-white/40 animate-pulse"
 								>
 									Loading milestones…
@@ -773,7 +1260,7 @@ const MilestoneQueue: React.FC = () => {
 
 						{!loading && milestones.length === 0 && (
 							<tr>
-								<td colSpan={7} className="py-12 text-center">
+								<td colSpan={6} className="py-12 text-center">
 									<p className="text-white/40 text-sm">
 										No milestone submissions found.
 									</p>
@@ -803,13 +1290,9 @@ const MilestoneQueue: React.FC = () => {
 										className="border-b border-white/5 hover:bg-white/3 transition-colors"
 									>
 										<td className="py-3 px-4">
-											<AddressDisplay
-												address={milestone.learnerAddress}
-												prefixLength={8}
-												suffixLength={4}
-												showExplorerLink={false}
-												addressClassName="text-xs text-white/50"
-											/>
+											<span className="font-mono text-xs text-white/50">
+												{shortenContractId(milestone.learnerAddress, 8, 4)}
+											</span>
 										</td>
 										<td className="py-3 px-4 text-sm text-white/80">
 											{milestone.course}
@@ -819,10 +1302,6 @@ const MilestoneQueue: React.FC = () => {
 										</td>
 										<td className="py-3 px-4">
 											<EvidenceLink value={milestone.evidenceLink} />
-										</td>
-										<td className="py-3 px-4 text-xs font-mono text-white/55 whitespace-nowrap">
-											+{milestone.peerApprovalCount} / −
-											{milestone.peerRejectionCount}
 										</td>
 										<td className="py-3 px-4">
 											<span
@@ -901,11 +1380,16 @@ const MilestoneQueue: React.FC = () => {
 				</div>
 			)}
 
+>>>>>>> main
 			{dialog && (
 				<ConfirmDialog
 					action={dialog.action}
 					milestone={dialog.milestone}
+<<<<<<< HEAD
+					onConfirm={handleConfirm}
+=======
 					onConfirm={() => void handleConfirm()}
+>>>>>>> main
 					onCancel={() => setDialog(null)}
 				/>
 			)}
@@ -913,10 +1397,31 @@ const MilestoneQueue: React.FC = () => {
 	)
 }
 
-export default Admin
-
 const UserLookup: React.FC = () => {
 	const [search, setSearch] = useState("")
+<<<<<<< HEAD
+	const [userData, setUserData] = useState<UserProfilePreview | null>(null)
+	return (
+		<section>
+			<input
+				value={search}
+				onChange={(event) => setSearch(event.target.value)}
+			/>
+			<button
+				type="button"
+				onClick={() =>
+					setUserData({
+						address: search.trim(),
+						balance: "250 LRN",
+						enrollment: "Stellar Basics",
+						tier: "Elite Learner",
+					})
+				}
+			>
+				Lookup
+			</button>
+			{userData ? <p>{userData.address}</p> : null}
+=======
 	const [submittedAddress, setSubmittedAddress] = useState<string | null>(null)
 	const [validationError, setValidationError] = useState<string | null>(null)
 	const {
@@ -977,8 +1482,7 @@ const UserLookup: React.FC = () => {
 				)}
 				{errorMessage && (
 					<p className="text-xs text-red-400 mt-3">
-						Could not load scholar profile — {errorMessage}. Check the address
-						and try again.
+						Failed to load scholar profile: {errorMessage}
 					</p>
 				)}
 
@@ -1051,11 +1555,23 @@ const UserLookup: React.FC = () => {
 					</div>
 				)}
 			</div>
+>>>>>>> main
 		</section>
 	)
 }
 
 const TreasuryControls: React.FC = () => {
+<<<<<<< HEAD
+	const [isPaused, setIsPaused] = useState(false)
+	return (
+		<section>
+			<button type="button" onClick={() => setIsPaused((value) => !value)}>
+				{isPaused ? "Resume DAO Treasury" : "Emergency Pause"}
+			</button>
+		</section>
+	)
+}
+=======
 	const { address } = useWallet()
 	const { data, isLoading, error, refetch } = useAdminContracts()
 	const {
@@ -1107,8 +1623,7 @@ const TreasuryControls: React.FC = () => {
 			<div className="glass border border-white/5 rounded-2xl p-6">
 				{queryError && (
 					<p className="text-sm text-red-400 mb-4">
-						Could not load treasury contract state — {queryError}. Check your
-						network connection and try again.
+						Failed to load treasury contract state: {queryError}
 					</p>
 				)}
 
@@ -1271,8 +1786,22 @@ const ContractStateCard: React.FC<{
 		</div>
 	)
 }
+>>>>>>> main
 
 const ContractInfo: React.FC = () => {
+<<<<<<< HEAD
+	return (
+		<section>
+			{contractRecords.map((contract) => (
+				<div key={contract.name}>
+					<strong>{contract.name}</strong> {contract.updated}
+				</div>
+			))}
+		</section>
+	)
+}
+
+=======
 	const { data, isLoading, error } = useAdminContracts()
 	const errorMessage = error instanceof Error ? error.message : null
 
@@ -1570,124 +2099,5 @@ const WikiManagement: React.FC = () => {
 	)
 }
 
-interface ScholarshipMetricsData {
-	active_scholarships: number
-	total_scholars: number
-	completion_rate: number
-	avg_milestones_per_scholar: number
-	dropout_rate: number
-	total_usdc_disbursed: number
-}
-
-const ScholarshipMetrics: React.FC = () => {
-	const [metrics, setMetrics] = useState<ScholarshipMetricsData | null>(null)
-	const [loading, setLoading] = useState(true)
-	const [error, setError] = useState<string | null>(null)
-
-	useEffect(() => {
-		const fetchMetrics = async () => {
-			try {
-				const res = await fetch(`${API_BASE}/api/scholarships/metrics`)
-				if (!res.ok) throw new Error(`HTTP ${res.status}`)
-				const data = await res.json()
-				setMetrics(data)
-			} catch (err) {
-				setError("Failed to load metrics")
-			} finally {
-				setLoading(false)
-			}
-		}
-		void fetchMetrics()
-	}, [])
-
-	const chartData = metrics
-		? [
-				{
-					name: "Completion Rate",
-					value: metrics.completion_rate,
-					fill: "#00d2ff",
-				},
-				{
-					name: "Dropout Rate",
-					value: metrics.dropout_rate,
-					fill: "#ff4d4d",
-				},
-			]
-		: []
-
-	return (
-		<section aria-busy={loading}>
-			<h2 className="text-2xl font-black mb-6">Scholarship Program Health</h2>
-
-			{loading && (
-				<div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-					{Array.from({ length: 6 }).map((_, i) => (
-						<div
-							key={i}
-							className="h-24 rounded-2xl bg-white/5 animate-pulse"
-						/>
-					))}
-				</div>
-			)}
-
-			{error && <p className="text-red-400 mb-6">{error}</p>}
-
-			{metrics && (
-				<>
-					<div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-						{[
-							{
-								label: "Active Scholarships",
-								value: metrics.active_scholarships,
-							},
-							{ label: "Total Scholars", value: metrics.total_scholars },
-							{
-								label: "Completion Rate",
-								value: `${metrics.completion_rate}%`,
-							},
-							{
-								label: "Avg Milestones / Scholar",
-								value: metrics.avg_milestones_per_scholar,
-							},
-							{ label: "Dropout Rate", value: `${metrics.dropout_rate}%` },
-							{
-								label: "Total USDC Disbursed",
-								value: `$${(metrics.total_usdc_disbursed / 1e7).toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
-							},
-						].map(({ label, value }) => (
-							<div
-								key={label}
-								className="glass-card p-5 rounded-2xl border border-white/5"
-							>
-								<p className="text-xs uppercase tracking-widest text-white/40 mb-1">
-									{label}
-								</p>
-								<p className="text-2xl font-black text-brand-cyan">{value}</p>
-							</div>
-						))}
-					</div>
-
-					<div className="glass-card p-6 rounded-2xl border border-white/5">
-						<h3 className="text-lg font-bold mb-4">Completion vs Dropout</h3>
-						<ResponsiveContainer width="100%" height={260}>
-							<RadialBarChart
-								cx="50%"
-								cy="50%"
-								innerRadius="30%"
-								outerRadius="80%"
-								data={chartData}
-							>
-								<RadialBar
-									dataKey="value"
-									label={{ position: "insideStart", fill: "#fff" }}
-								/>
-								<Legend />
-								<Tooltip formatter={(value: number) => `${value}%`} />
-							</RadialBarChart>
-						</ResponsiveContainer>
-					</div>
-				</>
-			)}
-		</section>
-	)
-}
+>>>>>>> main
+export default Admin

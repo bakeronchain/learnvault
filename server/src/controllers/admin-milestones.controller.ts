@@ -1,11 +1,11 @@
 import { type Request, type Response } from "express"
 import sanitizeHtml from "sanitize-html"
-import { logger } from "../lib/logger"
 import { milestoneStore, type MilestoneReport } from "../db/milestone-store"
 import {
 	attachPeerSummariesToReports,
 	listRecentPeerReviewsForReport,
 } from "../db/peer-review-store"
+import { logger } from "../lib/logger"
 
 const log = logger.child({ module: "admin-milestones" })
 import { type AdminRequest } from "../middleware/admin.middleware"

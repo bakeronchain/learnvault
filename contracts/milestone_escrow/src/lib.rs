@@ -5,6 +5,11 @@ use soroban_sdk::{
     contracttype, panic_with_error, symbol_short,
 };
 
+<<<<<<< HEAD
+const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
+const TREASURY_KEY: Symbol = symbol_short!("TREAS");
+const INACTIVITY_WINDOW_KEY: Symbol = symbol_short!("INACT_W");
+=======
 use learnvault_shared::upgrade;
 
 pub use upgrade::ContractUpgraded;
@@ -18,7 +23,6 @@ pub struct Config {
     pub treasury: Address,
     pub inactivity_window: u64,
 }
-
 #[derive(Clone)]
 #[contracttype]
 pub struct EscrowRecord {
@@ -86,12 +90,23 @@ pub struct EscrowReclaimed {
 
 #[contractimpl]
 impl MilestoneEscrow {
-    pub fn initialize(env: Env, admin: Address, treasury: Address, inactivity_window_seconds: u64) {
-        if env.storage().instance().has(&CONFIG_KEY) {
+    pub fn initialize(
+        env: Env,
+        admin: Address,
+        treasury: Address,
+        inactivity_window_seconds: u64,
+    ) {
+        if env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(&env, Error::AlreadyInitialized);
         }
         admin.require_auth();
 
+        // Keep 30 days (30 * 24 * 60 * 60) as the recommended default at deployment.
+        env.storage().instance().set(&ADMIN_KEY, &admin);
+        env.storage().instance().set(&TREASURY_KEY, &treasury);
+        env.storage()
+            .instance()
+            .set(&INACTIVITY_WINDOW_KEY, &inactivity_window_seconds);
         let config = Config {
             admin,
             treasury,
@@ -179,6 +194,9 @@ impl MilestoneEscrow {
 
         let now = env.ledger().timestamp();
         let inactive_for = now.saturating_sub(record.last_activity);
+ 
+        let inactivity_window = Self::inactivity_window(&env);
+        if inactive_for < inactivity_window {
         let config = Self::get_config(&env);
         if inactive_for < config.inactivity_window {
             panic_with_error!(&env, Error::InactivityNotReached);
@@ -198,6 +216,7 @@ impl MilestoneEscrow {
         record.released_amount = record.total_amount;
         record.last_activity = now;
         env.storage().persistent().set(&key, &record);
+ 
         EscrowReclaimed {
             proposal_id,
             scholar: record.scholar.clone(),

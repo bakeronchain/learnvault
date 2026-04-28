@@ -1,12 +1,6 @@
 import React, { useMemo } from "react"
 
 import { API_URL } from "../lib/api"
-import AddressDisplay from "../components/AddressDisplay"
-import { Link } from "react-router-dom"
-import { format } from "date-fns"
-import { stellarNetwork } from "../contracts/util"
-import { useQuery } from "@tanstack/react-query"
-import { useWallet } from "../hooks/useWallet"
 
 type ApiEvent = {
 	id: number

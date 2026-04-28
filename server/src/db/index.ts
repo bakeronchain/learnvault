@@ -53,6 +53,56 @@ const getPoolConfig = () => {
 	}
 }
 
+import { logger } from "../lib/logger"
+import { poolMonitor } from "../services/pool-monitor.service"
+
+const log = logger.child({ module: "db" })
+
+// Environment-specific pool configuration
+const getPoolConfig = () => {
+	const isProduction = process.env.NODE_ENV === "production"
+	const isDevelopment = process.env.NODE_ENV === "development"
+
+	// Recommended pool sizes per environment
+	const poolSizes = {
+		production: {
+			max: 20,
+			min: 4,
+			idleTimeoutMillis: 30000,
+			connectionTimeoutMillis: 5000,
+		},
+		staging: {
+			max: 15,
+			min: 2,
+			idleTimeoutMillis: 30000,
+			connectionTimeoutMillis: 5000,
+		},
+		development: {
+			max: 5,
+			min: 1,
+			idleTimeoutMillis: 30000,
+			connectionTimeoutMillis: 5000,
+		},
+	}
+
+	const env = isProduction
+		? "production"
+		: isDevelopment
+			? "development"
+			: "staging"
+	const config = poolSizes[env as keyof typeof poolSizes]
+
+	return {
+		connectionString: process.env.DATABASE_URL,
+		max: config.max,
+		min: config.min,
+		idleTimeoutMillis: config.idleTimeoutMillis,
+		connectionTimeoutMillis: config.connectionTimeoutMillis,
+		ssl: isProduction ? { rejectUnauthorized: false } : false,
+		application_name: `learnvault-${env}`,
+	}
+}
+
 class MockPool {
 	async connect () {
 		return {

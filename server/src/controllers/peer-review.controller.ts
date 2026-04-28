@@ -1,7 +1,6 @@
 import { type Response } from "express"
 import sanitizeHtml from "sanitize-html"
 import { getPeerReviewQueue, submitPeerReview } from "../db/peer-review-store"
-import { createLogger } from "../lib/logger"
 import { type AuthRequest } from "../middleware/auth.middleware"
 
 const logger = createLogger("peer-review")
@@ -45,9 +44,9 @@ export async function submitPeerReviewHandler (
 	const comment =
 		typeof rawComment === "string"
 			? sanitizeHtml(rawComment, {
-				allowedTags: [],
-				allowedAttributes: {},
-			}).trim() || null
+					allowedTags: [],
+					allowedAttributes: {},
+				}).trim() || null
 			: null
 
 	const verdict = req.body?.verdict as "approve" | "reject"

@@ -1,14 +1,14 @@
-import { Router } from "express"
-
 import {
 	cancelProposal,
 	castVote,
 	createGovernanceProposal,
-	getProposalStatus,
 	getGovernanceProposalById,
 	getGovernanceProposals,
+	getProposalStatus,
 	getVotingPower,
 } from "../controllers/governance.controller"
+
+import { Router } from "express"
 import { requireAdmin } from "../middleware/admin.middleware"
 
 export const governanceRouter = Router()

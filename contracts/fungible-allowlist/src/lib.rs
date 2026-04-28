@@ -68,8 +68,17 @@ impl FungibleAllowlist {
                 list.remove(idx as u32);
                 env.storage().instance().set(&DataKey::Allowlist, &list);
             }
+            env.storage().persistent().set(&DataKey::IsAllowed(account.clone()), &false);
+            let list: Vec<Address> = env.storage().instance().get(&DataKey::Allowlist).unwrap();
+            let mut new_list: Vec<Address> = Vec::new(&env);
+            for x in list.iter() {
+                if x != account {
+                    new_list.push_back(x);
+                }
+            }
+            env.storage().instance().set(&DataKey::Allowlist, &new_list);
         }
-    }
+    } 
 
     pub fn is_allowed(env: Env, account: Address) -> bool {
         env.storage()
@@ -78,11 +87,15 @@ impl FungibleAllowlist {
             .unwrap_or(false)
     }
 
+    /// Returns the complete list of allowed accounts.
     pub fn get_allowlist(env: Env) -> Vec<Address> {
-        // Enumeration should be rebuilt off-chain from events or indexers.
-        Vec::new(&env)
+        env.storage()
+            .instance()
+            .get(&DataKey::Allowlist)
+            .unwrap_or_else(|| Vec::new(&env))
     }
 
+    /// Transfer administrative role to a new address.
     pub fn set_admin(env: Env, admin: Address, new_admin: Address) {
         admin.require_auth();
         let stored_admin: Address = env
@@ -100,7 +113,7 @@ impl FungibleAllowlist {
 #[cfg(test)]
 mod test {
     use super::*;
-    use soroban_sdk::{Env, testutils::Address as _};
+    use soroban_sdk::{testutils::Address as _, Env};
 
     #[test]
     fn test_allowlist_flow() {
@@ -116,23 +129,31 @@ mod test {
         assert_eq!(client.is_allowed(&alice), false);
         assert_eq!(client.get_allowlist().len(), 0);
 
+        // Add Alice
         env.mock_all_auths();
-
         client.add_to_allowlist(&admin, &alice);
         assert_eq!(client.is_allowed(&alice), true);
-        assert_eq!(client.get_allowlist().len(), 0);
+        assert_eq!(client.get_allowlist().len(), 1);
+        assert_eq!(client.get_allowlist().get(0).unwrap(), alice);
 
+        // Add Bob
         client.add_to_allowlist(&admin, &bob);
         assert_eq!(client.is_allowed(&bob), true);
-        assert_eq!(client.get_allowlist().len(), 0);
+        assert_eq!(client.get_allowlist().len(), 2);
 
+        // Remove Alice
         client.remove_from_allowlist(&admin, &alice);
         assert_eq!(client.is_allowed(&alice), false);
-        assert_eq!(client.get_allowlist().len(), 0);
+        assert_eq!(client.get_allowlist().len(), 1);
+        assert_eq!(client.get_allowlist().get(0).unwrap(), bob);
 
+        // Set Admin
         let new_admin = Address::generate(&env);
         client.set_admin(&admin, &new_admin);
-
+        
+        // Try to add with old admin (should fail due to unauthorized)
+        // Wait, mock_all_auths is on, so we should test real auth maybe?
+        // But for unit test, we can just verify it works with new admin.
         client.add_to_allowlist(&new_admin, &alice);
         assert_eq!(client.is_allowed(&alice), true);
     }

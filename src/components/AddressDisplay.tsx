@@ -63,8 +63,8 @@ export const AddressDisplay: React.FC<AddressDisplayProps> = ({
 			activeNetwork.includes("public") || activeNetwork.includes("mainnet")
 				? "https://stellar.expert/explorer/public/account/"
 				: activeNetwork.includes("futurenet")
-				? "https://futurenet.stellar.expert/explorer/futurenet/account/"
-				: "https://testnet.stellar.expert/explorer/testnet/account/"
+					? "https://futurenet.stellar.expert/explorer/futurenet/account/"
+					: "https://testnet.stellar.expert/explorer/testnet/account/"
 		return `${baseUrl}${address}`
 	}
 

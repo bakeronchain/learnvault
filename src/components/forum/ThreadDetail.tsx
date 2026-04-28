@@ -8,6 +8,12 @@ import {
 
 import { Button } from "@stellar/design-system"
 import ReactMarkdown from "react-markdown"
+import {
+	deleteReply,
+	deleteThread,
+	replyToThread,
+	useForumThreadDetail,
+} from "../../hooks/useForum"
 import { WalletAddressPill } from "../WalletAddressPill"
 import { useQueryClient } from "@tanstack/react-query"
 

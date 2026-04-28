@@ -9,6 +9,7 @@ process.env.FRONTEND_URL = "http://localhost:3000"
 import express from "express"
 import jwt from "jsonwebtoken"
 import request from "supertest"
+import { governanceRouter } from "../routes/governance.routes"
 
 // Mock the dependencies before importing the router/controller
 jest.mock("../db/index", () => ({
@@ -65,7 +66,6 @@ jest.mock("../lib/request-context", () => ({
 	runWithRequestContext: jest.fn((context, fn) => fn()),
 }))
 
-import { governanceRouter } from "../routes/governance.routes"
 
 const app = express()
 app.use(express.json())

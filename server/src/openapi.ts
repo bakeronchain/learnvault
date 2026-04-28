@@ -1,5 +1,4 @@
 import path from "node:path"
-
 import swaggerJSDoc from "swagger-jsdoc"
 
 export const buildOpenApiSpec = () => {

@@ -264,6 +264,7 @@ impl UpgradeTimelockVault {
     /// Returns true if the timelock has expired for the given contract.
     pub fn is_upgrade_ready(env: Env, contract_address: Address) -> bool {
         if let Some(proposal) = Self::get_upgrade_proposal(env.clone(), contract_address) {
+            let timelock_duration = Self::get_timelock_duration(env.clone());
             let config = Self::get_config(&env);
             let current_time = env.ledger().timestamp();
             current_time >= proposal.queued_at + config.timelock_duration

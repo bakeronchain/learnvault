@@ -1,8 +1,8 @@
+import { Rate, Trend } from "k6/metrics"
 /* global __ENV */
 import { check, group, sleep } from "k6"
 
 import http from "k6/http"
-import { Rate, Trend } from "k6/metrics"
 
 // Baseline: p95 < 500ms for these routes under light load (tune in CI)
 const errorRate = new Rate("errors")

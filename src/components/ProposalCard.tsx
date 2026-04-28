@@ -3,6 +3,7 @@ import { Badge, Button, Card } from "@stellar/design-system"
 import ProposalCountdown from "./ProposalCountdown"
 import React from "react"
 import { shortenAddress } from "../util/contract"
+import ProposalCountdown from "./ProposalCountdown"
 
 export interface ProposalCardProps {
 	id: number

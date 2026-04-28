@@ -4,6 +4,9 @@ import path from "path"
 import cors from "cors"
 import dotenv from "dotenv"
 
+// Load server/.env whether you run from repo root or from server/
+dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
+
 import express, {
 	type Request,
 	type Response,
@@ -11,6 +14,7 @@ import express, {
 } from "express"
 import helmet from "helmet"
 import morgan from "morgan"
+
 import swaggerUi from "swagger-ui-express"
 import YAML from "yaml"
 import { z } from "zod"
@@ -135,6 +139,10 @@ app.use(
 	}),
 )
 
+const allowedOrigins = [
+	env.FRONTEND_URL || env.CORS_ORIGIN || "http://localhost:5173",
+	"https://learnvault.app",
+]
 if (!isProduction)
 	allowedOrigins.push(
 		"http://localhost:3000",

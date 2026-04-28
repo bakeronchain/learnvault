@@ -1,8 +1,13 @@
 import { type Request, type Response } from "express"
 import sanitizeHtml from "sanitize-html"
 import { milestoneStore, type MilestoneReport } from "../db/milestone-store"
-import { createLogger, logger } from "../lib/logger"
+import {
+	attachPeerSummariesToReports,
+	listRecentPeerReviewsForReport,
+} from "../db/peer-review-store"
+import { logger } from "../lib/logger"
 
+const log = logger.child({ module: "admin-milestones" })
 import { type AdminRequest } from "../middleware/admin.middleware"
 import { credentialService } from "../services/credential.service"
 import { createEmailService } from "../services/email.service"

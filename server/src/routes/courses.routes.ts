@@ -1,5 +1,3 @@
-import { Router } from "express"
-
 import {
 	createCourse,
 	getCourse,
@@ -11,6 +9,8 @@ import {
 	requireCourseAdmin,
 	requireCourseAdminIfRequested,
 } from "../middleware/course-admin.middleware"
+
+import { Router } from "express"
 
 export const coursesRouter = Router()
 

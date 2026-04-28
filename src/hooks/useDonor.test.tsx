@@ -19,7 +19,6 @@ vi.mock("../components/Toast/ToastProvider", () => ({
 	useToast: () => ({ showError: mockShowError }),
 }))
 
-
 const mockUseWallet = vi.mocked(useWallet)
 const mockUseContractIds = vi.mocked(useContractIds)
 const mockFetch = vi.fn()

@@ -37,6 +37,12 @@ const createWalletKeyGenerator =
 				ipKeyGenerator(req.ip ?? "unknown") ??
 				"unknown"
 			)
+
+			return (
+				getBodyWalletValue(req, bodyKeys) ??
+				ipKeyGenerator(req.ip ?? "unknown") ??
+				"unknown"
+			)
 		}
 
 const getKeyForRequest = (req: Request): string => {

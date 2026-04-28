@@ -5,9 +5,6 @@ use soroban_sdk::{
     Address, BytesN, Env, String, Symbol, Vec, contract, contracterror, contractimpl, contracttype,
     panic_with_error, symbol_short,
 };
-    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, Address,
-    Env, String, Symbol,
-};
 
 // ---------------------------------------------------------------------------
 // Storage Constants (assuming ~6s ledger time)

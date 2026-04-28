@@ -83,6 +83,7 @@ export async function submitMilestoneReport (
 				milestoneId.toString(),
 			)
 			.catch((err) => log.error({ err }, "Admin alert email failed"))
+			.catch((err) => log.error({ err }, "Admin alert email failed"))
 		res.status(201).json({ data: report })
 	} catch (err) {
 		if (err instanceof Error && err.message === "DUPLICATE_REPORT") {

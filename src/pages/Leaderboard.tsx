@@ -12,6 +12,45 @@ const Leaderboard: React.FC = () => {
 	const { t } = useTranslation()
 	const { address: currentUserAddress } = useWallet()
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+	useEffect(() => {
+		const fetchLeaderboard = async () => {
+			try {
+				const response = await fetch(
+					"http://localhost:4000/api/scholars/leaderboard?page=1&limit=25",
+				)
+				if (!response.ok) throw new Error("Failed to fetch leaderboard")
+				const result = (await response.json()) as {
+					rankings?: LeaderboardApiEntry[]
+					your_rank?: number | null
+				}
+				const rankings = Array.isArray(result.rankings) ? result.rankings : []
+				const mapped = rankings.map((item, index) => ({
+					id: `leader-${item.address}-${item.rank}-${index}`,
+					address: item.address,
+					lrnBalance: Number(item.lrn_balance ?? 0),
+					coursesCompleted: item.courses_completed ?? 0,
+					joinedDate: new Date(),
+					lastActive: new Date(),
+					rank: item.rank,
+					balance: item.lrn_balance ?? "0",
+					completedCourses: item.courses_completed ?? 0,
+					fullAddress: item.address,
+				}))
+				setLeaders(mapped)
+				setMyRank(
+					typeof result.your_rank === "number" ? result.your_rank : null,
+				)
+			} catch (err) {
+				console.error(err)
+				setError("Unable to load rankings. Please try again later.")
+			} finally {
+				setIsLoading(false)
+			}
+		}
+		
 	const {
 		data: result,
 		isLoading,

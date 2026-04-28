@@ -1,10 +1,11 @@
-import { rpc } from "@stellar/stellar-sdk" // dynamic later
 import { INDEXER_CONFIG, getPollingTargets } from "../lib/event-config"
-import { logger } from "../lib/logger"
 import {
 	getLastIndexedLedger,
 	indexEventsBatch,
 } from "../services/event-indexer.service"
+
+import { logger } from "../lib/logger"
+import { rpc } from "@stellar/stellar-sdk" // dynamic later
 
 const log = logger.child({ module: "poller" })
 

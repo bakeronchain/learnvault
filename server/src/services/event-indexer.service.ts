@@ -1,11 +1,11 @@
-import { rpc as StellarRpc } from "@stellar/stellar-sdk"
-import { Pool } from "pg"
 import {
 	INDEXER_CONFIG,
 	SOROBAN_RPC_URL,
 	getPollingTargets,
 } from "../lib/event-config"
 
+import { Pool } from "pg"
+import { rpc as StellarRpc } from "@stellar/stellar-sdk"
 import { leaderboardEmitter } from "../lib/leaderboard-emitter"
 import { logger } from "../lib/logger"
 

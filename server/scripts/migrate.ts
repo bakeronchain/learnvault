@@ -30,7 +30,7 @@ const pool = new Pool({ connectionString: DATABASE_URL })
 const MIGRATIONS_DIR = path.resolve(__dirname, "../src/db/migrations")
 const command = process.argv[2] ?? "up"
 
-async function ensureTrackingTable(client: PoolClient): Promise<void> {
+async function ensureTrackingTable (client: PoolClient): Promise<void> {
 	await client.query(`
 		CREATE TABLE IF NOT EXISTS schema_migrations (
 			filename   TEXT PRIMARY KEY,
@@ -39,7 +39,7 @@ async function ensureTrackingTable(client: PoolClient): Promise<void> {
 	`)
 }
 
-async function migrateUp(): Promise<void> {
+async function migrateUp (): Promise<void> {
 	const client = await pool.connect()
 	try {
 		await ensureTrackingTable(client)
@@ -47,7 +47,9 @@ async function migrateUp(): Promise<void> {
 		const { rows: applied } = await client.query<{ filename: string }>(
 			"SELECT filename FROM schema_migrations ORDER BY filename",
 		)
-		const appliedSet = new Set(applied.map((r: { filename: string }) => r.filename))
+		const appliedSet = new Set(
+			applied.map((r: { filename: string }) => r.filename),
+		)
 
 		const files = fs
 			.readdirSync(MIGRATIONS_DIR)
@@ -89,7 +91,7 @@ async function migrateUp(): Promise<void> {
 	}
 }
 
-async function migrateDown(): Promise<void> {
+async function migrateDown (): Promise<void> {
 	const client: PoolClient = await pool.connect()
 	try {
 		await ensureTrackingTable(client)

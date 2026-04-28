@@ -1,7 +1,5 @@
 import { type Request, type Response } from "express"
 
-const logger = createLogger("leaderboard")
-
 /**
  * Mock data for the leaderboard.
  * In a real production app, this would be fetched from an indexer or

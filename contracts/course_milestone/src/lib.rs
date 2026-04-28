@@ -39,7 +39,7 @@ pub enum DataKey {
     EnrolledCourses(Address),
     Course(String),
     CourseIds,
-    CompletedCount(Address, String),
+    CompletedCount(Address, String), 
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

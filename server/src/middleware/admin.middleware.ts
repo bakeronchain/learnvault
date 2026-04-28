@@ -1,28 +1,29 @@
 import { type NextFunction, type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
 
-import { JWT_AUDIENCE, JWT_ISSUER } from "../services/jwt.service"
+const DEFAULT_NON_PROD_JWT_SECRET = "learnvault-secret"
 
-function getAdminAddresses (): string[] {
+function getAdminAddresses(): string[] {
 	return (process.env.ADMIN_ADDRESSES ?? "")
 		.split(",")
 		.map((a) => a.trim())
 		.filter(Boolean)
 }
 
-function getJwtPublicKey (): string | undefined {
+function getJwtPublicKey(): string | undefined {
 	return process.env.JWT_PUBLIC_KEY?.replace(/\\n/g, "\n").trim()
 }
 
-function getJwtSecret (): string | undefined {
-	// HS256 fallback is development-only; production must use RS256 via JWT_PUBLIC_KEY.
+function getJwtSecret(): string | undefined {
+	const secret = process.env.JWT_SECRET?.trim()
+	if (secret) return secret
 	if (process.env.NODE_ENV === "production") return undefined
-	return process.env.JWT_SECRET?.trim()
+
+	return DEFAULT_NON_PROD_JWT_SECRET
 }
 
 export interface AdminRequest extends Request {
 	adminAddress?: string
-	walletAddress?: string
 }
 
 /**
@@ -32,7 +33,7 @@ export interface AdminRequest extends Request {
  * In dev mode (no ADMIN_ADDRESSES set) any valid JWT is accepted so the
  * API remains usable without extra config.
  */
-export function requireAdmin (
+export function requireAdmin(
 	req: AdminRequest,
 	res: Response,
 	next: NextFunction,
@@ -44,12 +45,6 @@ export function requireAdmin (
 	}
 
 	const token = header.slice("Bearer ".length).trim()
-	if (process.env.NODE_ENV !== "production" && token === "mock-admin-jwt") {
-		req.adminAddress = "dev-admin"
-		next()
-		return
-	}
-
 	let decoded: { address?: string; sub?: string }
 	const jwtPublicKey = getJwtPublicKey()
 	const jwtSecret = getJwtSecret()
@@ -63,10 +58,8 @@ export function requireAdmin (
 		decoded = (
 			jwtPublicKey
 				? jwt.verify(token, jwtPublicKey, {
-					algorithms: ["RS256"],
-					issuer: JWT_ISSUER,
-					audience: JWT_AUDIENCE,
-				})
+						algorithms: ["RS256"],
+					})
 				: jwt.verify(token, jwtSecret!)
 		) as { address?: string; sub?: string }
 	} catch {

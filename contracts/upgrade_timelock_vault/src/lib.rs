@@ -264,11 +264,7 @@ impl UpgradeTimelockVault {
     /// Returns true if the timelock has expired for the given contract.
     pub fn is_upgrade_ready(env: Env, contract_address: Address) -> bool {
         if let Some(proposal) = Self::get_upgrade_proposal(env.clone(), contract_address) {
-<<<<<<< HEAD
-            let timelock_duration = Self::get_timelock_duration(env.clone());
-=======
             let config = Self::get_config(&env);
->>>>>>> main
             let current_time = env.ledger().timestamp();
             current_time >= proposal.queued_at + config.timelock_duration
         } else {
@@ -292,11 +288,7 @@ impl UpgradeTimelockVault {
 #[cfg(test)]
 mod test {
     use super::*;
-<<<<<<< HEAD
-    use soroban_sdk::testutils::{Address as _, BytesN as _, Ledger};
-=======
     use soroban_sdk::testutils::{Address as _, Ledger};
->>>>>>> main
     use soroban_sdk::{Address, BytesN, Env, IntoVal, contractclient};
 
     #[contractclient(name = "UpgradeTimelockVaultClient")]
@@ -332,15 +324,10 @@ mod test {
     fn test_initialize() {
         let env = create_env();
         let admin = create_admin(&env);
-<<<<<<< HEAD
-        let contract =
-            UpgradeTimelockVaultClient::new(&env, &env.register(UpgradeTimelockVault {}, ()));
-=======
         let contract = UpgradeTimelockVaultClient::new(
             &env,
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
->>>>>>> main
 
         contract.initialize(&admin);
 
@@ -349,14 +336,6 @@ mod test {
     }
 
     #[test]
-<<<<<<< HEAD
-    #[should_panic(expected = "Error(Contract, #1)")]
-    fn test_initialize_twice_fails() {
-        let env = create_env();
-        let admin = create_admin(&env);
-        let contract =
-            UpgradeTimelockVaultClient::new(&env, &env.register(UpgradeTimelockVault {}, ()));
-=======
     #[should_panic(expected = "Error(Contract, #6)")]
     fn test_initialize_twice_fails() {
         let env = create_env();
@@ -365,7 +344,6 @@ mod test {
             &env,
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
->>>>>>> main
 
         contract.initialize(&admin);
         contract.initialize(&admin);
@@ -375,15 +353,10 @@ mod test {
     fn test_set_timelock_duration() {
         let env = create_env();
         let admin = create_admin(&env);
-<<<<<<< HEAD
-        let contract =
-            UpgradeTimelockVaultClient::new(&env, &env.register(UpgradeTimelockVault {}, ()));
-=======
         let contract = UpgradeTimelockVaultClient::new(
             &env,
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
->>>>>>> main
 
         contract.initialize(&admin);
 
@@ -408,15 +381,10 @@ mod test {
         let env = create_env();
         let admin = create_admin(&env);
         let unauthorized = create_admin(&env);
-<<<<<<< HEAD
-        let contract =
-            UpgradeTimelockVaultClient::new(&env, &env.register(UpgradeTimelockVault {}, ()));
-=======
         let contract = UpgradeTimelockVaultClient::new(
             &env,
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
->>>>>>> main
 
         contract.initialize(&admin);
 
@@ -438,15 +406,10 @@ mod test {
         let admin = create_admin(&env);
         let contract_addr = create_contract(&env);
         let wasm_hash = create_wasm_hash(&env);
-<<<<<<< HEAD
-        let contract =
-            UpgradeTimelockVaultClient::new(&env, &env.register(UpgradeTimelockVault {}, ()));
-=======
         let contract = UpgradeTimelockVaultClient::new(
             &env,
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
->>>>>>> main
 
         env.ledger().set_timestamp(1000);
         contract.initialize(&admin);
@@ -477,15 +440,10 @@ mod test {
         let admin = create_admin(&env);
         let contract_addr = create_contract(&env);
         let wasm_hash = create_wasm_hash(&env);
-<<<<<<< HEAD
-        let contract =
-            UpgradeTimelockVaultClient::new(&env, &env.register(UpgradeTimelockVault {}, ()));
-=======
         let contract = UpgradeTimelockVaultClient::new(
             &env,
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
->>>>>>> main
 
         contract.initialize(&admin);
 
@@ -518,15 +476,10 @@ mod test {
         let admin = create_admin(&env);
         let contract_addr = create_contract(&env);
         let wasm_hash = create_wasm_hash(&env);
-<<<<<<< HEAD
-        let contract =
-            UpgradeTimelockVaultClient::new(&env, &env.register(UpgradeTimelockVault {}, ()));
-=======
         let contract = UpgradeTimelockVaultClient::new(
             &env,
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
->>>>>>> main
 
         contract.initialize(&admin);
 
@@ -561,15 +514,10 @@ mod test {
         let admin = create_admin(&env);
         let contract_addr = create_contract(&env);
         let wasm_hash = create_wasm_hash(&env);
-<<<<<<< HEAD
-        let contract =
-            UpgradeTimelockVaultClient::new(&env, &env.register(UpgradeTimelockVault {}, ()));
-=======
         let contract = UpgradeTimelockVaultClient::new(
             &env,
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
->>>>>>> main
 
         contract.initialize(&admin);
 
@@ -595,15 +543,10 @@ mod test {
         let admin = create_admin(&env);
         let contract_addr = create_contract(&env);
         let wasm_hash = create_wasm_hash(&env);
-<<<<<<< HEAD
-        let contract =
-            UpgradeTimelockVaultClient::new(&env, &env.register(UpgradeTimelockVault {}, ()));
-=======
         let contract = UpgradeTimelockVaultClient::new(
             &env,
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
->>>>>>> main
 
         contract.initialize(&admin);
 
@@ -641,15 +584,10 @@ mod test {
         let admin = create_admin(&env);
         let contract_addr = create_contract(&env);
         let wasm_hash = create_wasm_hash(&env);
-<<<<<<< HEAD
-        let contract =
-            UpgradeTimelockVaultClient::new(&env, &env.register(UpgradeTimelockVault {}, ()));
-=======
         let contract = UpgradeTimelockVaultClient::new(
             &env,
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
->>>>>>> main
 
         contract.initialize(&admin);
 
@@ -678,8 +616,6 @@ mod test {
         // Now ready
         assert!(contract.is_upgrade_ready(&contract_addr));
     }
-<<<<<<< HEAD
-=======
 
     #[test]
     fn benchmark_costs() {
@@ -731,5 +667,4 @@ mod test {
         std::println!("queue_upgrade: instr={}, mem={}", queue_instr, queue_mem);
         std::println!("execute_upgrade: instr={}, mem={}", exec_instr, exec_mem);
     }
->>>>>>> main
 }

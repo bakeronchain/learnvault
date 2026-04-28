@@ -8,6 +8,18 @@ import { createCommentsRouter } from "../routes/comments.routes"
 const JWT_SECRET = "learnvault-secret"
 
 const testJwtService = {
+<<<<<<< HEAD
+	signWalletToken: (addr: string) => jwt.sign({ sub: addr }, JWT_SECRET),
+	verifyWalletToken: (token: string) => {
+		const d = jwt.verify(token, JWT_SECRET) as {
+			sub?: string
+			address?: string
+		}
+		const sub = d.sub ?? d.address ?? ""
+		if (!sub) throw new Error("Invalid token")
+		return { sub }
+	},
+=======
 	signWalletToken: (addr: string) =>
 		jwt.sign({ sub: addr, jti: "test-jti" }, JWT_SECRET),
 	verifyWalletToken: async (token: string) => {
@@ -21,6 +33,7 @@ const testJwtService = {
 		return { sub, jti: d.jti ?? "test-jti" }
 	},
 	revokeToken: jest.fn().mockResolvedValue(undefined),
+>>>>>>> main
 }
 
 function makeToken(address = "GUSER123") {

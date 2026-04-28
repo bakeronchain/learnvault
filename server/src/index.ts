@@ -1,3 +1,16 @@
+<<<<<<< HEAD
+import path from "path"
+import cors from "cors"
+import dotenv from "dotenv"
+import path from "path"
+
+// Load server/.env whether you run from repo root or from server/
+dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
+
+import cors from "cors"
+import express from "express"
+import morgan from "morgan"
+=======
 import { createPublicKey } from "node:crypto"
 import path from "path"
 import cors from "cors"
@@ -8,6 +21,7 @@ import express, {
 	type NextFunction,
 } from "express"
 import helmet from "helmet"
+>>>>>>> main
 import swaggerUi from "swagger-ui-express"
 import YAML from "yaml"
 import { z } from "zod"
@@ -51,7 +65,14 @@ import {
 	generateEphemeralDevJwtKeys,
 } from "./services/jwt.service"
 
+<<<<<<< HEAD
+const pemString = z
+	.string()
+	.min(1)
+	.transform((s) => s.replace(/\\n/g, "\n").trim())
+=======
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
+>>>>>>> main
 
 const envSchema = z.object({
 	PORT: z.coerce.number().int().positive().default(4000),

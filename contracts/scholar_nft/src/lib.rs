@@ -2,9 +2,27 @@
 #![allow(deprecated)]
 
 use soroban_sdk::{
+<<<<<<< HEAD
+    Address, Env, String, contract, contracterror, contractimpl, contracttype, panic_with_error,
+    symbol_short,
+=======
     Address, BytesN, Env, String, Symbol, Vec, contract, contracterror, contractimpl, contracttype,
     panic_with_error, symbol_short,
+>>>>>>> main
 };
+    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, Address,
+    Env, String, Symbol,
+};
+
+// ---------------------------------------------------------------------------
+// Storage Constants (assuming ~6s ledger time)
+// ---------------------------------------------------------------------------
+
+const DAY_IN_LEDGERS: u32 = 17_280;
+const INSTANCE_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
+const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30; // 30 days
+const PERSISTENT_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
+const PERSISTENT_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365; // 1 year
 
 use learnvault_shared::upgrade;
 
@@ -16,6 +34,11 @@ const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30;
 const TTL_MIN: u32 = DAY_IN_LEDGERS;
 const TTL_MAX: u32 = DAY_IN_LEDGERS * 365;
 
+<<<<<<< HEAD
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+=======
 const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
 const TOKEN_COUNTER_KEY: Symbol = symbol_short!("TCOUNTER");
 
@@ -26,16 +49,23 @@ pub struct ScholarMetadata {
     pub metadata_uri: String,
     pub issued_at: u64,
 }
+>>>>>>> main
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[contracttype]
 pub enum DataKey {
     Admin,
     Counter,
+<<<<<<< HEAD
+    Owner(u64),      // token_id -> Address
+    TokenUri(u64),   // token_id -> String
+    Revoked(u64),    // token_id -> String (reason)
+=======
     Owner(u64),
     TokenUri(u64),
     Revoked(u64),
     Metadata(u64),
+>>>>>>> main
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -66,12 +96,18 @@ pub struct RevokedEventData {
     pub reason: String,
 }
 
+<<<<<<< HEAD
+// ---------------------------------------------------------------------------
+// Errors
+// ---------------------------------------------------------------------------
+=======
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[contracttype]
 pub struct AdminChangedEventData {
     pub old_admin: Address,
     pub new_admin: Address,
 }
+>>>>>>> main
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -86,6 +122,13 @@ pub enum ScholarNFTError {
     Soulbound = 7,
     AlreadyRevoked = 8,
 }
+<<<<<<< HEAD
+
+// ---------------------------------------------------------------------------
+// Contract
+// ---------------------------------------------------------------------------
+=======
+>>>>>>> main
 
 #[contract]
 pub struct ScholarNFT;
@@ -96,6 +139,21 @@ impl ScholarNFT {
         if env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(&env, ScholarNFTError::AlreadyInitialized);
         }
+<<<<<<< HEAD
+        env.storage().instance().set(&DataKey::Admin, &admin);
+        env.storage().instance().set(&DataKey::Counter, &0_u64);
+
+        // Emit initialized event
+        env.events().publish(
+            (symbol_short!("init"),),
+            InitializedEventData { admin },
+        );
+        
+        Self::extend_instance(&env);
+    }
+
+    /// Mint a new soulbound NFT. Only callable by admin.
+=======
         admin.require_auth();
         env.storage().instance().set(&ADMIN_KEY, &admin);
         upgrade::init(&env);
@@ -109,6 +167,7 @@ impl ScholarNFT {
         Self::extend_instance(&env);
     }
 
+>>>>>>> main
     pub fn mint(env: Env, to: Address, metadata_uri: String) -> u64 {
         let admin = Self::get_admin(&env);
         admin.require_auth();
@@ -119,6 +178,20 @@ impl ScholarNFT {
             panic_with_error!(&env, ScholarNFTError::TokenExists);
         }
 
+<<<<<<< HEAD
+        env.storage().persistent().set(&key, &to);
+        env.storage().persistent().set(&DataKey::TokenUri(token_id), &uri);
+        
+        Self::extend_persistent(&env, &key);
+        Self::extend_persistent(&env, &DataKey::TokenUri(token_id));
+
+        // Emit minted event
+        env.events().publish(
+            (symbol_short!("minted"), token_id, to.clone()),
+            MintEventData {
+                owner: to,
+                metadata_uri: uri,
+=======
         env.storage().persistent().set(&owner_key, &to);
         Self::extend_persistent(&env, &owner_key);
 
@@ -142,12 +215,26 @@ impl ScholarNFT {
             MintEventData {
                 token_id,
                 owner: to,
+>>>>>>> main
             },
         );
 
         token_id
     }
 
+<<<<<<< HEAD
+    /// Revoke a credential. Only callable by admin.
+    pub fn revoke(env: Env, admin: Address, token_id: u64, reason: String) {
+        admin.require_auth();
+        let stored_admin = Self::get_admin(&env);
+        if admin != stored_admin {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
+
+        let key = DataKey::Owner(token_id);
+        if !env.storage().persistent().has(&key) {
+            panic_with_error!(&env, Error::TokenNotFound);
+=======
     pub fn revoke(env: Env, token_id: u64, reason: String) {
         let admin = Self::get_admin(&env);
         admin.require_auth();
@@ -155,16 +242,27 @@ impl ScholarNFT {
         let owner_key = DataKey::Owner(token_id);
         if !env.storage().persistent().has(&owner_key) {
             panic_with_error!(&env, ScholarNFTError::TokenNotFound);
+>>>>>>> main
         }
 
         let revoked_key = DataKey::Revoked(token_id);
         if env.storage().persistent().has(&revoked_key) {
+<<<<<<< HEAD
+            return;
+=======
             panic_with_error!(&env, ScholarNFTError::AlreadyRevoked);
+>>>>>>> main
         }
 
         env.storage().persistent().set(&revoked_key, &reason);
         Self::extend_persistent(&env, &revoked_key);
 
+<<<<<<< HEAD
+        Self::extend_persistent(&env, &revoked_key);
+        
+        // Emit revoked event
+=======
+>>>>>>> main
         env.events().publish(
             (symbol_short!("revoked"), token_id),
             RevokedEventData { token_id, reason },
@@ -185,6 +283,12 @@ impl ScholarNFT {
                 new_admin,
             },
         );
+<<<<<<< HEAD
+        panic_with_error!(&env, Error::Soulbound)
+    }
+
+    /// Returns the owner of the token.
+=======
 
         Self::extend_instance(&env);
     }
@@ -262,23 +366,45 @@ impl ScholarNFT {
         panic_with_error!(&env, ScholarNFTError::Soulbound);
     }
 
+>>>>>>> main
     pub fn owner_of(env: Env, token_id: u64) -> Address {
         Self::extend_instance(&env);
         let revoked_key = DataKey::Revoked(token_id);
         if env.storage().persistent().has(&revoked_key) {
             Self::extend_persistent(&env, &revoked_key);
+<<<<<<< HEAD
+            panic_with_error!(&env, Error::TokenRevoked);
+=======
             panic_with_error!(&env, ScholarNFTError::TokenRevoked);
+>>>>>>> main
         }
-
+ 
         let key = DataKey::Owner(token_id);
         if let Some(owner) = env.storage().persistent().get::<_, Address>(&key) {
             Self::extend_persistent(&env, &key);
             owner
         } else {
             panic_with_error!(&env, ScholarNFTError::TokenNotFound);
+<<<<<<< HEAD
         }
     }
 
+    /// Returns the URI of the token.
+    pub fn token_uri(env: Env, token_id: u64) -> String {
+        let key = DataKey::TokenUri(token_id);
+        if let Some(uri) = env.storage().persistent().get::<_, String>(&key) {
+            uri
+        } else {
+            panic_with_error!(&env, Error::TokenNotFound);
+        }
+    }
+
+    /// Returns true if the token is a valid credential (not revoked and exists).
+=======
+        }
+    }
+
+>>>>>>> main
     pub fn has_credential(env: Env, token_id: u64) -> bool {
         Self::extend_instance(&env);
         let revoked_key = DataKey::Revoked(token_id);
@@ -304,6 +430,11 @@ impl ScholarNFT {
         revoked
     }
 
+    /// Returns true if the token has been revoked.
+    pub fn is_revoked(env: Env, token_id: u64) -> bool {
+        env.storage().persistent().has(&DataKey::Revoked(token_id))
+    }
+
     pub fn get_revocation_reason(env: Env, token_id: u64) -> Option<String> {
         Self::extend_instance(&env);
         let key = DataKey::Revoked(token_id);
@@ -313,6 +444,17 @@ impl ScholarNFT {
         } else {
             None
         }
+    }
+
+    fn next_token_id(env: &Env) -> u64 {
+        let mut counter = env
+            .storage()
+            .instance()
+            .get(&TOKEN_COUNTER_KEY)
+            .unwrap_or(0_u64);
+        counter = counter.saturating_add(1);
+        env.storage().instance().set(&TOKEN_COUNTER_KEY, &counter);
+        counter
     }
 
     fn next_token_id(env: &Env) -> u64 {
@@ -341,7 +483,13 @@ impl ScholarNFT {
     }
 
     fn extend_persistent(env: &Env, key: &DataKey) {
+<<<<<<< HEAD
+        env.storage()
+            .persistent()
+            .extend_ttl(key, PERSISTENT_BUMP_THRESHOLD, PERSISTENT_EXTEND_TO);
+=======
         env.storage().persistent().extend_ttl(key, TTL_MIN, TTL_MAX);
+>>>>>>> main
     }
 }
 

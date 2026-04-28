@@ -1,14 +1,21 @@
+<<<<<<< HEAD
+import { useState, useCallback } from "react"
+=======
 import { useCallback, useRef, useState } from "react"
 import { apiFetchJson, buildApiUrl, createAuthHeaders } from "../lib/api"
+>>>>>>> main
 
 export interface AdminStats {
 	pendingMilestones: number
 	approvedToday: number
 	rejectedToday: number
+<<<<<<< HEAD
+=======
 	totalScholars: number
 	totalLrnMinted: string
 	openProposals: number
 	treasuryBalanceUsdc: string
+>>>>>>> main
 }
 
 export interface MilestoneSubmission {
@@ -129,6 +136,12 @@ export function useAdminStats() {
 		setLoading(true)
 		setError(null)
 		try {
+<<<<<<< HEAD
+			const res = await fetch("/api/admin/stats")
+			if (!res.ok) throw new Error("Failed to fetch admin stats")
+			const data: AdminStats = await res.json()
+			setStats(data)
+=======
 			const data = await apiFetchJson<AdminStatsResponse>("/api/admin/stats", {
 				auth: true,
 			})
@@ -141,6 +154,7 @@ export function useAdminStats() {
 				openProposals: Number(data.open_proposals ?? 0),
 				treasuryBalanceUsdc: data.treasury_balance_usdc ?? "0",
 			})
+>>>>>>> main
 		} catch (err: unknown) {
 			setError(err instanceof Error ? err.message : "Unknown error")
 		} finally {
@@ -157,8 +171,11 @@ export function useAdminMilestones() {
 	const [page, setPage] = useState(1)
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+<<<<<<< HEAD
+=======
 	const filtersRef = useRef<{ course?: string; status?: string }>({})
 	const pageRef = useRef(1)
+>>>>>>> main
 
 	const PAGE_SIZE = 10
 
@@ -169,8 +186,11 @@ export function useAdminMilestones() {
 		) => {
 			setLoading(true)
 			setError(null)
+<<<<<<< HEAD
+=======
 			filtersRef.current = filters
 			pageRef.current = pageNum
+>>>>>>> main
 			try {
 				const params = new URLSearchParams({
 					page: String(pageNum),
@@ -178,6 +198,12 @@ export function useAdminMilestones() {
 					...(filters.course ? { course: filters.course } : {}),
 					...(filters.status ? { status: filters.status } : {}),
 				})
+<<<<<<< HEAD
+				const res = await fetch(`/api/admin/milestones?${params.toString()}`)
+				if (!res.ok) throw new Error("Failed to fetch milestones")
+				const result: PaginatedMilestones = await res.json()
+				setMilestones(result.data)
+=======
 				const result = await apiFetchJson<PaginatedMilestonesApi>(
 					`/api/admin/milestones?${params.toString()}`,
 					{
@@ -185,6 +211,7 @@ export function useAdminMilestones() {
 					},
 				)
 				setMilestones(result.data.map(mapMilestoneSubmission))
+>>>>>>> main
 				setTotal(result.total)
 				setPage(result.page)
 			} catch (err: unknown) {
@@ -196,6 +223,50 @@ export function useAdminMilestones() {
 		[],
 	)
 
+<<<<<<< HEAD
+	const approveMilestone = useCallback(async (id: string): Promise<boolean> => {
+		// Optimistic update
+		setMilestones((prev) =>
+			prev.map((m) => (m.id === id ? { ...m, status: "approved" } : m)),
+		)
+		try {
+			const res = await fetch(`/api/admin/milestones/${id}/approve`, {
+				method: "POST",
+			})
+			if (!res.ok) throw new Error("Approval failed")
+			return true
+		} catch (err: unknown) {
+			// Rollback on failure
+			setMilestones((prev) =>
+				prev.map((m) => (m.id === id ? { ...m, status: "pending" } : m)),
+			)
+			setError(err instanceof Error ? err.message : "Approval failed")
+			return false
+		}
+	}, [])
+
+	const rejectMilestone = useCallback(async (id: string): Promise<boolean> => {
+		// Optimistic update
+		setMilestones((prev) =>
+			prev.map((m) => (m.id === id ? { ...m, status: "rejected" } : m)),
+		)
+		try {
+			const res = await fetch(`/api/admin/milestones/${id}/reject`, {
+				method: "POST",
+			})
+			if (!res.ok) throw new Error("Rejection failed")
+			return true
+		} catch (err: unknown) {
+			// Rollback on failure
+			setMilestones((prev) =>
+				prev.map((m) => (m.id === id ? { ...m, status: "pending" } : m)),
+			)
+			setError(err instanceof Error ? err.message : "Rejection failed")
+			return false
+		}
+	}, [])
+
+=======
 	const refreshMilestones = useCallback(async () => {
 		await fetchMilestones(pageRef.current, filtersRef.current)
 	}, [fetchMilestones])
@@ -321,6 +392,7 @@ export function useAdminMilestones() {
 		[runBatchMilestones],
 	)
 
+>>>>>>> main
 	return {
 		milestones,
 		total,
@@ -331,7 +403,10 @@ export function useAdminMilestones() {
 		fetchMilestones,
 		approveMilestone,
 		rejectMilestone,
+<<<<<<< HEAD
+=======
 		batchApproveMilestones,
 		batchRejectMilestones,
+>>>>>>> main
 	}
 }

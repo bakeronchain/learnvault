@@ -305,3 +305,41 @@ export function useLearnToken(address?: string): UseLearnTokenResult {
 		isMinting,
 	}
 }
+
+export function useLrnTotalForLinkedWallets(addresses: string[]) {
+	const normalizedAddresses = addresses.filter(
+		(address): address is string => address.trim().length > 0,
+	)
+	const { learnToken: contractId, isDeployed } = useContractIds()
+	const contractReady = isDeployed(contractId)
+
+	const { data, isLoading } = useQuery({
+		queryKey: [
+			"learnToken",
+			"linkedWalletsTotal",
+			contractId,
+			[...normalizedAddresses].sort().join(","),
+		],
+		queryFn: async (): Promise<bigint> => {
+			const client = await loadLearnTokenClient()
+			if (!client || !contractReady) return 0n
+
+			const fn = toMethod(client, "balance")
+			if (!fn) return 0n
+
+			let total = 0n
+			for (const account of normalizedAddresses) {
+				const raw = await fn({ account, id: account })
+				total += toBigInt(unwrapResult(raw))
+			}
+			return total
+		},
+		enabled: contractReady && normalizedAddresses.length > 0,
+		staleTime: BALANCE_STALE_TIME,
+	})
+
+	return {
+		total: data ?? 0n,
+		isLoading,
+	}
+}

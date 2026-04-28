@@ -3,6 +3,12 @@ import { useWallet } from "./useWallet"
 
 export interface LearnerProfile {
 	address: string
+	wallets?: LinkedWalletInfo[]
+}
+
+export interface LinkedWalletInfo {
+	address: string
+	isPrimary?: boolean
 }
 
 /**
@@ -29,7 +35,9 @@ export function useLearnerProfile() {
 			})
 
 			if (!response.ok) {
-				const error = await response.json().catch(() => ({}))
+				const error = (await response.json().catch(() => ({}))) as {
+					error?: string
+				}
 				throw new Error(error.error || "Failed to fetch learner profile")
 			}
 

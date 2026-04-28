@@ -68,7 +68,9 @@ export function useBookmarks() {
 				headers: authHeaders(),
 			})
 			if (!response.ok) {
-				const err = await response.json().catch(() => ({}))
+				const err = (await response.json().catch(() => ({}))) as {
+					error?: string
+				}
 				throw new Error(err.error ?? "Failed to fetch bookmarks")
 			}
 			const body = (await response.json()) as { data: Bookmark[] }
@@ -104,7 +106,9 @@ export function useBookmarks() {
 				body,
 			})
 			if (!response.ok) {
-				const err = await response.json().catch(() => ({}))
+				const err = (await response.json().catch(() => ({}))) as {
+					error?: string
+				}
 				throw new Error(err.error ?? "Failed to toggle bookmark")
 			}
 		},

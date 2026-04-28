@@ -335,13 +335,18 @@ export const useScholarshipApplication = () => {
 				})
 
 				if (!response.ok) {
-					const errorData = await response.json().catch(() => ({}))
+					const errorData = (await response.json().catch(() => ({}))) as {
+						error?: string
+					}
 					throw new Error(
 						errorData.error || "Failed to submit application to backend",
 					)
 				}
 
-				const result = await response.json()
+				const result = (await response.json()) as {
+					proposal_id?: string | number
+					tx_hash?: string
+				}
 				proposalId = String(result.proposal_id || fallbackProposalId())
 				txHash = result.tx_hash
 				source = txHash ? "on-chain" : "local-fallback"

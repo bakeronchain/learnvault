@@ -45,6 +45,20 @@ export interface BatchMilestoneResponse {
 	results: BatchMilestoneResult[]
 }
 
+export interface ValidatorAnalyticsRow {
+	validatorAddress: string
+	milestonesReviewed: number
+	averageReviewTimeSeconds: number
+	approvalRate: number
+	appealReversalRate: number
+}
+
+export interface ReviewQueueAlert {
+	pendingReviews: number
+	threshold: number
+	exceeded: boolean
+}
+
 type AdminStatsResponse = {
 	pending_milestones: number
 	approved_milestones_today: number
@@ -92,6 +106,23 @@ type BatchMilestoneResponseApi = {
 		results: BatchMilestoneResultApi[]
 	}
 	error?: string
+}
+
+type ValidatorAnalyticsApi = {
+	validator_address: string
+	milestones_reviewed: number
+	average_review_time_seconds: number
+	approval_rate: number
+	appeal_reversal_rate: number
+}
+
+type ValidatorAnalyticsResponseApi = {
+	validators: ValidatorAnalyticsApi[]
+	review_queue?: {
+		pending_reviews: number
+		threshold: number
+		exceeded: boolean
+	}
 }
 
 const mapMilestoneSubmission = (
@@ -149,6 +180,54 @@ export function useAdminStats() {
 	}, [])
 
 	return { stats, loading, error, fetchStats }
+}
+
+export function useValidatorAnalytics() {
+	const [analytics, setAnalytics] = useState<ValidatorAnalyticsRow[]>([])
+	const [reviewQueue, setReviewQueue] = useState<ReviewQueueAlert | null>(null)
+	const [loading, setLoading] = useState(false)
+	const [error, setError] = useState<string | null>(null)
+
+	const fetchAnalytics = useCallback(async () => {
+		setLoading(true)
+		setError(null)
+		try {
+			const data = await apiFetchJson<ValidatorAnalyticsResponseApi>(
+				"/api/admin/validator-analytics",
+				{
+					auth: true,
+				},
+			)
+			setAnalytics(
+				(data.validators ?? []).map((validator) => ({
+					validatorAddress: validator.validator_address,
+					milestonesReviewed: Number(validator.milestones_reviewed ?? 0),
+					averageReviewTimeSeconds: Number(
+						validator.average_review_time_seconds ?? 0,
+					),
+					approvalRate: Number(validator.approval_rate ?? 0),
+					appealReversalRate: Number(validator.appeal_reversal_rate ?? 0),
+				})),
+			)
+			setReviewQueue(
+				data.review_queue
+					? {
+							pendingReviews: Number(data.review_queue.pending_reviews ?? 0),
+							threshold: Number(data.review_queue.threshold ?? 0),
+							exceeded: Boolean(data.review_queue.exceeded),
+						}
+					: null,
+			)
+		} catch (err: unknown) {
+			setAnalytics([])
+			setReviewQueue(null)
+			setError(err instanceof Error ? err.message : "Unknown error")
+		} finally {
+			setLoading(false)
+		}
+	}, [])
+
+	return { analytics, reviewQueue, loading, error, fetchAnalytics }
 }
 
 export function useAdminMilestones() {

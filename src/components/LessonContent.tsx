@@ -29,6 +29,7 @@ interface LessonContentProps {
 	isCompleting: boolean
 	timeSpentLabel?: string | null
 	onMarkComplete: () => void
+	onScrolledToBottom?: () => void
 	prevLessonId: number | null
 	nextLessonId: number | null
 	isNextLocked: boolean
@@ -41,10 +42,15 @@ const LessonContent: React.FC<LessonContentProps> = ({
 	isCompleting,
 	timeSpentLabel,
 	onMarkComplete,
+	onScrolledToBottom,
 	prevLessonId,
 	nextLessonId,
 	isNextLocked,
 }) => {
+	React.useEffect(() => {
+		onScrolledToBottom?.()
+	}, [lesson.id, onScrolledToBottom])
+
 	if (isLoading) {
 		return (
 			<section className="glass-card p-8 md:p-12 rounded-[2.5rem] border border-white/10">

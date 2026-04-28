@@ -46,8 +46,8 @@ async function loadCourses(): Promise<CourseMetadata[]> {
 	if (coursesCache) return coursesCache
 
 	const coursesPath = path.resolve(
-		__dirname,
-		"../../content/courses/index.json",
+		process.cwd(),
+		"content/courses/index.json",
 	)
 	const coursesData = await fs.readFile(coursesPath, "utf-8")
 	const courses = JSON.parse(coursesData) as Array<{
@@ -81,16 +81,16 @@ const DEFAULT_IMAGE = "scholar-nft-base.png"
 const IMAGE_CID_MAP: Record<string, string> = {
 	"scholar-nft-stellar.png":
 		process.env.BADGE_CID_STELLAR ??
-		"bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+		"bafybeiaby2ip2h3s675n4bw5rtw6dlatwapfo2zzztvo56q4shpatk2ffe",
 	"scholar-nft-soroban.png":
 		process.env.BADGE_CID_SOROBAN ??
-		"bafybeihvvlkvjkbxy6qxzjzqxzqxzqxzqxzqxzqxzqxzqxzqxzqxzqxzqx",
+		"bafybeih6o2ug36stpo6rqx35xubs736zclfgvkzv7xb5feahm55oouu5sm",
 	"scholar-nft-defi.png":
 		process.env.BADGE_CID_DEFI ??
-		"bafybeidefi123456789abcdefghijklmnopqrstuvwxyz1234567890abc",
+		"bafybeic6c5o6jusf24nms2s5s2vmjemyh5niyjetve455575pf3kha42xu",
 	"scholar-nft-base.png":
 		process.env.BADGE_CID_BASE ??
-		"bafybeiabc123456789defghijklmnopqrstuvwxyz1234567890abcdef",
+		"bafybeid2g5mt6wttyselah5xt32wepgsg24rfhdr4i2tzi25s5ngegawmy",
 }
 
 function getImageCID(courseId: string): string {

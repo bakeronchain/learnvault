@@ -98,6 +98,7 @@ pub enum ScholarNFTError {
     TokenExists = 6,
     Soulbound = 7,
     AlreadyRevoked = 8,
+    CounterOverflow = 9,
 }
 
 #[contract]
@@ -339,7 +340,9 @@ impl ScholarNFT {
             .instance()
             .get(&TOKEN_COUNTER_KEY)
             .unwrap_or(0_u64);
-        counter = counter.saturating_add(1);
+        counter = counter
+            .checked_add(1)
+            .unwrap_or_else(|| panic_with_error!(env, ScholarNFTError::CounterOverflow));
         env.storage().instance().set(&TOKEN_COUNTER_KEY, &counter);
         counter
     }

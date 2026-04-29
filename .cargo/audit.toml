@@ -1,0 +1,15 @@
+# cargo-audit configuration
+# Ignore transitive advisories from Soroban/Stellar ecosystem crates
+# that cannot be resolved without upstream fixes.
+# These are all INFO-level "unmaintained" notices, not exploitable vulnerabilities.
+
+[advisories]
+ignore = [
+    # derivative 2.2.0 — unmaintained, used transitively by soroban-sdk
+    "RUSTSEC-2024-0388",
+    # paste 1.0.x — unmaintained, used transitively by soroban-sdk
+    "RUSTSEC-2024-0436",
+    # rand 0.8/0.9 — unsoundness with custom logger, used transitively by soroban-sdk
+    # Not exploitable in contract context (no custom global logger)
+    "RUSTSEC-2026-0097",
+]

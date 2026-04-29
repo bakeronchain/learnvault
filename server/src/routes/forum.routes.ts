@@ -18,12 +18,24 @@ export function createForumRouter(jwtService: JwtService): Router {
 
 	router.get("/courses/:idOrSlug/forum", listForumThreads)
 	router.get("/courses/:idOrSlug/forum/:threadId", getForumThread)
-	
+
 	router.post("/courses/:idOrSlug/forum", requireAuth, createForumThread)
-	router.post("/courses/:idOrSlug/forum/:threadId/replies", requireAuth, replyToForumThread)
-	
-	router.delete("/courses/:idOrSlug/forum/:threadId", requireCourseAdmin, deleteForumThread)
-	router.delete("/courses/:idOrSlug/forum/replies/:replyId", requireCourseAdmin, deleteForumReply)
+	router.post(
+		"/courses/:idOrSlug/forum/:threadId/replies",
+		requireAuth,
+		replyToForumThread,
+	)
+
+	router.delete(
+		"/courses/:idOrSlug/forum/:threadId",
+		requireCourseAdmin,
+		deleteForumThread,
+	)
+	router.delete(
+		"/courses/:idOrSlug/forum/replies/:replyId",
+		requireCourseAdmin,
+		deleteForumReply,
+	)
 
 	return router
 }

@@ -28,6 +28,7 @@ impl FungibleAllowlist {
         if env.storage().instance().has(&DataKey::Admin) {
             panic_with_error!(&env, AllowlistError::AlreadyInitialized);
         }
+        admin.require_auth();
         env.storage().instance().set(&DataKey::Admin, &admin);
     }
 
@@ -64,6 +65,11 @@ impl FungibleAllowlist {
             env.storage()
                 .persistent()
                 .set(&DataKey::IsAllowed(account.clone()), &false);
+            let mut list: Vec<Address> = env.storage().instance().get(&DataKey::Allowlist).unwrap();
+            if let Some(idx) = list.iter().position(|x| x == account) {
+                list.remove(idx as u32);
+                env.storage().instance().set(&DataKey::Allowlist, &list);
+            }
         }
     }
 
@@ -108,11 +114,10 @@ mod test {
         let contract_id = env.register_contract(None, FungibleAllowlist);
         let client = FungibleAllowlistClient::new(&env, &contract_id);
 
+        env.mock_all_auths();
         client.initialize(&admin);
         assert_eq!(client.is_allowed(&alice), false);
         assert_eq!(client.get_allowlist().len(), 0);
-
-        env.mock_all_auths();
 
         client.add_to_allowlist(&admin, &alice);
         assert_eq!(client.is_allowed(&alice), true);
@@ -131,5 +136,33 @@ mod test {
 
         client.add_to_allowlist(&new_admin, &alice);
         assert_eq!(client.is_allowed(&alice), true);
+    }
+
+    #[test]
+    fn benchmark_costs() {
+        let env = Env::default();
+        let admin = Address::generate(&env);
+        let alice = Address::generate(&env);
+
+        let contract_id = env.register(FungibleAllowlist, ());
+        let client = FungibleAllowlistClient::new(&env, &contract_id);
+
+        // 1. Benchmark initialize
+        env.cost_estimate().budget().reset_unlimited();
+        client.initialize(&admin);
+        let init_instr = env.cost_estimate().budget().cpu_instruction_cost();
+        let init_mem = env.cost_estimate().budget().memory_bytes_cost();
+
+        // 2. Benchmark add_to_allowlist
+        env.mock_all_auths();
+        env.cost_estimate().budget().reset_unlimited();
+        client.add_to_allowlist(&admin, &alice);
+        let add_instr = env.cost_estimate().budget().cpu_instruction_cost();
+        let add_mem = env.cost_estimate().budget().memory_bytes_cost();
+
+        extern crate std;
+        std::println!("BENCHMARK_RESULTS: fungible_allowlist");
+        std::println!("initialize: instr={}, mem={}", init_instr, init_mem);
+        std::println!("add_to_allowlist: instr={}, mem={}", add_instr, add_mem);
     }
 }

@@ -2,14 +2,21 @@ import React, { useEffect, useMemo, useState } from "react"
 import { Helmet } from "react-helmet"
 import { useSearchParams } from "react-router-dom"
 import CommentSection from "../components/CommentSection"
+import ConfirmDialog from "../components/ConfirmDialog"
 import Pagination from "../components/Pagination"
 import { NoProposalsEmptyState } from "../components/SkeletonLoader"
 import { ErrorState } from "../components/states/errorState"
+import { useToast } from "../components/Toast/ToastProvider"
 import {
 	type ProposalRecord,
 	useProposal,
 	useProposals,
 } from "../hooks/useProposals"
+import {
+	hasProposalDraft,
+	getDraftTimestamp,
+	clearProposalDraft,
+} from "../util/proposalDraft"
 
 type FilterType =
 	| "Voting Open"
@@ -20,7 +27,12 @@ type FilterType =
 
 const ITEMS_PER_PAGE = 5
 
-import AddressDisplay from "../components/AddressDisplay"
+const shortenAddress = (address: string) => {
+	if (!address) return ""
+	if (address.includes("...")) return address
+	if (address.length <= 10) return address
+	return `${address.slice(0, 6)}...${address.slice(-4)}`
+}
 
 const formatCountdown = (deadline: string | null, now: number) => {
 	if (!deadline) return "No deadline set"
@@ -60,7 +72,56 @@ const DaoProposals: React.FC = () => {
 		isLoading,
 		error,
 		refetch,
+		cancelProposal,
+		isCancelling,
 	} = useProposals()
+	const { showSuccess } = useToast()
+
+	const [hasDraft, setHasDraft] = useState(false)
+	const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null)
+
+	useEffect(() => {
+		const existingDraft = hasProposalDraft()
+		setHasDraft(existingDraft)
+		if (existingDraft) {
+			setDraftTimestamp(getDraftTimestamp())
+		}
+	}, [])
+
+	const [showDeleteDraftConfirm, setShowDeleteDraftConfirm] = useState(false)
+
+	const handleDeleteDraft = () => {
+		clearProposalDraft()
+		setHasDraft(false)
+		setDraftTimestamp(null)
+		setShowDeleteDraftConfirm(false)
+		showSuccess("Draft deleted")
+	}
+
+	const formatDraftTime = (timestamp: number | null): string => {
+		if (!timestamp) return ""
+		const date = new Date(timestamp)
+		const now = new Date()
+		const diffMs = now.getTime() - date.getTime()
+		const diffMins = Math.floor(diffMs / 60000)
+
+		if (diffMins < 1) return "just now"
+		if (diffMins < 60) return `${diffMins}m ago`
+		if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`
+		return date.toLocaleDateString()
+	}
+
+	const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+
+	const handleCancelProposal = async () => {
+		if (!selectedProposal) return
+		try {
+			await cancelProposal(selectedProposal.id)
+			setShowCancelConfirm(false)
+		} catch (err) {
+			console.error("Cancel proposal failed", err)
+		}
+	}
 
 	const proposalParam = searchParams.get("proposal")
 	const pageParam = searchParams.get("page")
@@ -244,6 +305,39 @@ const DaoProposals: React.FC = () => {
 				</p>
 			</header>
 
+			{hasDraft && (
+				<div className="mb-12 glass-card p-6 rounded-[2rem] border border-brand-amber/30 bg-brand-amber/5 animate-in fade-in slide-in-from-top-4 duration-700 flex flex-col md:flex-row items-center justify-between gap-4">
+					<div className="flex items-center gap-4">
+						<div className="w-12 h-12 rounded-2xl bg-brand-amber/20 flex items-center justify-center text-2xl">
+							📝
+						</div>
+						<div>
+							<h3 className="font-black text-lg text-brand-amber">
+								Unfinished Proposal Draft
+							</h3>
+							<p className="text-white/50 text-sm">
+								You have a draft saved {formatDraftTime(draftTimestamp)}.
+							</p>
+						</div>
+					</div>
+					<div className="flex items-center gap-3">
+						<button
+							type="button"
+							onClick={() => setShowDeleteDraftConfirm(true)}
+							className="px-6 py-2 text-xs font-black uppercase tracking-widest text-white/40 hover:text-red-400 transition-colors"
+						>
+							Discard
+						</button>
+						<a
+							href="/dao/propose"
+							className="px-8 py-2.5 bg-brand-amber/20 border border-brand-amber/40 text-brand-amber text-xs font-black uppercase tracking-widest rounded-full hover:bg-brand-amber/30 transition-all"
+						>
+							Continue Editing
+						</a>
+					</div>
+				</div>
+			)}
+
 			<div className="flex flex-wrap gap-3 mb-8 justify-center">
 				{(
 					[
@@ -269,6 +363,30 @@ const DaoProposals: React.FC = () => {
 				))}
 			</div>
 
+			{showCancelConfirm && selectedProposal && (
+				<ConfirmDialog
+					title="Cancel Proposal"
+					description="Are you sure you want to cancel this proposal? This will permanently remove it from the DAO and any votes cast will be lost. This action cannot be undone."
+					confirmLabel="Cancel Proposal"
+					cancelLabel="Keep Proposal"
+					onConfirm={() => void handleCancelProposal()}
+					onCancel={() => setShowCancelConfirm(false)}
+					isDestructive
+				/>
+			)}
+
+			{showDeleteDraftConfirm && (
+				<ConfirmDialog
+					title="Delete Draft"
+					description="Are you sure you want to delete your proposal draft? All your progress will be permanently lost. This action cannot be undone."
+					confirmLabel="Delete Draft"
+					cancelLabel="Keep Draft"
+					onConfirm={handleDeleteDraft}
+					onCancel={() => setShowDeleteDraftConfirm(false)}
+					isDestructive
+				/>
+			)}
+
 			{selectedProposal && (
 				<section className="glass-card p-10 rounded-[2.5rem] border border-white/5 mb-10">
 					<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-8">
@@ -280,8 +398,8 @@ const DaoProposals: React.FC = () => {
 								{selectedProposal.title}
 							</h2>
 							<div className="flex flex-wrap items-center gap-3 text-xs font-black uppercase tracking-widest">
-								<span className="text-brand-cyan flex items-center gap-1">
-									Applicant <AddressDisplay address={selectedProposal.authorAddress} showCopyButton={false} showExplorerLink={false} />
+								<span className="text-brand-cyan">
+									Applicant {shortenAddress(selectedProposal.authorAddress)}
 								</span>
 								<span className="w-1.5 h-1.5 bg-white/20 rounded-full" />
 								<span className="text-white/70">ID #{selectedProposal.id}</span>
@@ -291,8 +409,21 @@ const DaoProposals: React.FC = () => {
 								</span>
 							</div>
 						</div>
-						<div className="px-5 py-2 bg-brand-cyan/10 border border-brand-cyan/30 rounded-full text-brand-cyan text-xs font-black uppercase">
-							{selectedProposal.displayStatus}
+						<div className="flex flex-col items-end gap-3">
+							<div className="px-5 py-2 bg-brand-cyan/10 border border-brand-cyan/30 rounded-full text-brand-cyan text-xs font-black uppercase">
+								{selectedProposal.displayStatus}
+							</div>
+							{selectedProposal.authorAddress === walletAddress &&
+								selectedProposal.displayStatus === "Voting Open" && (
+									<button
+										type="button"
+										onClick={() => setShowCancelConfirm(true)}
+										disabled={isCancelling}
+										className="text-[10px] font-black uppercase text-red-400/70 hover:text-red-400 transition-colors"
+									>
+										{isCancelling ? "Cancelling..." : "Cancel Proposal"}
+									</button>
+								)}
 						</div>
 					</div>
 
@@ -433,9 +564,9 @@ const DaoProposals: React.FC = () => {
 								>
 									{proposal.title}
 								</h2>
-								<div className="text-[10px] text-white/40 uppercase font-black tracking-widest flex items-center gap-1">
-									Applicant <AddressDisplay address={proposal.authorAddress} showCopyButton={false} showExplorerLink={false} />
-								</div>
+								<p className="text-[10px] text-white/40 uppercase font-black tracking-widest">
+									Applicant {shortenAddress(proposal.authorAddress)}
+								</p>
 							</div>
 							<span className="px-3 py-1 bg-white/5 text-[10px] uppercase font-black rounded-full border border-white/10">
 								{proposal.displayStatus}

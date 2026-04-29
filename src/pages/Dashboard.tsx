@@ -1,16 +1,19 @@
 import React, { useContext, useEffect, useMemo } from "react"
+import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router-dom"
 import ActivityFeed from "../components/ActivityFeed"
+import AddressDisplay from "../components/AddressDisplay"
 import CourseCard from "../components/CourseCard"
 import LRNBalanceWidget from "../components/LRNBalanceWidget"
+import MyBookmarks from "../components/MyBookmarks"
 import { useCourse } from "../hooks/useCourse"
 import { useLearnerProfile } from "../hooks/useLearnerProfile"
 import { useLearnToken } from "../hooks/useLearnToken"
 import { WalletContext } from "../providers/WalletProvider"
 
-import AddressDisplay from "../components/AddressDisplay"
-
 const Dashboard: React.FC = () => {
+	const { i18n } = useTranslation()
+	const locale = i18n.resolvedLanguage
 	const { address } = useContext(WalletContext)
 	const navigate = useNavigate()
 	const [isInitializing, setIsInitializing] = React.useState(true)
@@ -57,10 +60,11 @@ const Dashboard: React.FC = () => {
 
 	if (isInitializing && !address) {
 		return (
-			<div className="min-h-screen flex items-center justify-center">
-				<div className="animate-pulse text-white/50 tracking-widest uppercase font-black text-sm">
-					Verifying Wallet...
-				</div>
+			<div
+				aria-busy="true"
+				className="min-h-screen p-6 md:p-12 max-w-7xl mx-auto"
+			>
+				<DashboardStatsSkeleton />
 			</div>
 		)
 	}
@@ -93,7 +97,7 @@ const Dashboard: React.FC = () => {
 			value: isLoading
 				? "—"
 				: lrnBalance !== undefined
-					? (Number(lrnBalance) / 1e7).toLocaleString("en-US", {
+					? (Number(lrnBalance) / 1e7).toLocaleString(locale, {
 							maximumFractionDigits: 0,
 						})
 					: "0",
@@ -124,7 +128,13 @@ const Dashboard: React.FC = () => {
 				{/* ── Header ── */}
 				<header className="space-y-1">
 					<h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter text-gradient leading-tight flex flex-wrap items-center gap-x-3">
-						Welcome back, <AddressDisplay address={profile?.address || address} showCopyButton={false} showExplorerLink={false} addressClassName="text-gradient" />
+						Welcome back,{" "}
+						<AddressDisplay
+							address={profile?.address || address}
+							showCopyButton={false}
+							showExplorerLink={false}
+							addressClassName="text-gradient"
+						/>
 					</h1>
 					<p className="text-white/50 text-sm sm:text-base md:text-lg font-medium">
 						Your learning dashboard and on-chain reputation.
@@ -214,6 +224,8 @@ const Dashboard: React.FC = () => {
 								</Link>
 							</div>
 						)}
+
+						<MyBookmarks />
 					</section>
 
 					{/* Activity Feed — takes up 1/3 on large screens, full width below */}

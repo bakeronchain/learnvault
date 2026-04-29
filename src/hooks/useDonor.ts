@@ -5,8 +5,10 @@ import {
 	type DonorData,
 	type DonorContribution,
 	type DonorStats,
+	type DonorImpact,
 	type Vote,
 	type RpcEvent,
+	type Scholar,
 } from "../types/contracts"
 import { useContractIds } from "./useContractIds"
 import { useWallet } from "./useWallet"
@@ -14,6 +16,7 @@ import { useWallet } from "./useWallet"
 export type {
 	DonorContribution,
 	DonorStats,
+	DonorImpact,
 	Vote,
 	Scholar,
 	DonorData,
@@ -27,6 +30,7 @@ const emptyStats: DonorStats = {
 
 const makeEmptyData = (): DonorData => ({
 	stats: emptyStats,
+	impact: null,
 	contributions: [],
 	votes: [],
 	scholars: [],
@@ -37,10 +41,10 @@ const makeEmptyData = (): DonorData => ({
 
 const toDate = (input?: string): string => {
 	if (!input) return new Date().toISOString().split("T")[0] ?? ""
-	const d = new Date(input)
-	return Number.isNaN(d.getTime())
+	const date = new Date(input)
+	return Number.isNaN(date.getTime())
 		? (new Date().toISOString().split("T")[0] ?? "")
-		: (d.toISOString().split("T")[0] ?? "")
+		: (date.toISOString().split("T")[0] ?? "")
 }
 
 const stringify = (value: unknown): string =>
@@ -52,11 +56,22 @@ const extractNumber = (value: unknown): number => {
 	return match ? Number.parseInt(match[1] ?? "0", 10) : 0
 }
 
+const fetchDonorImpact = async (address: string): Promise<DonorImpact | null> => {
+	try {
+		const response = await fetch(`/api/donors/${address}/impact`)
+		if (!response.ok) return null
+		return (await response.json()) as DonorImpact
+	} catch {
+		return null
+	}
+}
+
 const readContractEvents = async (
 	contractIds: string[],
 	walletAddress: string,
 ): Promise<RpcEvent[]> => {
-	if (!contractIds.length) return []
+	if (contractIds.length === 0) return []
+
 	const response = await fetch(rpcUrl, {
 		method: "POST",
 		headers: { "content-type": "application/json" },
@@ -70,14 +85,13 @@ const readContractEvents = async (
 			},
 		}),
 	})
+
 	if (!response.ok) return []
 	const payload = (await response.json()) as {
 		result?: { events?: RpcEvent[] }
 	}
 	const events = payload.result?.events ?? []
-	return events.filter((evt) =>
-		stringify(evt).includes(walletAddress.toLowerCase()),
-	)
+	return events.filter((event) => stringify(event).includes(walletAddress.toLowerCase()))
 }
 
 export const useDonor = (): DonorData => {
@@ -98,54 +112,59 @@ export const useDonor = (): DonorData => {
 				return
 			}
 
-			setData((prev) => ({ ...prev, isLoading: true, error: null }))
+			setData((previous) => ({ ...previous, isLoading: true, error: null }))
 			try {
 				const contractIds = [scholarshipTreasury, governanceToken].filter(
 					(id): id is string => Boolean(id),
 				)
-				const events = await readContractEvents(contractIds, address)
+
+				const [events, impact] = await Promise.all([
+					readContractEvents(contractIds, address),
+					fetchDonorImpact(address),
+				])
+
 				const contributions: DonorContribution[] = events
-					.filter((evt) =>
+					.filter((event) =>
 						stringify({
-							topic: evt.topics ?? evt.topic,
-							value: evt.value,
+							topic: event.topics ?? event.topic,
+							value: event.value,
 						}).includes("deposit"),
 					)
-					.map((evt, i) => ({
-						txHash: evt.txHash ?? evt.id ?? `deposit-${i}`,
-						amount: extractNumber(evt.value),
-						date: toDate(evt.ledgerCloseTime),
-						block: evt.ledger ?? 0,
+					.map((event, index) => ({
+						txHash: event.txHash ?? event.id ?? `deposit-${index}`,
+						amount: extractNumber(event.value),
+						date: toDate(event.ledgerCloseTime),
+						block: event.ledger ?? 0,
 					}))
 					.filter((entry) => entry.amount > 0)
 
 				const votes: Vote[] = events
-					.filter((evt) =>
+					.filter((event) =>
 						stringify({
-							topic: evt.topics ?? evt.topic,
-							value: evt.value,
+							topic: event.topics ?? event.topic,
+							value: event.value,
 						}).includes("vote"),
 					)
-					.map((evt, i): Vote => {
-						const text = stringify(evt.value)
+					.map((event, index): Vote => {
+						const text = stringify(event.value)
 						return {
-							proposalId: String(i + 1),
-							proposalTitle: `Proposal #${i + 1}`,
+							proposalId: String(index + 1),
+							proposalTitle: `Proposal #${index + 1}`,
 							voteChoice: text.includes("false") ? "against" : "for",
-							votePower: extractNumber(evt.value),
-							status: "active" as const,
+							votePower: extractNumber(event.value),
+							status: "active",
 						}
 					})
 					.filter((entry) => entry.votePower > 0)
 
 				const totalContributed = contributions.reduce(
-					(sum, c) => sum + c.amount,
+					(sum, contribution) => sum + contribution.amount,
 					0,
 				)
 				const scholarsFunded = new Set(
 					events
-						.filter((evt) => stringify(evt).includes("disburse"))
-						.map((evt) => evt.txHash ?? evt.id ?? ""),
+						.filter((event) => stringify(event).includes("disburse"))
+						.map((event) => event.txHash ?? event.id ?? ""),
 				).size
 
 				const next: DonorData = {
@@ -154,6 +173,7 @@ export const useDonor = (): DonorData => {
 						votes_cast: votes.length,
 						scholars_funded: scholarsFunded,
 					},
+					impact,
 					contributions,
 					votes,
 					scholars: [],
@@ -161,6 +181,7 @@ export const useDonor = (): DonorData => {
 					error: null,
 					isEmpty: contributions.length === 0 && votes.length === 0,
 				}
+
 				if (!cancelled) setData(next)
 			} catch {
 				if (!cancelled) {

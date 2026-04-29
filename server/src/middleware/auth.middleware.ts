@@ -1,5 +1,5 @@
 import { type NextFunction, type Request, type Response } from "express"
-
+import jwt from "jsonwebtoken"
 import { type JwtService } from "../services/jwt.service"
 
 // ---------------------------------------------------------------------------
@@ -30,9 +30,34 @@ export function createRequireAuth(jwtService: JwtService) {
 			;(req as AuthRequest).user = { address: sub }
 			next()
 		} catch (err) {
-			const message = err instanceof Error ? err.message : "Invalid or expired token"
+			const message =
+				err instanceof Error ? err.message : "Invalid or expired token"
 			res.status(401).json({ error: message })
 		}
+	}
+}
+
+export function createOptionalAuth(jwtService: JwtService) {
+	return async function optionalAuth(
+		req: Request,
+		_res: Response,
+		next: NextFunction,
+	): Promise<void> {
+		const header = req.headers.authorization
+		if (header?.startsWith("Bearer ")) {
+			const token = header.slice("Bearer ".length).trim()
+			if (token) {
+				try {
+					const { sub } = await jwtService.verifyWalletToken(token)
+					req.walletAddress = sub
+					;(req as AuthRequest).user = { address: sub }
+				} catch {
+					// Ignore invalid tokens for optional auth
+				}
+			}
+		}
+
+		next()
 	}
 }
 
@@ -67,7 +92,10 @@ export const authMiddleware = (
 				algorithms: ["RS256"],
 			}) as { sub?: string; address?: string }
 		} else {
-			decoded = jwt.verify(token, JWT_SECRET) as { sub?: string; address?: string }
+			decoded = jwt.verify(token, JWT_SECRET) as {
+				sub?: string
+				address?: string
+			}
 		}
 
 		const address = decoded.sub ?? decoded.address
@@ -80,4 +108,3 @@ export const authMiddleware = (
 		return res.status(401).json({ error: "Invalid token" })
 	}
 }
-

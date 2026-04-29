@@ -3,6 +3,10 @@
  * Uses the in-memory store so no database is required.
  */
 
+// Provide an explicit JWT_SECRET so the admin middleware does not rely on a
+// hardcoded fallback (which was removed as part of the JWT security hardening).
+process.env.JWT_SECRET = "learnvault-secret"
+
 jest.mock("../db/index", () => ({
 	pool: {
 		query: jest.fn(),
@@ -24,25 +28,6 @@ jest.mock("../services/stellar-contract.service", () => ({
 	},
 }))
 
-jest.mock("../services/email.service", () => ({
-	createEmailService: jest.fn().mockReturnValue({
-		sendNotification: jest.fn().mockResolvedValue(undefined),
-		sendAdminMilestoneNotification: jest.fn().mockResolvedValue(undefined),
-	}),
-}))
-
-jest.mock("../services/escrow-timeout.service", () => ({
-	markEscrowActivity: jest.fn().mockResolvedValue(undefined),
-}))
-
-jest.mock("../services/credential.service", () => ({
-	credentialService: {
-		mintCertificateIfComplete: jest
-			.fn()
-			.mockResolvedValue({ minted: false }),
-	},
-}))
-
 import express from "express"
 import jwt from "jsonwebtoken"
 import request from "supertest"
@@ -52,6 +37,7 @@ import { adminMilestonesRouter } from "../routes/admin-milestones.routes"
 import { stellarContractService } from "../services/stellar-contract.service"
 
 const JWT_SECRET = "learnvault-secret"
+process.env.JWT_SECRET = JWT_SECRET
 
 function makeAdminToken(address = "GADMIN123") {
 	return jwt.sign({ address }, JWT_SECRET, { expiresIn: "1h" })
@@ -67,6 +53,7 @@ function buildApp() {
 
 // Reset in-memory store before each test
 beforeEach(() => {
+	jest.clearAllMocks()
 	// @ts-ignore – reset private fields for test isolation
 	inMemoryMilestoneStore["reports"] = []
 	// @ts-ignore
@@ -80,15 +67,11 @@ beforeEach(() => {
 	// passes — the pool mock ensures no real SDK call is made.
 	process.env.STELLAR_SECRET_KEY = "FAKE_TEST_KEY"
 	process.env.COURSE_MILESTONE_CONTRACT_ID = "FAKE_TEST_CONTRACT"
-	process.env.FRONTEND_URL = "http://localhost:3000"
-	process.env.NODE_ENV = "test"
 })
 
 afterEach(() => {
 	delete process.env.STELLAR_SECRET_KEY
 	delete process.env.COURSE_MILESTONE_CONTRACT_ID
-	delete process.env.FRONTEND_URL
-	delete process.env.NODE_ENV
 })
 
 describe("POST /api/milestones/submit", () => {

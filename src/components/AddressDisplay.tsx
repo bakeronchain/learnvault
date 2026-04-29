@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion"
-import { useState, useId } from "react"
+import { useState } from "react"
 import { useWallet } from "../hooks/useWallet"
 import { stellarNetwork } from "../contracts/util"
 
@@ -39,7 +39,6 @@ export const AddressDisplay: React.FC<AddressDisplayProps> = ({
 	const [copied, setCopied] = useState(false)
 	const [isHovered, setIsHovered] = useState(false)
 	const { network: walletNetwork } = useWallet()
-	const tooltipId = useId()
 
 	if (!address) return null
 
@@ -58,16 +57,17 @@ export const AddressDisplay: React.FC<AddressDisplayProps> = ({
 
 	const getExplorerUrl = () => {
 		const activeNetwork = (walletNetwork || stellarNetwork).toLowerCase()
-		const baseUrl = activeNetwork.includes("public") || activeNetwork.includes("mainnet")
-			? "https://stellar.expert/explorer/public/account/"
-			: activeNetwork.includes("futurenet")
-			? "https://futurenet.stellar.expert/explorer/futurenet/account/"
-			: "https://testnet.stellar.expert/explorer/testnet/account/"
+		const baseUrl =
+			activeNetwork.includes("public") || activeNetwork.includes("mainnet")
+				? "https://stellar.expert/explorer/public/account/"
+				: activeNetwork.includes("futurenet")
+				? "https://futurenet.stellar.expert/explorer/futurenet/account/"
+				: "https://testnet.stellar.expert/explorer/testnet/account/"
 		return `${baseUrl}${address}`
 	}
 
 	return (
-		<div 
+		<div
 			className={`inline-flex items-center gap-2 group/addr ${className}`}
 			onMouseEnter={() => setIsHovered(true)}
 			onMouseLeave={() => setIsHovered(false)}
@@ -80,7 +80,7 @@ export const AddressDisplay: React.FC<AddressDisplayProps> = ({
 				>
 					{fullOnHover && isHovered ? address : truncated}
 				</motion.span>
-				
+
 				<AnimatePresence>
 					{isHovered && !fullOnHover && (
 						<motion.div
@@ -150,6 +150,7 @@ export const AddressDisplay: React.FC<AddressDisplayProps> = ({
 					rel="noopener noreferrer"
 					className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-colors text-white/50 hover:text-brand-cyan"
 					title="View on Stellar Expert"
+					aria-label="View on Stellar Expert"
 				>
 					<svg
 						viewBox="0 0 24 24"

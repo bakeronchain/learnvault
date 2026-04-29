@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query"
-import { useEffect, useId, useState, useCallback } from "react"
+import { useCallback, useEffect, useId, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { NavLink } from "react-router-dom"
 import { fetchCourses } from "../hooks/useCourses"
@@ -12,9 +12,13 @@ import {
 import { useWallet } from "../hooks/useWallet"
 import { fetchHistory } from "../pages/History"
 import GlobalSearch from "./GlobalSearch"
+import { LanguageSelector } from "./LanguageSelector"
+import NetworkIndicator from "./NetworkIndicator"
+import { NotificationBell } from "./NotificationBell"
 import { ReputationBadge } from "./ReputationBadge"
 import { ThemeToggle } from "./ThemeToggle"
 import { WalletButton } from "./WalletButton"
+import { getAuthToken } from "../util/auth"
 
 export default function NavBar() {
 	const [menuOpen, setMenuOpen] = useState(false)
@@ -32,19 +36,36 @@ export default function NavBar() {
 
 	const navLinks = [
 		{ to: "/courses", label: t("nav.learn") },
+		{ to: "/peer-review", label: "Peer review" },
 		{ to: "/dao", label: t("nav.dao") },
 		{ to: "/community", label: "Community" },
 		{ to: "/leaderboard", label: t("nav.leaderboard") },
+		{ to: "/impact", label: "Impact" },
 		{ to: "/history", label: "Activity" },
 		{ to: "/wiki", label: t("nav.docs") },
 		{ to: "/donor", label: "Donor" },
+		{ to: "/sponsor", label: "Sponsor" },
 		{ to: "/treasury", label: t("nav.treasury") },
 	]
 
 	const closeMenu = () => setMenuOpen(false)
 
+	// Close mobile menu on Escape key
+	useEffect(() => {
+		if (!menuOpen) return
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === "Escape") {
+				e.preventDefault()
+				closeMenu()
+			}
+		}
+		document.addEventListener("keydown", handleKeyDown)
+		return () => document.removeEventListener("keydown", handleKeyDown)
+	}, [menuOpen])
+
 	const queryClient = useQueryClient()
 	const { address } = useWallet()
+	const token = getAuthToken()
 
 	const handlePrefetch = useCallback(
 		(to: string) => {
@@ -62,8 +83,8 @@ export default function NavBar() {
 				})
 			} else if (to === "/leaderboard") {
 				void queryClient.prefetchQuery({
-					queryKey: ["leaderboard", address],
-					queryFn: () => fetchLeaderboard(address),
+					queryKey: ["leaderboard", address, 1, 10],
+					queryFn: () => fetchLeaderboard(address, 1, 10),
 					staleTime: 300 * 1000,
 				})
 			} else if (to === "/history" && address) {
@@ -112,6 +133,7 @@ export default function NavBar() {
 						<NavLink
 							key={to}
 							to={to}
+							id={to === "/courses" ? "courses-nav-link" : undefined}
 							onMouseEnter={() => handlePrefetch(to)}
 							className={({ isActive }) =>
 								`px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
@@ -130,13 +152,20 @@ export default function NavBar() {
 					<div className="hidden lg:block">
 						<GlobalSearch />
 					</div>
+					<div className="hidden md:flex items-center">
+						<LanguageSelector />
+					</div>
 					<ThemeToggle />
+					<div className="hidden xl:block">
+						<NetworkIndicator />
+					</div>
 
 					<ReputationBadge
 						className="hidden lg:inline-flex shrink-0"
 						size="sm"
 						showBalance
 					/>
+					<NotificationBell token={token} />
 					<div className="hidden md:block scale-90 [&_button]:dark:text-black [&_button]:dark:bg-white">
 						<WalletButton />
 					</div>
@@ -201,6 +230,18 @@ export default function NavBar() {
 					<ReputationBadge className="w-full" size="sm" showBalance />
 					<div className="w-full [&_button]:dark:text-black [&_button]:dark:bg-white">
 						<WalletButton />
+					</div>
+					<div className="w-full flex justify-center py-2">
+						<NetworkIndicator showLabel />
+					</div>
+
+					<div className="h-px bg-slate-200 dark:bg-white/10 my-1" />
+
+					<div className="flex items-center justify-between">
+						<span className="text-xs font-black uppercase tracking-[0.25em] text-slate-500 dark:text-white/40">
+							Language
+						</span>
+						<LanguageSelector />
 					</div>
 
 					<div className="h-px bg-slate-200 dark:bg-white/10 my-1" />

@@ -25,6 +25,7 @@ jest.mock("../services/stellar-contract.service", () => ({
 			simulated: false,
 		}),
 		getGovernanceTokenBalance: jest.fn().mockResolvedValue("1250000000"),
+		getGovernanceVotingPower: jest.fn().mockResolvedValue("1250000000"),
 		castVote: jest.fn().mockResolvedValue({
 			txHash: "mock_vote_tx_hash",
 			simulated: false,
@@ -68,7 +69,11 @@ import { governanceRouter } from "../routes/governance.routes"
 
 const app = express()
 app.use(express.json())
-app.use(require("../middleware/request-logger.middleware").createRequestLogger({ enabled: false }))
+app.use(
+	require("../middleware/request-logger.middleware").createRequestLogger({
+		enabled: false,
+	}),
+)
 app.use("/api", governanceRouter)
 
 const JWT_SECRET = "learnvault-secret"

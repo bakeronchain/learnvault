@@ -39,11 +39,17 @@ use soroban_sdk::{
 // Constants
 // ---------------------------------------------------------------------------
 
-const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
-const TIMELOCK_KEY: Symbol = symbol_short!("TIMELOCK");
+const CONFIG_KEY: Symbol = symbol_short!("CONFIG");
 
 // Default timelock duration: 48 hours in seconds
 const DEFAULT_TIMELOCK_DURATION: u64 = 48 * 60 * 60;
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Config {
+    pub admin: Address,
+    pub timelock_duration: u64,
+}
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -65,6 +71,10 @@ pub enum UpgradeTimelockError {
     TimelockNotExpired = 5,
     /// Contract has already been initialized.
     AlreadyInitialized = 6,
+    /// Timelock duration must be greater than zero.
+    InvalidTimelockDuration = 7,
+    /// Arithmetic overflow or underflow was detected.
+    ArithmeticOverflow = 8,
 }
 
 // ---------------------------------------------------------------------------
@@ -134,9 +144,10 @@ impl UpgradeTimelockVault {
     ///
     /// Sets the admin and default timelock duration (48 hours).
     pub fn initialize(env: Env, admin: Address) {
-        if env.storage().instance().has(&ADMIN_KEY) {
+        if env.storage().instance().has(&CONFIG_KEY) {
             panic_with_error!(&env, UpgradeTimelockError::AlreadyInitialized);
         }
+        admin.require_auth();
         env.storage().instance().set(&ADMIN_KEY, &admin);
         env.storage()
             .instance()
@@ -146,6 +157,9 @@ impl UpgradeTimelockVault {
     /// Set the timelock duration. Admin only.
     pub fn set_timelock_duration(env: Env, duration_seconds: u64) {
         Self::admin(&env).require_auth();
+        if duration_seconds == 0 {
+            panic_with_error!(&env, UpgradeTimelockError::InvalidTimelockDuration);
+        }
         env.storage()
             .instance()
             .set(&TIMELOCK_KEY, &duration_seconds);
@@ -153,17 +167,15 @@ impl UpgradeTimelockVault {
 
     /// Get the current timelock duration.
     pub fn get_timelock_duration(env: Env) -> u64 {
-        env.storage()
-            .instance()
-            .get(&TIMELOCK_KEY)
-            .unwrap_or(DEFAULT_TIMELOCK_DURATION)
+        Self::get_config(&env).timelock_duration
     }
 
     /// Queue an upgrade proposal for a contract.
     ///
     /// Only the admin can queue upgrades. Stores the proposal with current timestamp.
     pub fn queue_upgrade(env: Env, contract_address: Address, new_wasm_hash: BytesN<32>) {
-        Self::admin(&env).require_auth();
+        let config = Self::get_config(&env);
+        config.admin.require_auth();
 
         let key = DataKey::UpgradeProposal(contract_address.clone());
         if env.storage().persistent().has(&key) {
@@ -174,7 +186,7 @@ impl UpgradeTimelockVault {
             contract_address: contract_address.clone(),
             new_wasm_hash: new_wasm_hash.clone(),
             queued_at: env.ledger().timestamp(),
-            admin: Self::admin(&env),
+            admin: config.admin.clone(),
         };
 
         env.storage().persistent().set(&key, &proposal);
@@ -194,6 +206,7 @@ impl UpgradeTimelockVault {
     /// The caller (governance contract) is responsible for performing the actual upgrade.
     /// Removes the proposal from storage after successful execution.
     pub fn execute_upgrade(env: Env, contract_address: Address) -> BytesN<32> {
+        Self::admin(&env).require_auth();
         let key = DataKey::UpgradeProposal(contract_address.clone());
         let proposal: UpgradeProposal = env
             .storage()
@@ -201,9 +214,12 @@ impl UpgradeTimelockVault {
             .get(&key)
             .unwrap_or_else(|| panic_with_error!(&env, UpgradeTimelockError::UpgradeNotFound));
 
-        let timelock_duration = Self::get_timelock_duration(env.clone());
         let current_time = env.ledger().timestamp();
-        if current_time < proposal.queued_at + timelock_duration {
+        let ready_at = proposal
+            .queued_at
+            .checked_add(timelock_duration)
+            .unwrap_or_else(|| panic_with_error!(&env, UpgradeTimelockError::ArithmeticOverflow));
+        if current_time < ready_at {
             panic_with_error!(&env, UpgradeTimelockError::TimelockNotExpired);
         }
 
@@ -224,7 +240,8 @@ impl UpgradeTimelockVault {
     ///
     /// Removes the queued upgrade proposal. Can be called at any time during timelock.
     pub fn cancel_upgrade(env: Env, contract_address: Address) {
-        Self::admin(&env).require_auth();
+        let config = Self::get_config(&env);
+        config.admin.require_auth();
 
         let key = DataKey::UpgradeProposal(contract_address.clone());
         let proposal: UpgradeProposal = env
@@ -256,9 +273,13 @@ impl UpgradeTimelockVault {
     /// Returns true if the timelock has expired for the given contract.
     pub fn is_upgrade_ready(env: Env, contract_address: Address) -> bool {
         if let Some(proposal) = Self::get_upgrade_proposal(env.clone(), contract_address) {
-            let timelock_duration = Self::get_timelock_duration(env.clone());
+            let config = Self::get_config(&env);
             let current_time = env.ledger().timestamp();
-            current_time >= proposal.queued_at + timelock_duration
+            if let Some(ready_at) = proposal.queued_at.checked_add(timelock_duration) {
+                current_time >= ready_at
+            } else {
+                false
+            }
         } else {
             false
         }
@@ -266,13 +287,13 @@ impl UpgradeTimelockVault {
 
     /// Get the admin address.
     pub fn get_admin(env: Env) -> Address {
-        Self::admin(&env)
+        Self::get_config(&env).admin
     }
 
-    fn admin(env: &Env) -> Address {
+    fn get_config(env: &Env) -> Config {
         env.storage()
             .instance()
-            .get(&ADMIN_KEY)
+            .get(&CONFIG_KEY)
             .unwrap_or_else(|| panic_with_error!(env, UpgradeTimelockError::NotInitialized))
     }
 }
@@ -280,8 +301,8 @@ impl UpgradeTimelockVault {
 #[cfg(test)]
 mod test {
     use super::*;
-    use soroban_sdk::testutils::{Address as _, Ledger};
-    use soroban_sdk::{Address, BytesN, Env, IntoVal, contractclient};
+    use soroban_sdk::testutils::{Address as _, Ledger, MockAuth, MockAuthInvoke};
+    use soroban_sdk::{Address, BytesN, Env, IntoVal, Val, Vec, contractclient};
 
     #[contractclient(name = "UpgradeTimelockVaultClient")]
     pub trait UpgradeTimelockVaultInterface {
@@ -312,6 +333,38 @@ mod test {
         BytesN::from_array(env, &[0; 32])
     }
 
+    fn authorize_call<T>(
+        env: &Env,
+        contract: &Address,
+        signer: &Address,
+        fn_name: &'static str,
+        args: T,
+    ) where
+        T: IntoVal<Env, Vec<Val>>,
+    {
+        env.mock_auths(&[MockAuth {
+            address: signer,
+            invoke: &MockAuthInvoke {
+                contract,
+                fn_name,
+                args: args.into_val(env),
+                sub_invokes: &[],
+            },
+        }]);
+    }
+
+    fn initialize_contract(env: &Env, contract: &UpgradeTimelockVaultClient<'_>, admin: &Address) {
+        authorize_call(
+            env,
+            &contract.address,
+            admin,
+            "initialize",
+            (admin.clone(),),
+        );
+        contract.initialize(admin);
+        env.set_auths(&[]);
+    }
+
     #[test]
     fn test_initialize() {
         let env = create_env();
@@ -321,7 +374,7 @@ mod test {
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
 
-        contract.initialize(&admin);
+        initialize_contract(&env, &contract, &admin);
 
         assert_eq!(contract.get_admin(), admin);
         assert_eq!(contract.get_timelock_duration(), DEFAULT_TIMELOCK_DURATION);
@@ -337,7 +390,7 @@ mod test {
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
 
-        contract.initialize(&admin);
+        initialize_contract(&env, &contract, &admin);
         contract.initialize(&admin);
     }
 
@@ -350,7 +403,7 @@ mod test {
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
 
-        contract.initialize(&admin);
+        initialize_contract(&env, &contract, &admin);
 
         let new_duration = 24 * 60 * 60; // 24 hours
         env.mock_auths(&[soroban_sdk::testutils::MockAuth {
@@ -378,7 +431,7 @@ mod test {
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
 
-        contract.initialize(&admin);
+        initialize_contract(&env, &contract, &admin);
 
         env.mock_auths(&[soroban_sdk::testutils::MockAuth {
             address: &unauthorized,
@@ -403,7 +456,7 @@ mod test {
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
 
-        contract.initialize(&admin);
+        initialize_contract(&env, &contract, &admin);
         env.ledger().set_timestamp(1);
 
         env.mock_auths(&[soroban_sdk::testutils::MockAuth {
@@ -436,7 +489,7 @@ mod test {
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
 
-        contract.initialize(&admin);
+        initialize_contract(&env, &contract, &admin);
 
         env.mock_auths(&[soroban_sdk::testutils::MockAuth {
             address: &admin,
@@ -472,7 +525,7 @@ mod test {
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
 
-        contract.initialize(&admin);
+        initialize_contract(&env, &contract, &admin);
 
         // Queue upgrade
         env.mock_auths(&[soroban_sdk::testutils::MockAuth {
@@ -491,6 +544,13 @@ mod test {
             .set_timestamp(env.ledger().timestamp() + DEFAULT_TIMELOCK_DURATION + 1);
 
         // Execute upgrade
+        authorize_call(
+            &env,
+            &contract.address,
+            &admin,
+            "execute_upgrade",
+            (contract_addr.clone(),),
+        );
         let returned_hash = contract.execute_upgrade(&contract_addr);
         assert_eq!(returned_hash, wasm_hash);
 
@@ -510,7 +570,7 @@ mod test {
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
 
-        contract.initialize(&admin);
+        initialize_contract(&env, &contract, &admin);
 
         // Queue upgrade
         env.mock_auths(&[soroban_sdk::testutils::MockAuth {
@@ -525,6 +585,13 @@ mod test {
         contract.queue_upgrade(&contract_addr, &wasm_hash);
 
         // Try to execute immediately (before timelock)
+        authorize_call(
+            &env,
+            &contract.address,
+            &admin,
+            "execute_upgrade",
+            (contract_addr.clone(),),
+        );
         contract.execute_upgrade(&contract_addr);
     }
 
@@ -539,7 +606,7 @@ mod test {
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
 
-        contract.initialize(&admin);
+        initialize_contract(&env, &contract, &admin);
 
         // Queue upgrade
         env.mock_auths(&[soroban_sdk::testutils::MockAuth {
@@ -580,7 +647,7 @@ mod test {
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
 
-        contract.initialize(&admin);
+        initialize_contract(&env, &contract, &admin);
 
         // No proposal yet
         assert!(!contract.is_upgrade_ready(&contract_addr));
@@ -606,5 +673,56 @@ mod test {
 
         // Now ready
         assert!(contract.is_upgrade_ready(&contract_addr));
+    }
+
+    #[test]
+    fn benchmark_costs() {
+        let env = create_env();
+        let admin = create_admin(&env);
+        let contract_addr = create_contract(&env);
+        let wasm_hash = create_wasm_hash(&env);
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
+
+        contract.initialize(&admin);
+
+        // 1. Benchmark queue_upgrade
+        env.cost_estimate().budget().reset_unlimited();
+        env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+            address: &admin,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract.address,
+                fn_name: "queue_upgrade",
+                args: (contract_addr.clone(), wasm_hash.clone()).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
+        contract.queue_upgrade(&contract_addr, &wasm_hash);
+        let queue_instr = env.cost_estimate().budget().cpu_instruction_cost();
+        let queue_mem = env.cost_estimate().budget().memory_bytes_cost();
+
+        // 2. Benchmark execute_upgrade
+        env.ledger()
+            .set_timestamp(env.ledger().timestamp() + DEFAULT_TIMELOCK_DURATION + 1);
+        env.cost_estimate().budget().reset_unlimited();
+        env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+            address: &admin,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract.address,
+                fn_name: "execute_upgrade",
+                args: (contract_addr.clone(),).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
+        contract.execute_upgrade(&contract_addr);
+        let exec_instr = env.cost_estimate().budget().cpu_instruction_cost();
+        let exec_mem = env.cost_estimate().budget().memory_bytes_cost();
+
+        extern crate std;
+        std::println!("BENCHMARK_RESULTS: upgrade_timelock_vault");
+        std::println!("queue_upgrade: instr={}, mem={}", queue_instr, queue_mem);
+        std::println!("execute_upgrade: instr={}, mem={}", exec_instr, exec_mem);
     }
 }

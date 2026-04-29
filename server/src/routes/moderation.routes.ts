@@ -54,11 +54,7 @@ moderationRouter.get("/admin/moderation", requireAdmin, listFlaggedContent)
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  */
-moderationRouter.get(
-	"/admin/moderation/:flagId",
-	requireAdmin,
-	getFlagDetails,
-)
+moderationRouter.get("/admin/moderation/:flagId", requireAdmin, getFlagDetails)
 
 /**
  * @openapi

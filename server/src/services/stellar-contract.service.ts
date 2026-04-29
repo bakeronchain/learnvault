@@ -7,6 +7,7 @@
 import { pool } from "../db/index"
 import { logger } from "../lib/logger"
 import { getRequestId } from "../lib/request-context"
+import { getRpcCache, CacheKey, TTL } from "../lib/rpc-cache"
 
 const log = logger.child({ module: "stellar" })
 
@@ -663,6 +664,11 @@ async function isEnrolled(
 	courseId: number,
 	_options: RequestTraceOptions = {},
 ): Promise<boolean> {
+	const cache = getRpcCache()
+	const cacheKey = CacheKey.enrollment(learnerAddress, courseId)
+	const cached = await cache.get(cacheKey)
+	if (cached !== null) return cached === "1"
+
 	if (!COURSE_MILESTONE_CONTRACT_ID) {
 		log.warn(
 			"COURSE_MILESTONE_CONTRACT_ID not set — simulating enrollment check",
@@ -715,6 +721,12 @@ async function isEnrolled(
 			return false
 		}
 
+		if (simResult.result) {
+			const { scValToNative } = await import("@stellar/stellar-sdk")
+			const result = scValToNative(simResult.result.retval) as boolean
+			await cache.set(cacheKey, result ? "1" : "0", TTL.ENROLLMENT)
+			return result
+		}
 			if (rpc.Api.isSimulationError(simResult)) {
 				console.error("[stellar] is_enrolled simulation failed:", simResult.error)
 				return false
@@ -1079,6 +1091,11 @@ async function castVote(params: CastVoteParams): Promise<ContractCallResult> {
 }
 
 async function getLearnTokenBalance(address: string): Promise<string> {
+	const cache = getRpcCache()
+	const cacheKey = CacheKey.learnBalance(address)
+	const cached = await cache.get(cacheKey)
+	if (cached !== null) return cached
+
 	if (!LEARN_TOKEN_CONTRACT_ID) {
 		log.warn("LEARN_TOKEN_CONTRACT_ID not set — simulating balance")
 		return "10000000000" // 1000 LRN
@@ -1091,6 +1108,12 @@ async function getLearnTokenBalance(address: string): Promise<string> {
 					? "https://soroban-rpc.stellar.org"
 					: "https://soroban-testnet.stellar.org",
 			)
+		)
+			return "0"
+		const { scValToNative } = await import("@stellar/stellar-sdk")
+		const result = scValToNative(simResult.result?.retval!).toString()
+		await cache.set(cacheKey, result, TTL.BALANCE)
+		return result
 			const contract = new Contract(LEARN_TOKEN_CONTRACT_ID)
 			const tx = new TransactionBuilder(
 				new Account("GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBF3UKJQ2K5RQDD", "0"),
@@ -1114,6 +1137,11 @@ async function getLearnTokenBalance(address: string): Promise<string> {
 }
 
 async function getGovernanceTokenBalance(address: string): Promise<string> {
+	const cache = getRpcCache()
+	const cacheKey = CacheKey.govBalance(address)
+	const cached = await cache.get(cacheKey)
+	if (cached !== null) return cached
+
 	if (!GOVERNANCE_TOKEN_CONTRACT_ID) {
 		log.warn("GOVERNANCE_TOKEN_CONTRACT_ID not set — simulating balance")
 		return "1250000000"
@@ -1126,6 +1154,12 @@ async function getGovernanceTokenBalance(address: string): Promise<string> {
 					? "https://soroban-rpc.stellar.org"
 					: "https://soroban-testnet.stellar.org",
 			)
+		)
+			return "0"
+		const { scValToNative } = await import("@stellar/stellar-sdk")
+		const result = scValToNative(simResult.result?.retval!).toString()
+		await cache.set(cacheKey, result, TTL.BALANCE)
+		return result
 			const contract = new Contract(GOVERNANCE_TOKEN_CONTRACT_ID)
 			const tx = new TransactionBuilder(
 				new Account("GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBF3UKJQ2K5RQDD", "0"),
@@ -1149,6 +1183,11 @@ async function getGovernanceTokenBalance(address: string): Promise<string> {
 }
 
 async function getGovernanceVotingPower(address: string): Promise<string> {
+	const cache = getRpcCache()
+	const cacheKey = CacheKey.votingPower(address)
+	const cached = await cache.get(cacheKey)
+	if (cached !== null) return cached
+
 	if (!GOVERNANCE_TOKEN_CONTRACT_ID) {
 		log.warn(
 			"[stellar] GOVERNANCE_TOKEN_CONTRACT_ID not set — simulating voting power",
@@ -1171,6 +1210,12 @@ async function getGovernanceVotingPower(address: string): Promise<string> {
 					networkPassphrase: STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
 				},
 			)
+		)
+			return "0"
+		const { scValToNative } = await import("@stellar/stellar-sdk")
+		const result = scValToNative(simResult.result?.retval!).toString()
+		await cache.set(cacheKey, result, TTL.VOTING_POWER)
+		return result
 				.addOperation(
 					contract.call("get_voting_power", new Address(address).toScVal()),
 				)
@@ -1190,6 +1235,11 @@ async function getGovernanceVotingPower(address: string): Promise<string> {
 async function getGovernanceDelegation(
 	address: string,
 ): Promise<string | null> {
+	const cache = getRpcCache()
+	const cacheKey = CacheKey.delegation(address)
+	const cached = await cache.get(cacheKey)
+	if (cached !== null) return cached === "__null__" ? null : cached
+
 	if (!GOVERNANCE_TOKEN_CONTRACT_ID) return null
 	try {
 		return await stellarRpcCircuitBreaker.call(async () => {
@@ -1207,6 +1257,14 @@ async function getGovernanceDelegation(
 					networkPassphrase: STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
 				},
 			)
+		)
+			return null
+		const { scValToNative } = await import("@stellar/stellar-sdk")
+		const raw = scValToNative(simResult.result?.retval!)
+		// Option<Address> → null (None) or an Address string (Some)
+		const result = typeof raw === "string" ? raw : null
+		await cache.set(cacheKey, result ?? "__null__", TTL.DELEGATION)
+		return result
 				.addOperation(
 					contract.call("get_delegate", new Address(address).toScVal()),
 				)

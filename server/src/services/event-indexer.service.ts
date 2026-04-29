@@ -5,6 +5,7 @@ import {
 	INDEXER_CONFIG,
 	getPollingTargets,
 } from "../lib/event-config"
+import { getRpcCache, CacheKey } from "../lib/rpc-cache"
 import { leaderboardEmitter } from "../lib/leaderboard-emitter"
 import { logger } from "../lib/logger"
 
@@ -51,7 +52,55 @@ function extractEventIndex(eventId: string): number | undefined {
 }
 
 /**
- * Poll and index new events from target contracts using UPSERT for idempotency
+ * Invalidate RPC cache entries that are stale after a new event is indexed.
+ * We only invalidate keys we can derive from the event data — everything else
+ * expires naturally via TTL.
+ */
+async function invalidateCacheForEvent(
+	topic: string,
+	data: Record<string, unknown>,
+): Promise<void> {
+	const cache = getRpcCache()
+	const addr = typeof data.address === "string" ? data.address : null
+
+	switch (topic) {
+		case "LearnToken_Mint":
+			if (addr) {
+				await cache.invalidate(CacheKey.learnBalance(addr))
+				await cache.invalidate(CacheKey.votingPower(addr))
+			}
+			break
+		case "CourseMilestone_MilestoneComplete":
+			if (addr) {
+				const courseId =
+					typeof data.courseId === "string" ? Number(data.courseId) : null
+				if (courseId !== null && !isNaN(courseId)) {
+					await cache.invalidate(CacheKey.enrollment(addr, courseId))
+				}
+			}
+			break
+		case "ScholarshipTreasury_Deposit":
+			// Deposit mints governance tokens — invalidate gov balance + voting power
+			if (addr) {
+				await cache.invalidate(CacheKey.govBalance(addr))
+				await cache.invalidate(CacheKey.votingPower(addr))
+			}
+			break
+		case "ScholarshipTreasury_VoteCastEvent": {
+			const voter =
+				typeof data.voter === "string" ? data.voter : null
+			if (voter) {
+				await cache.invalidate(CacheKey.votingPower(voter))
+			}
+			break
+		}
+		default:
+			break
+	}
+}
+
+/**
+ * Poll and index new events from target contracts
  * @param startLedger - Starting ledger (config or last indexed)
  * @param endLedger - Latest ledger to check
  */
@@ -114,6 +163,8 @@ export async function indexEventsBatch(
 						 RETURNING id`,
 						[contractId, topic, data, ledger, txHash, eventIndex],
 					)
+					inserted++
+					await invalidateCacheForEvent(topic, data)
 
 					if ((result.rowCount ?? 0) > 0) {
 						inserted++

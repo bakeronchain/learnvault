@@ -1,6 +1,4 @@
-import { type Response } from "express"
-
-import { type AuthRequest } from "../middleware/auth.middleware"
+import { type Request, type Response } from "express"
 import { flaggedContentStore } from "../db/flagged-content-store"
 import { pool } from "../db/index"
 import { createEmailService } from "../services/email.service"
@@ -13,10 +11,7 @@ interface FlagContentRequestBody {
 	reason: string
 }
 
-export async function flagContent(
-	req: AuthRequest,
-	res: Response,
-): Promise<void> {
+export async function flagContent(req: Request, res: Response): Promise<void> {
 	const body = req.body as FlagContentRequestBody
 	const { contentType, contentId, reason } = body
 
@@ -35,10 +30,7 @@ export async function flagContent(
 		return
 	}
 
-	const reporterAddress = (req as any).user?.address || (req as any).walletAddress
-
-	const reporterAddress = req.user?.address
- main
+	const reporterAddress = (req as any).user?.address
 
 	if (!reporterAddress) {
 		res.status(401).json({ error: "Authentication required" })
@@ -86,8 +78,15 @@ export async function flagContent(
 
 		// Send email to admin
 		emailService
-			.sendAdminFlagNotification(contentType, contentId, reason, reporterAddress)
-			.catch((err) => console.error("[EmailService] Admin flag alert failed:", err))
+			.sendAdminFlagNotification(
+				contentType,
+				contentId,
+				reason,
+				reporterAddress,
+			)
+			.catch((err: unknown) =>
+				console.error("[EmailService] Admin flag alert failed:", err),
+			)
 
 		res.status(201).json({ data: flag })
 	} catch (err) {

@@ -1,8 +1,6 @@
 import { type NextFunction, type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
 
-const DEFAULT_NON_PROD_JWT_SECRET = "learnvault-secret"
-
 type TokenPayload = {
 	sub?: string
 	address?: string
@@ -15,16 +13,14 @@ function getJwtPublicKey(): string | undefined {
 }
 
 function getJwtSecret(): string | undefined {
-	const secret = process.env.JWT_SECRET?.trim()
-	if (secret) return secret
 	if (process.env.NODE_ENV === "production") return undefined
-
-	return DEFAULT_NON_PROD_JWT_SECRET
+	const secret = process.env.JWT_SECRET?.trim()
+	return secret && secret.length > 0 ? secret : undefined
 }
 
 function getAdminApiKey(): string | undefined {
 	const apiKey = process.env.ADMIN_API_KEY?.trim()
-	return apiKey || undefined
+	return apiKey && apiKey.length > 0 ? apiKey : undefined
 }
 
 function getAdminAddresses(): string[] {
@@ -35,10 +31,9 @@ function getAdminAddresses(): string[] {
 }
 
 function wantsUnpublishedCourses(req: Request): boolean {
-	const rawValue = req.query.includeUnpublished
-	if (typeof rawValue !== "string") return false
-
-	return ["1", "true", "yes"].includes(rawValue.trim().toLowerCase())
+	const raw = req.query.includeUnpublished
+	if (typeof raw !== "string") return false
+	return ["1", "true", "yes"].includes(raw.trim().toLowerCase())
 }
 
 export function requireCourseAdmin(
@@ -50,8 +45,9 @@ export function requireCourseAdmin(
 	const jwtSecret = getJwtSecret()
 	const adminApiKey = getAdminApiKey()
 	const adminAddresses = getAdminAddresses()
-	const apiKey = req.header("x-api-key")
-	if (adminApiKey && apiKey && apiKey === adminApiKey) {
+
+	const providedApiKey = req.header("x-api-key")
+	if (adminApiKey && providedApiKey && providedApiKey === adminApiKey) {
 		next()
 		return
 	}

@@ -5,6 +5,19 @@ use soroban_sdk::{
     Address, BytesN, Env, String, Symbol, Vec, contract, contracterror, contractimpl, contracttype,
     panic_with_error, symbol_short,
 };
+    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, Address,
+    Env, String, Symbol,
+};
+
+// ---------------------------------------------------------------------------
+// Storage Constants (assuming ~6s ledger time)
+// ---------------------------------------------------------------------------
+
+const DAY_IN_LEDGERS: u32 = 17_280;
+const INSTANCE_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
+const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30; // 30 days
+const PERSISTENT_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
+const PERSISTENT_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365; // 1 year
 
 use learnvault_shared::upgrade;
 
@@ -32,7 +45,6 @@ pub struct ScholarMetadata {
 pub enum DataKey {
     Admin,
     Counter,
-    Scholars,
     Owner(u64),
     TokenUri(u64),
     Revoked(u64),
@@ -104,11 +116,6 @@ impl ScholarNFT {
         env.storage().instance().set(&TOKEN_COUNTER_KEY, &0_u64);
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::Counter, &0_u64);
-        let scholars: Vec<Address> = Vec::new(&env);
-        env.storage()
-            .persistent()
-            .set(&DataKey::Scholars, &scholars);
-        Self::extend_persistent(&env, &DataKey::Scholars);
 
         env.events()
             .publish((symbol_short!("init"),), InitializedEventData { admin });
@@ -143,17 +150,6 @@ impl ScholarNFT {
             .persistent()
             .set(&DataKey::Metadata(token_id), &metadata);
         Self::extend_persistent(&env, &DataKey::Metadata(token_id));
-
-        let mut scholars: Vec<Address> = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Scholars)
-            .unwrap_or_else(|| Vec::new(&env));
-        scholars.push_back(to.clone());
-        env.storage()
-            .persistent()
-            .set(&DataKey::Scholars, &scholars);
-        Self::extend_persistent(&env, &DataKey::Scholars);
 
         env.events().publish(
             (symbol_short!("minted"), token_id),
@@ -250,14 +246,17 @@ impl ScholarNFT {
 
     pub fn get_all_scholars(env: Env) -> Vec<Address> {
         Self::extend_instance(&env);
-        let key = DataKey::Scholars;
-        let scholars: Vec<Address> = env
-            .storage()
-            .persistent()
-            .get(&key)
-            .unwrap_or_else(|| Vec::new(&env));
-        if env.storage().persistent().has(&key) {
-            Self::extend_persistent(&env, &key);
+        let count = Self::token_counter(env.clone());
+        let mut scholars = Vec::new(&env);
+        for i in 1..=count {
+            if let Some(owner) = env
+                .storage()
+                .persistent()
+                .get::<_, Address>(&DataKey::Owner(i))
+            {
+                scholars.push_back(owner);
+                Self::extend_persistent(&env, &DataKey::Owner(i));
+            }
         }
         scholars
     }
@@ -284,7 +283,7 @@ impl ScholarNFT {
             Self::extend_persistent(&env, &revoked_key);
             panic_with_error!(&env, ScholarNFTError::TokenRevoked);
         }
-
+ 
         let key = DataKey::Owner(token_id);
         if let Some(owner) = env.storage().persistent().get::<_, Address>(&key) {
             Self::extend_persistent(&env, &key);
@@ -319,6 +318,11 @@ impl ScholarNFT {
         revoked
     }
 
+    /// Returns true if the token has been revoked.
+    pub fn is_revoked(env: Env, token_id: u64) -> bool {
+        env.storage().persistent().has(&DataKey::Revoked(token_id))
+    }
+
     pub fn get_revocation_reason(env: Env, token_id: u64) -> Option<String> {
         Self::extend_instance(&env);
         let key = DataKey::Revoked(token_id);
@@ -339,6 +343,17 @@ impl ScholarNFT {
         counter = counter
             .checked_add(1)
             .unwrap_or_else(|| panic_with_error!(env, ScholarNFTError::CounterOverflow));
+        env.storage().instance().set(&TOKEN_COUNTER_KEY, &counter);
+        counter
+    }
+
+    fn next_token_id(env: &Env) -> u64 {
+        let mut counter = env
+            .storage()
+            .instance()
+            .get(&TOKEN_COUNTER_KEY)
+            .unwrap_or(0_u64);
+        counter = counter.saturating_add(1);
         env.storage().instance().set(&TOKEN_COUNTER_KEY, &counter);
         counter
     }

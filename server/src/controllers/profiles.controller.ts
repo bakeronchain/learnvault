@@ -40,7 +40,10 @@ export async function getProfile(req: Request, res: Response): Promise<void> {
 	}
 }
 
-export async function updateProfile(req: Request, res: Response): Promise<void> {
+export async function updateProfile(
+	req: Request,
+	res: Response,
+): Promise<void> {
 	try {
 		// The authMiddleware should attach the user object
 		const user = (req as any).user

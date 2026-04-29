@@ -1,10 +1,8 @@
-import { useEffect, useId, useState, useCallback } from "react"
+import { useEffect, useId, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useWallet } from "../hooks/useWallet"
 import { getAuthToken } from "../util/auth"
 import CommentCard from "./CommentCard"
-
-const API_BASE = import.meta.env.VITE_SERVER_URL ?? "http://localhost:4000"
 
 export interface Comment {
 	id: number
@@ -29,10 +27,10 @@ const API_URL = (
 	""
 ).replace(/\/$/, "")
 
-const CommentSection: React.FC<CommentSectionProps> = ({
+const CommentSection = ({
 	proposalId,
 	proposalAuthor,
-}) => {
+}: CommentSectionProps) => {
 	const { t } = useTranslation()
 	const { address } = useWallet()
 	const pollInterval = Number(import.meta.env.VITE_COMMENT_POLL_MS) || 15000
@@ -52,8 +50,8 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 		setLoading(true)
 		try {
 			const res = await fetch(`${API_URL}/api/proposals/${proposalId}/comments`)
-			const data = await res.json()
-			setComments(data)
+			const data = (await res.json()) as Comment[] | { data?: Comment[] }
+			setComments(Array.isArray(data) ? data : (data.data ?? []))
 		} catch (err) {
 			console.error("Failed to fetch comments", err)
 		} finally {
@@ -112,7 +110,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 				setSubmissionStatus("Comment posted successfully.")
 				void fetchComments()
 			} else {
-				const err = await res.json()
+				const err = (await res.json().catch(() => ({}))) as { error?: string }
 				setSubmissionError(err.error || "Failed to post comment.")
 			}
 		} catch (err) {
@@ -246,6 +244,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 								comment={comment}
 								isAuthor={comment.author_address === proposalAuthor}
 								canPin={proposalAuthor === address}
+								canDelete={comment.author_address === address}
 								onUpdate={fetchComments}
 							/>
 							<div className="ml-12 mt-6 space-y-6 border-l border-white/5 pl-8">
@@ -254,6 +253,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 										key={reply.id}
 										comment={reply}
 										isReply
+										canDelete={reply.author_address === address}
 										onUpdate={fetchComments}
 									/>
 								))}

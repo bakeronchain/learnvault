@@ -39,6 +39,7 @@ pub enum DataKey {
     EnrolledCourses(Address),
     Course(String),
     CourseIds,
+    CompletedCount(Address, String),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -134,7 +135,7 @@ pub struct CourseMilestone;
 
 #[contractimpl]
 impl CourseMilestone {
-    pub fn initialize(env: Env, admin: Address, learn_token_contract: Address) {
+    pub fn initialize(env: Env, admin: Address) {
         if env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(&env, Error::AlreadyInitialized);
         }
@@ -330,8 +331,9 @@ impl CourseMilestone {
             .persistent()
             .get::<_, MilestoneStatus>(&state_key)
             .unwrap_or(MilestoneStatus::NotStarted);
+        Self::bump_persistent_ttl(&env, &state_key);
 
-        if current_state != MilestoneStatus::NotStarted {
+        if current_state == MilestoneStatus::Pending || current_state == MilestoneStatus::Approved {
             panic_with_error!(&env, Error::DuplicateSubmission);
         }
 
@@ -344,6 +346,7 @@ impl CourseMilestone {
             DataKey::MilestoneSubmission(learner.clone(), course_id.clone(), milestone_id);
 
         env.storage().persistent().set(&submission_key, &submission);
+        Self::bump_persistent_ttl(&env, &submission_key);
         env.storage()
             .persistent()
             .set(&state_key, &MilestoneStatus::Pending);
@@ -452,6 +455,12 @@ impl CourseMilestone {
             Self::extend_persistent(&env, &reward_key);
         }
 
+        // Increment completion count
+        let count_key = DataKey::CompletedCount(learner.clone(), course_id.clone());
+        let count: u32 = env.storage().persistent().get(&count_key).unwrap_or(0);
+        env.storage().persistent().set(&count_key, &(count + 1));
+        Self::extend_persistent(&env, &count_key);
+
         env.events().publish(
             (symbol_short!("ms_done"),),
             MilestoneCompleted {
@@ -544,6 +553,12 @@ impl CourseMilestone {
         Self::extend_persistent(&env, &state_key);
         Self::extend_persistent(&env, &completed_key);
 
+        // Increment completion count
+        let count_key = DataKey::CompletedCount(learner.clone(), course_id.clone());
+        let count: u32 = env.storage().persistent().get(&count_key).unwrap_or(0);
+        env.storage().persistent().set(&count_key, &(count + 1));
+        Self::extend_persistent(&env, &count_key);
+
         env.events().publish(
             (symbol_short!("ms_done"),),
             MilestoneCompleted {
@@ -631,7 +646,15 @@ impl CourseMilestone {
                 },
             );
 
-            i = Self::checked_add_u32(&env, i, 1);
+            // Increment completion count
+            let count_key = DataKey::CompletedCount(entry.learner.clone(), entry.course_id.clone());
+            let count: u32 = env.storage().persistent().get(&count_key).unwrap_or(0);
+            env.storage().persistent().set(&count_key, &(count + 1));
+            Self::extend_persistent(&env, &count_key);
+
+            Self::emit_course_completed_if_ready(&env, &entry.learner, &entry.course_id);
+
+            i += 1;
         }
     }
 
@@ -760,14 +783,18 @@ impl CourseMilestone {
             Self::extend_persistent(env, &state_key);
             milestone_id = Self::checked_add_u32(env, milestone_id, 1);
         }
+        let count_key = DataKey::CompletedCount(learner.clone(), course_id.clone());
+        let count: u32 = env.storage().persistent().get(&count_key).unwrap_or(0);
 
-        env.events().publish(
-            (Symbol::new(env, "course_done"),),
-            CourseCompleted {
-                learner: learner.clone(),
-                course_id: course_id.clone(),
-            },
-        );
+        if count == config.milestone_count {
+            env.events().publish(
+                (Symbol::new(env, "course_done"),),
+                CourseCompleted {
+                    learner: learner.clone(),
+                    course_id: course_id.clone(),
+                },
+            );
+        }
     }
 
     fn extend_instance(env: &Env) {

@@ -1,8 +1,10 @@
 import React, { useMemo } from "react"
 import { Helmet } from "react-helmet"
+import { useTranslation } from "react-i18next"
 import {
 	EmptyState,
 	DashboardStatsSkeleton,
+	ActivityFeedSkeleton,
 } from "../components/SkeletonLoader"
 import { ErrorState } from "../components/states/errorState"
 import { useToast } from "../components/Toast/ToastProvider"
@@ -10,7 +12,6 @@ import TreasuryHealthChart, {
 	type TreasuryPoint,
 } from "../components/treasury/TreasuryHealthChart"
 import TxHashLink from "../components/TxHashLink"
-import { ActivityFeedSkeleton } from "../components/SkeletonLoader"
 import { useContractIds } from "../hooks/useContractIds"
 import { useTreasury } from "../hooks/useTreasury"
 import { useUSDC } from "../hooks/useUSDC"
@@ -41,8 +42,8 @@ interface TreasuryEvent {
 const startOfDay = (value: Date) =>
 	new Date(value.getFullYear(), value.getMonth(), value.getDate())
 
-const formatDayLabel = (value: Date) =>
-	value.toLocaleDateString("en-US", { weekday: "short" })
+const formatDayLabel = (value: Date, locale?: string) =>
+	value.toLocaleDateString(locale, { weekday: "short" })
 
 const parseAmount = (amount?: string) => {
 	const parsed = Number(amount ?? "0")
@@ -50,7 +51,10 @@ const parseAmount = (amount?: string) => {
 	return parsed / STROOPS_PER_USDC
 }
 
-const buildTreasuryChartData = (events: TreasuryEvent[]): TreasuryPoint[] => {
+const buildTreasuryChartData = (
+	events: TreasuryEvent[],
+	locale?: string,
+): TreasuryPoint[] => {
 	const today = startOfDay(new Date())
 	const buckets = new Map<
 		string,
@@ -62,7 +66,7 @@ const buildTreasuryChartData = (events: TreasuryEvent[]): TreasuryPoint[] => {
 		day.setDate(today.getDate() - offset)
 		const key = day.toISOString().slice(0, 10)
 		buckets.set(key, {
-			name: formatDayLabel(day),
+			name: formatDayLabel(day, locale),
 			inflows: 0,
 			outflows: 0,
 		})
@@ -88,6 +92,8 @@ const buildTreasuryChartData = (events: TreasuryEvent[]): TreasuryPoint[] => {
 }
 
 const Treasury: React.FC = () => {
+	const { i18n } = useTranslation()
+	const locale = i18n.resolvedLanguage
 	const { address } = useWallet()
 	const { showInfo } = useToast()
 	const { scholarshipTreasury } = useContractIds()
@@ -112,8 +118,8 @@ const Treasury: React.FC = () => {
 	const refetchActivity = refetch
 
 	const chartData = useMemo(
-		() => buildTreasuryChartData(activity ?? []),
-		[activity],
+		() => buildTreasuryChartData(activity ?? [], locale),
+		[activity, locale],
 	)
 
 	const hasChartData = chartData.some(
@@ -122,14 +128,14 @@ const Treasury: React.FC = () => {
 
 	const formatUSDC = (stroops: string) => {
 		const usdc = Number(stroops) / STROOPS_PER_USDC
-		return usdc.toLocaleString("en-US", {
+		return usdc.toLocaleString(locale, {
 			minimumFractionDigits: 0,
 			maximumFractionDigits: 2,
 		})
 	}
 
 	const formatAmount = (stroops: string) => {
-		return parseAmount(stroops).toLocaleString("en-US", {
+		return parseAmount(stroops).toLocaleString(locale, {
 			minimumFractionDigits: 0,
 			maximumFractionDigits: 2,
 		})
@@ -201,7 +207,10 @@ const Treasury: React.FC = () => {
 	const description = `LearnVault's decentralized scholarship treasury holds ${displayStats.totalTreasury} and has funded ${displayStats.scholarsFunded} scholars. View real-time inflows and disbursements.`
 
 	return (
-		<div aria-busy={isLoading} className="p-12 max-w-7xl mx-auto min-h-screen text-white animate-in fade-in duration-1000">
+		<div
+			aria-busy={isLoading}
+			className="p-12 max-w-7xl mx-auto min-h-screen text-white animate-in fade-in duration-1000"
+		>
 			<Helmet>
 				<title>{title}</title>
 				<meta property="og:title" content={title} />
@@ -225,12 +234,8 @@ const Treasury: React.FC = () => {
 			{isLoading ? (
 				<DashboardStatsSkeleton />
 			) : isError ? (
-				<div className="glass-card p-8 rounded-[3rem] border border-white/5">
-					<ErrorState
-						message="Failed to load treasury stats. The data service may be temporarily unavailable."
-						onRetry={() => void refetch()}
-						showContactSupport
-					/>
+				<div className="glass-card p-8 rounded-[3rem] border border-white/5 text-center text-red-400">
+					Failed to load treasury stats.
 				</div>
 			) : (
 				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-20">
@@ -353,33 +358,6 @@ const Treasury: React.FC = () => {
 					<span className="relative z-10">Donate to Treasury</span>
 				</button>
 			</div>
-
-			{/* Scholarship Program Metrics */}
-			<section aria-busy={isLoading} className="mt-20">
-				<h2 className="text-4xl font-black mb-2 tracking-tighter">
-					Scholarship Program
-				</h2>
-				<p className="text-white/40 text-sm mb-10">
-					Real-time health metrics for the active scholarship cohort.
-				</p>
-
-				{isLoading && (
-					<div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
-						{Array.from({ length: 6 }).map((_, i) => (
-							<div
-								key={i}
-								className="h-28 rounded-3xl bg-white/5 animate-pulse"
-							/>
-						))}
-					</div>
-				)}
-
-				{!isLoading && (
-					<p className="text-white/40 text-center py-10">
-						Scholarship metrics unavailable
-					</p>
-				)}
-			</section>
 		</div>
 	)
 }
@@ -479,7 +457,18 @@ const ActivityFeed: React.FC<{
 		</h3>
 		<div className="flex flex-col gap-4">
 			{loading ? (
-				<ActivityFeedSkeleton rows={2} />
+				<div className="space-y-4 py-2">
+					{Array.from({ length: 3 }).map((_, index) => (
+						<div
+							key={index}
+							className="rounded-2xl border border-white/5 bg-white/5 p-5 animate-pulse"
+						>
+							<div className="h-4 w-24 rounded-full bg-white/10" />
+							<div className="mt-3 h-3 w-16 rounded-full bg-white/5" />
+							<div className="mt-4 h-4 w-28 rounded-full bg-white/10" />
+						</div>
+					))}
+				</div>
 			) : error ? (
 				<div className="text-center text-white/40 py-8">{error}</div>
 			) : items.length === 0 ? (

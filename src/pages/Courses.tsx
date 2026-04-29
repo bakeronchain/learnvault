@@ -1,8 +1,10 @@
 import { BookOpen } from "lucide-react"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useSearchParams } from "react-router-dom"
+import BookmarkButton from "../components/BookmarkButton"
 import { CourseFilter } from "../components/CourseFilter"
 import Pagination from "../components/Pagination"
+import SponsorLogosForTrack from "../components/SponsorLogosForTrack"
 import { CourseCardSkeleton } from "../components/skeletons/CourseCardSkeleton"
 import { EmptyState } from "../components/states/emptyState"
 import { ErrorState } from "../components/states/errorState"
@@ -23,7 +25,7 @@ function trackSlug(track: string): string {
 
 const Courses: React.FC = () => {
 	const [searchParams, setSearchParams] = useSearchParams()
-	const { courses, isLoading, error, refetch } = useCourses()
+	const { courses, isLoading, error } = useCourses()
 
 	const [searchInput, setSearchInput] = useState(
 		() => searchParams.get("q") ?? "",
@@ -32,10 +34,10 @@ const Courses: React.FC = () => {
 	const difficulty = searchParams.get("difficulty") ?? ""
 	const track = searchParams.get("track") ?? ""
 	const parsedPage = parseInt(searchParams.get("page") || "1", 10)
-	const currentPage = isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
+	const currentPage = Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
 
 	useEffect(() => {
-		const t = setTimeout(() => {
+		const timer = setTimeout(() => {
 			setSearchParams(
 				(prev) => {
 					const next = new URLSearchParams(prev)
@@ -47,7 +49,8 @@ const Courses: React.FC = () => {
 				{ replace: true },
 			)
 		}, 300)
-		return () => clearTimeout(t)
+
+		return () => clearTimeout(timer)
 	}, [searchInput, setSearchParams])
 
 	const handleDifficultyChange = useCallback(
@@ -91,7 +94,7 @@ const Courses: React.FC = () => {
 		setSearchParams(
 			(prev) => {
 				const next = new URLSearchParams(prev)
-				next.set("page", newPage.toString())
+				next.set("page", String(newPage))
 				return next
 			},
 			{ replace: false },
@@ -99,7 +102,7 @@ const Courses: React.FC = () => {
 		window.scrollTo({ top: 0, behavior: "smooth" })
 	}
 
-	const hasActiveFilters = !!searchInput || !!difficulty || !!track
+	const hasActiveFilters = Boolean(searchInput || difficulty || track)
 
 	const filtered = useMemo(() => {
 		const q = searchInput.toLowerCase()
@@ -116,7 +119,7 @@ const Courses: React.FC = () => {
 
 	const trackOptions = useMemo(() => {
 		const seen = new Set<string>()
-		const dynamicOptions = courses
+		const options = courses
 			.filter((course) => {
 				if (seen.has(course.trackKey)) return false
 				seen.add(course.trackKey)
@@ -127,27 +130,24 @@ const Courses: React.FC = () => {
 				value: trackSlug(course.track),
 			}))
 
-		return [{ label: "All Tracks", value: "" }, ...dynamicOptions]
+		return [{ label: "All Tracks", value: "" }, ...options]
 	}, [courses])
 
 	const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE))
 	const safePage = Math.min(currentPage, totalPages)
 	const startIndex = (safePage - 1) * ITEMS_PER_PAGE
-	const paginatedCourses = filtered.slice(
-		startIndex,
-		startIndex + ITEMS_PER_PAGE,
-	)
+	const paginatedCourses = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE)
 
 	return (
 		<div className="container mx-auto px-4 py-12">
 			<header className="mb-12 text-center">
-				<p className="text-sm uppercase tracking-[0.35em] text-brand-cyan/80 mb-4">
+				<p className="mb-4 text-sm uppercase tracking-[0.35em] text-brand-cyan/80">
 					Learning Tracks
 				</p>
-				<h1 className="text-4xl md:text-5xl font-bold mb-4 text-gradient">
+				<h1 className="mb-4 text-4xl font-bold text-gradient md:text-5xl">
 					Choose a path and start with a focused first lesson.
 				</h1>
-				<p className="text-gray-400 text-lg max-w-3xl mx-auto leading-relaxed">
+				<p className="mx-auto max-w-3xl text-lg leading-relaxed text-gray-400">
 					Every LearnVault track is designed to move new learners from setup to
 					hands-on progress with a clear first milestone.
 				</p>
@@ -166,19 +166,13 @@ const Courses: React.FC = () => {
 			/>
 
 			{isLoading ? (
-				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-					{[1, 2, 3, 4].map((i) => (
-						<CourseCardSkeleton key={i} />
+				<div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+					{[1, 2, 3, 4].map((index) => (
+						<CourseCardSkeleton key={index} />
 					))}
 				</div>
 			) : error ? (
-				<ErrorState
-					message={
-						error ||
-						"Failed to load courses. The server may be temporarily unavailable."
-					}
-					onRetry={() => void refetch()}
-				/>
+				<ErrorState message={error} onRetry={() => window.location.reload()} />
 			) : courses.length === 0 ? (
 				<EmptyState
 					icon={BookOpen}
@@ -187,57 +181,62 @@ const Courses: React.FC = () => {
 				/>
 			) : filtered.length === 0 ? (
 				<div className="glass-card rounded-[2.5rem] border border-white/5 p-16 text-center">
-					<p className="text-5xl mb-6">🔍</p>
-					<h2 className="text-2xl font-black tracking-tight mb-3">
+					<p className="mb-6 text-5xl">Search</p>
+					<h2 className="mb-3 text-2xl font-black tracking-tight">
 						No courses match your filters
 					</h2>
-					<p className="text-white/50 mb-8 max-w-sm mx-auto">
-						Try a different search term or adjust the difficulty and track
-						filters.
+					<p className="mx-auto mb-8 max-w-sm text-white/50">
+						Try a different search term or adjust the difficulty and track filters.
 					</p>
 					<button
 						type="button"
 						onClick={handleClear}
-						className="w-full sm:w-auto px-6 py-2.5 rounded-full text-sm font-bold uppercase tracking-widest border border-brand-cyan/30 text-brand-cyan hover:bg-brand-cyan/10 transition-all"
+						className="w-full rounded-full border border-brand-cyan/30 px-6 py-2.5 text-sm font-bold uppercase tracking-widest text-brand-cyan transition-all hover:bg-brand-cyan/10 sm:w-auto"
 					>
 						Clear all filters
 					</button>
 				</div>
 			) : (
 				<>
-					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-						{paginatedCourses.map((course) => (
+					<div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+						{paginatedCourses.map((course, index) => (
 							<article
 								key={course.id}
-								className="glass-card rounded-4xl flex flex-col h-full border border-white/10 overflow-hidden group"
+								className="glass-card relative flex h-full flex-col overflow-hidden rounded-4xl border border-white/10"
 							>
+								<div className="absolute right-4 top-4 z-10">
+									<BookmarkButton courseId={course.id} />
+								</div>
 								<div
-									className={`h-36 bg-linear-to-br ${course.accentClassName} border-b border-white/10`}
+									className={`h-36 border-b border-white/10 bg-linear-to-br ${course.accentClassName}`}
 								/>
-								<div className="p-6 flex flex-col h-full">
-									<div className="flex items-center justify-between mb-4 gap-3">
-										<span className="px-3 py-1 rounded-full text-xs font-semibold bg-brand-blue/20 text-brand-cyan border border-brand-cyan/20">
+								<div className="flex h-full flex-col p-6">
+									<div className="mb-4 flex items-center justify-between gap-3">
+										<span className="rounded-full border border-brand-cyan/20 bg-brand-blue/20 px-3 py-1 text-xs font-semibold text-brand-cyan">
 											{course.track}
 										</span>
 										<span
-											className={`px-3 py-1 rounded-full text-xs font-semibold border ${levelStyles[course.level]}`}
+											className={`rounded-full border px-3 py-1 text-xs font-semibold ${levelStyles[course.level]}`}
 										>
 											{course.level}
 										</span>
 									</div>
 
-									<h2 className="text-xl font-bold mb-3 group-hover:text-brand-cyan transition-colors duration-300">
+									<h2 className="mb-3 text-xl font-bold transition-colors duration-300 group-hover:text-brand-cyan">
 										{course.title}
 									</h2>
-									<p className="text-white/55 text-sm leading-relaxed mb-5">
+									<p className="mb-5 text-sm leading-relaxed text-white/55">
 										{course.description}
 									</p>
 
-									<div className="mt-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 text-sm text-gray-400">
+									<SponsorLogosForTrack track={course.track} compact />
+
+									<div className="mt-auto flex flex-col items-stretch justify-between gap-4 text-sm text-gray-400 sm:flex-row sm:items-center">
 										<span>{course.track}</span>
 										<Link
 											to={`/courses/${course.slug}/lessons/1`}
-											className="iridescent-border w-full sm:w-auto text-center px-4 py-2 rounded-xl font-semibold text-white hover:scale-105 transition-transform"
+											id={index === 0 ? "course-card-0" : undefined}
+											className="iridescent-border w-full rounded-xl px-4 py-2 text-center font-semibold text-white transition-transform hover:scale-105 sm:w-auto"
 										>
 											Open course
 										</Link>

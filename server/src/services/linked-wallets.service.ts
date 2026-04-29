@@ -54,7 +54,10 @@ export const linkedWalletsService = {
 		authenticated: string,
 		toLink: string,
 	): Promise<{ group: LinkedWalletRow[]; error?: string }> {
-		if (!isValidStellarPublicKey(authenticated) || !isValidStellarPublicKey(toLink)) {
+		if (
+			!isValidStellarPublicKey(authenticated) ||
+			!isValidStellarPublicKey(toLink)
+		) {
 			return { group: [], error: "Invalid Stellar public key" }
 		}
 		if (authenticated === toLink) {
@@ -64,7 +67,11 @@ export const linkedWalletsService = {
 		if (!p) {
 			return {
 				group: [
-					{ stellar_address: authenticated, is_primary: true, account_id: "local" },
+					{
+						stellar_address: authenticated,
+						is_primary: true,
+						account_id: "local",
+					},
 				],
 			}
 		}
@@ -77,7 +84,10 @@ export const linkedWalletsService = {
 			)
 			if (taken.rowCount && taken.rowCount > 0) {
 				await client.query("ROLLBACK")
-				return { group: [], error: "This address is already linked to an account" }
+				return {
+					group: [],
+					error: "This address is already linked to an account",
+				}
 			}
 			const ex = await client.query<{ account_id: string }>(
 				"SELECT account_id::text as account_id FROM linked_wallets WHERE stellar_address = $1",
@@ -111,7 +121,10 @@ export const linkedWalletsService = {
 	},
 
 	async setPrimary(authenticated: string, primary: string) {
-		if (!isValidStellarPublicKey(authenticated) || !isValidStellarPublicKey(primary)) {
+		if (
+			!isValidStellarPublicKey(authenticated) ||
+			!isValidStellarPublicKey(primary)
+		) {
 			return { error: "Invalid Stellar public key" as const }
 		}
 		const p = getPgPool()

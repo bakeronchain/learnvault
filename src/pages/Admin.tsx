@@ -2,14 +2,6 @@ import { useQuery } from "@tanstack/react-query"
 import React, { useEffect, useMemo, useState } from "react"
 import ReactMarkdown from "react-markdown"
 import { useNavigate } from "react-router-dom"
-import {
-	RadialBarChart,
-	RadialBar,
-	Legend,
-	ResponsiveContainer,
-	Tooltip,
-} from "recharts"
-import AddressDisplay from "../components/AddressDisplay"
 import TxHashLink from "../components/TxHashLink"
 import {
 	useAdminStats,
@@ -29,11 +21,10 @@ import {
 	useDeleteWikiPage,
 	type WikiPage,
 } from "../hooks/useWiki"
+import i18n from "../i18n"
 import { apiFetchJson } from "../lib/api"
 import { getAuthToken } from "../util/auth"
 import { shortenContractId } from "../util/contract"
-
-const API_BASE = import.meta.env.VITE_SERVER_URL || "http://localhost:4000"
 
 type AdminSection =
 	| "courses"
@@ -41,7 +32,6 @@ type AdminSection =
 	| "users"
 	| "wiki"
 	| "treasury"
-	| "scholarships"
 	| "contracts"
 type CourseStatus = "draft" | "published"
 
@@ -85,30 +75,9 @@ const sectionDescriptions: Record<AdminSection, string> = {
 	milestones: "Review milestone reports and approvals.",
 	users: "Lookup learner profiles by wallet address.",
 	wiki: "Create and edit platform documentation and guides.",
-	treasury: "Monitor and manage treasury controls.",
-	scholarships: "View scholarship program health metrics.",
-	contracts: "Inspect deployed on-chain contract records.",
+	treasury: "Monitor and manage live treasury controls.",
+	contracts: "Inspect deployed contract addresses and on-chain state.",
 }
-
-const initialCourses: AdminCourse[] = [
-	{ id: 1, title: "Soroban Basics", status: "published", students: 84 },
-	{ id: 2, title: "Stellar Security", status: "draft", students: 0 },
-]
-
-const contractRecords: ContractRecord[] = [
-	{
-		name: "Scholarship Treasury",
-		tag: "prod",
-		address: "CXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-		updated: "2026-03-20",
-	},
-	{
-		name: "Governance Token",
-		tag: "prod",
-		address: "CYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY",
-		updated: "2026-03-20",
-	},
-]
 
 const STATUSES = ["pending", "approved", "rejected"] as const
 
@@ -118,7 +87,7 @@ const formatDate = (value: string | undefined): string => {
 	const date = new Date(value)
 	if (Number.isNaN(date.getTime())) return value
 
-	return date.toLocaleDateString("en-GB", {
+	return date.toLocaleDateString(i18n.resolvedLanguage, {
 		day: "2-digit",
 		month: "short",
 		year: "numeric",
@@ -126,19 +95,7 @@ const formatDate = (value: string | undefined): string => {
 }
 
 const formatCount = (value: number): string =>
-	value.toLocaleString("en-US", { maximumFractionDigits: 0 })
-
-const formatPercent = (value: number): string => {
-	if (!Number.isFinite(value)) return "0.0%"
-	return `${value.toFixed(1)}%`
-}
-
-const formatReviewTime = (seconds: number): string => {
-	if (!Number.isFinite(seconds) || seconds < 0) return "-"
-	if (seconds < 60) return `${Math.round(seconds)}s`
-	if (seconds < 3600) return `${(seconds / 60).toFixed(1)}m`
-	return `${(seconds / 3600).toFixed(1)}h`
-}
+	value.toLocaleString(i18n.resolvedLanguage, { maximumFractionDigits: 0 })
 
 const renderAddress = (value: string | undefined) =>
 	value ? shortenContractId(value, 6, 6) : "Not available"
@@ -189,10 +146,7 @@ const ConfirmDialog: React.FC<{
 			<p className="text-sm text-white/60 mb-1">
 				Learner:{" "}
 				<span className="font-mono text-white/90">
-					<AddressDisplay
-						address={milestone.learnerAddress}
-						showExplorerLink={false}
-					/>
+					{milestone.learnerAddress}
 				</span>
 			</p>
 			<p className="text-sm text-white/60 mb-4">
@@ -260,7 +214,7 @@ const MilestoneStatsBar: React.FC = () => {
 		<div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
 			{error && (
 				<p className="md:col-span-3 text-xs text-red-400">
-					Could not load stats — {error}. Refresh the page to try again.
+					Failed to load stats: {error}
 				</p>
 			)}
 			{items.map((item) => (
@@ -329,7 +283,6 @@ const Admin: React.FC = () => {
 							"users",
 							"wiki",
 							"treasury",
-							"scholarships",
 							"contracts",
 						] as const
 					).map((section) => (
@@ -358,8 +311,6 @@ const Admin: React.FC = () => {
 				{activeSection === "users" && <UserLookup />}
 				{activeSection === "wiki" && <WikiManagement />}
 				{activeSection === "treasury" && <TreasuryControls />}
-				{activeSection === "wiki" && <WikiManagement />}
-				{activeSection === "scholarships" && <ScholarshipMetrics />}
 				{activeSection === "contracts" && <ContractInfo />}
 			</main>
 		</div>
@@ -395,8 +346,7 @@ const CourseManagement: React.FC = () => {
 
 			{errorMessage && (
 				<p className="text-sm text-red-400 mb-4">
-					Could not load courses — {errorMessage}. Use the Refresh button above
-					to retry.
+					Failed to load courses: {errorMessage}
 				</p>
 			)}
 
@@ -466,13 +416,6 @@ const MilestoneQueue: React.FC = () => {
 	const { data: courseOptionsData = [], error: courseOptionsError } =
 		useAdminCoursesList()
 	const {
-		analytics,
-		reviewQueue,
-		loading: analyticsLoading,
-		error: analyticsError,
-		fetchAnalytics,
-	} = useValidatorAnalytics()
-	const {
 		milestones,
 		total,
 		page,
@@ -482,6 +425,8 @@ const MilestoneQueue: React.FC = () => {
 		fetchMilestones,
 		approveMilestone,
 		rejectMilestone,
+		batchApproveMilestones,
+		batchRejectMilestones,
 	} = useAdminMilestones()
 	const courseOptions = useMemo(
 		() => ["All", ...courseOptionsData.map((course) => course.slug)],
@@ -494,6 +439,18 @@ const MilestoneQueue: React.FC = () => {
 		action: "approve" | "reject"
 		milestone: MilestoneSubmission
 	} | null>(null)
+	const [selectedMilestoneIds, setSelectedMilestoneIds] = useState<string[]>([])
+	const [batchState, setBatchState] = useState<{
+		action: "approve" | "reject"
+		total: number
+		inProgress: boolean
+		results: BatchMilestoneResponse | null
+	}>({
+		action: "approve",
+		total: 0,
+		inProgress: false,
+		results: null,
+	})
 
 	useEffect(() => {
 		void fetchMilestones(1, {
@@ -501,10 +458,6 @@ const MilestoneQueue: React.FC = () => {
 			status: statusFilter,
 		})
 	}, [courseFilter, statusFilter, fetchMilestones])
-
-	useEffect(() => {
-		void fetchAnalytics()
-	}, [fetchAnalytics])
 
 	const handlePageChange = (newPage: number) => {
 		void fetchMilestones(newPage, {
@@ -522,7 +475,6 @@ const MilestoneQueue: React.FC = () => {
 		} else {
 			await rejectMilestone(milestone.id)
 		}
-		await fetchAnalytics()
 	}
 
 	const pendingMilestones = milestones.filter(
@@ -615,7 +567,8 @@ const MilestoneQueue: React.FC = () => {
 						Validator review queue is above threshold
 					</p>
 					<p className="mt-1 text-xs text-yellow-100/80">
-						Pending: {formatCount(reviewQueue.pendingReviews)} | Threshold: {formatCount(reviewQueue.threshold)}
+						Pending: {formatCount(reviewQueue.pendingReviews)} | Threshold:{" "}
+						{formatCount(reviewQueue.threshold)}
 					</p>
 				</div>
 			)}
@@ -655,7 +608,10 @@ const MilestoneQueue: React.FC = () => {
 
 						{!analyticsLoading && analytics.length === 0 && (
 							<tr>
-								<td colSpan={5} className="py-8 text-center text-sm text-white/40">
+								<td
+									colSpan={5}
+									className="py-8 text-center text-sm text-white/40"
+								>
 									No validator analytics available.
 								</td>
 							</tr>
@@ -687,7 +643,6 @@ const MilestoneQueue: React.FC = () => {
 					</tbody>
 				</table>
 			</div>
-
 			<div className="flex flex-wrap gap-3 mb-4 items-center">
 				<div className="flex items-center gap-2">
 					<label
@@ -735,14 +690,13 @@ const MilestoneQueue: React.FC = () => {
 
 			{coursesErrorMessage && (
 				<p className="text-xs text-red-400 mb-2">
-					Could not load course filters — {coursesErrorMessage}. Filters may be
-					incomplete.
+					Failed to load course filters: {coursesErrorMessage}
 				</p>
 			)}
 
 			{error && (
 				<p className="text-xs text-red-400 mb-4">
-					Could not load milestones — {error}. Try refreshing the page.
+					Error loading milestones: {error}
 				</p>
 			)}
 
@@ -754,7 +708,6 @@ const MilestoneQueue: React.FC = () => {
 							<th className="py-3 px-4 font-medium">Course</th>
 							<th className="py-3 px-4 font-medium">Submitted</th>
 							<th className="py-3 px-4 font-medium">Evidence</th>
-							<th className="py-3 px-4 font-medium">Peer signals</th>
 							<th className="py-3 px-4 font-medium">Status</th>
 							<th className="py-3 px-4 font-medium">Actions</th>
 						</tr>
@@ -763,7 +716,7 @@ const MilestoneQueue: React.FC = () => {
 						{loading && (
 							<tr>
 								<td
-									colSpan={7}
+									colSpan={6}
 									className="py-12 text-center text-sm text-white/40 animate-pulse"
 								>
 									Loading milestones…
@@ -773,7 +726,7 @@ const MilestoneQueue: React.FC = () => {
 
 						{!loading && milestones.length === 0 && (
 							<tr>
-								<td colSpan={7} className="py-12 text-center">
+								<td colSpan={6} className="py-12 text-center">
 									<p className="text-white/40 text-sm">
 										No milestone submissions found.
 									</p>
@@ -803,13 +756,9 @@ const MilestoneQueue: React.FC = () => {
 										className="border-b border-white/5 hover:bg-white/3 transition-colors"
 									>
 										<td className="py-3 px-4">
-											<AddressDisplay
-												address={milestone.learnerAddress}
-												prefixLength={8}
-												suffixLength={4}
-												showExplorerLink={false}
-												addressClassName="text-xs text-white/50"
-											/>
+											<span className="font-mono text-xs text-white/50">
+												{shortenContractId(milestone.learnerAddress, 8, 4)}
+											</span>
 										</td>
 										<td className="py-3 px-4 text-sm text-white/80">
 											{milestone.course}
@@ -819,10 +768,6 @@ const MilestoneQueue: React.FC = () => {
 										</td>
 										<td className="py-3 px-4">
 											<EvidenceLink value={milestone.evidenceLink} />
-										</td>
-										<td className="py-3 px-4 text-xs font-mono text-white/55 whitespace-nowrap">
-											+{milestone.peerApprovalCount} / −
-											{milestone.peerRejectionCount}
 										</td>
 										<td className="py-3 px-4">
 											<span
@@ -878,6 +823,7 @@ const MilestoneQueue: React.FC = () => {
 							type="button"
 							disabled={page <= 1}
 							onClick={() => handlePageChange(page - 1)}
+							aria-label="Previous page"
 							className="px-3 py-1 rounded-xl border border-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
 						>
 							← Prev
@@ -886,6 +832,7 @@ const MilestoneQueue: React.FC = () => {
 							type="button"
 							disabled={page >= totalPages}
 							onClick={() => handlePageChange(page + 1)}
+							aria-label="Next page"
 							className="px-3 py-1 rounded-xl border border-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
 						>
 							Next →
@@ -905,8 +852,6 @@ const MilestoneQueue: React.FC = () => {
 		</section>
 	)
 }
-
-export default Admin
 
 const UserLookup: React.FC = () => {
 	const [search, setSearch] = useState("")
@@ -970,8 +915,7 @@ const UserLookup: React.FC = () => {
 				)}
 				{errorMessage && (
 					<p className="text-xs text-red-400 mt-3">
-						Could not load scholar profile — {errorMessage}. Check the address
-						and try again.
+						Failed to load scholar profile: {errorMessage}
 					</p>
 				)}
 
@@ -1100,8 +1044,7 @@ const TreasuryControls: React.FC = () => {
 			<div className="glass border border-white/5 rounded-2xl p-6">
 				{queryError && (
 					<p className="text-sm text-red-400 mb-4">
-						Could not load treasury contract state — {queryError}. Check your
-						network connection and try again.
+						Failed to load treasury contract state: {queryError}
 					</p>
 				)}
 
@@ -1563,124 +1506,4 @@ const WikiManagement: React.FC = () => {
 	)
 }
 
-interface ScholarshipMetricsData {
-	active_scholarships: number
-	total_scholars: number
-	completion_rate: number
-	avg_milestones_per_scholar: number
-	dropout_rate: number
-	total_usdc_disbursed: number
-}
-
-const ScholarshipMetrics: React.FC = () => {
-	const [metrics, setMetrics] = useState<ScholarshipMetricsData | null>(null)
-	const [loading, setLoading] = useState(true)
-	const [error, setError] = useState<string | null>(null)
-
-	useEffect(() => {
-		const fetchMetrics = async () => {
-			try {
-				const res = await fetch(`${API_BASE}/api/scholarships/metrics`)
-				if (!res.ok) throw new Error(`HTTP ${res.status}`)
-				const data = await res.json()
-				setMetrics(data)
-			} catch (err) {
-				setError("Failed to load metrics")
-			} finally {
-				setLoading(false)
-			}
-		}
-		void fetchMetrics()
-	}, [])
-
-	const chartData = metrics
-		? [
-				{
-					name: "Completion Rate",
-					value: metrics.completion_rate,
-					fill: "#00d2ff",
-				},
-				{
-					name: "Dropout Rate",
-					value: metrics.dropout_rate,
-					fill: "#ff4d4d",
-				},
-			]
-		: []
-
-	return (
-		<section aria-busy={loading}>
-			<h2 className="text-2xl font-black mb-6">Scholarship Program Health</h2>
-
-			{loading && (
-				<div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-					{Array.from({ length: 6 }).map((_, i) => (
-						<div
-							key={i}
-							className="h-24 rounded-2xl bg-white/5 animate-pulse"
-						/>
-					))}
-				</div>
-			)}
-
-			{error && <p className="text-red-400 mb-6">{error}</p>}
-
-			{metrics && (
-				<>
-					<div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-						{[
-							{
-								label: "Active Scholarships",
-								value: metrics.active_scholarships,
-							},
-							{ label: "Total Scholars", value: metrics.total_scholars },
-							{
-								label: "Completion Rate",
-								value: `${metrics.completion_rate}%`,
-							},
-							{
-								label: "Avg Milestones / Scholar",
-								value: metrics.avg_milestones_per_scholar,
-							},
-							{ label: "Dropout Rate", value: `${metrics.dropout_rate}%` },
-							{
-								label: "Total USDC Disbursed",
-								value: `$${(metrics.total_usdc_disbursed / 1e7).toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
-							},
-						].map(({ label, value }) => (
-							<div
-								key={label}
-								className="glass-card p-5 rounded-2xl border border-white/5"
-							>
-								<p className="text-xs uppercase tracking-widest text-white/40 mb-1">
-									{label}
-								</p>
-								<p className="text-2xl font-black text-brand-cyan">{value}</p>
-							</div>
-						))}
-					</div>
-
-					<div className="glass-card p-6 rounded-2xl border border-white/5">
-						<h3 className="text-lg font-bold mb-4">Completion vs Dropout</h3>
-						<ResponsiveContainer width="100%" height={260}>
-							<RadialBarChart
-								cx="50%"
-								cy="50%"
-								innerRadius="30%"
-								outerRadius="80%"
-								data={chartData}
-							>
-								<RadialBar
-									dataKey="value"
-									label={{ position: "insideStart", fill: "#fff" }}
-								/>
-								<Legend />
-								<Tooltip formatter={(value: number) => `${value}%`} />
-							</RadialBarChart>
-						</ResponsiveContainer>
-					</div>
-				</>
-			)}
-		</section>
-	)
-}
+export default Admin

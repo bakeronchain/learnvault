@@ -1,20 +1,54 @@
 import React, { useCallback, useContext, useEffect, useState } from "react"
 import { Helmet } from "react-helmet"
 import { useTranslation } from "react-i18next"
+import { Link, useParams } from "react-router-dom"
 import { ActivityFeed } from "../components/ActivityFeed"
 import AddressDisplay from "../components/AddressDisplay"
+import { FollowButton } from "../components/FollowButton"
+import IdenticonAvatar from "../components/IdenticonAvatar"
 import LRNHistoryChart from "../components/LRNHistoryChart"
+import ProfileEditForm, {
+	type ProfileFormData,
+} from "../components/ProfileEditForm"
+import { ProfileLinkedWallets } from "../components/ProfileLinkedWallets"
 import { ReputationBadge } from "../components/ReputationBadge"
 import {
 	NoCredentialsEmptyState,
 	ProfileSkeleton,
 } from "../components/SkeletonLoader"
 import { ErrorState } from "../components/states/errorState"
-import { ProfileLinkedWallets } from "../components/ProfileLinkedWallets"
 import { useLearnerProfile } from "../hooks/useLearnerProfile"
+import { useScholarCredentials } from "../hooks/useScholarCredentials"
+import { useScholarProfile } from "../hooks/useScholarProfile"
 import { WalletContext } from "../providers/WalletProvider"
 import { formatDuration, getLearningTimeSummary } from "../util/learningTime"
 import { shortenAddress } from "../util/scholarshipApplications"
+
+interface UserProfile {
+	id: string
+	stellarAddress: string
+	displayName: string | null
+	bio: string | null
+	avatarUrl: string | null
+	avatarCid: string | null
+	socialLinks: {
+		twitter?: string
+		github?: string
+		linkedin?: string
+		website?: string
+		discord?: string
+	}
+	reputationRank: number | null
+	createdAt: string
+	updatedAt: string
+}
+
+interface ProfileStats {
+	lrnBalance: number
+	coursesCompleted: number
+	reputationRank: number | null
+	percentile: number
+}
 
 type UserNft = {
 	id: string
@@ -26,70 +60,68 @@ type UserNft = {
 
 const Profile: React.FC = () => {
 	const { t } = useTranslation()
+	const { walletAddress: paramAddress } = useParams<{ walletAddress: string }>()
 	const { address: walletAddress } = useContext(WalletContext)
-	const { profile } = useLearnerProfile()
+
+	const displayAddress = paramAddress || walletAddress
+
+	const {
+		data: profile,
+		isLoading: isProfileLoading,
+		error: profileError,
+	} = useScholarProfile(displayAddress)
+
 	const [isLoading, setIsLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 	const [nfts, setNfts] = useState<UserNft[]>([])
 	const [learningTimeLabel, setLearningTimeLabel] = useState("0m")
+	const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+	const [stats, setStats] = useState<ProfileStats | null>(null)
+	const [isEditing, setIsEditing] = useState(false)
+	const [isSaving, setIsSaving] = useState(false)
+	const [viewAddress, setViewAddress] = useState<string | null>(null)
 
 	const fetchCredentials = useCallback(async () => {
-		if (!walletAddress) {
+		if (!displayAddress) {
 			setNfts([])
 			setIsLoading(false)
 			return
 		}
 
-		const addresses =
-			profile?.wallets && profile.wallets.length > 0
-				? profile.wallets.map((w) => w.address)
-				: [walletAddress]
-
 		try {
 			setIsLoading(true)
 			setError(null)
 
-			const responses = await Promise.all(
-				addresses.map((addr) =>
-					fetch(`/api/credentials/${addr}`, { method: "GET" }),
-				),
-			)
-			for (const response of responses) {
-				if (!response.ok) {
-					const payload = await response.json().catch(() => ({}))
-					throw new Error(
-						payload.message || payload.error || "Unable to load credentials",
-					)
+			const response = await fetch(`/api/credentials/${displayAddress}`, {
+				method: "GET",
+			})
+
+			if (!response.ok) {
+				const payload = (await response.json().catch(() => ({}))) as {
+					message?: string
+					error?: string
 				}
+				throw new Error(
+					payload.message || payload.error || "Unable to load credentials",
+				)
 			}
-			const payloads = await Promise.all(
-				responses.map((r) => r.json() as Promise<{ data?: unknown[] }>),
+
+			const data = (await response.json()) as { data?: any[] }
+			setNfts(
+				Array.isArray(data.data)
+					? data.data.map((item: any) => ({
+							id: String(item.token_id ?? item.course_id ?? Math.random()),
+							course_id: item.course_id,
+							program: item.course_id ?? "Unknown course",
+							date: item.minted_at
+								? new Date(item.minted_at).toLocaleDateString()
+								: "Unknown",
+							artwork: item.metadata_uri
+								? `https://gateway.pinata.cloud/ipfs/${item.metadata_uri.replace("ipfs://", "")}`
+								: undefined,
+						}))
+					: [],
 			)
-			const byId = new Map<string, UserNft>()
-			for (const data of payloads) {
-				if (!Array.isArray(data.data)) continue
-				for (const item of data.data) {
-					const anyItem = item as any
-					const id = String(
-						anyItem.token_id ?? anyItem.course_id ?? crypto.randomUUID(),
-					)
-					if (byId.has(id)) continue
-					byId.set(id, {
-						id,
-						course_id: anyItem.course_id,
-						program: anyItem.course_id ?? "Unknown course",
-						date: anyItem.minted_at
-							? new Date(anyItem.minted_at).toLocaleDateString()
-							: "Unknown",
-						artwork: anyItem.metadata_uri
-							? `https://gateway.pinata.cloud/ipfs/${String(
-									anyItem.metadata_uri,
-								).replace("ipfs://", "")}`
-							: undefined,
-					})
-				}
-			}
-			setNfts([...byId.values()])
 		} catch (err) {
 			console.error("[profile] error loading credentials", err)
 			setError(
@@ -98,7 +130,44 @@ const Profile: React.FC = () => {
 		} finally {
 			setIsLoading(false)
 		}
-	}, [walletAddress, profile])
+	}, [displayAddress])
+
+	// Determine which address to view (from URL param or connected wallet)
+	useEffect(() => {
+		const pathMatch = window.location.pathname.match(/\/profile\/(.+)/)
+		if (pathMatch?.[1]) {
+			setViewAddress(pathMatch[1])
+		} else if (walletAddress) {
+			setViewAddress(walletAddress)
+		}
+	}, [walletAddress])
+
+	// Fetch rich profile data
+	const fetchProfileData = useCallback(async () => {
+		if (!viewAddress) return
+
+		try {
+			const response = await fetch(`/api/profile/${viewAddress}`)
+			if (!response.ok) {
+				const errorData = (await response.json().catch(() => ({}))) as {
+					error?: string
+				}
+				throw new Error(errorData.error || "Failed to load profile")
+			}
+			const data = (await response.json()) as {
+				profile?: UserProfile
+				stats?: ProfileStats
+			}
+			setUserProfile(data.profile ?? null)
+			setStats(data.stats ?? null)
+		} catch (err) {
+			console.error("[profile] Error loading profile data:", err)
+		}
+	}, [viewAddress])
+
+	useEffect(() => {
+		void fetchProfileData()
+	}, [fetchProfileData])
 
 	useEffect(() => {
 		void fetchCredentials()
@@ -109,18 +178,73 @@ const Profile: React.FC = () => {
 		setLearningTimeLabel(formatDuration(summary.totalSeconds))
 	}, [])
 
+	const handleSaveProfile = useCallback(
+		async (formData: ProfileFormData) => {
+			if (!walletAddress) return
+
+			setIsSaving(true)
+			try {
+				const authToken = localStorage.getItem("authToken") || ""
+				const response = await fetch("/api/profile", {
+					method: "PUT",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${authToken}`,
+					},
+					body: JSON.stringify({
+						displayName: formData.displayName || null,
+						bio: formData.bio || null,
+						avatarUrl: formData.avatarUrl,
+						avatarCid: formData.avatarCid,
+						socialLinks: formData.socialLinks,
+					}),
+				})
+
+				if (!response.ok) {
+					const errorData = (await response.json().catch(() => ({}))) as {
+						error?: string
+					}
+					throw new Error(errorData.error || "Failed to save profile")
+				}
+
+				const data = (await response.json()) as { profile?: UserProfile }
+				setUserProfile(data.profile ?? null)
+				setIsEditing(false)
+			} catch (err) {
+				console.error("[profile] Error saving profile:", err)
+				throw err
+			} finally {
+				setIsSaving(false)
+			}
+		},
+		[walletAddress],
+	)
+
+	const isOwnProfile = walletAddress === viewAddress
+	const displayName =
+		userProfile?.displayName ||
+		(viewAddress ? shortenAddress(viewAddress) : "Learner")
+	const bio = userProfile?.bio || ""
+	const hasSocialLinks =
+		userProfile?.socialLinks &&
+		Object.values(userProfile.socialLinks).some(Boolean)
+
 	const siteUrl = "https://learnvault.app"
-	const userName = walletAddress ? shortenAddress(walletAddress) : "Learner"
-	const lrnBalance = "100,000"
-	const coursesCompleted = nfts.length
-	const title = `${userName} — ${lrnBalance} · ${coursesCompleted} Course${
+	const lrnBalance =
+		stats?.lrnBalance?.toLocaleString() ||
+		profile?.lrn_balance?.toLocaleString() ||
+		"0"
+	const coursesCompleted = stats?.coursesCompleted ?? nfts.length
+	const title = `${displayName} — ${lrnBalance} LRN · ${coursesCompleted} Course${
 		coursesCompleted !== 1 ? "s" : ""
 	} — LearnVault`
-	const description = `${userName} has completed ${coursesCompleted} course${
-		coursesCompleted !== 1 ? "s" : ""
-	} and earned ${lrnBalance} on LearnVault.`
+	const description =
+		bio ||
+		`${displayName} has completed ${coursesCompleted} course${
+			coursesCompleted !== 1 ? "s" : ""
+		} and earned ${lrnBalance} LRN on LearnVault.`
 
-	if (isLoading) {
+	if (isProfileLoading || isLoading) {
 		return (
 			<div className="p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
 				<ProfileSkeleton />
@@ -128,10 +252,13 @@ const Profile: React.FC = () => {
 		)
 	}
 
-	if (error) {
+	if (profileError || error) {
 		return (
 			<div className="p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
-				<ErrorState message={error} onRetry={fetchCredentials} />
+				<ErrorState
+					message={(profileError as any)?.message || error}
+					onRetry={fetchCredentials}
+				/>
 			</div>
 		)
 	}
@@ -145,7 +272,7 @@ const Profile: React.FC = () => {
 				<meta property="og:image" content={`${siteUrl}/og-image.png`} />
 				<meta
 					property="og:url"
-					content={`${siteUrl}/profile/${walletAddress ?? ""}`}
+					content={`${siteUrl}/profile/${displayAddress ?? ""}`}
 				/>
 				<meta name="twitter:card" content="summary_large_image" />
 			</Helmet>
@@ -153,43 +280,191 @@ const Profile: React.FC = () => {
 			<header className="glass-card mb-20 p-12 rounded-[3.5rem] flex flex-col md:flex-row items-center gap-12 relative overflow-hidden group">
 				<div className="absolute top-0 right-0 w-64 h-64 bg-brand-cyan/10 blur-[100px] rounded-full -z-10 group-hover:bg-brand-purple/10 transition-colors duration-1000"></div>
 				<div className="iridescent-border p-1 rounded-full shadow-2xl shadow-brand-cyan/20">
-					<div className="w-32 h-32 bg-[#05070a] rounded-full flex items-center justify-center text-4xl font-black text-gradient">
-						AR
-					</div>
+					{userProfile?.avatarUrl ? (
+						<img
+							src={userProfile.avatarUrl}
+							alt={`${displayName}'s avatar`}
+							className="w-32 h-32 rounded-full object-cover"
+						/>
+					) : viewAddress ? (
+						<IdenticonAvatar address={viewAddress} size={128} />
+					) : (
+						<div className="w-32 h-32 bg-[#05070a] rounded-full flex items-center justify-center text-4xl font-black text-gradient">
+							{displayName.slice(0, 2).toUpperCase()}
+						</div>
+					)}
 				</div>
 				<div className="flex-1 text-center md:text-left">
 					<h1 className="text-4xl font-black mb-3 tracking-tighter">
-						{t("pages.profile.title")}
+						{displayName}
 					</h1>
-					<div className="mb-6">
-						{walletAddress ? (
-							<AddressDisplay
-								address={walletAddress}
-								addressClassName="text-white/30 text-sm tracking-widest"
-								buttonClassName="h-6 w-6"
-							/>
+					{bio && (
+						<p className="text-white/70 mb-4 max-w-lg mx-auto md:mx-0 line-clamp-3">
+							{bio}
+						</p>
+					)}
+					<div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mb-4">
+						{displayAddress ? (
+							<div className="flex items-center gap-6">
+								<AddressDisplay
+									address={displayAddress}
+									addressClassName="text-white/30 text-sm tracking-widest"
+									buttonClassName="h-6 w-6"
+								/>
+								{!isOwnProfile && (
+									<FollowButton
+										targetAddress={displayAddress}
+										isFollowingInitial={profile?.is_following}
+									/>
+								)}
+							</div>
 						) : (
 							<code className="text-white/30 text-sm block font-mono tracking-widest">
 								{t("wallet.connect")}
 							</code>
 						)}
 					</div>
-					<div className="flex flex-wrap justify-center md:justify-start gap-4">
-						{walletAddress ? (
-							<ReputationBadge size="md" showBalance />
-						) : (
-							<div className="px-5 py-2 glass rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-white/40">
-								{t("wallet.connect")}
+					<div className="flex flex-wrap justify-center md:justify-start gap-6 mb-6">
+						<div className="flex gap-4">
+							<div className="text-center md:text-left">
+								<div className="text-xl font-black text-white">
+									{profile?.follower_count || 0}
+								</div>
+								<div className="text-[10px] uppercase font-black tracking-widest text-white/30">
+									Followers
+								</div>
 							</div>
-						)}
-						<div className="px-5 py-2 glass rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-brand-cyan">
-							Learning Time: {learningTimeLabel}
+							<div className="text-center md:text-left">
+								<div className="text-xl font-black text-white">
+									{profile?.following_count || 0}
+								</div>
+								<div className="text-[10px] uppercase font-black tracking-widest text-white/30">
+									Following
+								</div>
+							</div>
+						</div>
+						<div className="w-px h-10 bg-white/10 hidden md:block" />
+						<div className="flex flex-wrap gap-4">
+							{displayAddress ? (
+								<ReputationBadge size="md" showBalance />
+							) : (
+								<div className="px-5 py-2 glass rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-white/40">
+									{t("wallet.connect")}
+								</div>
+							)}
+							<div className="px-5 py-2 glass rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-brand-cyan">
+								Learning Time: {learningTimeLabel}
+							</div>
+							{stats?.reputationRank && (
+								<div className="px-5 py-2 glass rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-brand-purple">
+									Rank #{stats.reputationRank}
+								</div>
+							)}
+							{stats?.percentile && (
+								<div className="px-5 py-2 glass rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-brand-emerald">
+									Top {stats.percentile}%
+								</div>
+							)}
 						</div>
 					</div>
+
+					{/* Social Links */}
+					{hasSocialLinks && (
+						<div className="flex flex-wrap justify-center md:justify-start gap-3 mt-4">
+							{userProfile.socialLinks.twitter && (
+								<a
+									href={
+										userProfile.socialLinks.twitter.startsWith("http")
+											? userProfile.socialLinks.twitter
+											: `https://twitter.com/${userProfile.socialLinks.twitter}`
+									}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+								>
+									Twitter
+								</a>
+							)}
+							{userProfile.socialLinks.github && (
+								<a
+									href={
+										userProfile.socialLinks.github.startsWith("http")
+											? userProfile.socialLinks.github
+											: `https://github.com/${userProfile.socialLinks.github}`
+									}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+								>
+									GitHub
+								</a>
+							)}
+							{userProfile.socialLinks.linkedin && (
+								<a
+									href={
+										userProfile.socialLinks.linkedin.startsWith("http")
+											? userProfile.socialLinks.linkedin
+											: `https://linkedin.com/in/${userProfile.socialLinks.linkedin}`
+									}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+								>
+									LinkedIn
+								</a>
+							)}
+							{userProfile.socialLinks.website && (
+								<a
+									href={
+										userProfile.socialLinks.website.startsWith("http")
+											? userProfile.socialLinks.website
+											: `https://${userProfile.socialLinks.website}`
+									}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+								>
+									Website
+								</a>
+							)}
+						</div>
+					)}
+
+					{/* Edit Profile Button (only for own profile) */}
+					{isOwnProfile && !isEditing && (
+						<button
+							onClick={() => setIsEditing(true)}
+							className="mt-4 px-4 py-2 rounded-lg border border-brand-cyan/30 bg-brand-cyan/10 text-sm font-medium text-brand-cyan hover:bg-brand-cyan/20 transition-colors"
+						>
+							Edit Profile
+						</button>
+					)}
 				</div>
 			</header>
 
-			<ProfileLinkedWallets />
+			{/* Edit Profile Form */}
+			{isEditing && isOwnProfile && (
+				<section className="glass-card mb-12 p-8 rounded-3xl border border-brand-cyan/20">
+					<div className="flex items-center gap-4 mb-6">
+						<h2 className="text-2xl font-black tracking-tight">Edit Profile</h2>
+						<div className="h-px flex-1 bg-linear-to-r from-brand-cyan/20 to-transparent" />
+					</div>
+					<ProfileEditForm
+						walletAddress={walletAddress || ""}
+						authToken={localStorage.getItem("authToken") || ""}
+						initialData={{
+							displayName: userProfile?.displayName ?? "",
+							bio: userProfile?.bio ?? "",
+							avatarUrl: userProfile?.avatarUrl,
+							avatarCid: userProfile?.avatarCid,
+							socialLinks: userProfile?.socialLinks ?? {},
+						}}
+						onSave={handleSaveProfile}
+						onCancel={() => setIsEditing(false)}
+						isLoading={isSaving}
+					/>
+				</section>
+			)}
 
 			<section>
 				<div className="flex items-center gap-4 mb-12">
@@ -258,10 +533,10 @@ const Profile: React.FC = () => {
 					<h2 className="text-2xl font-black tracking-tight">LRN History</h2>
 					<div className="h-px flex-1 bg-linear-to-r from-white/10 to-transparent" />
 				</div>
-				<LRNHistoryChart address={walletAddress} />
+				<LRNHistoryChart address={displayAddress} />
 			</section>
 
-			<ActivityFeed address={walletAddress} limit={10} />
+			<ActivityFeed address={displayAddress} limit={10} />
 		</div>
 	)
 }

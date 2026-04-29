@@ -12,6 +12,8 @@ import {
 import { pool } from "../db"
 import { logger } from "../lib/logger"
 
+import { getPgStatStatementsSnapshot, pool } from "../db/index"
+import { getRpcCacheStats, resetRpcCacheStats } from "../lib/rpc-cache"
 const log = logger.child({ module: "health" })
 
 export const healthRouter = Router()
@@ -278,59 +280,26 @@ healthRouter.get("/health", async (req, res) => {
 	})
 })
 
-/**
- * @openapi
- * /api/metrics/pool:
- *   get:
- *     tags: [Monitoring]
- *     summary: Get database pool metrics for monitoring dashboard
- *     responses:
- *       200:
- *         description: Pool metrics retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 timestamp:
- *                   type: string
- *                   format: date-time
- *                 metrics:
- *                   type: object
- *                   properties:
- *                     pool:
- *                       type: object
- *                       properties:
- *                         total:
- *                           type: number
- *                         active:
- *                           type: number
- *                         idle:
- *                           type: number
- *                         waiting:
- *                           type: number
- *                         capacityUsagePercent:
- *                           type: number
- *                         isNearCapacity:
- *                           type: boolean
- *                     lastAlert:
- *                       type: object
- *                       nullable: true
- *       500:
- *         $ref: '#/components/responses/InternalServerError'
- */
-healthRouter.get("/metrics/pool", getPoolMetrics)
+healthRouter.get("/health/db/performance", async (_req, res) => {
+	try {
+		const snapshot = await getPgStatStatementsSnapshot(10)
+		res.status(200).json(snapshot)
+	} catch {
+		res.status(500).json({
+			enabled: false,
+			rows: [],
+			error: "Failed to fetch database performance stats",
+		})
+	}
+})
 
-/**
- * @openapi
- * /api/metrics/pool/alerts/reset:
- *   post:
- *     tags: [Monitoring]
- *     summary: Reset pool alerts
- *     responses:
- *       200:
- *         description: Alerts reset successfully
- *       500:
- *         $ref: '#/components/responses/InternalServerError'
- */
-healthRouter.post("/metrics/pool/alerts/reset", resetPoolAlerts)
+/** GET /api/rpc-stats — RPC cache hit/miss counters since last reset */
+healthRouter.get("/rpc-stats", (_req, res) => {
+	res.json(getRpcCacheStats())
+})
+
+/** DELETE /api/rpc-stats — reset counters */
+healthRouter.delete("/rpc-stats", (_req, res) => {
+	resetRpcCacheStats()
+	res.json({ reset: true })
+})

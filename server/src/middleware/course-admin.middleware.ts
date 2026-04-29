@@ -1,18 +1,6 @@
 import { type NextFunction, type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
 
-<<<<<<< HEAD
-const JWT_PUBLIC_KEY = process.env.JWT_PUBLIC_KEY?.replace(/\\n/g, "\n").trim()
-const JWT_SECRET = process.env.JWT_SECRET
-const ADMIN_API_KEY = process.env.ADMIN_API_KEY
-const ADMIN_ADDRESSES = (process.env.ADMIN_ADDRESSES ?? "")
-	.split(",")
-	.map((value) => value.trim())
-	.filter(Boolean)
-=======
-import { JWT_AUDIENCE, JWT_ISSUER } from "../services/jwt.service"
->>>>>>> main
-
 type TokenPayload = {
 	sub?: string
 	address?: string
@@ -25,14 +13,14 @@ function getJwtPublicKey(): string | undefined {
 }
 
 function getJwtSecret(): string | undefined {
-	// HS256 fallback is development-only; production must use RS256 via JWT_PUBLIC_KEY.
 	if (process.env.NODE_ENV === "production") return undefined
-	return process.env.JWT_SECRET?.trim()
+	const secret = process.env.JWT_SECRET?.trim()
+	return secret && secret.length > 0 ? secret : undefined
 }
 
 function getAdminApiKey(): string | undefined {
 	const apiKey = process.env.ADMIN_API_KEY?.trim()
-	return apiKey || undefined
+	return apiKey && apiKey.length > 0 ? apiKey : undefined
 }
 
 function getAdminAddresses(): string[] {
@@ -43,10 +31,9 @@ function getAdminAddresses(): string[] {
 }
 
 function wantsUnpublishedCourses(req: Request): boolean {
-	const rawValue = req.query.includeUnpublished
-	if (typeof rawValue !== "string") return false
-
-	return ["1", "true", "yes"].includes(rawValue.trim().toLowerCase())
+	const raw = req.query.includeUnpublished
+	if (typeof raw !== "string") return false
+	return ["1", "true", "yes"].includes(raw.trim().toLowerCase())
 }
 
 export function requireCourseAdmin(
@@ -58,8 +45,9 @@ export function requireCourseAdmin(
 	const jwtSecret = getJwtSecret()
 	const adminApiKey = getAdminApiKey()
 	const adminAddresses = getAdminAddresses()
-	const apiKey = req.header("x-api-key")
-	if (adminApiKey && apiKey && apiKey === adminApiKey) {
+
+	const providedApiKey = req.header("x-api-key")
+	if (adminApiKey && providedApiKey && providedApiKey === adminApiKey) {
 		next()
 		return
 	}
@@ -76,34 +64,19 @@ export function requireCourseAdmin(
 		return
 	}
 
-<<<<<<< HEAD
-	if (!JWT_PUBLIC_KEY && !JWT_SECRET) {
-=======
 	if (!jwtPublicKey && !jwtSecret) {
->>>>>>> main
 		res.status(500).json({ error: "JWT verification not configured" })
 		return
 	}
 
 	let decoded: TokenPayload
 	try {
-<<<<<<< HEAD
-		if (JWT_PUBLIC_KEY) {
-			decoded = jwt.verify(token, JWT_PUBLIC_KEY, {
-				algorithms: ["RS256"],
-			}) as TokenPayload
-		} else {
-			decoded = jwt.verify(token, JWT_SECRET!) as TokenPayload
-=======
 		if (jwtPublicKey) {
 			decoded = jwt.verify(token, jwtPublicKey, {
 				algorithms: ["RS256"],
-				issuer: JWT_ISSUER,
-				audience: JWT_AUDIENCE,
 			}) as TokenPayload
 		} else {
 			decoded = jwt.verify(token, jwtSecret!) as TokenPayload
->>>>>>> main
 		}
 	} catch {
 		res.status(401).json({ error: "Unauthorized" })

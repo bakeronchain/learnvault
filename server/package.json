@@ -10,15 +10,11 @@
     "test": "jest --runInBand",
     "migrate": "ts-node scripts/migrate.ts up",
     "migrate:rollback": "ts-node scripts/migrate.ts down",
-<<<<<<< HEAD
-    "db:migrate": "npm run migrate",
-    "db:seed": "ts-node scripts/seed.ts"
-=======
     "migrate:verify": "ts-node scripts/verify-migrations.ts",
     "db:migrate": "npm run migrate",
     "db:seed": "ts-node scripts/seed.ts",
-    "db:query:analyze": "ts-node scripts/query-analysis.ts"
->>>>>>> main
+    "db:query:analyze": "ts-node scripts/query-analysis.ts",
+    "test:coverage": "jest --runInBand --testPathPatterns=\"src/tests/(auth|bookmarks|comments|csrf|upload)\\.test\\.ts\""
   },
   "dependencies": {
     "@pinata/sdk": "^2.1.0",
@@ -31,6 +27,7 @@
     "helmet": "^8.1.0",
     "ioredis": "^5.6.0",
     "jsonwebtoken": "^9.0.2",
+    "learnvault-frontend": "file:..",
     "multer": "^2.0.0",
     "node-cache": "^5.1.2",
     "nodemailer": "^8.0.4",

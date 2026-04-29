@@ -23,12 +23,17 @@ const Debug = lazy(() => import("./pages/Debug"))
 const Donor = lazy(() => import("./pages/Donor"))
 const Home = lazy(() => import("./pages/Home"))
 const History = lazy(() => import("./pages/History"))
+const ImpactDashboard = lazy(() => import("./pages/ImpactDashboard"))
+const ImpactWidget = lazy(() => import("./pages/ImpactWidget"))
 const Leaderboard = lazy(() => import("./pages/Leaderboard"))
 const Learn = lazy(() => import("./pages/Learn"))
+const LessonVersionDiff = lazy(() => import("./pages/LessonVersionDiff"))
 const LessonView = lazy(() => import("./pages/LessonView"))
 const NotFound = lazy(() => import("./pages/NotFound"))
+const PeerReview = lazy(() => import("./pages/PeerReview"))
 const Profile = lazy(() => import("./pages/Profile"))
 const ScholarshipApply = lazy(() => import("./pages/ScholarshipApply"))
+const SponsorPortal = lazy(() => import("./pages/SponsorPortal"))
 const Treasury = lazy(() => import("./pages/Treasury"))
 const Wiki = lazy(() => import("./pages/Wiki"))
 const WikiPage = lazy(() => import("./pages/WikiPage"))
@@ -46,6 +51,7 @@ function App() {
 		<ToastProvider>
 			<WalletToastWatcher />
 			<Routes>
+				<Route path="/impact/widget" element={renderRoute(<ImpactWidget />)} />
 				<Route element={<AppLayout />}>
 					<Route path="/" element={renderRoute(<Home />)} />
 					<Route path="/courses" element={renderRoute(<Courses />)} />
@@ -55,32 +61,24 @@ function App() {
 					/>
 					<Route path="/learn" element={renderRoute(<Learn />)} />
 					<Route path="/dao" element={renderRoute(<Dao />)} />
-					<Route
-						path="/dao/proposals"
-						element={renderRoute(<DaoProposals />)}
-					/>
+					<Route path="/dao/proposals" element={renderRoute(<DaoProposals />)} />
 					<Route path="/dao/propose" element={renderRoute(<DaoPropose />)} />
 					<Route path="/leaderboard" element={renderRoute(<Leaderboard />)} />
 					<Route path="/community" element={renderRoute(<Community />)} />
 					<Route path="/history" element={renderRoute(<History />)} />
 					<Route path="/profile" element={renderRoute(<Profile />)} />
-					<Route
-						path="/profile/:walletAddress"
-						element={renderRoute(<Profile />)}
-					/>
-					<Route
-						path="/scholarships/apply"
-						element={renderRoute(<ScholarshipApply />)}
-					/>
+					<Route path="/profile/:walletAddress" element={renderRoute(<Profile />)} />
+					<Route path="/scholarships/apply" element={renderRoute(<ScholarshipApply />)} />
 					<Route path="/admin" element={renderRoute(<Admin />)} />
+					<Route path="/admin/lesson-diff" element={renderRoute(<LessonVersionDiff />)} />
 					<Route path="/wiki" element={renderRoute(<Wiki />)} />
 					<Route path="/wiki/:slug" element={renderRoute(<WikiPage />)} />
 					<Route path="/treasury" element={renderRoute(<Treasury />)} />
 					<Route path="/donor" element={renderRoute(<Donor />)} />
-					<Route
-						path="/credentials/:id"
-						element={renderRoute(<Credential />)}
-					/>
+					<Route path="/sponsor" element={renderRoute(<SponsorPortal />)} />
+					<Route path="/impact" element={renderRoute(<ImpactDashboard />)} />
+					<Route path="/peer-review" element={renderRoute(<PeerReview />)} />
+					<Route path="/credentials/:id" element={renderRoute(<Credential />)} />
 					<Route path="/dashboard" element={renderRoute(<Dashboard />)} />
 					<Route path="/debug" element={renderRoute(<Debug />)} />
 					<Route path="/debug/:contractName" element={renderRoute(<Debug />)} />
@@ -109,13 +107,12 @@ const RouteFallback = () => (
 )
 
 const AppLayout = () => (
-	// Issue #61 — Theme-aware background using CSS variables + Tailwind dark: variant
 	<div className="min-h-screen flex flex-col pt-24 overflow-x-hidden w-full max-w-full bg-[var(--color-app-bg)] text-[var(--color-app-text)] transition-colors duration-300">
 		<NetworkPreconnect />
 		<TestnetBanner />
 		<NavBar />
 		<OnboardingTour />
-		<main id="main-content" className="flex-1 relative z-10" tabIndex={-1}>
+		<main id="main-content" className="relative z-10 flex-1" tabIndex={-1}>
 			<Outlet />
 		</main>
 		<Footer />

@@ -46,6 +46,25 @@ export interface CastVoteParams {
 	support: boolean
 }
 
+export interface CancelProposalParams {
+	proposalId: number
+}
+
+interface RequestTraceOptions {
+	requestId?: string
+}
+
+function resolveRequestId(options?: RequestTraceOptions): string | undefined {
+	return options?.requestId ?? getRequestId()
+}
+
+function buildRequestMemoValue(requestId?: string): string | null {
+	if (!requestId) return null
+	const compact = requestId.replace(/-/g, "").slice(0, 24)
+	if (!compact) return null
+	return `rid:${compact}`
+}
+
 // --- Admin Validation Cache ---
 let cachedAdminAddress: string | null = null
 let lastAdminCheckTime: number = 0
@@ -1054,8 +1073,7 @@ async function castVote(params: CastVoteParams): Promise<ContractCallResult> {
 	} catch (err) {
 		console.error("[stellar] Cast vote failed:", err)
 		throw new Error(
-			"Cast vote failed: " +
-				(err instanceof Error ? err.message : String(err)),
+			"Cast vote failed: " + (err instanceof Error ? err.message : String(err)),
 		)
 	}
 }
@@ -1261,6 +1279,8 @@ export const stellarContractService = {
 	isEnrolled,
 	submitScholarshipProposal,
 	castVote,
+	cancelProposal,
+	reclaimInactiveEscrow,
 	getLearnTokenBalance,
 	getGovernanceTokenBalance,
 	getGovernanceVotingPower,

@@ -274,6 +274,7 @@ healthRouter.get("/health", async (req, res) => {
 			redis,
 			stellarHorizon,
 		},
+		stellarRpc: stellarRpcCircuitBreaker.getStatus(),
 	})
 })
 

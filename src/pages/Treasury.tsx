@@ -1,8 +1,10 @@
 import React, { useMemo } from "react"
 import { Helmet } from "react-helmet"
+import { useTranslation } from "react-i18next"
 import {
 	EmptyState,
 	DashboardStatsSkeleton,
+	ActivityFeedSkeleton,
 } from "../components/SkeletonLoader"
 import { ErrorState } from "../components/states/errorState"
 import { useToast } from "../components/Toast/ToastProvider"
@@ -40,8 +42,8 @@ interface TreasuryEvent {
 const startOfDay = (value: Date) =>
 	new Date(value.getFullYear(), value.getMonth(), value.getDate())
 
-const formatDayLabel = (value: Date) =>
-	value.toLocaleDateString("en-US", { weekday: "short" })
+const formatDayLabel = (value: Date, locale?: string) =>
+	value.toLocaleDateString(locale, { weekday: "short" })
 
 const parseAmount = (amount?: string) => {
 	const parsed = Number(amount ?? "0")
@@ -49,7 +51,10 @@ const parseAmount = (amount?: string) => {
 	return parsed / STROOPS_PER_USDC
 }
 
-const buildTreasuryChartData = (events: TreasuryEvent[]): TreasuryPoint[] => {
+const buildTreasuryChartData = (
+	events: TreasuryEvent[],
+	locale?: string,
+): TreasuryPoint[] => {
 	const today = startOfDay(new Date())
 	const buckets = new Map<
 		string,
@@ -61,7 +66,7 @@ const buildTreasuryChartData = (events: TreasuryEvent[]): TreasuryPoint[] => {
 		day.setDate(today.getDate() - offset)
 		const key = day.toISOString().slice(0, 10)
 		buckets.set(key, {
-			name: formatDayLabel(day),
+			name: formatDayLabel(day, locale),
 			inflows: 0,
 			outflows: 0,
 		})
@@ -87,6 +92,8 @@ const buildTreasuryChartData = (events: TreasuryEvent[]): TreasuryPoint[] => {
 }
 
 const Treasury: React.FC = () => {
+	const { i18n } = useTranslation()
+	const locale = i18n.resolvedLanguage
 	const { address } = useWallet()
 	const { showInfo } = useToast()
 	const { scholarshipTreasury } = useContractIds()
@@ -111,8 +118,8 @@ const Treasury: React.FC = () => {
 	const refetchActivity = refetch
 
 	const chartData = useMemo(
-		() => buildTreasuryChartData(activity ?? []),
-		[activity],
+		() => buildTreasuryChartData(activity ?? [], locale),
+		[activity, locale],
 	)
 
 	const hasChartData = chartData.some(
@@ -121,14 +128,14 @@ const Treasury: React.FC = () => {
 
 	const formatUSDC = (stroops: string) => {
 		const usdc = Number(stroops) / STROOPS_PER_USDC
-		return usdc.toLocaleString("en-US", {
+		return usdc.toLocaleString(locale, {
 			minimumFractionDigits: 0,
 			maximumFractionDigits: 2,
 		})
 	}
 
 	const formatAmount = (stroops: string) => {
-		return parseAmount(stroops).toLocaleString("en-US", {
+		return parseAmount(stroops).toLocaleString(locale, {
 			minimumFractionDigits: 0,
 			maximumFractionDigits: 2,
 		})
@@ -200,7 +207,10 @@ const Treasury: React.FC = () => {
 	const description = `LearnVault's decentralized scholarship treasury holds ${displayStats.totalTreasury} and has funded ${displayStats.scholarsFunded} scholars. View real-time inflows and disbursements.`
 
 	return (
-		<div className="p-12 max-w-7xl mx-auto min-h-screen text-white animate-in fade-in duration-1000">
+		<div
+			aria-busy={isLoading}
+			className="p-12 max-w-7xl mx-auto min-h-screen text-white animate-in fade-in duration-1000"
+		>
 			<Helmet>
 				<title>{title}</title>
 				<meta property="og:title" content={title} />

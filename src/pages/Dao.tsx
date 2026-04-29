@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react"
+import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import { useDelegation } from "../hooks/useDelegation"
 import { useProposals } from "../hooks/useProposals"
@@ -8,9 +9,9 @@ import { hasProposalDraft } from "../util/proposalDraft"
 const GOV_DECIMALS = 7
 const GOV_DIVISOR = 10 ** GOV_DECIMALS
 
-function formatGov(raw: string): string {
+function formatGov(raw: string, locale?: string): string {
 	const n = Number(raw) / GOV_DIVISOR
-	return n.toLocaleString("en-US", { maximumFractionDigits: 2 })
+	return n.toLocaleString(locale, { maximumFractionDigits: 2 })
 }
 
 function shortenAddress(addr: string): string {
@@ -19,6 +20,8 @@ function shortenAddress(addr: string): string {
 }
 
 export default function Dao() {
+	const { i18n } = useTranslation()
+	const locale = i18n.resolvedLanguage
 	const { address } = useWallet()
 	const { proposals, votingPower, isLoading } = useProposals()
 	const [hasDraft, setHasDraft] = useState(false)
@@ -64,9 +67,9 @@ export default function Dao() {
 		}
 	}
 
-	const ownFmt = formatGov(ownBalance)
-	const delegatedFmt = formatGov(delegatedToMe)
-	const effectiveFmt = formatGov(onChainVotingPower)
+	const ownFmt = formatGov(ownBalance, locale)
+	const delegatedFmt = formatGov(delegatedToMe, locale)
+	const effectiveFmt = formatGov(onChainVotingPower, locale)
 
 	return (
 		<div className="p-8 md:p-12 max-w-5xl mx-auto text-white animate-in fade-in duration-700">

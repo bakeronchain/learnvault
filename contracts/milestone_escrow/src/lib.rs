@@ -52,6 +52,7 @@ pub enum Error {
     Overpayment = 8,
     InactivityNotReached = 9,
     NothingToReclaim = 10,
+    ArithmeticOverflow = 11,
 }
 
 #[contract]
@@ -136,6 +137,9 @@ impl MilestoneEscrow {
             admin: config.admin.clone(),
         };
         env.storage().persistent().set(&key, &record);
+
+        xlm::token_client(&env).transfer(&treasury, env.current_contract_address(), &amount);
+
         EscrowCreated {
             proposal_id,
             scholar: record.scholar.clone(),
@@ -156,12 +160,12 @@ impl MilestoneEscrow {
         }
 
         let amount = Self::next_tranche_amount(&env, &record);
-        xlm::token_client(&env).transfer(&env.current_contract_address(), &record.scholar, &amount);
-
-        record.released_amount += amount;
-        record.tranches_released += 1;
+        record.released_amount = Self::checked_add_i128(&env, record.released_amount, amount);
+        record.tranches_released = Self::checked_add_u32(&env, record.tranches_released, 1);
         record.last_activity = env.ledger().timestamp();
         env.storage().persistent().set(&key, &record);
+
+        xlm::token_client(&env).transfer(&env.current_contract_address(), &record.scholar, &amount);
 
         TrancheReleased {
             scholar: record.scholar.clone(),
@@ -184,20 +188,20 @@ impl MilestoneEscrow {
             panic_with_error!(&env, Error::InactivityNotReached);
         }
 
-        let unspent = record.total_amount - record.released_amount;
+        let unspent = Self::checked_sub_i128(&env, record.total_amount, record.released_amount);
         if unspent <= 0 {
             panic_with_error!(&env, Error::NothingToReclaim);
         }
+
+        record.released_amount = record.total_amount;
+        record.last_activity = now;
+        env.storage().persistent().set(&key, &record);
 
         xlm::token_client(&env).transfer(
             &env.current_contract_address(),
             &record.treasury,
             &unspent,
         );
-
-        record.released_amount = record.total_amount;
-        record.last_activity = now;
-        env.storage().persistent().set(&key, &record);
 
         EscrowReclaimed {
             proposal_id,
@@ -221,15 +225,17 @@ impl MilestoneEscrow {
     }
 
     fn next_tranche_amount(env: &Env, record: &EscrowRecord) -> i128 {
-        let remaining = record.total_amount - record.released_amount;
-        let is_last = record.tranches_released + 1 == record.total_tranches;
+        let remaining = Self::checked_sub_i128(env, record.total_amount, record.released_amount);
+        let next_tranche_index = Self::checked_add_u32(env, record.tranches_released, 1);
+        let is_last = next_tranche_index == record.total_tranches;
         let amount = if is_last {
             remaining
         } else {
             record.total_amount / (record.total_tranches as i128)
         };
 
-        if amount <= 0 || record.released_amount + amount > record.total_amount {
+        let released_after = Self::checked_add_i128(env, record.released_amount, amount);
+        if amount <= 0 || released_after > record.total_amount {
             panic_with_error!(env, Error::Overpayment);
         }
         amount
@@ -267,6 +273,21 @@ impl MilestoneEscrow {
         let admin = Self::admin(&env);
         admin.require_auth();
         upgrade::apply(&env, &admin, &new_wasm_hash);
+    }
+
+    fn checked_add_i128(env: &Env, left: i128, right: i128) -> i128 {
+        left.checked_add(right)
+            .unwrap_or_else(|| panic_with_error!(env, Error::ArithmeticOverflow))
+    }
+
+    fn checked_sub_i128(env: &Env, left: i128, right: i128) -> i128 {
+        left.checked_sub(right)
+            .unwrap_or_else(|| panic_with_error!(env, Error::ArithmeticOverflow))
+    }
+
+    fn checked_add_u32(env: &Env, left: u32, right: u32) -> u32 {
+        left.checked_add(right)
+            .unwrap_or_else(|| panic_with_error!(env, Error::ArithmeticOverflow))
     }
 }
 

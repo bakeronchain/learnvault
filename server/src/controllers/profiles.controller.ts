@@ -1,7 +1,10 @@
 import { type Request, type Response } from "express"
 import sanitizeHtml from "sanitize-html"
 import { pool } from "../db/index"
+import { createLogger } from "../lib/logger"
 import { userProfileSchema } from "../lib/zod-schemas"
+
+const logger = createLogger("profiles")
 
 // Options for sanitize-html. We allow basic formatting.
 const sanitizeOptions = {
@@ -35,7 +38,7 @@ export async function getProfile(req: Request, res: Response): Promise<void> {
 
 		res.status(200).json(rows[0])
 	} catch (error) {
-		console.error("[getProfile] Error:", error)
+		logger.error("getProfile failed", { error, address: req.params.address })
 		res.status(500).json({ error: "Internal server error" })
 	}
 }
@@ -97,7 +100,7 @@ export async function updateProfile(
 		const { rows } = await pool.query(query, values)
 		res.status(200).json(rows[0])
 	} catch (error: any) {
-		console.error("[updateProfile] Error:", error)
+		logger.error("updateProfile failed", { error })
 
 		// Handle unique constraint violation for display_name
 		if (error.code === "23505" || error.message.includes("unique constraint")) {

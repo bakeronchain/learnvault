@@ -5,7 +5,7 @@ import { nonceRateLimiter } from "../middleware/nonce-rate-limit.middleware"
 import { authVerifyLimiter } from "../middleware/rate-limit.middleware"
 import { type AuthService } from "../services/auth.service"
 
-export function createAuthRouter(authService: AuthService): Router {
+export function createAuthRouter (authService: AuthService): Router {
 	const router = Router()
 	const { getNonce, postVerify, getChallenge, postChallengeVerify } =
 		createAuthControllers(authService)

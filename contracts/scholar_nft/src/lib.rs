@@ -5,9 +5,6 @@ use soroban_sdk::{
     Address, BytesN, Env, String, Symbol, Vec, contract, contracterror, contractimpl, contracttype,
     panic_with_error, symbol_short,
 };
-    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, Address,
-    Env, String, Symbol,
-};
 
 // ---------------------------------------------------------------------------
 // Storage Constants (assuming ~6s ledger time)
@@ -98,7 +95,6 @@ pub enum ScholarNFTError {
     TokenExists = 6,
     Soulbound = 7,
     AlreadyRevoked = 8,
-    CounterOverflow = 9,
 }
 
 #[contract]
@@ -340,9 +336,7 @@ impl ScholarNFT {
             .instance()
             .get(&TOKEN_COUNTER_KEY)
             .unwrap_or(0_u64);
-        counter = counter
-            .checked_add(1)
-            .unwrap_or_else(|| panic_with_error!(env, ScholarNFTError::CounterOverflow));
+        counter = counter.saturating_add(1);
         env.storage().instance().set(&TOKEN_COUNTER_KEY, &counter);
         counter
     }

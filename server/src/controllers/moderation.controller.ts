@@ -1,6 +1,9 @@
 import { type Request, type Response } from "express"
 import { flaggedContentStore } from "../db/flagged-content-store"
 import { pool } from "../db/index"
+import { createLogger } from "../lib/logger"
+
+const logger = createLogger("moderation")
 
 interface ModerationActionRequest {
 	action: "delete" | "dismiss" | "warn"
@@ -19,7 +22,7 @@ export async function listFlaggedContent(
 
 		res.json({ data: flags })
 	} catch (err) {
-		console.error("[listFlaggedContent] error:", err)
+		logger.error("listFlaggedContent failed", { error: err })
 		res.status(500).json({ error: "Failed to fetch flagged content" })
 	}
 }
@@ -56,7 +59,7 @@ export async function getFlagDetails(
 
 		res.json({ data: { flag, content, auditLog } })
 	} catch (err) {
-		console.error("[getFlagDetails] error:", err)
+		logger.error("getFlagDetails failed", { error: err, flagId })
 		res.status(500).json({ error: "Failed to fetch flag details" })
 	}
 }
@@ -111,7 +114,7 @@ export async function actionOnFlag(req: Request, res: Response): Promise<void> {
 
 		res.json({ data: updatedFlag })
 	} catch (err) {
-		console.error("[actionOnFlag] error:", err)
+		logger.error("actionOnFlag failed", { error: err, flagId, action })
 		res.status(500).json({ error: "Failed to take action on flag" })
 	}
 }
@@ -133,7 +136,7 @@ export async function getAdminModerationStats(
 
 		res.json(stats)
 	} catch (err) {
-		console.error("[getAdminModerationStats] error:", err)
+		logger.error("getAdminModerationStats failed", { error: err })
 		res.status(500).json({ error: "Failed to fetch moderation stats" })
 	}
 }

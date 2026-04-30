@@ -1,7 +1,8 @@
-import { motion, AnimatePresence } from "framer-motion"
-import { useState } from "react"
-import { useWallet } from "../hooks/useWallet"
+import { AnimatePresence, motion } from "framer-motion"
+import { useId, useState } from "react"
+
 import { stellarNetwork } from "../contracts/util"
+import { useWallet } from "../hooks/useWallet"
 
 export interface AddressDisplayProps {
 	address?: string | null
@@ -39,6 +40,7 @@ export const AddressDisplay: React.FC<AddressDisplayProps> = ({
 	const [copied, setCopied] = useState(false)
 	const [isHovered, setIsHovered] = useState(false)
 	const { network: walletNetwork } = useWallet()
+	const tooltipId = useId()
 
 	if (!address) return null
 
@@ -61,8 +63,8 @@ export const AddressDisplay: React.FC<AddressDisplayProps> = ({
 			activeNetwork.includes("public") || activeNetwork.includes("mainnet")
 				? "https://stellar.expert/explorer/public/account/"
 				: activeNetwork.includes("futurenet")
-				? "https://futurenet.stellar.expert/explorer/futurenet/account/"
-				: "https://testnet.stellar.expert/explorer/testnet/account/"
+					? "https://futurenet.stellar.expert/explorer/futurenet/account/"
+					: "https://testnet.stellar.expert/explorer/testnet/account/"
 		return `${baseUrl}${address}`
 	}
 

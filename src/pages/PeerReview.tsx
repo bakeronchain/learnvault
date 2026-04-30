@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react"
+import AddressDisplay from "../components/AddressDisplay"
 import { usePeerReviewQueue } from "../hooks/usePeerReview"
 import { useWallet } from "../hooks/useWallet"
-import AddressDisplay from "../components/AddressDisplay"
 
 function evidenceLabel(row: {
 	evidence_github?: string | null
@@ -50,8 +50,8 @@ const PeerReview: React.FC = () => {
 					</h1>
 					<p className="text-white/50 max-w-2xl">
 						Your review is a signal for admins — it does not approve or reject
-						milestones on its own. Completing a review earns LRN in your
-						scholar balance.
+						milestones on its own. Completing a review earns LRN in your scholar
+						balance.
 					</p>
 					{lastReward && (
 						<p className="mt-3 text-sm text-emerald-400/90">

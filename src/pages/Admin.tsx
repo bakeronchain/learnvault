@@ -21,7 +21,6 @@ import {
 	useDeleteWikiPage,
 	type WikiPage,
 } from "../hooks/useWiki"
-import i18n from "../i18n"
 import { apiFetchJson } from "../lib/api"
 import { getAuthToken } from "../util/auth"
 import { shortenContractId } from "../util/contract"
@@ -87,7 +86,7 @@ const formatDate = (value: string | undefined): string => {
 	const date = new Date(value)
 	if (Number.isNaN(date.getTime())) return value
 
-	return date.toLocaleDateString(i18n.resolvedLanguage, {
+	return date.toLocaleDateString("en-GB", {
 		day: "2-digit",
 		month: "short",
 		year: "numeric",
@@ -95,7 +94,7 @@ const formatDate = (value: string | undefined): string => {
 }
 
 const formatCount = (value: number): string =>
-	value.toLocaleString(i18n.resolvedLanguage, { maximumFractionDigits: 0 })
+	value.toLocaleString("en-US", { maximumFractionDigits: 0 })
 
 const renderAddress = (value: string | undefined) =>
 	value ? shortenContractId(value, 6, 6) : "Not available"
@@ -425,6 +424,249 @@ const MilestoneQueue: React.FC = () => {
 		fetchMilestones,
 		approveMilestone,
 		rejectMilestone,
+	} = useAdminMilestones()
+
+	const [courseFilter, setCourseFilter] = useState("All")
+	const [statusFilter, setStatusFilter] = useState("pending")
+	const [dialog, setDialog] = useState<{
+		action: "approve" | "reject"
+		milestone: MilestoneSubmission
+	} | null>(null)
+	const [selectedMilestoneIds, setSelectedMilestoneIds] = useState<string[]>([])
+	const [batchState, setBatchState] = useState<{
+		action: "approve" | "reject"
+		total: number
+		inProgress: boolean
+		results: BatchMilestoneResponse | null
+	}>({
+		action: "approve",
+		total: 0,
+		inProgress: false,
+		results: null,
+	})
+
+	useEffect(() => {
+		void fetchMilestones(1, {
+			course: courseFilter !== "All" ? courseFilter : undefined,
+			status: statusFilter,
+		})
+	}, [courseFilter, statusFilter, fetchMilestones])
+
+	const handlePageChange = (newPage: number) => {
+		void fetchMilestones(newPage, {
+			course: courseFilter !== "All" ? courseFilter : undefined,
+			status: statusFilter,
+		})
+	}
+
+	const handleConfirm = async () => {
+		if (!dialog) return
+		const { action, milestone } = dialog
+		setDialog(null)
+		if (action === "approve") await approveMilestone(milestone.id)
+		else await rejectMilestone(milestone.id)
+	}
+
+	const totalPages = Math.ceil(total / pageSize)
+
+	return (
+		<section>
+			{/* Stats bar */}
+			<MilestoneStatsBar />
+
+			{/* Filters */}
+			<div className="flex flex-wrap gap-3 mb-4 items-center">
+				<div className="flex items-center gap-2">
+					<label
+						htmlFor="course-filter"
+						className="text-xs text-white/40 uppercase tracking-widest"
+					>
+						Course
+					</label>
+					<select
+						id="course-filter"
+						value={courseFilter}
+						onChange={(e) => setCourseFilter(e.target.value)}
+						className="glass border border-white/10 text-white/80 text-sm rounded-xl px-3 py-1.5 bg-transparent focus:outline-none focus:border-white/20"
+					>
+						{COURSES.map((c) => (
+							<option key={c} className="bg-gray-900">
+								{c}
+							</option>
+						))}
+					</select>
+				</div>
+				<div className="flex items-center gap-2">
+					<label
+						htmlFor="status-filter"
+						className="text-xs text-white/40 uppercase tracking-widest"
+					>
+						Status
+					</label>
+					<select
+						id="status-filter"
+						value={statusFilter}
+						onChange={(e) => setStatusFilter(e.target.value)}
+						className="glass border border-white/10 text-white/80 text-sm rounded-xl px-3 py-1.5 bg-transparent focus:outline-none focus:border-white/20"
+					>
+						{STATUSES.map((s) => (
+							<option key={s} className="bg-gray-900">
+								{s}
+							</option>
+						))}
+					</select>
+				</div>
+			</div>
+
+			{/* Error */}
+			{error && (
+				<p className="text-xs text-red-400 mb-4">
+					Error loading milestones: {error}
+				</p>
+			)}
+
+			{/* Table */}
+			<div className="overflow-x-auto rounded-2xl border border-white/5 glass">
+				<table className="w-full text-left">
+					<thead>
+						<tr className="border-b border-white/5 text-xs uppercase tracking-widest text-white/40">
+							<th className="py-3 px-4 font-medium">Learner</th>
+							<th className="py-3 px-4 font-medium">Course</th>
+							<th className="py-3 px-4 font-medium">Submitted</th>
+							<th className="py-3 px-4 font-medium">Evidence</th>
+							<th className="py-3 px-4 font-medium">Status</th>
+							<th className="py-3 px-4 font-medium">Actions</th>
+						</tr>
+					</thead>
+					<tbody>
+						{loading && (
+							<tr>
+								<td
+									colSpan={6}
+									className="py-12 text-center text-sm text-white/40 animate-pulse"
+								>
+									Loading milestones…
+								</td>
+							</tr>
+						)}
+
+						{!loading && milestones.length === 0 && (
+							<tr>
+								<td colSpan={6} className="py-12 text-center">
+									<p className="text-white/40 text-sm">
+										No milestone submissions found.
+									</p>
+									<p className="text-white/20 text-xs mt-1">
+										Try adjusting your filters or check back later.
+									</p>
+								</td>
+							</tr>
+						)}
+
+						{!loading &&
+							milestones.map((m) => {
+								const statusStyles: Record<
+									MilestoneSubmission["status"],
+									string
+								> = {
+									pending:
+										"text-yellow-400 bg-yellow-400/10 border-yellow-400/30",
+									approved:
+										"text-emerald-400 bg-emerald-400/10 border-emerald-400/30",
+									rejected: "text-red-400 bg-red-400/10 border-red-400/30",
+								}
+								return (
+									<tr
+										key={m.id}
+										className="border-b border-white/5 hover:bg-white/3 transition-colors"
+									>
+										<td className="py-3 px-4">
+											<span className="font-mono text-xs text-white/50">
+												{m.learnerAddress.slice(0, 8)}…
+												{m.learnerAddress.slice(-4)}
+											</span>
+										</td>
+										<td className="py-3 px-4 text-sm text-white/80">
+											{m.course}
+										</td>
+										<td className="py-3 px-4 text-sm text-white/50">
+											{new Date(m.submittedAt).toLocaleDateString("en-GB", {
+												day: "2-digit",
+												month: "short",
+												year: "numeric",
+											})}
+										</td>
+										<td className="py-3 px-4">
+											<TxHashLink hash={m.evidenceLink} />
+										</td>
+										<td className="py-3 px-4">
+											<span
+												className={`text-xs px-2 py-0.5 rounded-full border ${statusStyles[m.status]}`}
+											>
+												{m.status}
+											</span>
+										</td>
+										<td className="py-3 px-4">
+											{m.status === "pending" && (
+												<div className="flex gap-2">
+													<button
+														type="button"
+														onClick={() =>
+															setDialog({ action: "approve", milestone: m })
+														}
+														aria-label={`Approve milestone for ${m.learnerAddress}`}
+														className="px-3 py-1 text-xs font-medium rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors"
+													>
+														Approve
+													</button>
+													<button
+														type="button"
+														onClick={() =>
+															setDialog({ action: "reject", milestone: m })
+														}
+														aria-label={`Reject milestone for ${m.learnerAddress}`}
+														className="px-3 py-1 text-xs font-medium rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-colors"
+													>
+														Reject
+													</button>
+												</div>
+											)}
+										</td>
+									</tr>
+								)
+							})}
+					</tbody>
+				</table>
+			</div>
+
+			{/* Pagination */}
+			{totalPages > 1 && (
+				<div className="flex items-center justify-between mt-4 text-sm text-white/40">
+					<span>
+						Page {page} of {totalPages} ({total} total)
+					</span>
+					<div className="flex gap-2">
+						<button
+							type="button"
+							disabled={page <= 1}
+							onClick={() => handlePageChange(page - 1)}
+							className="px-3 py-1 rounded-xl border border-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+						>
+							← Prev
+						</button>
+						<button
+							type="button"
+							disabled={page >= totalPages}
+							onClick={() => handlePageChange(page + 1)}
+							className="px-3 py-1 rounded-xl border border-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+						>
+							Next →
+						</button>
+					</div>
+				</div>
+			)}
+
+			{/* Confirmation dialog */}
 		batchApproveMilestones,
 		batchRejectMilestones,
 	} = useAdminMilestones()
@@ -561,88 +803,6 @@ const MilestoneQueue: React.FC = () => {
 		<section>
 			<MilestoneStatsBar />
 
-			{reviewQueue?.exceeded && (
-				<div className="mb-4 rounded-xl border border-yellow-500/40 bg-yellow-500/10 px-4 py-3">
-					<p className="text-sm font-medium text-yellow-300">
-						Validator review queue is above threshold
-					</p>
-					<p className="mt-1 text-xs text-yellow-100/80">
-						Pending: {formatCount(reviewQueue.pendingReviews)} | Threshold:{" "}
-						{formatCount(reviewQueue.threshold)}
-					</p>
-				</div>
-			)}
-
-			<div className="mb-6 overflow-x-auto rounded-2xl border border-white/5 glass">
-				<div className="flex items-center justify-between px-4 pt-4">
-					<h2 className="text-sm font-medium uppercase tracking-widest text-white/50">
-						Validator Performance
-					</h2>
-				</div>
-				{analyticsError && (
-					<p className="px-4 py-2 text-xs text-red-400">
-						Failed to load validator analytics: {analyticsError}
-					</p>
-				)}
-				<table className="w-full text-left">
-					<thead>
-						<tr className="border-b border-white/5 text-xs uppercase tracking-widest text-white/40">
-							<th className="py-3 px-4 font-medium">Validator</th>
-							<th className="py-3 px-4 font-medium">Reviewed</th>
-							<th className="py-3 px-4 font-medium">Avg Review Time</th>
-							<th className="py-3 px-4 font-medium">Approval Rate</th>
-							<th className="py-3 px-4 font-medium">Appeal Reversal Rate</th>
-						</tr>
-					</thead>
-					<tbody>
-						{analyticsLoading && (
-							<tr>
-								<td
-									colSpan={5}
-									className="py-8 text-center text-sm text-white/40 animate-pulse"
-								>
-									Loading validator analytics...
-								</td>
-							</tr>
-						)}
-
-						{!analyticsLoading && analytics.length === 0 && (
-							<tr>
-								<td
-									colSpan={5}
-									className="py-8 text-center text-sm text-white/40"
-								>
-									No validator analytics available.
-								</td>
-							</tr>
-						)}
-
-						{!analyticsLoading &&
-							analytics.map((row) => (
-								<tr
-									key={row.validatorAddress}
-									className="border-b border-white/5 hover:bg-white/3 transition-colors"
-								>
-									<td className="py-3 px-4 font-mono text-xs text-white/60">
-										{shortenContractId(row.validatorAddress, 8, 4)}
-									</td>
-									<td className="py-3 px-4 text-sm text-white/80">
-										{formatCount(row.milestonesReviewed)}
-									</td>
-									<td className="py-3 px-4 text-sm text-white/80">
-										{formatReviewTime(row.averageReviewTimeSeconds)}
-									</td>
-									<td className="py-3 px-4 text-sm text-emerald-300">
-										{formatPercent(row.approvalRate)}
-									</td>
-									<td className="py-3 px-4 text-sm text-amber-200">
-										{formatPercent(row.appealReversalRate)}
-									</td>
-								</tr>
-							))}
-					</tbody>
-				</table>
-			</div>
 			<div className="flex flex-wrap gap-3 mb-4 items-center">
 				<div className="flex items-center gap-2">
 					<label
@@ -823,7 +983,10 @@ const MilestoneQueue: React.FC = () => {
 							type="button"
 							disabled={page <= 1}
 							onClick={() => handlePageChange(page - 1)}
+
 							aria-label="Previous page"
+
+
 							className="px-3 py-1 rounded-xl border border-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
 						>
 							← Prev
@@ -832,7 +995,9 @@ const MilestoneQueue: React.FC = () => {
 							type="button"
 							disabled={page >= totalPages}
 							onClick={() => handlePageChange(page + 1)}
+
 							aria-label="Next page"
+
 							className="px-3 py-1 rounded-xl border border-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
 						>
 							Next →
@@ -1504,6 +1669,4 @@ const WikiManagement: React.FC = () => {
 			)}
 		</section>
 	)
-}
-
-export default Admin
+	}

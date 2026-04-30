@@ -59,8 +59,6 @@ pub enum LRNError {
     NotInitialized = 3,
     /// Token is soulbound and cannot be transferred.
     Soulbound = 4,
-    /// Arithmetic overflow or underflow was detected.
-    ArithmeticOverflow = 5,
 }
 
 // ---------------------------------------------------------------------------
@@ -94,7 +92,6 @@ impl LearnToken {
         if env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(&env, LRNError::Unauthorized);
         }
-        admin.require_auth();
         env.storage().instance().set(&ADMIN_KEY, &admin);
         upgrade::init(&env);
         env.storage()
@@ -104,7 +101,6 @@ impl LearnToken {
             .instance()
             .set(&SYMBOL_KEY, &String::from_str(&env, "LRN"));
         env.storage().instance().set(&DECIMALS_KEY, &7_u32);
-
         Self::extend_instance(&env);
     }
 
@@ -131,8 +127,7 @@ impl LearnToken {
         // 3. Add amount to Balance(to) in persistent storage
         let bal_key = DataKey::Balance(to.clone());
         let bal: i128 = env.storage().persistent().get(&bal_key).unwrap_or(0);
-        let new_balance = Self::checked_add_amount(&env, bal, amount);
-        env.storage().persistent().set(&bal_key, &new_balance);
+        env.storage().persistent().set(&bal_key, &(bal + amount));
 
         // 4. Add amount to TotalSupply in persistent storage
         let supply: i128 = env
@@ -140,10 +135,9 @@ impl LearnToken {
             .persistent()
             .get(&DataKey::TotalSupply)
             .unwrap_or(0);
-        let new_supply = Self::checked_add_amount(&env, supply, amount);
         env.storage()
             .persistent()
-            .set(&DataKey::TotalSupply, &new_supply);
+            .set(&DataKey::TotalSupply, &(supply + amount));
 
         // Extend persistent storage for balance entries
         env.storage().persistent().extend_ttl(
@@ -285,11 +279,6 @@ impl LearnToken {
         env.storage()
             .instance()
             .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_EXTEND_TO);
-    }
-
-    fn checked_add_amount(env: &Env, left: i128, right: i128) -> i128 {
-        left.checked_add(right)
-            .unwrap_or_else(|| panic_with_error!(env, LRNError::ArithmeticOverflow))
     }
 }
 

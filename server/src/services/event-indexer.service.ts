@@ -1,11 +1,11 @@
-import { rpc as StellarRpc } from "@stellar/stellar-sdk"
-import { Pool } from "pg"
 import {
-	SOROBAN_RPC_URL,
 	INDEXER_CONFIG,
+	SOROBAN_RPC_URL,
 	getPollingTargets,
 } from "../lib/event-config"
-import { getRpcCache, CacheKey } from "../lib/rpc-cache"
+
+import { Pool } from "pg"
+import { rpc as StellarRpc } from "@stellar/stellar-sdk"
 import { leaderboardEmitter } from "../lib/leaderboard-emitter"
 import { logger } from "../lib/logger"
 
@@ -28,7 +28,7 @@ export interface IndexedEvent {
  * Extract transaction hash from event ID or data
  * Event ID format: "<ledger_sequence>-<tx_hash>-<event_index>"
  */
-function extractTxHash(eventId: string): string | undefined {
+function extractTxHash (eventId: string): string | undefined {
 	// Event IDs are typically formatted as: "0000428575-250fd482f34ac0d5387a77e62ae696126f22cb09377b8038cd1cf011c62dcbd-0"
 	const parts = eventId.split("-")
 	if (parts.length >= 2) {
@@ -40,7 +40,7 @@ function extractTxHash(eventId: string): string | undefined {
 /**
  * Extract event index from event ID
  */
-function extractEventIndex(eventId: string): number | undefined {
+function extractEventIndex (eventId: string): number | undefined {
 	const parts = eventId.split("-")
 	if (parts.length >= 3) {
 		const index = Number.parseInt(parts[2], 10)
@@ -52,59 +52,11 @@ function extractEventIndex(eventId: string): number | undefined {
 }
 
 /**
- * Invalidate RPC cache entries that are stale after a new event is indexed.
- * We only invalidate keys we can derive from the event data — everything else
- * expires naturally via TTL.
- */
-async function invalidateCacheForEvent(
-	topic: string,
-	data: Record<string, unknown>,
-): Promise<void> {
-	const cache = getRpcCache()
-	const addr = typeof data.address === "string" ? data.address : null
-
-	switch (topic) {
-		case "LearnToken_Mint":
-			if (addr) {
-				await cache.invalidate(CacheKey.learnBalance(addr))
-				await cache.invalidate(CacheKey.votingPower(addr))
-			}
-			break
-		case "CourseMilestone_MilestoneComplete":
-			if (addr) {
-				const courseId =
-					typeof data.courseId === "string" ? Number(data.courseId) : null
-				if (courseId !== null && !isNaN(courseId)) {
-					await cache.invalidate(CacheKey.enrollment(addr, courseId))
-				}
-			}
-			break
-		case "ScholarshipTreasury_Deposit":
-			// Deposit mints governance tokens — invalidate gov balance + voting power
-			if (addr) {
-				await cache.invalidate(CacheKey.govBalance(addr))
-				await cache.invalidate(CacheKey.votingPower(addr))
-			}
-			break
-		case "ScholarshipTreasury_VoteCastEvent": {
-			const voter =
-				typeof data.voter === "string" ? data.voter : null
-			if (voter) {
-				await cache.invalidate(CacheKey.votingPower(voter))
-			}
-			break
-		}
-		default:
-			break
-	}
-}
-
-/**
- * Poll and index new events from target contracts
+ * Poll and index new events from target contracts using UPSERT for idempotency
  * @param startLedger - Starting ledger (config or last indexed)
  * @param endLedger - Latest ledger to check
  */
-export async function indexEventsBatch(
+export async function indexEventsBatch (
 	startLedger: number,
 	endLedger: number,
 ): Promise<void> {
@@ -163,8 +115,6 @@ export async function indexEventsBatch(
 						 RETURNING id`,
 						[contractId, topic, data, ledger, txHash, eventIndex],
 					)
-					inserted++
-					await invalidateCacheForEvent(topic, data)
 
 					if ((result.rowCount ?? 0) > 0) {
 						inserted++
@@ -192,7 +142,7 @@ export async function indexEventsBatch(
 /**
  * Update indexer state with last processed ledger for a contract
  */
-export async function updateIndexerState(
+export async function updateIndexerState (
 	contract: string,
 	lastLedger: number,
 ): Promise<void> {
@@ -211,7 +161,7 @@ export async function updateIndexerState(
  * Get last indexed ledger per contract from indexer_state table
  * Falls back to events table max if no state exists
  */
-export async function getLastIndexedLedger(contract: string): Promise<number> {
+export async function getLastIndexedLedger (contract: string): Promise<number> {
 	// First check indexer_state table
 	const stateRes = await pool.query(
 		"SELECT last_processed_ledger FROM indexer_state WHERE contract = $1",
@@ -234,7 +184,7 @@ export async function getLastIndexedLedger(contract: string): Promise<number> {
 /**
  * Get all indexer state entries
  */
-export async function getAllIndexerState(): Promise<
+export async function getAllIndexerState (): Promise<
 	Array<{
 		contract: string
 		last_processed_ledger: number

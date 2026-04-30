@@ -3,12 +3,15 @@ import fs from "node:fs"
 import path from "node:path"
 import dotenv from "dotenv"
 import { Pool, type PoolClient } from "pg"
+import { createLogger } from "../src/lib/logger"
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") })
 
+const logger = createLogger("verify-migrations")
+
 const DATABASE_URL = process.env.DATABASE_URL
 if (!DATABASE_URL) {
-	console.error("ERROR: DATABASE_URL is not set in server/.env")
+	logger.error("DATABASE_URL is not set in server/.env")
 	process.exit(1)
 }
 
@@ -228,6 +231,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-	console.error(err)
+	logger.error("verify-migrations failed", { error: err })
 	process.exit(1)
 })

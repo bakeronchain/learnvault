@@ -39,11 +39,11 @@ import { stellarContractService } from "../services/stellar-contract.service"
 const JWT_SECRET = "learnvault-secret"
 process.env.JWT_SECRET = JWT_SECRET
 
-function makeAdminToken(address = "GADMIN123") {
+function makeAdminToken (address = "GADMIN123") {
 	return jwt.sign({ address }, JWT_SECRET, { expiresIn: "1h" })
 }
 
-function buildApp() {
+function buildApp () {
 	const app = express()
 	app.use(express.json())
 	app.use("/api", adminMilestonesRouter)

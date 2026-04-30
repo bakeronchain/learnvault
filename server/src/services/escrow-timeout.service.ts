@@ -222,7 +222,7 @@ export async function processEscrowTimeouts(): Promise<void> {
 			 ORDER BY last_activity_at ASC`,
 		)
 	} catch (err) {
-		console.error("[escrow-timeout] query failed:", err)
+		logger.error("query failed", { error: err })
 		return
 	}
 
@@ -251,9 +251,9 @@ export async function processEscrowTimeouts(): Promise<void> {
 				)
 			}
 		} catch (err) {
-			console.error("[escrow-timeout] processing failed:", {
+			logger.error("processing failed", {
 				proposalId: row.proposal_id,
-				err,
+				error: err,
 			})
 		}
 	}

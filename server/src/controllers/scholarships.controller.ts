@@ -8,6 +8,7 @@ import { trackEscrowTimeout } from "../services/escrow-timeout.service"
 const log = logger.child({ module: "scholarships" })
 import { stellarContractService } from "../services/stellar-contract.service"
 
+
 const applySchema = z.object({
 	applicant_address: z.string().min(50).max(56),
 	full_name: z.string().min(2),
@@ -17,7 +18,7 @@ const applySchema = z.object({
 	amount: z.number().positive().optional(),
 })
 
-export async function applyForScholarship(
+export async function applyForScholarship (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -111,7 +112,10 @@ export async function applyForScholarship(
 					courseId: course_id,
 				})
 			} catch (trackingErr) {
-				console.error("[scholarships] escrow tracking failed:", trackingErr)
+				logger.error("escrow tracking failed", {
+					error: trackingErr,
+					proposalId: proposal_id,
+				})
 			}
 		}
 

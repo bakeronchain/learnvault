@@ -1,6 +1,12 @@
-import { Button } from "@stellar/design-system"
 import React, { useState } from "react"
-import { useQueryClient } from "@tanstack/react-query"
+import {
+	deleteReply,
+	deleteThread,
+	replyToThread,
+	useForumThreadDetail,
+} from "../../hooks/useForum"
+
+import { Button } from "@stellar/design-system"
 import ReactMarkdown from "react-markdown"
 import {
 	deleteReply,
@@ -9,6 +15,7 @@ import {
 	useForumThreadDetail,
 } from "../../hooks/useForum"
 import { WalletAddressPill } from "../WalletAddressPill"
+import { useQueryClient } from "@tanstack/react-query"
 
 interface ThreadDetailProps {
 	courseId: string
@@ -25,10 +32,11 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 	currentAddress,
 	isAdmin,
 }) => {
-	const { data: thread, isLoading, error } = useForumThreadDetail(
-		courseId,
-		threadId,
-	)
+	const {
+		data: thread,
+		isLoading,
+		error,
+	} = useForumThreadDetail(courseId, threadId)
 	const queryClient = useQueryClient()
 	const [replyContent, setReplyContent] = useState("")
 	const [isSubmitting, setIsSubmitting] = useState(false)
@@ -80,7 +88,9 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 	}
 
 	if (isLoading) {
-		return <div className="text-white/60 animate-pulse">Loading discussion...</div>
+		return (
+			<div className="text-white/60 animate-pulse">Loading discussion...</div>
+		)
 	}
 
 	if (error || !thread) {
@@ -152,9 +162,7 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 									<div className="flex items-center gap-3 text-xs text-white/50">
 										<WalletAddressPill address={reply.author_address} />
 										<span>•</span>
-										<span>
-											{new Date(reply.created_at).toLocaleString()}
-										</span>
+										<span>{new Date(reply.created_at).toLocaleString()}</span>
 									</div>
 
 									{(isAdmin || currentAddress === reply.author_address) && (
@@ -169,7 +177,6 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 										</button>
 									)}
 								</div>
-
 								<div className="prose prose-sm prose-invert max-w-none text-white/70">
 									<ReactMarkdown>{reply.content}</ReactMarkdown>
 								</div>
@@ -182,7 +189,6 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 			{currentAddress ? (
 				<div className="glass-card p-6 rounded-2xl border border-brand-cyan/20">
 					<h4 className="font-bold mb-4">Add a Reply</h4>
-
 					<form onSubmit={handleReply} className="space-y-4">
 						<textarea
 							placeholder="Type your response here (Markdown supported)..."
@@ -191,7 +197,6 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 							rows={4}
 							className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:outline-hidden focus:border-brand-cyan transition-colors font-mono text-sm"
 						/>
-
 						<div className="flex justify-end">
 							<Button
 								variant="primary"
@@ -206,9 +211,7 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 				</div>
 			) : (
 				<div className="bg-white/5 p-6 rounded-2xl text-center">
-					<p className="text-white/60 mb-3">
-						You must be connected to reply.
-					</p>
+					<p className="text-white/60 mb-3">You must be connected to reply.</p>
 				</div>
 			)}
 		</div>

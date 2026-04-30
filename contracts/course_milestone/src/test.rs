@@ -165,6 +165,23 @@ fn set_ledger_sequence(env: &Env, sequence_number: u32) {
     });
 }
 
+// =======================
+// ✅ ENROLL TESTS
+// =======================
+
+fn set_ledger_sequence(env: &Env, sequence_number: u32) {
+    env.ledger().set(LedgerInfo {
+        timestamp: 1_700_000_000,
+        protocol_version: 23,
+        sequence_number,
+        network_id: Default::default(),
+        base_reserve: 10,
+        min_temp_entry_ttl: 16,
+        min_persistent_entry_ttl: 16,
+        max_entry_ttl: 6312000,
+    });
+}
+
 #[test]
 fn add_course_and_get_course_work() {
     let (env, contract_id, admin, _token_id, client, _token_client) = setup();
@@ -1022,4 +1039,19 @@ fn benchmark_costs() {
     std::println!("add_course: instr={}, mem={}", add_instr, add_mem);
     std::println!("enroll: instr={}, mem={}", enroll_instr, enroll_mem);
     std::println!("complete_milestone: instr={}, mem={}", comp_instr, comp_mem);
+}
+
+#[test]
+fn unpause_restores_functionality() {
+    let (env, _contract_id, admin, client) = setup();
+    let learner = Address::generate(&env);
+    let course_id = sid(&env, "rust-101");
+
+    client.add_course(&admin, &course_id, &1);
+    client.pause(&admin);
+    client.unpause(&admin);
+
+    client.enroll(&learner, &course_id);
+
+    assert!(client.is_enrolled(&learner, &course_id));
 }

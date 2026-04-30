@@ -48,11 +48,19 @@ jobs:
       - name: Run migrations
         run: npm run migrate
         working-directory: server
-
+ 
       - name: Verify migrations (apply, idempotency, rollback)
         run: npm run migrate:verify
         working-directory: server
 
-      - name: Run tests
+      - name: Run tests with coverage
         run: npm run test:coverage
         working-directory: server
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./server/coverage/lcov.info
+          flags: backend
+          fail_ci_if_error: false 

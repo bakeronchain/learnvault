@@ -8,7 +8,6 @@ import {
 	type DonorImpact,
 	type Vote,
 	type RpcEvent,
-	type Scholar,
 } from "../types/contracts"
 import { useContractIds } from "./useContractIds"
 import { useWallet } from "./useWallet"
@@ -41,10 +40,10 @@ const makeEmptyData = (): DonorData => ({
 
 const toDate = (input?: string): string => {
 	if (!input) return new Date().toISOString().split("T")[0] ?? ""
-	const date = new Date(input)
-	return Number.isNaN(date.getTime())
+	const d = new Date(input)
+	return Number.isNaN(d.getTime())
 		? (new Date().toISOString().split("T")[0] ?? "")
-		: (date.toISOString().split("T")[0] ?? "")
+		: (d.toISOString().split("T")[0] ?? "")
 }
 
 const stringify = (value: unknown): string =>
@@ -60,7 +59,7 @@ const fetchDonorImpact = async (address: string): Promise<DonorImpact | null> =>
 	try {
 		const response = await fetch(`/api/donors/${address}/impact`)
 		if (!response.ok) return null
-		return (await response.json()) as DonorImpact
+		return await response.json()
 	} catch {
 		return null
 	}
@@ -70,8 +69,7 @@ const readContractEvents = async (
 	contractIds: string[],
 	walletAddress: string,
 ): Promise<RpcEvent[]> => {
-	if (contractIds.length === 0) return []
-
+	if (!contractIds.length) return []
 	const response = await fetch(rpcUrl, {
 		method: "POST",
 		headers: { "content-type": "application/json" },
@@ -85,13 +83,14 @@ const readContractEvents = async (
 			},
 		}),
 	})
-
 	if (!response.ok) return []
 	const payload = (await response.json()) as {
 		result?: { events?: RpcEvent[] }
 	}
 	const events = payload.result?.events ?? []
-	return events.filter((event) => stringify(event).includes(walletAddress.toLowerCase()))
+	return events.filter((evt) =>
+		stringify(evt).includes(walletAddress.toLowerCase()),
+	)
 }
 
 export const useDonor = (): DonorData => {
@@ -112,59 +111,57 @@ export const useDonor = (): DonorData => {
 				return
 			}
 
-			setData((previous) => ({ ...previous, isLoading: true, error: null }))
+			setData((prev) => ({ ...prev, isLoading: true, error: null }))
 			try {
 				const contractIds = [scholarshipTreasury, governanceToken].filter(
 					(id): id is string => Boolean(id),
 				)
-
 				const [events, impact] = await Promise.all([
 					readContractEvents(contractIds, address),
 					fetchDonorImpact(address),
 				])
-
 				const contributions: DonorContribution[] = events
-					.filter((event) =>
+					.filter((evt) =>
 						stringify({
-							topic: event.topics ?? event.topic,
-							value: event.value,
+							topic: evt.topics ?? evt.topic,
+							value: evt.value,
 						}).includes("deposit"),
 					)
-					.map((event, index) => ({
-						txHash: event.txHash ?? event.id ?? `deposit-${index}`,
-						amount: extractNumber(event.value),
-						date: toDate(event.ledgerCloseTime),
-						block: event.ledger ?? 0,
+					.map((evt, i) => ({
+						txHash: evt.txHash ?? evt.id ?? `deposit-${i}`,
+						amount: extractNumber(evt.value),
+						date: toDate(evt.ledgerCloseTime),
+						block: evt.ledger ?? 0,
 					}))
 					.filter((entry) => entry.amount > 0)
 
 				const votes: Vote[] = events
-					.filter((event) =>
+					.filter((evt) =>
 						stringify({
-							topic: event.topics ?? event.topic,
-							value: event.value,
+							topic: evt.topics ?? evt.topic,
+							value: evt.value,
 						}).includes("vote"),
 					)
-					.map((event, index): Vote => {
-						const text = stringify(event.value)
+					.map((evt, i): Vote => {
+						const text = stringify(evt.value)
 						return {
-							proposalId: String(index + 1),
-							proposalTitle: `Proposal #${index + 1}`,
+							proposalId: String(i + 1),
+							proposalTitle: `Proposal #${i + 1}`,
 							voteChoice: text.includes("false") ? "against" : "for",
-							votePower: extractNumber(event.value),
-							status: "active",
+							votePower: extractNumber(evt.value),
+							status: "active" as const,
 						}
 					})
 					.filter((entry) => entry.votePower > 0)
 
 				const totalContributed = contributions.reduce(
-					(sum, contribution) => sum + contribution.amount,
+					(sum, c) => sum + c.amount,
 					0,
 				)
 				const scholarsFunded = new Set(
 					events
-						.filter((event) => stringify(event).includes("disburse"))
-						.map((event) => event.txHash ?? event.id ?? ""),
+						.filter((evt) => stringify(evt).includes("disburse"))
+						.map((evt) => evt.txHash ?? evt.id ?? ""),
 				).size
 
 				const next: DonorData = {
@@ -181,7 +178,6 @@ export const useDonor = (): DonorData => {
 					error: null,
 					isEmpty: contributions.length === 0 && votes.length === 0,
 				}
-
 				if (!cancelled) setData(next)
 			} catch {
 				if (!cancelled) {

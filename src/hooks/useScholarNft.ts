@@ -2,7 +2,6 @@ import { Contract, rpc, xdr } from "@stellar/stellar-sdk"
 import { useQuery } from "@tanstack/react-query"
 import { CONTRACT_IDS } from "../constants/contracts"
 import { networkPassphrase, rpcUrl } from "../contracts/util"
-import i18n from "../i18n"
 import { getIpfsUrl, normaliseCid, isCid } from "../lib/ipfs"
 
 // ---------------------------------------------------------------------------
@@ -233,7 +232,7 @@ function findAttribute(
 function formatTimestamp(ts: number | undefined): string {
 	if (!ts) return "Unknown"
 	try {
-		return new Date(ts * 1000).toLocaleDateString(i18n.resolvedLanguage, {
+		return new Date(ts * 1000).toLocaleDateString("en-US", {
 			year: "numeric",
 			month: "long",
 			day: "numeric",

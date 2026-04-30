@@ -1,12 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { Helmet } from "react-helmet"
 import { useSearchParams } from "react-router-dom"
-import CommentSection from "../components/CommentSection"
 import ConfirmDialog from "../components/ConfirmDialog"
+import CommentSection from "../components/CommentSection"
 import Pagination from "../components/Pagination"
 import { NoProposalsEmptyState } from "../components/SkeletonLoader"
 import { ErrorState } from "../components/states/errorState"
-import { useToast } from "../components/Toast/ToastProvider"
 import {
 	type ProposalRecord,
 	useProposal,
@@ -17,6 +16,7 @@ import {
 	getDraftTimestamp,
 	clearProposalDraft,
 } from "../util/proposalDraft"
+import { useToast } from "../components/Toast/ToastProvider"
 
 type FilterType =
 	| "Voting Open"

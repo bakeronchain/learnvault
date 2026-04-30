@@ -23,11 +23,11 @@ const testJwtService = {
 	revokeToken: jest.fn().mockResolvedValue(undefined),
 }
 
-function makeToken(address = "GUSER123") {
+function makeToken (address = "GUSER123") {
 	return jwt.sign({ address, jti: "test-jti" }, JWT_SECRET, { expiresIn: "1h" })
 }
 
-function buildApp() {
+function buildApp () {
 	const app = express()
 	app.use(express.json())
 	app.use("/api", createCommentsRouter(testJwtService))

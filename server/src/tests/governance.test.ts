@@ -9,6 +9,7 @@ process.env.FRONTEND_URL = "http://localhost:3000"
 import express from "express"
 import jwt from "jsonwebtoken"
 import request from "supertest"
+import { governanceRouter } from "../routes/governance.routes"
 
 // Mock the dependencies before importing the router/controller
 jest.mock("../db/index", () => ({
@@ -65,7 +66,6 @@ jest.mock("../lib/request-context", () => ({
 	runWithRequestContext: jest.fn((context, fn) => fn()),
 }))
 
-import { governanceRouter } from "../routes/governance.routes"
 
 const app = express()
 app.use(express.json())
@@ -78,7 +78,7 @@ app.use("/api", governanceRouter)
 
 const JWT_SECRET = "learnvault-secret"
 
-function makeToken(address: string) {
+function makeToken (address: string) {
 	return jwt.sign({ address }, JWT_SECRET, { expiresIn: "1h" })
 }
 
@@ -157,9 +157,9 @@ describe("POST /api/governance/proposals", () => {
 	it("should handle contract call failure gracefully", async () => {
 		const { stellarContractService } =
 			await import("../services/stellar-contract.service")
-		;(
-			stellarContractService.submitScholarshipProposal as jest.Mock
-		).mockRejectedValueOnce(new Error("Contract call failed"))
+			; (
+				stellarContractService.submitScholarshipProposal as jest.Mock
+			).mockRejectedValueOnce(new Error("Contract call failed"))
 
 		const response = await request(app).post("/api/governance/proposals").send({
 			author_address:
@@ -197,9 +197,9 @@ describe("GET /api/governance/voting-power/:address", () => {
 	it("returns can_vote false for zero balance", async () => {
 		const { stellarContractService } =
 			await import("../services/stellar-contract.service")
-		;(
-			stellarContractService.getGovernanceTokenBalance as jest.Mock
-		).mockResolvedValueOnce("0")
+			; (
+				stellarContractService.getGovernanceTokenBalance as jest.Mock
+			).mockResolvedValueOnce("0")
 
 		const response = await request(app).get(
 			"/api/governance/voting-power/GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBFUKJQ2K5RQDDXYZ",

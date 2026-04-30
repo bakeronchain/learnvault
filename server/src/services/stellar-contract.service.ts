@@ -7,7 +7,6 @@
 import { pool } from "../db/index"
 import { logger } from "../lib/logger"
 import { getRequestId } from "../lib/request-context"
-import { getRpcCache, CacheKey, TTL } from "../lib/rpc-cache"
 
 const log = logger.child({ module: "stellar" })
 
@@ -55,11 +54,11 @@ interface RequestTraceOptions {
 	requestId?: string
 }
 
-function resolveRequestId(options?: RequestTraceOptions): string | undefined {
+function resolveRequestId (options?: RequestTraceOptions): string | undefined {
 	return options?.requestId ?? getRequestId()
 }
 
-function buildRequestMemoValue(requestId?: string): string | null {
+function buildRequestMemoValue (requestId?: string): string | null {
 	if (!requestId) return null
 	const compact = requestId.replace(/-/g, "").slice(0, 24)
 	if (!compact) return null
@@ -77,7 +76,7 @@ const ADMIN_CACHE_TTL = 5 * 60 * 1000 // 5 minutes in milliseconds
  * Determines whether an error is transient and safe to retry.
  * Non-retryable errors: contract reverts, auth failures, missing config.
  */
-function isRetryableError(err: unknown): boolean {
+function isRetryableError (err: unknown): boolean {
 	const msg = (err instanceof Error ? err.message : String(err)).toLowerCase()
 	// Non-retryable: config missing, auth / access-control, contract logic errors
 	const nonRetryablePatterns = [
@@ -120,7 +119,7 @@ function isRetryableError(err: unknown): boolean {
  * @param maxAttempts  Maximum total attempts (default 3)
  * @param label  Human-readable label used in log messages
  */
-async function withRetry<T>(
+async function withRetry<T> (
 	operation: () => Promise<T>,
 	maxAttempts = 3,
 	label = "Stellar contract call",
@@ -153,168 +152,7 @@ async function withRetry<T>(
 	throw wrapped
 }
 
-// ---------------------------------------------------------------------------
-// Circuit Breaker
-// ---------------------------------------------------------------------------
-
-/**
- * Circuit breaker states:
- *   CLOSED    – calls pass through normally (healthy)
- *   OPEN      – calls are rejected immediately (endpoint assumed failed)
- *   HALF_OPEN – a single probe call is allowed to test recovery
- */
-export type CircuitState = "CLOSED" | "OPEN" | "HALF_OPEN"
-
-interface CircuitBreakerOptions {
-	/** Number of consecutive failures before the circuit opens. Default: 5 */
-	failureThreshold?: number
-	/** Milliseconds to wait before moving from OPEN → HALF_OPEN. Default: 30 000 */
-	resetTimeoutMs?: number
-	/** Label used in log messages. Default: "stellar-rpc" */
-	label?: string
-}
-
-export class CircuitBreaker {
-	private state: CircuitState = "CLOSED"
-	private consecutiveFailures = 0
-	private openedAt: number | null = null
-
-	private readonly failureThreshold: number
-	private readonly resetTimeoutMs: number
-	private readonly label: string
-
-	constructor(options: CircuitBreakerOptions = {}) {
-		this.failureThreshold = options.failureThreshold ?? 5
-		this.resetTimeoutMs = options.resetTimeoutMs ?? 30_000
-		this.label = options.label ?? "stellar-rpc"
-	}
-
-	/** Returns a snapshot of the current circuit state for health checks. */
-	getStatus(): {
-		state: CircuitState
-		consecutiveFailures: number
-		openedAt: string | null
-	} {
-		return {
-			state: this.state,
-			consecutiveFailures: this.consecutiveFailures,
-			openedAt: this.openedAt ? new Date(this.openedAt).toISOString() : null,
-		}
-	}
-
-	/**
-	 * Wrap an async operation with circuit-breaker protection.
-	 * Throws `CircuitOpenError` when the circuit is OPEN and the probe window
-	 * has not yet elapsed.
-	 */
-	async call<T>(operation: () => Promise<T>): Promise<T> {
-		this.maybeTransitionToHalfOpen()
-
-		if (this.state === "OPEN") {
-			throw new CircuitOpenError(
-				`[circuit:${this.label}] Circuit is OPEN – Stellar RPC calls are suspended`,
-			)
-		}
-
-		try {
-			const result = await operation()
-			this.onSuccess()
-			return result
-		} catch (err) {
-			this.onFailure(err)
-			throw err
-		}
-	}
-
-	// -------------------------------------------------------------------------
-	// Private helpers
-	// -------------------------------------------------------------------------
-
-	private maybeTransitionToHalfOpen(): void {
-		if (
-			this.state === "OPEN" &&
-			this.openedAt !== null &&
-			Date.now() - this.openedAt >= this.resetTimeoutMs
-		) {
-			this.transition("HALF_OPEN")
-		}
-	}
-
-	private onSuccess(): void {
-		if (this.state === "HALF_OPEN") {
-			this.transition("CLOSED")
-		}
-		this.consecutiveFailures = 0
-	}
-
-	private onFailure(err: unknown): void {
-		this.consecutiveFailures++
-
-		if (this.state === "HALF_OPEN") {
-			// Probe failed – reopen immediately
-			this.transition("OPEN")
-			return
-		}
-
-		if (
-			this.state === "CLOSED" &&
-			this.consecutiveFailures >= this.failureThreshold
-		) {
-			this.transition("OPEN")
-		} else {
-			const msg = err instanceof Error ? err.message : String(err)
-			console.warn(
-				`[circuit:${this.label}] Failure recorded (${this.consecutiveFailures}/${this.failureThreshold}): ${msg}`,
-			)
-		}
-	}
-
-	private transition(next: CircuitState): void {
-		const prev = this.state
-		this.state = next
-
-		if (next === "OPEN") {
-			this.openedAt = Date.now()
-		} else if (next === "CLOSED") {
-			this.openedAt = null
-			this.consecutiveFailures = 0
-		}
-
-		console.warn(
-			`[circuit:${this.label}] State transition: ${prev} → ${next}` +
-				(next === "OPEN"
-					? ` (will probe after ${this.resetTimeoutMs}ms)`
-					: ""),
-		)
-	}
-}
-
-/** Error thrown when a call is rejected because the circuit is open. */
-export class CircuitOpenError extends Error {
-	readonly isCircuitOpen = true
-
-	constructor(message: string) {
-		super(message)
-		this.name = "CircuitOpenError"
-	}
-}
-
-/**
- * Shared circuit breaker instance for all Stellar RPC calls.
- *
- * Configuration via environment variables:
- *   STELLAR_CB_FAILURE_THRESHOLD  – consecutive failures before opening (default 5)
- *   STELLAR_CB_RESET_TIMEOUT_MS   – ms before probing recovery (default 30 000)
- */
-export const stellarRpcCircuitBreaker = new CircuitBreaker({
-	failureThreshold: Number(process.env.STELLAR_CB_FAILURE_THRESHOLD ?? 5),
-	resetTimeoutMs: Number(process.env.STELLAR_CB_RESET_TIMEOUT_MS ?? 30_000),
-	label: "stellar-rpc",
-})
-
-// ---------------------------------------------------------------------------
-
-async function ensureAdminRole(): Promise<void> {
+async function ensureAdminRole (): Promise<void> {
 	if (!STELLAR_SECRET_KEY) {
 		throw new Error(
 			"STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction",
@@ -386,11 +224,11 @@ async function ensureAdminRole(): Promise<void> {
 	}
 }
 
-async function callVerifyMilestone(
+async function callVerifyMilestone (
 	scholarAddress: string,
 	courseId: string,
 	milestoneId: number,
-	options: RequestTraceOptions = {},
+	_options: RequestTraceOptions = {},
 ): Promise<ContractCallResult> {
 	if (!STELLAR_SECRET_KEY) {
 		throw new Error(
@@ -403,43 +241,26 @@ async function callVerifyMilestone(
 		)
 	}
 
-	return stellarRpcCircuitBreaker.call(() => withRetry(async () => {
-		try {
-			// Enforce access control before doing anything
-			await ensureAdminRole()
-			// Dynamic import so the SDK is only loaded when actually needed
-			const {
-				Keypair,
-				Contract,
-				TransactionBuilder,
-				Networks,
-				BASE_FEE,
-				rpc,
-				xdr,
-			} = await import("@stellar/stellar-sdk")
+	return withRetry(
+		async () => {
+			try {
+				// Enforce access control before doing anything
+				await ensureAdminRole()
+				// Dynamic import so the SDK is only loaded when actually needed
+				const {
+					Keypair,
+					Contract,
+					TransactionBuilder,
+					Networks,
+					BASE_FEE,
+					rpc,
+					xdr,
+				} = await import("@stellar/stellar-sdk")
 
-			const server = new rpc.Server(
-				STELLAR_NETWORK === "mainnet"
-					? "https://soroban-rpc.stellar.org"
-					: "https://soroban-testnet.stellar.org",
-			)
-
-			const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
-			const account = await server.getAccount(keypair.publicKey())
-			const contract = new Contract(COURSE_MILESTONE_CONTRACT_ID)
-
-			const tx = new TransactionBuilder(account, {
-				fee: BASE_FEE,
-				networkPassphrase:
-					STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-			})
-				.addOperation(
-					contract.call(
-						"verify_milestone",
-						xdr.ScVal.scvString(scholarAddress),
-						xdr.ScVal.scvString(courseId),
-						xdr.ScVal.scvU32(milestoneId),
-					),
+				const server = new rpc.Server(
+					STELLAR_NETWORK === "mainnet"
+						? "https://soroban-rpc.stellar.org"
+						: "https://soroban-testnet.stellar.org",
 				)
 
 				const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
@@ -476,24 +297,21 @@ async function callVerifyMilestone(
 				log.error({ err }, "Contract call failed")
 				throw new Error(
 					"Contract call failed: " +
-						(err instanceof Error ? err.message : String(err)),
+					(err instanceof Error ? err.message : String(err)),
 				)
 			}
-			log.error({ err }, "Contract call failed")
-			throw new Error(
-				"Contract call failed: " +
-					(err instanceof Error ? err.message : String(err)),
-			)
-		}
-	}, 3, "callVerifyMilestone"))
+		},
+		3,
+		"callVerifyMilestone",
+	)
 }
 
-async function emitRejectionEvent(
+async function emitRejectionEvent (
 	scholarAddress: string,
 	courseId: string,
 	milestoneId: number,
 	reason: string,
-	options: RequestTraceOptions = {},
+	_options: RequestTraceOptions = {},
 ): Promise<ContractCallResult> {
 	if (!STELLAR_SECRET_KEY) {
 		throw new Error(
@@ -506,43 +324,25 @@ async function emitRejectionEvent(
 		)
 	}
 
-	return stellarRpcCircuitBreaker.call(() => withRetry(async () => {
-		try {
-			// Enforce access control before doing anything
-			await ensureAdminRole()
-			const {
-				Keypair,
-				Contract,
-				TransactionBuilder,
-				Networks,
-				BASE_FEE,
-				rpc,
-				xdr,
-			} = await import("@stellar/stellar-sdk")
+	return withRetry(
+		async () => {
+			try {
+				// Enforce access control before doing anything
+				await ensureAdminRole()
+				const {
+					Keypair,
+					Contract,
+					TransactionBuilder,
+					Networks,
+					BASE_FEE,
+					rpc,
+					xdr,
+				} = await import("@stellar/stellar-sdk")
 
-			const server = new rpc.Server(
-				STELLAR_NETWORK === "mainnet"
-					? "https://soroban-rpc.stellar.org"
-					: "https://soroban-testnet.stellar.org",
-			)
-
-			const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
-			const account = await server.getAccount(keypair.publicKey())
-			const contract = new Contract(COURSE_MILESTONE_CONTRACT_ID)
-
-			const tx = new TransactionBuilder(account, {
-				fee: BASE_FEE,
-				networkPassphrase:
-					STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-			})
-				.addOperation(
-					contract.call(
-						"reject_milestone",
-						xdr.ScVal.scvString(scholarAddress),
-						xdr.ScVal.scvString(courseId),
-						xdr.ScVal.scvU32(milestoneId),
-						xdr.ScVal.scvString(reason),
-					),
+				const server = new rpc.Server(
+					STELLAR_NETWORK === "mainnet"
+						? "https://soroban-rpc.stellar.org"
+						: "https://soroban-testnet.stellar.org",
 				)
 
 				const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
@@ -580,19 +380,16 @@ async function emitRejectionEvent(
 				log.error({ err }, "Rejection event failed")
 				throw new Error(
 					"Rejection event failed: " +
-						(err instanceof Error ? err.message : String(err)),
+					(err instanceof Error ? err.message : String(err)),
 				)
 			}
-			log.error({ err }, "Rejection event failed")
-			throw new Error(
-				"Rejection event failed: " +
-					(err instanceof Error ? err.message : String(err)),
-			)
-		}
-	}, 3, "emitRejectionEvent"))
+		},
+		3,
+		"emitRejectionEvent",
+	)
 }
 
-async function callMintScholarNFT(
+async function callMintScholarNFT (
 	scholarAddress: string,
 	metadataUri: string,
 ): Promise<ContractCallResult & { tokenId?: number }> {
@@ -607,68 +404,69 @@ async function callMintScholarNFT(
 		)
 	}
 
-	return stellarRpcCircuitBreaker.call(() => withRetry(async () => {
-		try {
-			const {
-				Keypair,
-				Contract,
-				TransactionBuilder,
-				Networks,
-				BASE_FEE,
-				rpc,
-				xdr,
-			} = await import("@stellar/stellar-sdk")
+	return withRetry(
+		async () => {
+			try {
+				const {
+					Keypair,
+					Contract,
+					TransactionBuilder,
+					Networks,
+					BASE_FEE,
+					rpc,
+					xdr,
+				} = await import("@stellar/stellar-sdk")
 
-			const server = new rpc.Server(
-				STELLAR_NETWORK === "mainnet"
-					? "https://soroban-rpc.stellar.org"
-					: "https://soroban-testnet.stellar.org",
-			)
-
-			const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
-			const account = await server.getAccount(keypair.publicKey())
-			const contract = new Contract(SCHOLAR_NFT_CONTRACT_ID)
-
-			const tx = new TransactionBuilder(account, {
-				fee: BASE_FEE,
-				networkPassphrase:
-					STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-			})
-				.addOperation(
-					contract.call(
-						"mint",
-						xdr.ScVal.scvString(scholarAddress),
-						xdr.ScVal.scvString(metadataUri),
-					),
+				const server = new rpc.Server(
+					STELLAR_NETWORK === "mainnet"
+						? "https://soroban-rpc.stellar.org"
+						: "https://soroban-testnet.stellar.org",
 				)
 
-			const prepared = await server.prepareTransaction(tx)
-			prepared.sign(keypair)
+				const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
+				const account = await server.getAccount(keypair.publicKey())
+				const contract = new Contract(SCHOLAR_NFT_CONTRACT_ID)
 
-			const result = await server.sendTransaction(prepared)
-			return { txHash: result.hash, simulated: false, tokenId }
-		} catch (err) {
-			log.error({ err }, "ScholarNFT mint failed")
-			throw new Error(
-				`ScholarNFT mint failed: ${err instanceof Error ? err.message : String(err)}`,
-			)
-		}
-	}, 3, "callMintScholarNFT"))
+				const tx = new TransactionBuilder(account, {
+					fee: BASE_FEE,
+					networkPassphrase:
+						STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+				})
+					.addOperation(
+						contract.call(
+							"mint",
+							xdr.ScVal.scvString(scholarAddress),
+							xdr.ScVal.scvString(metadataUri),
+						),
+					)
+					.setTimeout(30)
+					.build()
+
+				const prepared = await server.prepareTransaction(tx)
+				prepared.sign(keypair)
+
+				const result = await server.sendTransaction(prepared)
+				return { txHash: result.hash, simulated: false }
+			} catch (err) {
+				log.error({ err }, "ScholarNFT mint failed")
+				throw new Error(
+					`ScholarNFT mint failed: ${err instanceof Error ? err.message : String(err)}`,
+				)
+			}
+		},
+		3,
+		"callMintScholarNFT",
+	)
 }
 
 /**
  * Check if a learner is enrolled in a course on-chain.
  */
-async function isEnrolled(
+async function isEnrolled (
 	learnerAddress: string,
 	courseId: number,
 	_options: RequestTraceOptions = {},
 ): Promise<boolean> {
-	const cache = getRpcCache()
-	const cacheKey = CacheKey.enrollment(learnerAddress, courseId)
-	const cached = await cache.get(cacheKey)
-	if (cached !== null) return cached === "1"
-
 	if (!COURSE_MILESTONE_CONTRACT_ID) {
 		log.warn(
 			"COURSE_MILESTONE_CONTRACT_ID not set — simulating enrollment check",
@@ -677,44 +475,45 @@ async function isEnrolled(
 	}
 
 	try {
-		return await stellarRpcCircuitBreaker.call(async () => {
-			const {
-				Contract,
-				rpc,
-				xdr,
-				Address,
-				Networks,
-				TransactionBuilder,
-				Keypair,
-			} = await import("@stellar/stellar-sdk")
+		const {
+			Contract,
+			rpc,
+			xdr,
+			Address,
+			Networks,
+			TransactionBuilder,
+			Keypair,
+		} = await import("@stellar/stellar-sdk")
 
-			const server = new rpc.Server(
-				STELLAR_NETWORK === "mainnet"
-					? "https://soroban-rpc.stellar.org"
-					: "https://soroban-testnet.stellar.org",
+		const server = new rpc.Server(
+			STELLAR_NETWORK === "mainnet"
+				? "https://soroban-rpc.stellar.org"
+				: "https://soroban-testnet.stellar.org",
+		)
+
+		// Get a dummy account for simulation
+		const dummyKeypair = Keypair.random()
+		const dummyAccount = await server.getAccount(dummyKeypair.publicKey())
+
+		const contract = new Contract(COURSE_MILESTONE_CONTRACT_ID)
+
+		// Create address from learner address
+		const learnerScVal = xdr.ScVal.scvAddress(
+			new Address(learnerAddress).toScVal() as any,
+		)
+
+		const tx = new TransactionBuilder(dummyAccount, {
+			fee: "100",
+			networkPassphrase:
+				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+		})
+			.addOperation(
+				contract.call("is_enrolled", learnerScVal, xdr.ScVal.scvU32(courseId)),
 			)
+			.setTimeout(30)
+			.build()
 
-			// Get a dummy account for simulation
-			const dummyKeypair = Keypair.random()
-			const dummyAccount = await server.getAccount(dummyKeypair.publicKey())
-
-			const contract = new Contract(COURSE_MILESTONE_CONTRACT_ID)
-
-			// Create address from learner address
-			const learnerScVal = xdr.ScVal.scvAddress(
-				new Address(learnerAddress).toScVal() as any,
-			)
-
-			const tx = new TransactionBuilder(dummyAccount, {
-				fee: "100",
-				networkPassphrase:
-					STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-			})
-				.addOperation(
-					contract.call("is_enrolled", learnerScVal, xdr.ScVal.scvU32(courseId)),
-				)
-				.setTimeout(30)
-				.build()
+		const simResult = await server.simulateTransaction(tx)
 
 		if (rpc.Api.isSimulationError(simResult)) {
 			log.error({ err: simResult.error }, "is_enrolled simulation failed")
@@ -723,31 +522,19 @@ async function isEnrolled(
 
 		if (simResult.result) {
 			const { scValToNative } = await import("@stellar/stellar-sdk")
-			const result = scValToNative(simResult.result.retval) as boolean
-			await cache.set(cacheKey, result ? "1" : "0", TTL.ENROLLMENT)
-			return result
+			return scValToNative(simResult.result.retval) as boolean
 		}
-			if (rpc.Api.isSimulationError(simResult)) {
-				console.error("[stellar] is_enrolled simulation failed:", simResult.error)
-				return false
-			}
 
-			if (simResult.result) {
-				const { scValToNative } = await import("@stellar/stellar-sdk")
-				return scValToNative(simResult.result.retval) as boolean
-			}
-
-			return false
-		})
+		return false
 	} catch (err) {
 		log.error({ err }, "is_enrolled check failed")
 		return false
 	}
 }
 
-async function submitScholarshipProposal(
+async function submitScholarshipProposal (
 	params: ScholarshipProposalParams,
-	options: RequestTraceOptions = {},
+	_options: RequestTraceOptions = {},
 ): Promise<ContractCallResult & { proposalId: string | null }> {
 	if (!STELLAR_SECRET_KEY) {
 		throw new Error(
@@ -760,59 +547,70 @@ async function submitScholarshipProposal(
 		)
 	}
 
-	return stellarRpcCircuitBreaker.call(() => withRetry(async () => {
-		try {
-			const {
-				Keypair,
-				Contract,
-				TransactionBuilder,
-				Networks,
-				BASE_FEE,
-				rpc,
-				nativeToScVal,
-			} = await import("@stellar/stellar-sdk")
+	return withRetry(
+		async () => {
+			try {
+				const {
+					Keypair,
+					Contract,
+					TransactionBuilder,
+					Networks,
+					BASE_FEE,
+					rpc,
+					nativeToScVal,
+				} = await import("@stellar/stellar-sdk")
 
-			const server = new rpc.Server(
-				STELLAR_NETWORK === "mainnet"
-					? "https://soroban-rpc.stellar.org"
-					: "https://soroban-testnet.stellar.org",
-			)
-
-			const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
-			const account = await server.getAccount(keypair.publicKey())
-			const contract = new Contract(SCHOLARSHIP_TREASURY_CONTRACT_ID)
-
-			const tx = new TransactionBuilder(account, {
-				fee: BASE_FEE,
-				networkPassphrase:
-					STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-			})
-				.addOperation(
-					contract.call(
-						"submit_proposal",
-						nativeToScVal(params.applicant, { type: "address" }),
-						nativeToScVal(params.amount, { type: "i128" }),
-						nativeToScVal(params.programName),
-						nativeToScVal(params.programUrl),
-						nativeToScVal(params.programDescription),
-						nativeToScVal(params.startDate),
-						nativeToScVal(params.milestoneTitles),
-						nativeToScVal(params.milestoneDates),
-					),
+				const server = new rpc.Server(
+					STELLAR_NETWORK === "mainnet"
+						? "https://soroban-rpc.stellar.org"
+						: "https://soroban-testnet.stellar.org",
 				)
 
-			return { txHash: result.hash, proposalId: null, simulated: false }
-		} catch (err) {
-			log.error({ err }, "Scholarship proposal submission failed")
-			throw new Error(
-				"Scholarship proposal submission failed: " +
+				const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
+				const account = await server.getAccount(keypair.publicKey())
+				const contract = new Contract(SCHOLARSHIP_TREASURY_CONTRACT_ID)
+
+				const tx = new TransactionBuilder(account, {
+					fee: BASE_FEE,
+					networkPassphrase:
+						STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+				})
+					.addOperation(
+						contract.call(
+							"submit_proposal",
+							nativeToScVal(params.applicant, { type: "address" }),
+							nativeToScVal(params.amount, { type: "i128" }),
+							nativeToScVal(params.programName),
+							nativeToScVal(params.programUrl),
+							nativeToScVal(params.programDescription),
+							nativeToScVal(params.startDate),
+							nativeToScVal(params.milestoneTitles),
+							nativeToScVal(params.milestoneDates),
+						),
+					)
+					.setTimeout(30)
+					.build()
+
+				const prepared = await server.prepareTransaction(tx)
+				prepared.sign(keypair)
+
+				const result = await server.sendTransaction(prepared)
+
+				return { txHash: result.hash, proposalId: null, simulated: false }
+			} catch (err) {
+				log.error({ err }, "Scholarship proposal submission failed")
+				throw new Error(
+					"Scholarship proposal submission failed: " +
 					(err instanceof Error ? err.message : String(err)),
-			)
-		}
-	}, 3, "submitScholarshipProposal"))
+				)
+			}
+		},
+		3,
+		"submitScholarshipProposal",
+	)
 }
 
-async function castVote(
+async function castVote (
 	params: CastVoteParams,
 	options: RequestTraceOptions = {},
 ): Promise<ContractCallResult> {
@@ -827,53 +625,54 @@ async function castVote(
 		)
 	}
 
-	return stellarRpcCircuitBreaker.call(async () => {
-		try {
-			const {
-				Keypair,
-				Contract,
-				TransactionBuilder,
-				Memo,
-				Networks,
-				BASE_FEE,
-				rpc,
-				nativeToScVal,
-			} = await import("@stellar/stellar-sdk")
+	try {
+		const {
+			Keypair,
+			Contract,
+			TransactionBuilder,
+			Memo,
+			Networks,
+			BASE_FEE,
+			rpc,
+			nativeToScVal,
+		} = await import("@stellar/stellar-sdk")
 
-			const server = new rpc.Server(
-				STELLAR_NETWORK === "mainnet"
-					? "https://soroban-rpc.stellar.org"
-					: "https://soroban-testnet.stellar.org",
+		const server = new rpc.Server(
+			STELLAR_NETWORK === "mainnet"
+				? "https://soroban-rpc.stellar.org"
+				: "https://soroban-testnet.stellar.org",
+		)
+
+		const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
+		const account = await server.getAccount(keypair.publicKey())
+		const contract = new Contract(SCHOLARSHIP_TREASURY_CONTRACT_ID)
+
+		const txBuilder = new TransactionBuilder(account, {
+			fee: BASE_FEE,
+			networkPassphrase:
+				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+		})
+		const requestMemoValue = buildRequestMemoValue(resolveRequestId(options))
+		if (requestMemoValue) {
+			txBuilder.addMemo(Memo.text(requestMemoValue))
+		}
+
+		const tx = txBuilder
+			.addOperation(
+				contract.call(
+					"vote",
+					nativeToScVal(params.voter, { type: "address" }),
+					nativeToScVal(params.proposalId, { type: "u32" }),
+					nativeToScVal(params.support, { type: "bool" }),
+				),
 			)
+			.setTimeout(30)
+			.build()
 
-			const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
-			const account = await server.getAccount(keypair.publicKey())
-			const contract = new Contract(SCHOLARSHIP_TREASURY_CONTRACT_ID)
+		const prepared = await server.prepareTransaction(tx)
+		prepared.sign(keypair)
 
-			const txBuilder = new TransactionBuilder(account, {
-				fee: BASE_FEE,
-				networkPassphrase:
-					STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-			})
-			const requestMemoValue = buildRequestMemoValue(resolveRequestId(options))
-			if (requestMemoValue) {
-				txBuilder.addMemo(Memo.text(requestMemoValue))
-			}
-
-			const tx = txBuilder
-				.addOperation(
-					contract.call(
-						"vote",
-						nativeToScVal(params.voter, { type: "address" }),
-						nativeToScVal(params.proposalId, { type: "u32" }),
-						nativeToScVal(params.support, { type: "bool" }),
-					),
-				)
-				.setTimeout(30)
-				.build()
-
-			const prepared = await server.prepareTransaction(tx)
-			prepared.sign(keypair)
+		const result = await server.sendTransaction(prepared)
 
 		return { txHash: result.hash, simulated: false }
 	} catch (err) {
@@ -884,7 +683,7 @@ async function castVote(
 	}
 }
 
-async function cancelProposal(
+async function cancelProposal (
 	params: CancelProposalParams,
 	options: RequestTraceOptions = {},
 ): Promise<ContractCallResult> {
@@ -899,65 +698,64 @@ async function cancelProposal(
 		)
 	}
 
-	return stellarRpcCircuitBreaker.call(async () => {
-		try {
-			const {
-				Keypair,
-				Contract,
-				TransactionBuilder,
-				Memo,
-				Networks,
-				BASE_FEE,
-				rpc,
-				nativeToScVal,
-			} = await import("@stellar/stellar-sdk")
+	try {
+		const {
+			Keypair,
+			Contract,
+			TransactionBuilder,
+			Memo,
+			Networks,
+			BASE_FEE,
+			rpc,
+			nativeToScVal,
+		} = await import("@stellar/stellar-sdk")
 
-			const server = new rpc.Server(
-				STELLAR_NETWORK === "mainnet"
-					? "https://soroban-rpc.stellar.org"
-					: "https://soroban-testnet.stellar.org",
+		const server = new rpc.Server(
+			STELLAR_NETWORK === "mainnet"
+				? "https://soroban-rpc.stellar.org"
+				: "https://soroban-testnet.stellar.org",
+		)
+
+		const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
+		const account = await server.getAccount(keypair.publicKey())
+		const contract = new Contract(SCHOLARSHIP_TREASURY_CONTRACT_ID)
+
+		const txBuilder = new TransactionBuilder(account, {
+			fee: BASE_FEE,
+			networkPassphrase:
+				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+		})
+		const requestMemoValue = buildRequestMemoValue(resolveRequestId(options))
+		if (requestMemoValue) {
+			txBuilder.addMemo(Memo.text(requestMemoValue))
+		}
+
+		const tx = txBuilder
+			.addOperation(
+				contract.call(
+					"cancel_proposal",
+					nativeToScVal(params.proposalId, { type: "u32" }),
+				),
 			)
+			.setTimeout(30)
+			.build()
 
-			const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
-			const account = await server.getAccount(keypair.publicKey())
-			const contract = new Contract(SCHOLARSHIP_TREASURY_CONTRACT_ID)
+		const prepared = await server.prepareTransaction(tx)
+		prepared.sign(keypair)
 
-			const txBuilder = new TransactionBuilder(account, {
-				fee: BASE_FEE,
-				networkPassphrase:
-					STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-			})
-			const requestMemoValue = buildRequestMemoValue(resolveRequestId(options))
-			if (requestMemoValue) {
-				txBuilder.addMemo(Memo.text(requestMemoValue))
-			}
-
-			const tx = txBuilder
-				.addOperation(
-					contract.call(
-						"cancel_proposal",
-						nativeToScVal(params.proposalId, { type: "u32" }),
-					),
-				)
-				.setTimeout(30)
-				.build()
-
-			const prepared = await server.prepareTransaction(tx)
-			prepared.sign(keypair)
-
-			const result = await server.sendTransaction(prepared)
+		const result = await server.sendTransaction(prepared)
 
 		return { txHash: result.hash, simulated: false }
 	} catch (err) {
 		log.error({ err }, "Cancel proposal failed")
 		throw new Error(
 			"Cancel proposal failed: " +
-				(err instanceof Error ? err.message : String(err)),
+			(err instanceof Error ? err.message : String(err)),
 		)
 	}
 }
 
-async function reclaimInactiveEscrow(
+async function reclaimInactiveEscrow (
 	proposalId: number,
 	options: RequestTraceOptions = {},
 ): Promise<ContractCallResult> {
@@ -972,48 +770,50 @@ async function reclaimInactiveEscrow(
 		)
 	}
 
-	return stellarRpcCircuitBreaker.call(async () => {
-		try {
-			const {
-				Keypair,
-				Contract,
-				TransactionBuilder,
-				Memo,
-				Networks,
-				BASE_FEE,
-				rpc,
-				nativeToScVal,
-			} = await import("@stellar/stellar-sdk")
+	try {
+		const {
+			Keypair,
+			Contract,
+			TransactionBuilder,
+			Memo,
+			Networks,
+			BASE_FEE,
+			rpc,
+			nativeToScVal,
+		} = await import("@stellar/stellar-sdk")
 
-			const server = new rpc.Server(
-				STELLAR_NETWORK === "mainnet"
-					? "https://soroban-rpc.stellar.org"
-					: "https://soroban-testnet.stellar.org",
+		const server = new rpc.Server(
+			STELLAR_NETWORK === "mainnet"
+				? "https://soroban-rpc.stellar.org"
+				: "https://soroban-testnet.stellar.org",
+		)
+
+		const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
+		const account = await server.getAccount(keypair.publicKey())
+		const contract = new Contract(MILESTONE_ESCROW_CONTRACT_ID)
+
+		const txBuilder = new TransactionBuilder(account, {
+			fee: BASE_FEE,
+			networkPassphrase:
+				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+		})
+		const requestMemoValue = buildRequestMemoValue(resolveRequestId(options))
+		if (requestMemoValue) {
+			txBuilder.addMemo(Memo.text(requestMemoValue))
+		}
+
+		const tx = txBuilder
+			.addOperation(
+				contract.call(
+					"reclaim_inactive",
+					nativeToScVal(proposalId, { type: "u32" }),
+				),
 			)
+			.setTimeout(30)
+			.build()
 
-			const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
-			const account = await server.getAccount(keypair.publicKey())
-			const contract = new Contract(MILESTONE_ESCROW_CONTRACT_ID)
-
-			const txBuilder = new TransactionBuilder(account, {
-				fee: BASE_FEE,
-				networkPassphrase:
-					STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-			})
-			const requestMemoValue = buildRequestMemoValue(resolveRequestId(options))
-			if (requestMemoValue) {
-				txBuilder.addMemo(Memo.text(requestMemoValue))
-			}
-
-			const tx = txBuilder
-				.addOperation(
-					contract.call(
-						"reclaim_inactive",
-						nativeToScVal(proposalId, { type: "u32" }),
-					),
-				)
-				.setTimeout(30)
-				.build()
+		const prepared = await server.prepareTransaction(tx)
+		prepared.sign(keypair)
 
 		const result = await server.sendTransaction(prepared)
 		return { txHash: result.hash, simulated: false }
@@ -1021,12 +821,12 @@ async function reclaimInactiveEscrow(
 		log.error({ err }, "reclaim_inactive failed")
 		throw new Error(
 			"reclaim_inactive failed: " +
-				(err instanceof Error ? err.message : String(err)),
+			(err instanceof Error ? err.message : String(err)),
 		)
 	}
 }
 
-async function castVote(params: CastVoteParams): Promise<ContractCallResult> {
+async function castVote (params: CastVoteParams): Promise<ContractCallResult> {
 	if (!STELLAR_SECRET_KEY) {
 		throw new Error(
 			"STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction",
@@ -1085,109 +885,103 @@ async function castVote(params: CastVoteParams): Promise<ContractCallResult> {
 	} catch (err) {
 		console.error("[stellar] Cast vote failed:", err)
 		throw new Error(
-			"Cast vote failed: " + (err instanceof Error ? err.message : String(err)),
+			"Cast vote failed: " +
+			(err instanceof Error ? err.message : String(err)),
 		)
 	}
 }
 
-async function getLearnTokenBalance(address: string): Promise<string> {
-	const cache = getRpcCache()
-	const cacheKey = CacheKey.learnBalance(address)
-	const cached = await cache.get(cacheKey)
-	if (cached !== null) return cached
-
+async function getLearnTokenBalance (address: string): Promise<string> {
 	if (!LEARN_TOKEN_CONTRACT_ID) {
 		log.warn("LEARN_TOKEN_CONTRACT_ID not set — simulating balance")
 		return "10000000000" // 1000 LRN
 	}
 	try {
-		return await stellarRpcCircuitBreaker.call(async () => {
-			const { Contract, Address, rpc, TransactionBuilder, Account, Networks } = await import("@stellar/stellar-sdk")
-			const server = new rpc.Server(
-				STELLAR_NETWORK === "mainnet"
-					? "https://soroban-rpc.stellar.org"
-					: "https://soroban-testnet.stellar.org",
+		const { Contract, Address } = await import("@stellar/stellar-sdk")
+		const server = new (await import("@stellar/stellar-sdk")).rpc.Server(
+			STELLAR_NETWORK === "mainnet"
+				? "https://soroban-rpc.stellar.org"
+				: "https://soroban-testnet.stellar.org",
+		)
+		const contract = new Contract(LEARN_TOKEN_CONTRACT_ID)
+		const tx = new (await import("@stellar/stellar-sdk")).TransactionBuilder(
+			new (await import("@stellar/stellar-sdk")).Account(
+				"GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBF3UKJQ2K5RQDD",
+				"0",
+			),
+			{
+				fee: "100",
+				networkPassphrase:
+					STELLAR_NETWORK === "mainnet"
+						? (await import("@stellar/stellar-sdk")).Networks.PUBLIC
+						: (await import("@stellar/stellar-sdk")).Networks.TESTNET,
+			},
+		)
+			.addOperation(contract.call("balance", new Address(address).toScVal()))
+			.setTimeout(30)
+			.build()
+
+		const simResult = await server.simulateTransaction(tx)
+		if (
+			(await import("@stellar/stellar-sdk")).rpc.Api.isSimulationError(
+				simResult,
 			)
 		)
 			return "0"
 		const { scValToNative } = await import("@stellar/stellar-sdk")
-		const result = scValToNative(simResult.result?.retval!).toString()
-		await cache.set(cacheKey, result, TTL.BALANCE)
-		return result
-			const contract = new Contract(LEARN_TOKEN_CONTRACT_ID)
-			const tx = new TransactionBuilder(
-				new Account("GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBF3UKJQ2K5RQDD", "0"),
-				{
-					fee: "100",
-					networkPassphrase: STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-				},
-			)
-				.addOperation(contract.call("balance", new Address(address).toScVal()))
-				.setTimeout(30)
-				.build()
-			const simResult = await server.simulateTransaction(tx)
-			if (rpc.Api.isSimulationError(simResult)) return "0"
-			const { scValToNative } = await import("@stellar/stellar-sdk")
-			return scValToNative(simResult.result?.retval!).toString()
-		})
+		return scValToNative(simResult.result?.retval!).toString()
 	} catch (err) {
 		log.error({ err }, "getLearnTokenBalance failed")
 		return "0"
 	}
 }
 
-async function getGovernanceTokenBalance(address: string): Promise<string> {
-	const cache = getRpcCache()
-	const cacheKey = CacheKey.govBalance(address)
-	const cached = await cache.get(cacheKey)
-	if (cached !== null) return cached
-
+async function getGovernanceTokenBalance (address: string): Promise<string> {
 	if (!GOVERNANCE_TOKEN_CONTRACT_ID) {
 		log.warn("GOVERNANCE_TOKEN_CONTRACT_ID not set — simulating balance")
 		return "1250000000"
 	}
 	try {
-		return await stellarRpcCircuitBreaker.call(async () => {
-			const { Contract, Address, rpc, TransactionBuilder, Account, Networks } = await import("@stellar/stellar-sdk")
-			const server = new rpc.Server(
-				STELLAR_NETWORK === "mainnet"
-					? "https://soroban-rpc.stellar.org"
-					: "https://soroban-testnet.stellar.org",
+		const { Contract, Address } = await import("@stellar/stellar-sdk")
+		const server = new (await import("@stellar/stellar-sdk")).rpc.Server(
+			STELLAR_NETWORK === "mainnet"
+				? "https://soroban-rpc.stellar.org"
+				: "https://soroban-testnet.stellar.org",
+		)
+		const contract = new Contract(GOVERNANCE_TOKEN_CONTRACT_ID)
+		const tx = new (await import("@stellar/stellar-sdk")).TransactionBuilder(
+			new (await import("@stellar/stellar-sdk")).Account(
+				"GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBF3UKJQ2K5RQDD",
+				"0",
+			),
+			{
+				fee: "100",
+				networkPassphrase:
+					STELLAR_NETWORK === "mainnet"
+						? (await import("@stellar/stellar-sdk")).Networks.PUBLIC
+						: (await import("@stellar/stellar-sdk")).Networks.TESTNET,
+			},
+		)
+			.addOperation(contract.call("balance", new Address(address).toScVal()))
+			.setTimeout(30)
+			.build()
+
+		const simResult = await server.simulateTransaction(tx)
+		if (
+			(await import("@stellar/stellar-sdk")).rpc.Api.isSimulationError(
+				simResult,
 			)
 		)
 			return "0"
 		const { scValToNative } = await import("@stellar/stellar-sdk")
-		const result = scValToNative(simResult.result?.retval!).toString()
-		await cache.set(cacheKey, result, TTL.BALANCE)
-		return result
-			const contract = new Contract(GOVERNANCE_TOKEN_CONTRACT_ID)
-			const tx = new TransactionBuilder(
-				new Account("GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBF3UKJQ2K5RQDD", "0"),
-				{
-					fee: "100",
-					networkPassphrase: STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-				},
-			)
-				.addOperation(contract.call("balance", new Address(address).toScVal()))
-				.setTimeout(30)
-				.build()
-			const simResult = await server.simulateTransaction(tx)
-			if (rpc.Api.isSimulationError(simResult)) return "0"
-			const { scValToNative } = await import("@stellar/stellar-sdk")
-			return scValToNative(simResult.result?.retval!).toString()
-		})
+		return scValToNative(simResult.result?.retval!).toString()
 	} catch (err) {
 		log.error({ err }, "getGovernanceTokenBalance failed")
 		return "0"
 	}
 }
 
-async function getGovernanceVotingPower(address: string): Promise<string> {
-	const cache = getRpcCache()
-	const cacheKey = CacheKey.votingPower(address)
-	const cached = await cache.get(cacheKey)
-	if (cached !== null) return cached
-
+async function getGovernanceVotingPower (address: string): Promise<string> {
 	if (!GOVERNANCE_TOKEN_CONTRACT_ID) {
 		log.warn(
 			"[stellar] GOVERNANCE_TOKEN_CONTRACT_ID not set — simulating voting power",
@@ -1195,95 +989,96 @@ async function getGovernanceVotingPower(address: string): Promise<string> {
 		return "1250000000"
 	}
 	try {
-		return await stellarRpcCircuitBreaker.call(async () => {
-			const { Contract, Address, rpc, TransactionBuilder, Account, Networks } = await import("@stellar/stellar-sdk")
-			const server = new rpc.Server(
-				STELLAR_NETWORK === "mainnet"
-					? "https://soroban-rpc.stellar.org"
-					: "https://soroban-testnet.stellar.org",
+		const { Contract, Address } = await import("@stellar/stellar-sdk")
+		const server = new (await import("@stellar/stellar-sdk")).rpc.Server(
+			STELLAR_NETWORK === "mainnet"
+				? "https://soroban-rpc.stellar.org"
+				: "https://soroban-testnet.stellar.org",
+		)
+		const contract = new Contract(GOVERNANCE_TOKEN_CONTRACT_ID)
+		const tx = new (await import("@stellar/stellar-sdk")).TransactionBuilder(
+			new (await import("@stellar/stellar-sdk")).Account(
+				"GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBF3UKJQ2K5RQDD",
+				"0",
+			),
+			{
+				fee: "100",
+				networkPassphrase:
+					STELLAR_NETWORK === "mainnet"
+						? (await import("@stellar/stellar-sdk")).Networks.PUBLIC
+						: (await import("@stellar/stellar-sdk")).Networks.TESTNET,
+			},
+		)
+			.addOperation(
+				contract.call("get_voting_power", new Address(address).toScVal()),
 			)
-			const contract = new Contract(GOVERNANCE_TOKEN_CONTRACT_ID)
-			const tx = new TransactionBuilder(
-				new Account("GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBF3UKJQ2K5RQDD", "0"),
-				{
-					fee: "100",
-					networkPassphrase: STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-				},
+			.setTimeout(30)
+			.build()
+
+		const simResult = await server.simulateTransaction(tx)
+		if (
+			(await import("@stellar/stellar-sdk")).rpc.Api.isSimulationError(
+				simResult,
 			)
 		)
 			return "0"
 		const { scValToNative } = await import("@stellar/stellar-sdk")
-		const result = scValToNative(simResult.result?.retval!).toString()
-		await cache.set(cacheKey, result, TTL.VOTING_POWER)
-		return result
-				.addOperation(
-					contract.call("get_voting_power", new Address(address).toScVal()),
-				)
-				.setTimeout(30)
-				.build()
-			const simResult = await server.simulateTransaction(tx)
-			if (rpc.Api.isSimulationError(simResult)) return "0"
-			const { scValToNative } = await import("@stellar/stellar-sdk")
-			return scValToNative(simResult.result?.retval!).toString()
-		})
+		return scValToNative(simResult.result?.retval!).toString()
 	} catch (err) {
 		log.error({ err }, "getGovernanceVotingPower failed")
 		return "0"
 	}
 }
 
-async function getGovernanceDelegation(
+async function getGovernanceDelegation (
 	address: string,
 ): Promise<string | null> {
-	const cache = getRpcCache()
-	const cacheKey = CacheKey.delegation(address)
-	const cached = await cache.get(cacheKey)
-	if (cached !== null) return cached === "__null__" ? null : cached
-
 	if (!GOVERNANCE_TOKEN_CONTRACT_ID) return null
 	try {
-		return await stellarRpcCircuitBreaker.call(async () => {
-			const { Contract, Address, rpc, TransactionBuilder, Account, Networks } = await import("@stellar/stellar-sdk")
-			const server = new rpc.Server(
-				STELLAR_NETWORK === "mainnet"
-					? "https://soroban-rpc.stellar.org"
-					: "https://soroban-testnet.stellar.org",
+		const { Contract, Address } = await import("@stellar/stellar-sdk")
+		const server = new (await import("@stellar/stellar-sdk")).rpc.Server(
+			STELLAR_NETWORK === "mainnet"
+				? "https://soroban-rpc.stellar.org"
+				: "https://soroban-testnet.stellar.org",
+		)
+		const contract = new Contract(GOVERNANCE_TOKEN_CONTRACT_ID)
+		const tx = new (await import("@stellar/stellar-sdk")).TransactionBuilder(
+			new (await import("@stellar/stellar-sdk")).Account(
+				"GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBF3UKJQ2K5RQDD",
+				"0",
+			),
+			{
+				fee: "100",
+				networkPassphrase:
+					STELLAR_NETWORK === "mainnet"
+						? (await import("@stellar/stellar-sdk")).Networks.PUBLIC
+						: (await import("@stellar/stellar-sdk")).Networks.TESTNET,
+			},
+		)
+			.addOperation(
+				contract.call("get_delegate", new Address(address).toScVal()),
 			)
-			const contract = new Contract(GOVERNANCE_TOKEN_CONTRACT_ID)
-			const tx = new TransactionBuilder(
-				new Account("GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBF3UKJQ2K5RQDD", "0"),
-				{
-					fee: "100",
-					networkPassphrase: STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-				},
+			.setTimeout(30)
+			.build()
+
+		const simResult = await server.simulateTransaction(tx)
+		if (
+			(await import("@stellar/stellar-sdk")).rpc.Api.isSimulationError(
+				simResult,
 			)
 		)
 			return null
 		const { scValToNative } = await import("@stellar/stellar-sdk")
 		const raw = scValToNative(simResult.result?.retval!)
 		// Option<Address> → null (None) or an Address string (Some)
-		const result = typeof raw === "string" ? raw : null
-		await cache.set(cacheKey, result ?? "__null__", TTL.DELEGATION)
-		return result
-				.addOperation(
-					contract.call("get_delegate", new Address(address).toScVal()),
-				)
-				.setTimeout(30)
-				.build()
-			const simResult = await server.simulateTransaction(tx)
-			if (rpc.Api.isSimulationError(simResult)) return null
-			const { scValToNative } = await import("@stellar/stellar-sdk")
-			const raw = scValToNative(simResult.result?.retval!)
-			// Option<Address> → null (None) or an Address string (Some)
-			return typeof raw === "string" ? raw : null
-		})
+		return typeof raw === "string" ? raw : null
 	} catch (err) {
 		log.error({ err }, "getGovernanceDelegation failed")
 		return null
 	}
 }
 
-async function getEnrolledCourses(address: string): Promise<string[]> {
+async function getEnrolledCourses (address: string): Promise<string[]> {
 	if (!COURSE_MILESTONE_CONTRACT_ID) {
 		log.warn("COURSE_MILESTONE_CONTRACT_ID not set — simulating enrollments")
 		return ["stellar-basics", "defi-101"]
@@ -1291,7 +1086,7 @@ async function getEnrolledCourses(address: string): Promise<string[]> {
 	return ["stellar-basics", "defi-101"]
 }
 
-async function getScholarCredentials(address: string): Promise<any[]> {
+async function getScholarCredentials (address: string): Promise<any[]> {
 	try {
 		const result = await pool.query(
 			`SELECT 

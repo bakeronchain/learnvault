@@ -1,5 +1,6 @@
 import { Router, type Response } from "express"
 import sanitizeHtml from "sanitize-html"
+import { flagContent } from "../controllers/flag-content.controller"
 import { pool } from "../db/index"
 import { createCommentBodySchema } from "../lib/zod-schemas"
 import {
@@ -14,7 +15,7 @@ const VOTE_COLUMN: Record<string, string> = {
 	downvote: "downvotes",
 }
 
-export function createCommentsRouter(jwtService: JwtService): Router {
+export function createCommentsRouter (jwtService: JwtService): Router {
 	const router = Router()
 	const requireAuth = createRequireAuth(jwtService)
 	const maxCommentLength = 2000

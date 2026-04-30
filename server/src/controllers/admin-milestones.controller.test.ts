@@ -38,14 +38,13 @@ jest.mock("../services/escrow-timeout.service", () => ({
 	markEscrowActivity: jest.fn().mockResolvedValue(undefined),
 }))
 
-import express from "express"
-import jwt from "jsonwebtoken"
-import request from "supertest"
-
-import { milestoneStore } from "../db/milestone-store"
-import { errorHandler } from "../middleware/error.middleware"
 import { adminMilestonesRouter } from "../routes/admin-milestones.routes"
 import { credentialService } from "../services/credential.service"
+import { errorHandler } from "../middleware/error.middleware"
+import express from "express"
+import jwt from "jsonwebtoken"
+import { milestoneStore } from "../db/milestone-store"
+import request from "supertest"
 import { stellarContractService } from "../services/stellar-contract.service"
 
 // ── Typed mock helpers ───────────────────────────────────────────────────────
@@ -91,11 +90,11 @@ const approvedAuditEntry = {
 	decided_at: new Date().toISOString(),
 }
 
-function makeAdminToken(address = "GADMIN123") {
+function makeAdminToken (address = "GADMIN123") {
 	return jwt.sign({ address }, JWT_SECRET, { expiresIn: "1h" })
 }
 
-function buildApp() {
+function buildApp () {
 	const app = express()
 	app.use(express.json())
 	app.use("/api", adminMilestonesRouter)

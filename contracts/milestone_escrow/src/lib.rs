@@ -5,6 +5,11 @@ use soroban_sdk::{
     contracttype, panic_with_error, symbol_short,
 };
 
+<<<<<<< HEAD
+const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
+const TREASURY_KEY: Symbol = symbol_short!("TREAS");
+const INACTIVITY_WINDOW_KEY: Symbol = symbol_short!("INACT_W");
+=======
 use learnvault_shared::upgrade;
 
 pub use upgrade::ContractUpgraded;
@@ -18,7 +23,6 @@ pub struct Config {
     pub treasury: Address,
     pub inactivity_window: u64,
 }
-
 #[derive(Clone)]
 #[contracttype]
 pub struct EscrowRecord {
@@ -52,7 +56,6 @@ pub enum Error {
     Overpayment = 8,
     InactivityNotReached = 9,
     NothingToReclaim = 10,
-    ArithmeticOverflow = 11,
 }
 
 #[contract]
@@ -87,12 +90,23 @@ pub struct EscrowReclaimed {
 
 #[contractimpl]
 impl MilestoneEscrow {
-    pub fn initialize(env: Env, admin: Address, treasury: Address, inactivity_window_seconds: u64) {
-        if env.storage().instance().has(&CONFIG_KEY) {
+    pub fn initialize(
+        env: Env,
+        admin: Address,
+        treasury: Address,
+        inactivity_window_seconds: u64,
+    ) {
+        if env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(&env, Error::AlreadyInitialized);
         }
         admin.require_auth();
 
+        // Keep 30 days (30 * 24 * 60 * 60) as the recommended default at deployment.
+        env.storage().instance().set(&ADMIN_KEY, &admin);
+        env.storage().instance().set(&TREASURY_KEY, &treasury);
+        env.storage()
+            .instance()
+            .set(&INACTIVITY_WINDOW_KEY, &inactivity_window_seconds);
         let config = Config {
             admin,
             treasury,
@@ -137,9 +151,6 @@ impl MilestoneEscrow {
             admin: config.admin.clone(),
         };
         env.storage().persistent().set(&key, &record);
-
-        xlm::token_client(&env).transfer(&treasury, env.current_contract_address(), &amount);
-
         EscrowCreated {
             proposal_id,
             scholar: record.scholar.clone(),
@@ -160,12 +171,12 @@ impl MilestoneEscrow {
         }
 
         let amount = Self::next_tranche_amount(&env, &record);
-        record.released_amount = Self::checked_add_i128(&env, record.released_amount, amount);
-        record.tranches_released = Self::checked_add_u32(&env, record.tranches_released, 1);
+        xlm::token_client(&env).transfer(&env.current_contract_address(), &record.scholar, &amount);
+
+        record.released_amount += amount;
+        record.tranches_released += 1;
         record.last_activity = env.ledger().timestamp();
         env.storage().persistent().set(&key, &record);
-
-        xlm::token_client(&env).transfer(&env.current_contract_address(), &record.scholar, &amount);
 
         TrancheReleased {
             scholar: record.scholar.clone(),
@@ -183,19 +194,18 @@ impl MilestoneEscrow {
 
         let now = env.ledger().timestamp();
         let inactive_for = now.saturating_sub(record.last_activity);
+ 
+        let inactivity_window = Self::inactivity_window(&env);
+        if inactive_for < inactivity_window {
         let config = Self::get_config(&env);
         if inactive_for < config.inactivity_window {
             panic_with_error!(&env, Error::InactivityNotReached);
         }
 
-        let unspent = Self::checked_sub_i128(&env, record.total_amount, record.released_amount);
+        let unspent = record.total_amount - record.released_amount;
         if unspent <= 0 {
             panic_with_error!(&env, Error::NothingToReclaim);
         }
-
-        record.released_amount = record.total_amount;
-        record.last_activity = now;
-        env.storage().persistent().set(&key, &record);
 
         xlm::token_client(&env).transfer(
             &env.current_contract_address(),
@@ -203,6 +213,10 @@ impl MilestoneEscrow {
             &unspent,
         );
 
+        record.released_amount = record.total_amount;
+        record.last_activity = now;
+        env.storage().persistent().set(&key, &record);
+ 
         EscrowReclaimed {
             proposal_id,
             scholar: record.scholar.clone(),
@@ -225,17 +239,15 @@ impl MilestoneEscrow {
     }
 
     fn next_tranche_amount(env: &Env, record: &EscrowRecord) -> i128 {
-        let remaining = Self::checked_sub_i128(env, record.total_amount, record.released_amount);
-        let next_tranche_index = Self::checked_add_u32(env, record.tranches_released, 1);
-        let is_last = next_tranche_index == record.total_tranches;
+        let remaining = record.total_amount - record.released_amount;
+        let is_last = record.tranches_released + 1 == record.total_tranches;
         let amount = if is_last {
             remaining
         } else {
             record.total_amount / (record.total_tranches as i128)
         };
 
-        let released_after = Self::checked_add_i128(env, record.released_amount, amount);
-        if amount <= 0 || released_after > record.total_amount {
+        if amount <= 0 || record.released_amount + amount > record.total_amount {
             panic_with_error!(env, Error::Overpayment);
         }
         amount
@@ -273,21 +285,6 @@ impl MilestoneEscrow {
         let admin = Self::admin(&env);
         admin.require_auth();
         upgrade::apply(&env, &admin, &new_wasm_hash);
-    }
-
-    fn checked_add_i128(env: &Env, left: i128, right: i128) -> i128 {
-        left.checked_add(right)
-            .unwrap_or_else(|| panic_with_error!(env, Error::ArithmeticOverflow))
-    }
-
-    fn checked_sub_i128(env: &Env, left: i128, right: i128) -> i128 {
-        left.checked_sub(right)
-            .unwrap_or_else(|| panic_with_error!(env, Error::ArithmeticOverflow))
-    }
-
-    fn checked_add_u32(env: &Env, left: u32, right: u32) -> u32 {
-        left.checked_add(right)
-            .unwrap_or_else(|| panic_with_error!(env, Error::ArithmeticOverflow))
     }
 }
 

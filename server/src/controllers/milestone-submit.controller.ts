@@ -5,6 +5,7 @@ import { logger } from "../lib/logger"
 
 const log = logger.child({ module: "milestones" })
 import { createEmailService } from "../services/email.service"
+
 import { markEscrowActivity } from "../services/escrow-timeout.service"
 
 interface MilestoneSubmitRequestBody {
@@ -21,7 +22,7 @@ interface MilestoneSubmitRequestBody {
 }
 const emailService = createEmailService(process.env.EMAIL_API_KEY || "")
 
-export async function submitMilestoneReport(
+export async function submitMilestoneReport (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -68,7 +69,11 @@ export async function submitMilestoneReport(
 		try {
 			await markEscrowActivity(scholarAddress, courseId)
 		} catch (trackingErr) {
-			console.error("[milestones] escrow activity update failed:", trackingErr)
+			logger.error("Escrow activity update failed", {
+				error: trackingErr,
+				scholarAddress,
+				courseId,
+			})
 		}
 
 		emailService
@@ -77,6 +82,7 @@ export async function submitMilestoneReport(
 				courseId,
 				milestoneId.toString(),
 			)
+			.catch((err) => log.error({ err }, "Admin alert email failed"))
 			.catch((err) => log.error({ err }, "Admin alert email failed"))
 		res.status(201).json({ data: report })
 	} catch (err) {

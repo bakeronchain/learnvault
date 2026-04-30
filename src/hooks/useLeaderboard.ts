@@ -11,32 +11,22 @@ export type LeaderboardApiEntry = {
 export interface LeaderboardData {
 	rankings?: LeaderboardApiEntry[]
 	your_rank?: number | null
-	total?: number
 }
 
 export async function fetchLeaderboard(
 	address?: string,
-	page = 1,
-	limit = 10,
 ): Promise<LeaderboardData> {
-	const params = new URLSearchParams()
-	params.set("page", String(page))
-	params.set("limit", String(limit))
-	if (address) {
-		params.set("viewer_address", address)
-	}
-
 	const response = await fetch(
-		`${API_URL}/api/scholars/leaderboard?${params.toString()}`,
+		`${API_URL}/api/scholars/leaderboard${address ? `?viewer_address=${address}` : ""}`,
 	)
 	if (!response.ok) throw new Error("Failed to fetch leaderboard")
 	return (await response.json()) as LeaderboardData
 }
 
-export function useLeaderboard(address?: string, page = 1, limit = 10) {
+export function useLeaderboard(address?: string) {
 	return useQuery({
-		queryKey: ["leaderboard", address, page, limit],
-		queryFn: () => fetchLeaderboard(address, page, limit),
+		queryKey: ["leaderboard", address],
+		queryFn: () => fetchLeaderboard(address),
 		staleTime: 300 * 1000, // 5 minutes
 	})
 }

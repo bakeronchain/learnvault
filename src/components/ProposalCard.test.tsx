@@ -4,7 +4,9 @@ import ProposalCard from "./ProposalCard"
 
 // Mock AddressDisplay and ProposalCountdown to simplify testing
 vi.mock("./AddressDisplay", () => ({
-	default: ({ address }: { address: string }) => <div data-testid="address-display">{address}</div>,
+	default: ({ address }: { address: string }) => (
+		<div data-testid="address-display">{address}</div>
+	),
 }))
 vi.mock("./ProposalCountdown", () => ({
 	default: ({ deadlineLedger }: { deadlineLedger: number }) => (
@@ -14,10 +16,20 @@ vi.mock("./ProposalCountdown", () => ({
 
 // Mock @stellar/design-system components
 vi.mock("@stellar/design-system", () => ({
-	Card: ({ children, className }: any) => <div className={className} data-testid="mock-card">{children}</div>,
-	Badge: ({ children, variant }: any) => <span data-testid="mock-badge" data-variant={variant}>{children}</span>,
+	Card: ({ children, className }: any) => (
+		<div className={className} data-testid="mock-card">
+			{children}
+		</div>
+	),
+	Badge: ({ children, variant }: any) => (
+		<span data-testid="mock-badge" data-variant={variant}>
+			{children}
+		</span>
+	),
 	Button: ({ children, onClick, disabled }: any) => (
-		<button onClick={onClick} disabled={disabled}>{children}</button>
+		<button onClick={onClick} disabled={disabled}>
+			{children}
+		</button>
 	),
 }))
 

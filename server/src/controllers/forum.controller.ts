@@ -1,5 +1,6 @@
 import { type Request, type Response } from "express"
 import { pool } from "../db"
+import { createLogger } from "../lib/logger"
 import { createEmailService } from "../services/email.service"
 
 export const listForumThreads = async (
@@ -38,7 +39,7 @@ export const listForumThreads = async (
 
 		res.status(200).json({ data: threadsResult.rows })
 	} catch (error) {
-		console.error("[forum] listForumThreads error:", error)
+		logger.error("listForumThreads failed", { error })
 		res.status(500).json({ error: "Internal server error" })
 	}
 }
@@ -96,7 +97,7 @@ export const createForumThread = async (
 
 		res.status(201).json(result.rows[0])
 	} catch (error) {
-		console.error("[forum] createForumThread error:", error)
+		logger.error("createForumThread failed", { error })
 		res.status(500).json({ error: "Internal server error" })
 	}
 }
@@ -132,7 +133,7 @@ export const getForumThread = async (
 			replies: repliesResult.rows,
 		})
 	} catch (error) {
-		console.error("[forum] getForumThread error:", error)
+		logger.error("getForumThread failed", { error })
 		res.status(500).json({ error: "Internal server error" })
 	}
 }
@@ -211,12 +212,12 @@ export const replyToForumThread = async (
 				},
 			})
 		} catch (emailErr) {
-			console.error("[forum] email notification failed:", emailErr)
+			logger.error("email notification failed", { error: emailErr, threadId })
 		}
 
 		res.status(201).json(result.rows[0])
 	} catch (error) {
-		console.error("[forum] replyToForumThread error:", error)
+		logger.error("replyToForumThread failed", { error })
 		res.status(500).json({ error: "Internal server error" })
 	}
 }
@@ -235,7 +236,10 @@ export const deleteForumThread = async (
 		await pool.query(`DELETE FROM forum_threads WHERE id = $1`, [threadId])
 		res.status(200).json({ success: true })
 	} catch (error) {
-		console.error("[forum] deleteForumThread error:", error)
+		logger.error("deleteForumThread failed", {
+			error,
+			threadId: req.params.threadId,
+		})
 		res.status(500).json({ error: "Internal server error" })
 	}
 }
@@ -254,7 +258,10 @@ export const deleteForumReply = async (
 		await pool.query(`DELETE FROM forum_replies WHERE id = $1`, [replyId])
 		res.status(200).json({ success: true })
 	} catch (error) {
-		console.error("[forum] deleteForumReply error:", error)
+		logger.error("deleteForumReply failed", {
+			error,
+			replyId: req.params.replyId,
+		})
 		res.status(500).json({ error: "Internal server error" })
 	}
 }

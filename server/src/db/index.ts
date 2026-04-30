@@ -1,4 +1,57 @@
 import { Pool } from "pg"
+import { createLogger } from "../lib/logger"
+
+const logger = createLogger("db")
+
+import { logger } from "../lib/logger"
+import { poolMonitor } from "../services/pool-monitor.service"
+
+const log = logger.child({ module: "db" })
+
+// Environment-specific pool configuration
+const getPoolConfig = () => {
+	const isProduction = process.env.NODE_ENV === "production"
+	const isDevelopment = process.env.NODE_ENV === "development"
+
+	// Recommended pool sizes per environment
+	const poolSizes = {
+		production: {
+			max: 20,
+			min: 4,
+			idleTimeoutMillis: 30000,
+			connectionTimeoutMillis: 5000,
+		},
+		staging: {
+			max: 15,
+			min: 2,
+			idleTimeoutMillis: 30000,
+			connectionTimeoutMillis: 5000,
+		},
+		development: {
+			max: 5,
+			min: 1,
+			idleTimeoutMillis: 30000,
+			connectionTimeoutMillis: 5000,
+		},
+	}
+
+	const env = isProduction
+		? "production"
+		: isDevelopment
+			? "development"
+			: "staging"
+	const config = poolSizes[env as keyof typeof poolSizes]
+
+	return {
+		connectionString: process.env.DATABASE_URL,
+		max: config.max,
+		min: config.min,
+		idleTimeoutMillis: config.idleTimeoutMillis,
+		connectionTimeoutMillis: config.connectionTimeoutMillis,
+		ssl: isProduction ? { rejectUnauthorized: false } : false,
+		application_name: `learnvault-${env}`,
+	}
+}
 
 import { logger } from "../lib/logger"
 import { poolMonitor } from "../services/pool-monitor.service"
@@ -51,13 +104,13 @@ const getPoolConfig = () => {
 }
 
 class MockPool {
-	async connect() {
+	async connect () {
 		return {
 			query: async () => ({ rows: [], rowCount: 0 }),
-			release: () => {},
+			release: () => { },
 		}
 	}
-	async query(_text: string, _params?: any[]) {
+	async query (_text: string, _params?: any[]) {
 		return { rows: [], rowCount: 0 }
 	}
 }
@@ -115,7 +168,7 @@ export const db = {
 	connected: true,
 }
 
-export async function getPgStatStatementsSnapshot(limit = 5): Promise<{
+export async function getPgStatStatementsSnapshot (limit = 5): Promise<{
 	enabled: boolean
 	rows: Array<{
 		query: string
@@ -168,7 +221,7 @@ export async function getPgStatStatementsSnapshot(limit = 5): Promise<{
 	}
 }
 
-async function logPgStatStatementsSnapshot(): Promise<void> {
+async function logPgStatStatementsSnapshot (): Promise<void> {
 	const snapshot = await getPgStatStatementsSnapshot(3)
 	if (!snapshot.enabled) {
 		console.log("[db] pg_stat_statements not enabled")

@@ -9,17 +9,18 @@ import { socialStore } from "../db/social-store"
 import { listEscrowTimeoutsForScholar } from "../services/escrow-timeout.service"
 import { stellarContractService } from "../services/stellar-contract.service"
 
+
 type ApiMilestoneStatus = "pending" | "verified" | "rejected"
 type InternalMilestoneStatus = "pending" | "approved" | "rejected"
 
-function mapInternalStatus(
+function mapInternalStatus (
 	status: InternalMilestoneStatus,
 ): ApiMilestoneStatus {
 	if (status === "approved") return "verified"
 	return status
 }
 
-function mapQueryStatus(
+function mapQueryStatus (
 	status: string | undefined,
 ): InternalMilestoneStatus | undefined {
 	if (!status) return undefined
@@ -32,7 +33,7 @@ function mapQueryStatus(
 	return undefined
 }
 
-function toIsoDateTime(value: unknown): string | null {
+function toIsoDateTime (value: unknown): string | null {
 	if (!value) return null
 	if (value instanceof Date) return value.toISOString()
 	if (typeof value === "string") {
@@ -42,7 +43,7 @@ function toIsoDateTime(value: unknown): string | null {
 	return String(value)
 }
 
-export async function getScholarMilestones(
+export async function getScholarMilestones (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -121,14 +122,14 @@ export async function getScholarMilestones(
 	}
 }
 
-function parsePositiveInt(value: unknown, fallback: number): number {
+function parsePositiveInt (value: unknown, fallback: number): number {
 	if (typeof value !== "string") return fallback
 	const parsed = Number.parseInt(value, 10)
 	if (Number.isNaN(parsed) || parsed < 1) return fallback
 	return parsed
 }
 
-export async function getScholarsLeaderboard(
+export async function getScholarsLeaderboard (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -163,12 +164,7 @@ export async function getScholarsLeaderboard(
 			rankingsValues,
 		)
 
-		const viewerAddress =
-			typeof req.query.viewer_address === "string"
-				? req.query.viewer_address.trim()
-				: ""
-		const currentAddress =
-			(req.walletAddress && req.walletAddress.trim()) || viewerAddress || ""
+		const currentAddress = req.walletAddress
 		let yourRank: number | null = null
 
 		if (currentAddress) {
@@ -193,7 +189,7 @@ export async function getScholarsLeaderboard(
 	}
 }
 
-export async function getScholarProfile(
+export async function getScholarProfile (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -259,7 +255,7 @@ export async function getScholarProfile(
 	}
 }
 
-export async function getScholarCredentials(
+export async function getScholarCredentials (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -280,7 +276,7 @@ export async function getScholarCredentials(
 	}
 }
 
-export async function getScholarEscrowTimeouts(
+export async function getScholarEscrowTimeouts (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -294,7 +290,7 @@ export async function getScholarEscrowTimeouts(
 		const escrows = await listEscrowTimeoutsForScholar(address)
 		res.status(200).json({ escrows })
 	} catch (error) {
-		console.error("[scholars] Error fetching escrow timeout status:", error)
+		logger.error("Error fetching escrow timeout status", { error, address })
 		res.status(500).json({ error: "Failed to fetch escrow timeout status" })
 	}
 }

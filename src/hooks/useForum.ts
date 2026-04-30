@@ -1,16 +1,13 @@
 import { useQuery } from "@tanstack/react-query"
-import { apiFetchJson } from "../lib/api"
 import { type ForumThread, type ForumThreadDetail } from "../types/forum"
+import { api } from "../util/api"
 
 export const useForumThreads = (courseId: string) => {
 	return useQuery({
 		queryKey: ["forum", "threads", courseId],
 		queryFn: async (): Promise<ForumThread[]> => {
-			const res = await apiFetchJson<{ data: ForumThread[] }>(
-				`/api/courses/${courseId}/forum`,
-				{ auth: true },
-			)
-			return res.data
+			const res = await api.get(`/courses/${courseId}/forum`)
+			return res.data.data
 		},
 		enabled: Boolean(courseId),
 	})
@@ -19,11 +16,10 @@ export const useForumThreads = (courseId: string) => {
 export const useForumThreadDetail = (courseId: string, threadId: number) => {
 	return useQuery({
 		queryKey: ["forum", "thread", courseId, threadId],
-		queryFn: () =>
-			apiFetchJson<ForumThreadDetail>(
-				`/api/courses/${courseId}/forum/${threadId}`,
-				{ auth: true },
-			),
+		queryFn: async (): Promise<ForumThreadDetail> => {
+			const res = await api.get(`/courses/${courseId}/forum/${threadId}`)
+			return res.data
+		},
 		enabled: Boolean(courseId) && Boolean(threadId),
 	})
 }
@@ -33,12 +29,8 @@ export const createThread = async (
 	title: string,
 	content: string,
 ) => {
-	return apiFetchJson(`/api/courses/${courseId}/forum`, {
-		method: "POST",
-		auth: true,
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ title, content }),
-	})
+	const res = await api.post(`/courses/${courseId}/forum`, { title, content })
+	return res.data
 }
 
 export const replyToThread = async (
@@ -46,24 +38,18 @@ export const replyToThread = async (
 	threadId: number,
 	content: string,
 ) => {
-	return apiFetchJson(`/api/courses/${courseId}/forum/${threadId}/replies`, {
-		method: "POST",
-		auth: true,
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ content }),
+	const res = await api.post(`/courses/${courseId}/forum/${threadId}/replies`, {
+		content,
 	})
+	return res.data
 }
 
 export const deleteThread = async (courseId: string, threadId: number) => {
-	return apiFetchJson(`/api/courses/${courseId}/forum/${threadId}`, {
-		method: "DELETE",
-		auth: true,
-	})
+	const res = await api.delete(`/courses/${courseId}/forum/${threadId}`)
+	return res.data
 }
 
 export const deleteReply = async (courseId: string, replyId: number) => {
-	return apiFetchJson(`/api/courses/${courseId}/forum/replies/${replyId}`, {
-		method: "DELETE",
-		auth: true,
-	})
+	const res = await api.delete(`/courses/${courseId}/forum/replies/${replyId}`)
+	return res.data
 }

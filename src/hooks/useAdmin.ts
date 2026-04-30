@@ -120,7 +120,7 @@ const mapBatchMilestoneResult = (
 	reason: result.reason,
 })
 
-export function useAdminStats() {
+export function useAdminStats () {
 	const [stats, setStats] = useState<AdminStats | null>(null)
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
@@ -151,7 +151,7 @@ export function useAdminStats() {
 	return { stats, loading, error, fetchStats }
 }
 
-export function useAdminMilestones() {
+export function useAdminMilestones () {
 	const [milestones, setMilestones] = useState<MilestoneSubmission[]>([])
 	const [total, setTotal] = useState(0)
 	const [page, setPage] = useState(1)

@@ -4,6 +4,10 @@
  * Pinata is mocked so no real API credentials are needed.
  */
 
+import * as pinataService from "../services/pinata.service"
+
+import { createUploadRouter } from "../routes/upload.routes"
+import { errorHandler } from "../middleware/error.middleware"
 import express from "express"
 import jwt from "jsonwebtoken"
 import request from "supertest"
@@ -21,9 +25,6 @@ jest.mock("../services/pinata.service", () => ({
 	),
 }))
 
-import { errorHandler } from "../middleware/error.middleware"
-import { createUploadRouter } from "../routes/upload.routes"
-import * as pinataService from "../services/pinata.service"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -31,7 +32,7 @@ import * as pinataService from "../services/pinata.service"
 
 const JWT_SECRET = "learnvault-secret"
 
-const testJwtService = {
+const testJwtService = { 
 	signWalletToken: (addr: string) =>
 		jwt.sign({ sub: addr, jti: "test-jti" }, JWT_SECRET),
 	verifyWalletToken: async (token: string) => {
@@ -51,7 +52,7 @@ function makeToken(address = "GUSER123") {
 	return jwt.sign({ address, jti: "test-jti" }, JWT_SECRET, { expiresIn: "1h" })
 }
 
-function buildApp() {
+function buildApp () {
 	const app = express()
 	app.use(express.json())
 	app.use("/api", createUploadRouter(testJwtService))
@@ -136,7 +137,7 @@ describe("POST /api/upload", () => {
 	})
 
 	it("returns 500 when Pinata throws", async () => {
-		;(pinataService.pinFileToIPFS as jest.Mock).mockRejectedValueOnce(
+		; (pinataService.pinFileToIPFS as jest.Mock).mockRejectedValueOnce(
 			new Error("Pinata API error"),
 		)
 

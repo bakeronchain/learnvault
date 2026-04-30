@@ -15,21 +15,24 @@ import { markEscrowActivity } from "../services/escrow-timeout.service"
 import { stellarContractService } from "../services/stellar-contract.service"
 import { templates, toPlainText } from "../templates/email-templates"
 
+// const log = logger.child({ module: "admin-milestones" })
 const emailService = createEmailService(
 	process.env.RESEND_API_KEY || process.env.EMAIL_API_KEY || "",
 )
 
 type MilestoneStatusFilter = "pending" | "approved" | "rejected"
 
-function hasStellarMilestoneCredentials(): boolean {
+function hasStellarMilestoneCredentials (): boolean {
 	return Boolean(
 		process.env.STELLAR_SECRET_KEY && process.env.COURSE_MILESTONE_CONTRACT_ID,
 	)
 }
 
+// const logger = createLogger("admin-milestones")
+
 // ── GET /api/admin/milestones/pending ────────────────────────────────────────
 
-export async function listMilestones(
+export async function listMilestones (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -81,7 +84,7 @@ export async function listMilestones(
 	}
 }
 
-export async function getPendingMilestones(
+export async function getPendingMilestones (
 	_req: Request,
 	res: Response,
 ): Promise<void> {
@@ -94,7 +97,7 @@ export async function getPendingMilestones(
 	}
 }
 
-export async function getMilestoneById(
+export async function getMilestoneById (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -118,7 +121,7 @@ export async function getMilestoneById(
 	}
 }
 
-export async function approveMilestone(
+export async function approveMilestone (
 	req: AdminRequest,
 	res: Response,
 ): Promise<void> {
@@ -158,7 +161,10 @@ export async function approveMilestone(
 		try {
 			await markEscrowActivity(report.scholar_address, report.course_id)
 		} catch (trackingErr) {
-			console.error("[admin] escrow activity update failed:", trackingErr)
+			logger.error("Escrow activity update failed", {
+				error: trackingErr,
+				reportId: id,
+			})
 		}
 		const auditEntry = await milestoneStore.addAuditEntry({
 			report_id: id,
@@ -231,7 +237,7 @@ export async function approveMilestone(
 	}
 }
 
-export async function rejectMilestone(
+export async function rejectMilestone (
 	req: AdminRequest,
 	res: Response,
 ): Promise<void> {
@@ -289,7 +295,10 @@ export async function rejectMilestone(
 		try {
 			await markEscrowActivity(report.scholar_address, report.course_id)
 		} catch (trackingErr) {
-			console.error("[admin] escrow activity update failed:", trackingErr)
+			logger.error("Escrow activity update failed", {
+				error: trackingErr,
+				reportId: id,
+			})
 		}
 		const auditEntry = await milestoneStore.addAuditEntry({
 			report_id: id,
@@ -350,7 +359,7 @@ export async function rejectMilestone(
 	}
 }
 
-export async function batchApproveMilestones(
+export async function batchApproveMilestones (
 	req: AdminRequest,
 	res: Response,
 ): Promise<void> {
@@ -438,7 +447,7 @@ export async function batchApproveMilestones(
 	})
 }
 
-export async function batchRejectMilestones(
+export async function batchRejectMilestones (
 	req: AdminRequest,
 	res: Response,
 ): Promise<void> {

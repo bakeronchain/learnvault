@@ -5,14 +5,14 @@ import { logger } from "../lib/logger"
 
 const log = logger.child({ module: "events" })
 
-function parsePositiveInt(value: unknown, fallback: number): number {
+function parsePositiveInt (value: unknown, fallback: number): number {
 	if (typeof value !== "string") return fallback
 	const parsed = Number.parseInt(value, 10)
 	if (Number.isNaN(parsed) || parsed < 0) return fallback
 	return parsed
 }
 
-function extractTxHash(data: unknown): string | null {
+function extractTxHash (data: unknown): string | null {
 	if (!data || typeof data !== "object") return null
 
 	const queue: unknown[] = [data]

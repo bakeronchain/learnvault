@@ -26,18 +26,24 @@ const getBodyWalletValue = (
 
 const createWalletKeyGenerator =
 	(bodyKeys: string[]) =>
-	(req: Request): string => {
-		const headerWallet = req.headers["x-wallet-address"]
-		if (typeof headerWallet === "string" && headerWallet.trim().length > 0) {
-			return headerWallet
-		}
+		(req: Request): string => {
+			const headerWallet = req.headers["x-wallet-address"]
+			if (typeof headerWallet === "string" && headerWallet.trim().length > 0) {
+				return headerWallet
+			}
 
-		return (
-			getBodyWalletValue(req, bodyKeys) ??
-			ipKeyGenerator(req.ip ?? "unknown") ??
-			"unknown"
-		)
-	}
+			return (
+				getBodyWalletValue(req, bodyKeys) ??
+				ipKeyGenerator(req.ip ?? "unknown") ??
+				"unknown"
+			)
+
+			return (
+				getBodyWalletValue(req, bodyKeys) ??
+				ipKeyGenerator(req.ip ?? "unknown") ??
+				"unknown"
+			)
+		}
 
 const getKeyForRequest = (req: Request): string => {
 	return (req.headers["x-wallet-address"] as string) || req.ip || "unknown"

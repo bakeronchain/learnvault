@@ -1,8 +1,11 @@
 import { useEffect, useId, useState } from "react"
+import { formatDistanceToNow } from "date-fns"
 import { useTranslation } from "react-i18next"
 import { useWallet } from "../hooks/useWallet"
 import { getAuthToken } from "../util/auth"
 import CommentCard from "./CommentCard"
+
+const API_BASE = import.meta.env.VITE_SERVER_URL ?? "http://localhost:4000"
 
 export interface Comment {
 	id: number
@@ -27,10 +30,10 @@ const API_URL = (
 	""
 ).replace(/\/$/, "")
 
-const CommentSection = ({
+const CommentSection: React.FC<CommentSectionProps> = ({
 	proposalId,
 	proposalAuthor,
-}: CommentSectionProps) => {
+}: CommentSectionProps) {
 	const { t } = useTranslation()
 	const { address } = useWallet()
 	const pollInterval = Number(import.meta.env.VITE_COMMENT_POLL_MS) || 15000
@@ -50,8 +53,8 @@ const CommentSection = ({
 		setLoading(true)
 		try {
 			const res = await fetch(`${API_URL}/api/proposals/${proposalId}/comments`)
-			const data = (await res.json()) as Comment[] | { data?: Comment[] }
-			setComments(Array.isArray(data) ? data : (data.data ?? []))
+			const data = await res.json()
+			setComments(data)
 		} catch (err) {
 			console.error("Failed to fetch comments", err)
 		} finally {
@@ -110,7 +113,7 @@ const CommentSection = ({
 				setSubmissionStatus("Comment posted successfully.")
 				void fetchComments()
 			} else {
-				const err = (await res.json().catch(() => ({}))) as { error?: string }
+				const err = await res.json()
 				setSubmissionError(err.error || "Failed to post comment.")
 			}
 		} catch (err) {

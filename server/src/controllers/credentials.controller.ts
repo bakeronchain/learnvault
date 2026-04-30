@@ -8,6 +8,7 @@ import { logger } from "../lib/logger"
 const log = logger.child({ module: "credentials" })
 import { pinJsonToIPFS, getGatewayUrl } from "../services/pinata.service"
 
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -42,7 +43,7 @@ interface CreateMetadataRequest {
 
 let coursesCache: CourseMetadata[] | null = null
 
-async function loadCourses(): Promise<CourseMetadata[]> {
+async function loadCourses (): Promise<CourseMetadata[]> {
 	if (coursesCache) return coursesCache
 
 	const coursesPath = path.resolve(
@@ -93,7 +94,7 @@ const IMAGE_CID_MAP: Record<string, string> = {
 		"bafybeid2g5mt6wttyselah5xt32wepgsg24rfhdr4i2tzi25s5ngegawmy",
 }
 
-function getImageCID(courseId: string): string {
+function getImageCID (courseId: string): string {
 	const imageName = COURSE_IMAGE_MAP[courseId] || DEFAULT_IMAGE
 	return IMAGE_CID_MAP[imageName] || IMAGE_CID_MAP[DEFAULT_IMAGE]
 }
@@ -102,7 +103,7 @@ function getImageCID(courseId: string): string {
 // Metadata Generation
 // ---------------------------------------------------------------------------
 
-function generateMetadata(
+function generateMetadata (
 	course: CourseMetadata,
 	learnerAddress: string,
 	completedAt: string,
@@ -148,7 +149,7 @@ function generateMetadata(
  * Generate NFT metadata for a course completion credential and upload to IPFS.
  * Returns the ipfs:// URI for use in scholar_nft.mint().
  */
-export async function createCredentialMetadata(
+export async function createCredentialMetadata (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -219,7 +220,7 @@ type CredentialRow = {
 	revoked: boolean
 }
 
-export async function getCredentialsByAddress(
+export async function getCredentialsByAddress (
 	req: Request,
 	res: Response,
 ): Promise<void> {

@@ -748,6 +748,8 @@ fn reputation_score_matches_balance_division() {
         );
     }
 }
+<<<<<<< HEAD
+=======
 
 #[test]
 fn upgrade_requires_admin_auth() {

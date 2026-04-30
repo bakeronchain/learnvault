@@ -40,11 +40,9 @@ export default function NavBar() {
 		{ to: "/dao", label: t("nav.dao") },
 		{ to: "/community", label: "Community" },
 		{ to: "/leaderboard", label: t("nav.leaderboard") },
-		{ to: "/impact", label: "Impact" },
 		{ to: "/history", label: "Activity" },
 		{ to: "/wiki", label: t("nav.docs") },
 		{ to: "/donor", label: "Donor" },
-		{ to: "/sponsor", label: "Sponsor" },
 		{ to: "/treasury", label: t("nav.treasury") },
 	]
 
@@ -83,8 +81,8 @@ export default function NavBar() {
 				})
 			} else if (to === "/leaderboard") {
 				void queryClient.prefetchQuery({
-					queryKey: ["leaderboard", address, 1, 10],
-					queryFn: () => fetchLeaderboard(address, 1, 10),
+					queryKey: ["leaderboard", address],
+					queryFn: () => fetchLeaderboard(address),
 					staleTime: 300 * 1000,
 				})
 			} else if (to === "/history" && address) {

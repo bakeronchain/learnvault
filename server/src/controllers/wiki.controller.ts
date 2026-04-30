@@ -1,5 +1,8 @@
 import { type Request, type Response } from "express"
 import { pool } from "../db"
+import { createLogger } from "../lib/logger"
+
+const logger = createLogger("wiki")
 
 type WikiPageRow = {
 	id: number
@@ -53,7 +56,7 @@ export const getWikiPages = async (
 
 		res.status(200).json(result.rows.map(toWikiPage))
 	} catch (error) {
-		console.error("Error fetching wiki pages:", error)
+		logger.error("Error fetching wiki pages", { error })
 		res.status(500).json({ error: "Internal server error" })
 	}
 }
@@ -76,7 +79,7 @@ export const getWikiPageBySlug = async (
 
 		res.status(200).json(toWikiPage(result.rows[0]))
 	} catch (error) {
-		console.error("Error fetching wiki page:", error)
+		logger.error("Error fetching wiki page", { error, slug: req.params.slug })
 		res.status(500).json({ error: "Internal server error" })
 	}
 }
@@ -106,7 +109,7 @@ export const createWikiPage = async (
 			res.status(409).json({ error: "Slug already exists" })
 			return
 		}
-		console.error("Error creating wiki page:", error)
+		logger.error("Error creating wiki page", { error, slug: req.body?.slug })
 		res.status(500).json({ error: "Internal server error" })
 	}
 }
@@ -143,7 +146,7 @@ export const updateWikiPage = async (
 			res.status(409).json({ error: "Slug already exists" })
 			return
 		}
-		console.error("Error updating wiki page:", error)
+		logger.error("Error updating wiki page", { error, id: req.params.id })
 		res.status(500).json({ error: "Internal server error" })
 	}
 }
@@ -165,7 +168,7 @@ export const deleteWikiPage = async (
 
 		res.status(204).send()
 	} catch (error) {
-		console.error("Error deleting wiki page:", error)
+		logger.error("Error deleting wiki page", { error, id: req.params.id })
 		res.status(500).json({ error: "Internal server error" })
 	}
 }

@@ -1,18 +1,7 @@
-import {
-	QueryClient,
-	QueryClientProvider,
-	QueryCache,
-	MutationCache,
-} from "@tanstack/react-query"
-import { StrictMode } from "react"
-import { createRoot } from "react-dom/client"
-import { BrowserRouter } from "react-router-dom"
 import "@stellar/design-system/build/styles.min.css"
 import "./index.css"
-import App from "./App.tsx"
-import { NotificationProvider } from "./providers/NotificationProvider.tsx"
-import { WalletProvider } from "./providers/WalletProvider.tsx"
 import "./i18n"
+
 import { parseError } from "./util/error"
 
 // Issue #61 — FOUC prevention: apply theme before first render

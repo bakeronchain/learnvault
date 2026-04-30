@@ -3,7 +3,7 @@ import pino from "pino"
 const isProduction = process.env.NODE_ENV === "production"
 const isTest = process.env.NODE_ENV === "test"
 
-function buildTransport() {
+function buildTransport () {
 	if (isTest) return undefined
 	if (!isProduction) {
 		return {
@@ -26,7 +26,7 @@ export const logger = pino({
  * as they can be used as PII fingerprints. Shows first 4 + last 4 characters.
  * e.g. "GABC...WXYZ"
  */
-export function maskAddress(address: string): string {
+export function maskAddress (address: string): string {
 	if (!address || address.length <= 8) return address
 	return `${address.slice(0, 4)}...${address.slice(-4)}`
 }

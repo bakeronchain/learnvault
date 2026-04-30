@@ -1,5 +1,4 @@
 import React, { useContext, useEffect, useMemo } from "react"
-import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router-dom"
 import ActivityFeed from "../components/ActivityFeed"
 import AddressDisplay from "../components/AddressDisplay"
@@ -12,8 +11,6 @@ import { useLearnToken } from "../hooks/useLearnToken"
 import { WalletContext } from "../providers/WalletProvider"
 
 const Dashboard: React.FC = () => {
-	const { i18n } = useTranslation()
-	const locale = i18n.resolvedLanguage
 	const { address } = useContext(WalletContext)
 	const navigate = useNavigate()
 	const [isInitializing, setIsInitializing] = React.useState(true)
@@ -97,7 +94,7 @@ const Dashboard: React.FC = () => {
 			value: isLoading
 				? "—"
 				: lrnBalance !== undefined
-					? (Number(lrnBalance) / 1e7).toLocaleString(locale, {
+					? (Number(lrnBalance) / 1e7).toLocaleString("en-US", {
 							maximumFractionDigits: 0,
 						})
 					: "0",

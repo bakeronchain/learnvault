@@ -1,8 +1,11 @@
 import { type Request, type Response } from "express"
 import { flaggedContentStore } from "../db/flagged-content-store"
 import { pool } from "../db/index"
+import { createLogger } from "../lib/logger"
+import { type AuthRequest } from "../middleware/auth.middleware"
 import { createEmailService } from "../services/email.service"
 
+const logger = createLogger("flag-content")
 const emailService = createEmailService(process.env.EMAIL_API_KEY || "")
 
 interface FlagContentRequestBody {
@@ -11,7 +14,7 @@ interface FlagContentRequestBody {
 	reason: string
 }
 
-export async function flagContent(req: Request, res: Response): Promise<void> {
+export async function flagContent (req: Request, res: Response): Promise<void> {
 	const body = req.body as FlagContentRequestBody
 	const { contentType, contentId, reason } = body
 
@@ -90,7 +93,7 @@ export async function flagContent(req: Request, res: Response): Promise<void> {
 
 		res.status(201).json({ data: flag })
 	} catch (err) {
-		console.error("[flagContent] error:", err)
+		logger.error("flagContent failed", { error: err, contentType, contentId })
 		res.status(500).json({ error: "Failed to flag content" })
 	}
 }

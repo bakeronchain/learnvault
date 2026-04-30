@@ -33,7 +33,10 @@ function redactWalletAddresses(value: unknown): unknown {
 function scrubPII(event: Sentry.Event): Sentry.Event | null {
 	// Redact wallet addresses from error messages
 	if (event.message && typeof event.message === "string") {
-		event.message = event.message.replace(WALLET_ADDRESS_REGEX, "[REDACTED_WALLET]")
+		event.message = event.message.replace(
+			WALLET_ADDRESS_REGEX,
+			"[REDACTED_WALLET]",
+		)
 	}
 
 	// Redact from exception values
@@ -68,9 +71,10 @@ function scrubPII(event: Sentry.Event): Sentry.Event | null {
 				)
 			}
 			if (breadcrumb.data) {
-				breadcrumb.data = redactWalletAddresses(
-					breadcrumb.data,
-				) as Record<string, unknown>
+				breadcrumb.data = redactWalletAddresses(breadcrumb.data) as Record<
+					string,
+					unknown
+				>
 			}
 		}
 	}
@@ -145,11 +149,15 @@ export function initSentry(config: SentryConfig): void {
 		replaysOnErrorSampleRate: config.replaysOnErrorSampleRate ?? 1.0,
 		// PII scrubbing
 		beforeSend: (event: Sentry.ErrorEvent) => {
-			return scrubPII(event as unknown as Sentry.Event) as Sentry.ErrorEvent | null
+			return scrubPII(
+				event as unknown as Sentry.Event,
+			) as Sentry.ErrorEvent | null
 		},
 		beforeSendTransaction: (transaction) => {
 			// Also scrub PII from transaction events
-			return scrubPII(transaction as unknown as Sentry.Event) as Sentry.Event | null
+			return scrubPII(
+				transaction as unknown as Sentry.Event,
+			) as Sentry.Event | null
 		},
 		// Ignore common non-actionable errors
 		ignoreErrors: [

@@ -14,7 +14,7 @@ type ProposalPublicState = "open" | "closed" | "cancelled" | "executed"
 
 const stellarAddressSchema = z.string().min(56).max(56).startsWith("G")
 
-function parseStatus(value: unknown): ProposalStatus | undefined {
+function parseStatus (value: unknown): ProposalStatus | undefined {
 	if (typeof value !== "string") return undefined
 	const normalized = value.trim().toLowerCase()
 	if (
@@ -27,21 +27,21 @@ function parseStatus(value: unknown): ProposalStatus | undefined {
 	return undefined
 }
 
-function parsePositiveInt(value: unknown, fallback: number): number {
+function parsePositiveInt (value: unknown, fallback: number): number {
 	if (typeof value !== "string") return fallback
 	const parsed = Number.parseInt(value, 10)
 	if (Number.isNaN(parsed) || parsed < 1) return fallback
 	return parsed
 }
 
-function parseProposalId(value: unknown): number | null {
+function parseProposalId (value: unknown): number | null {
 	if (typeof value !== "string") return null
 	const parsed = Number.parseInt(value, 10)
 	if (Number.isNaN(parsed) || parsed < 1) return null
 	return parsed
 }
 
-function deriveProposalState(proposal: {
+function deriveProposalState (proposal: {
 	status: string
 	cancelled?: boolean | null
 	deadline?: Date | string | null
@@ -60,14 +60,14 @@ function deriveProposalState(proposal: {
 	return "open"
 }
 
-function parseViewerAddress(value: unknown): string | null {
+function parseViewerAddress (value: unknown): string | null {
 	if (typeof value !== "string") return null
 	const trimmed = value.trim()
 	const validation = stellarAddressSchema.safeParse(trimmed)
 	return validation.success ? validation.data : null
 }
 
-function buildProposalSelect(viewerParamIndex?: number) {
+function buildProposalSelect (viewerParamIndex?: number) {
 	const viewerVoteSelect = viewerParamIndex
 		? ", uv.support AS user_vote_support"
 		: ", NULL::boolean AS user_vote_support"
@@ -91,7 +91,7 @@ function buildProposalSelect(viewerParamIndex?: number) {
 		FROM proposals p${viewerJoin}`
 }
 
-export async function getGovernanceProposals(
+export async function getGovernanceProposals (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -144,7 +144,7 @@ export async function getGovernanceProposals(
 	}
 }
 
-export async function getGovernanceProposalById(
+export async function getGovernanceProposalById (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -181,7 +181,7 @@ export async function getGovernanceProposalById(
 const GOV_DECIMALS = 7
 const GOV_DIVISOR = 10n ** BigInt(GOV_DECIMALS)
 
-export async function getVotingPower(
+export async function getVotingPower (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -220,10 +220,7 @@ const createProposalSchema = z.object({
 })
 
 const castVoteSchema = z.object({
-	proposal_id: z
-		.number()
-		.int()
-		.positive("proposal_id must be a positive integer"),
+	proposal_id: z.number().int().positive("proposal_id must be a positive integer"),
 	voter_address: z
 		.string()
 		.min(56, "voter_address must be a valid Stellar address")
@@ -233,21 +230,7 @@ const castVoteSchema = z.object({
 	signature: z.string().optional(),
 })
 
-const castVoteSchema = z.object({
-	proposal_id: z
-		.number()
-		.int()
-		.positive("proposal_id must be a positive integer"),
-	voter_address: z
-		.string()
-		.min(56, "voter_address must be a valid Stellar address")
-		.max(56, "voter_address must be a valid Stellar address")
-		.startsWith("G", "voter_address must be a valid Stellar address"),
-	support: z.boolean(),
-	signature: z.string().optional(),
-})
-
-export async function createGovernanceProposal(
+export async function createGovernanceProposal (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -344,7 +327,10 @@ export async function createGovernanceProposal(
 					scholarAddress: author_address,
 				})
 			} catch (trackingErr) {
-				console.error("[governance] escrow tracking failed:", trackingErr)
+				logger.error("escrow tracking failed", {
+					error: trackingErr,
+					proposalId: proposal_id,
+				})
 			}
 		}
 
@@ -361,7 +347,7 @@ export async function createGovernanceProposal(
 	}
 }
 
-export async function castVote(req: Request, res: Response): Promise<void> {
+export async function castVote (req: Request, res: Response): Promise<void> {
 	const validation = castVoteSchema.safeParse(req.body)
 	if (!validation.success) {
 		res.status(400).json({
@@ -486,7 +472,8 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 	}
 }
 
-export async function getProposalStatus(
+
+export async function getProposalStatus (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -521,7 +508,7 @@ export async function getProposalStatus(
 	}
 }
 
-export async function cancelProposal(
+export async function cancelProposal (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -572,7 +559,7 @@ export async function cancelProposal(
 	}
 }
 
-export async function getDelegation(
+export async function getDelegation (
 	req: Request,
 	res: Response,
 ): Promise<void> {
@@ -602,7 +589,7 @@ export async function getDelegation(
 			voting_power: rawVotingPower,
 		})
 	} catch (err) {
-		console.error("[governance] getDelegation error:", err)
+		logger.error("getDelegation failed", { error: err, address })
 		res.status(500).json({ error: "Failed to fetch delegation state" })
 	}
 }

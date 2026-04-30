@@ -1,5 +1,9 @@
-import { renderHook, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { renderHook, waitFor } from "@testing-library/react"
+
+import { useContractIds } from "./useContractIds"
+import { useDonor } from "./useDonor"
+import { useWallet } from "./useWallet"
 
 const mockShowError = vi.fn()
 
@@ -14,10 +18,6 @@ vi.mock("./useContractIds", () => ({ useContractIds: vi.fn() }))
 vi.mock("../components/Toast/ToastProvider", () => ({
 	useToast: () => ({ showError: mockShowError }),
 }))
-
-import { useContractIds } from "./useContractIds"
-import { useDonor } from "./useDonor"
-import { useWallet } from "./useWallet"
 
 const mockUseWallet = vi.mocked(useWallet)
 const mockUseContractIds = vi.mocked(useContractIds)

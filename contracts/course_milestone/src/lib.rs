@@ -103,6 +103,7 @@ pub enum Error {
     InvalidState = 13,
     AlreadyCompleted = 14,
     InvalidReward = 15,
+    ArithmeticOverflow = 16,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -134,7 +135,7 @@ pub struct CourseMilestone;
 
 #[contractimpl]
 impl CourseMilestone {
-    pub fn initialize(env: Env, admin: Address, learn_token_contract: Address) {
+    pub fn initialize(env: Env, admin: Address, learn_token: Address) {
         if env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(&env, Error::AlreadyInitialized);
         }
@@ -143,7 +144,7 @@ impl CourseMilestone {
         upgrade::init(&env);
         env.storage()
             .instance()
-            .set(&LEARN_TOKEN_KEY, &learn_token_contract);
+            .set(&LEARN_TOKEN_KEY, &learn_token);
 
         Self::extend_instance(&env);
     }
@@ -186,9 +187,7 @@ impl CourseMilestone {
         Self::require_initialized(&env);
         Self::require_stored_admin_auth(&env);
 
-        if !Self::is_course_active(&env, &course_id) {
-            panic_with_error!(&env, Error::CourseNotFound);
-        }
+        Self::ensure_valid_milestone(&env, &course_id, milestone_id);
 
         if lrn < 0 {
             panic_with_error!(&env, Error::InvalidReward);
@@ -242,27 +241,19 @@ impl CourseMilestone {
                     active_courses.push_back(course_id);
                 }
             }
-            i += 1;
+            i = Self::checked_add_u32(&env, i, 1);
         }
 
         active_courses
     }
 
     pub fn pause(env: Env, admin: Address) {
-        admin.require_auth();
-        let stored_admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap();
-        if admin != stored_admin {
-            panic_with_error!(&env, Error::Unauthorized);
-        }
+        Self::require_admin(&env, &admin);
         env.storage().instance().set(&PAUSED_KEY, &true);
     }
 
     pub fn unpause(env: Env, admin: Address) {
-        admin.require_auth();
-        let stored_admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap();
-        if admin != stored_admin {
-            panic_with_error!(&env, Error::Unauthorized);
-        }
+        Self::require_admin(&env, &admin);
         env.storage().instance().set(&PAUSED_KEY, &false);
     }
 
@@ -332,6 +323,7 @@ impl CourseMilestone {
         if !Self::is_enrolled(env.clone(), learner.clone(), course_id.clone()) {
             panic_with_error!(&env, Error::NotEnrolled);
         }
+        Self::ensure_valid_milestone(&env, &course_id, milestone_id);
 
         let state_key = DataKey::MilestoneState(learner.clone(), course_id.clone(), milestone_id);
         let current_state = env
@@ -339,6 +331,7 @@ impl CourseMilestone {
             .persistent()
             .get::<_, MilestoneStatus>(&state_key)
             .unwrap_or(MilestoneStatus::NotStarted);
+        Self::extend_persistent(&env, &state_key);
 
         if current_state == MilestoneStatus::Pending || current_state == MilestoneStatus::Approved {
             panic_with_error!(&env, Error::DuplicateSubmission);
@@ -353,6 +346,7 @@ impl CourseMilestone {
             DataKey::MilestoneSubmission(learner.clone(), course_id.clone(), milestone_id);
 
         env.storage().persistent().set(&submission_key, &submission);
+        Self::extend_persistent(&env, &submission_key);
         env.storage()
             .persistent()
             .set(&state_key, &MilestoneStatus::Pending);
@@ -421,6 +415,7 @@ impl CourseMilestone {
         if !Self::is_enrolled(env.clone(), learner.clone(), course_id.clone()) {
             panic_with_error!(&env, Error::NotEnrolled);
         }
+        Self::ensure_valid_milestone(&env, &course_id, milestone_id);
 
         let completed_key = DataKey::Completed(learner.clone(), course_id.clone(), milestone_id);
         let already_completed = env
@@ -458,6 +453,17 @@ impl CourseMilestone {
         Self::extend_persistent(&env, &state_key);
         if env.storage().persistent().has(&reward_key) {
             Self::extend_persistent(&env, &reward_key);
+        }
+
+        // Mint LRN reward when non-zero — consistent with verify_milestone.
+        if lrn_reward > 0 {
+            let learn_token_address: Address = env
+                .storage()
+                .instance()
+                .get(&LEARN_TOKEN_KEY)
+                .unwrap_or_else(|| panic_with_error!(&env, Error::NotInitialized));
+            let learn_token_client = LearnTokenClient::new(&env, &learn_token_address);
+            learn_token_client.mint(&learner, &lrn_reward);
         }
 
         // Increment completion count
@@ -528,6 +534,11 @@ impl CourseMilestone {
         if !Self::is_enrolled(env.clone(), learner.clone(), course_id.clone()) {
             panic_with_error!(&env, Error::NotEnrolled);
         }
+        Self::ensure_valid_milestone(&env, &course_id, milestone_id);
+
+        if tokens_amount < 0 {
+            panic_with_error!(&env, Error::InvalidReward);
+        }
 
         let state_key = DataKey::MilestoneState(learner.clone(), course_id.clone(), milestone_id);
         let current_state = env
@@ -546,9 +557,14 @@ impl CourseMilestone {
         let completed_key = DataKey::Completed(learner.clone(), course_id.clone(), milestone_id);
         env.storage().persistent().set(&completed_key, &true);
 
-        let learn_token_address: Address = env.storage().instance().get(&LEARN_TOKEN_KEY).unwrap();
-        let learn_token_client = LearnTokenClient::new(&env, &learn_token_address);
-        learn_token_client.mint(&learner, &tokens_amount);
+        // Only mint when reward is non-zero; zero-reward milestones (non-incentivised
+        // checkpoints) are valid and must not panic the LearnToken mint guard.
+        if tokens_amount > 0 {
+            let learn_token_address: Address =
+                env.storage().instance().get(&LEARN_TOKEN_KEY).unwrap();
+            let learn_token_client = LearnTokenClient::new(&env, &learn_token_address);
+            learn_token_client.mint(&learner, &tokens_amount);
+        }
 
         Self::extend_persistent(&env, &state_key);
         Self::extend_persistent(&env, &completed_key);
@@ -600,6 +616,11 @@ impl CourseMilestone {
             if !Self::is_enrolled(env.clone(), entry.learner.clone(), entry.course_id.clone()) {
                 panic_with_error!(&env, Error::NotEnrolled);
             }
+            Self::ensure_valid_milestone(&env, &entry.course_id, entry.milestone_id);
+
+            if entry.lrn_reward < 0 {
+                panic_with_error!(&env, Error::InvalidReward);
+            }
 
             let state_key = DataKey::MilestoneState(
                 entry.learner.clone(),
@@ -626,7 +647,11 @@ impl CourseMilestone {
                 entry.milestone_id,
             );
             env.storage().persistent().set(&completed_key, &true);
-            learn_token_client.mint(&entry.learner, &entry.lrn_reward);
+            // Skip mint for zero-reward entries (non-incentivised checkpoints).
+            // LearnToken::mint panics on amount <= 0, so guard before calling.
+            if entry.lrn_reward > 0 {
+                learn_token_client.mint(&entry.learner, &entry.lrn_reward);
+            }
 
             Self::extend_persistent(&env, &state_key);
             Self::extend_persistent(&env, &completed_key);
@@ -675,6 +700,7 @@ impl CourseMilestone {
         if !Self::is_enrolled(env.clone(), learner.clone(), course_id.clone()) {
             panic_with_error!(&env, Error::NotEnrolled);
         }
+        Self::ensure_valid_milestone(&env, &course_id, milestone_id);
 
         let state_key = DataKey::MilestoneState(learner.clone(), course_id.clone(), milestone_id);
         let current_state = env
@@ -737,6 +763,23 @@ impl CourseMilestone {
         }
     }
 
+    fn ensure_valid_milestone(env: &Env, course_id: &String, milestone_id: u32) {
+        let course_key = DataKey::Course(course_id.clone());
+        let config: CourseConfig = env
+            .storage()
+            .persistent()
+            .get(&course_key)
+            .unwrap_or_else(|| panic_with_error!(env, Error::CourseNotFound));
+        Self::extend_persistent(env, &course_key);
+
+        if !config.active {
+            panic_with_error!(env, Error::CourseNotFound);
+        }
+        if milestone_id == 0 || milestone_id > config.milestone_count {
+            panic_with_error!(env, Error::InvalidMilestones);
+        }
+    }
+
     fn emit_course_completed_if_ready(env: &Env, learner: &Address, course_id: &String) {
         let course_key = DataKey::Course(course_id.clone());
         let config: CourseConfig = match env.storage().persistent().get(&course_key) {
@@ -745,6 +788,21 @@ impl CourseMilestone {
         };
         Self::extend_persistent(env, &course_key);
 
+        let mut milestone_id = 1_u32;
+        while milestone_id <= config.milestone_count {
+            let state_key =
+                DataKey::MilestoneState(learner.clone(), course_id.clone(), milestone_id);
+            let state = env
+                .storage()
+                .persistent()
+                .get::<_, MilestoneStatus>(&state_key)
+                .unwrap_or(MilestoneStatus::NotStarted);
+            if state != MilestoneStatus::Approved {
+                return;
+            }
+            Self::extend_persistent(env, &state_key);
+            milestone_id = Self::checked_add_u32(env, milestone_id, 1);
+        }
         let count_key = DataKey::CompletedCount(learner.clone(), course_id.clone());
         let count: u32 = env.storage().persistent().get(&count_key).unwrap_or(0);
 
@@ -769,6 +827,11 @@ impl CourseMilestone {
         env.storage()
             .persistent()
             .extend_ttl(key, PERSISTENT_BUMP_THRESHOLD, PERSISTENT_EXTEND_TO);
+    }
+
+    fn checked_add_u32(env: &Env, left: u32, right: u32) -> u32 {
+        left.checked_add(right)
+            .unwrap_or_else(|| panic_with_error!(env, Error::ArithmeticOverflow))
     }
 }
 

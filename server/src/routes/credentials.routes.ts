@@ -3,6 +3,7 @@ import { Router } from "express"
 import {
 	createCredentialMetadata,
 	getCredentialsByAddress,
+	verifyCredentialZkProof,
 } from "../controllers/credentials.controller"
 import * as schemas from "../lib/zod-schemas"
 import { createRequireAuth } from "../middleware/auth.middleware"
@@ -182,6 +183,8 @@ export function createCredentialsRouter(jwtService: JwtService): Router {
 		}),
 		createCredentialMetadata,
 	)
+
+	credentialsRouter.post("/credentials/zk/verify", verifyCredentialZkProof)
 
 	return credentialsRouter
 }

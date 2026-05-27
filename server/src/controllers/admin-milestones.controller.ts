@@ -1,6 +1,7 @@
 import { type Request, type Response } from "express"
 import { milestoneStore } from "../db/milestone-store"
 import { type AdminRequest } from "../middleware/admin.middleware"
+import { getRequestIp, recordAdminAuditEvent } from "../services/admin-audit.service"
 import { credentialService } from "../services/credential.service"
 import { createEmailService } from "../services/email.service"
 import { stellarContractService } from "../services/stellar-contract.service"
@@ -204,7 +205,37 @@ export async function approveMilestone(
 				certificate,
 			},
 		})
+
+		await recordAdminAuditEvent({
+			actorAddress: validatorAddress,
+			authMethod: req.adminAuthMethod ?? "jwt",
+			operation: "milestone.approve",
+			targetType: "milestone_report",
+			targetId: String(id),
+			outcome: "success",
+			requestId: req.requestId,
+			ipAddress: getRequestIp(req),
+			metadata: {
+				courseId: report.course_id,
+				milestoneId: report.milestone_id,
+				contractTxHash: contractResult.txHash,
+			},
+		})
 	} catch (err) {
+		await recordAdminAuditEvent({
+			actorAddress: validatorAddress,
+			authMethod: req.adminAuthMethod ?? "jwt",
+			operation: "milestone.approve",
+			targetType: "milestone_report",
+			targetId: String(id),
+			outcome: "failure",
+			requestId: req.requestId,
+			ipAddress: getRequestIp(req),
+			metadata: {
+				error: err instanceof Error ? err.message : String(err),
+			},
+		})
+
 		console.error("[admin] approveMilestone error:", err)
 		const msg = err instanceof Error ? err.message : String(err)
 		if (msg.includes("not configured")) {
@@ -300,7 +331,38 @@ export async function rejectMilestone(
 				auditEntry,
 			},
 		})
+
+		await recordAdminAuditEvent({
+			actorAddress: validatorAddress,
+			authMethod: req.adminAuthMethod ?? "jwt",
+			operation: "milestone.reject",
+			targetType: "milestone_report",
+			targetId: String(id),
+			outcome: "success",
+			requestId: req.requestId,
+			ipAddress: getRequestIp(req),
+			metadata: {
+				courseId: report.course_id,
+				milestoneId: report.milestone_id,
+				reason,
+				contractTxHash: contractResult.txHash,
+			},
+		})
 	} catch (err) {
+		await recordAdminAuditEvent({
+			actorAddress: validatorAddress,
+			authMethod: req.adminAuthMethod ?? "jwt",
+			operation: "milestone.reject",
+			targetType: "milestone_report",
+			targetId: String(id),
+			outcome: "failure",
+			requestId: req.requestId,
+			ipAddress: getRequestIp(req),
+			metadata: {
+				error: err instanceof Error ? err.message : String(err),
+			},
+		})
+
 		console.error("[admin] rejectMilestone error:", err)
 		const msg = err instanceof Error ? err.message : String(err)
 		if (msg.includes("not configured")) {

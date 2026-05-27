@@ -1,5 +1,6 @@
 import { type NextFunction, type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
+import { validateAdminApiKey } from "../services/admin-key.service"
 
 const DEFAULT_NON_PROD_JWT_SECRET = "learnvault-secret"
 
@@ -22,11 +23,6 @@ function getJwtSecret(): string | undefined {
 	return DEFAULT_NON_PROD_JWT_SECRET
 }
 
-function getAdminApiKey(): string | undefined {
-	const apiKey = process.env.ADMIN_API_KEY?.trim()
-	return apiKey || undefined
-}
-
 function getAdminAddresses(): string[] {
 	return (process.env.ADMIN_ADDRESSES ?? "")
 		.split(",")
@@ -45,14 +41,20 @@ export function requireCourseAdmin(
 	req: Request,
 	res: Response,
 	next: NextFunction,
-): void {
+): void | Promise<void> {
 	const jwtPublicKey = getJwtPublicKey()
 	const jwtSecret = getJwtSecret()
-	const adminApiKey = getAdminApiKey()
 	const adminAddresses = getAdminAddresses()
-	const apiKey = req.header("x-api-key")
-	if (adminApiKey && apiKey && apiKey === adminApiKey) {
-		next()
+	const apiKey = req.header("x-api-key")?.trim()
+	if (apiKey) {
+		void (async () => {
+			if (await validateAdminApiKey(apiKey)) {
+				next()
+				return
+			}
+
+			res.status(401).json({ error: "Unauthorized" })
+		})()
 		return
 	}
 

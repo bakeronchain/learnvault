@@ -155,6 +155,12 @@ export const batchRejectMilestonesBodySchema = z
 	})
 	.strict()
 
+export const rotateAdminApiKeyBodySchema = z
+	.object({
+		currentKey: requiredString("currentKey"),
+	})
+	.strict()
+
 export const createCommentBodySchema = z
 	.object({
 		proposalId: optionalTrimmedString("proposalId"),

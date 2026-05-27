@@ -184,6 +184,27 @@ app.use((req, res, next) => {
 - Set appropriate token expiration times
 - Use secure cookie flags (HttpOnly, Secure, SameSite)
 
+## Admin API Key Rotation And Audit Trail (Implemented)
+
+### Overview
+
+Admin API key rotation is now supported at runtime, with a one-hour transition
+window and persistent audit logging for sensitive admin operations.
+
+### Changes Made
+
+- Added `POST /api/admin/rotate-key`
+- Added database-backed admin key state with overlap support
+- Added 90-day stale-key alerts
+- Added `admin_operation_audit_log` for security-sensitive admin actions
+- Added `ADMIN_API_KEY_LAST_ROTATED_AT` bootstrap metadata support
+
+### Production Notes
+
+- Prefer JWT-based human admin sessions and reserve API keys for automation.
+- Store rotated keys in a secret manager immediately.
+- Forward stale-key warnings and audit log events into your alerting stack.
+
 ### 5. API Security Headers
 
 Add security headers middleware:

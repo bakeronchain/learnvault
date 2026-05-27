@@ -10,6 +10,9 @@ Admin-only endpoints accept either:
 - `Authorization: Bearer <jwt>` (must resolve to admin role/allowlist)
 - `x-api-key: <ADMIN_API_KEY>`
 
+Runtime rotation is available via `POST /api/admin/rotate-key`. See
+`docs/admin-key-rotation.md`.
+
 ### Security Responses
 
 - `401` `{ "error": "Unauthorized" }`

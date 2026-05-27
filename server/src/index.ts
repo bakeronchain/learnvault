@@ -35,6 +35,7 @@ import { treasuryRouter } from "./routes/treasury.routes"
 import { createUploadRouter } from "./routes/upload.routes"
 import { validatorRouter } from "./routes/validator.routes"
 import { createAuthService } from "./services/auth.service"
+import { emitAdminKeyRotationAlertIfNeeded } from "./services/admin-key.service"
 import {
 	createJwtService,
 	generateEphemeralDevJwtKeys,
@@ -172,6 +173,14 @@ app.use(errorHandler)
 
 initDb()
 	.then(() => {
+		if (process.env.NODE_ENV !== "test") {
+			void emitAdminKeyRotationAlertIfNeeded()
+			setInterval(
+				() => void emitAdminKeyRotationAlertIfNeeded(),
+				12 * 60 * 60 * 1000,
+			).unref()
+		}
+
 		app.listen(env.PORT, () => {
 			console.log(`Server listening on port ${env.PORT}`)
 		})

@@ -542,6 +542,7 @@ expect all participants to uphold these standards.
 
 - [Glossary](docs/glossary.md) — Key terms, tokens, and contracts explained in
   plain English
+ - [Contract events](docs/contract-events.md) — Documented on-chain event names, payloads, and example payloads for the indexer
 
 ---
 

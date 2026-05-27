@@ -1,5 +1,6 @@
 import { type NextFunction, type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
+import { validateAdminApiKey } from "../services/admin-key.service"
 
 type TokenPayload = {
 	sub?: string
@@ -18,11 +19,14 @@ function getJwtSecret(): string | undefined {
 	return secret && secret.length > 0 ? secret : undefined
 }
 
+<<<<<<< HEAD
 function getAdminApiKey(): string | undefined {
 	const apiKey = process.env.ADMIN_API_KEY?.trim()
 	return apiKey && apiKey.length > 0 ? apiKey : undefined
 }
 
+=======
+>>>>>>> 342a14b (feat(deploy): automate multi-contract Stellar deployment with CI support, verification, and frontend sync)
 function getAdminAddresses(): string[] {
 	return (process.env.ADMIN_ADDRESSES ?? "")
 		.split(",")
@@ -40,15 +44,27 @@ export function requireCourseAdmin(
 	req: Request,
 	res: Response,
 	next: NextFunction,
-): void {
+): void | Promise<void> {
 	const jwtPublicKey = getJwtPublicKey()
 	const jwtSecret = getJwtSecret()
-	const adminApiKey = getAdminApiKey()
 	const adminAddresses = getAdminAddresses()
+<<<<<<< HEAD
 
 	const providedApiKey = req.header("x-api-key")
 	if (adminApiKey && providedApiKey && providedApiKey === adminApiKey) {
 		next()
+=======
+	const apiKey = req.header("x-api-key")?.trim()
+	if (apiKey) {
+		void (async () => {
+			if (await validateAdminApiKey(apiKey)) {
+				next()
+				return
+			}
+
+			res.status(401).json({ error: "Unauthorized" })
+		})()
+>>>>>>> 342a14b (feat(deploy): automate multi-contract Stellar deployment with CI support, verification, and frontend sync)
 		return
 	}
 

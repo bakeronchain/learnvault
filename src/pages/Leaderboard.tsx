@@ -2,18 +2,30 @@ import { ChevronLeft, ChevronRight, Trophy } from "lucide-react"
 import React, { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import AddressDisplay from "../components/AddressDisplay"
+import { LeaderboardRowSkeleton } from "../components/SkeletonLoader"
 import { EmptyState } from "../components/states/emptyState"
 import { ErrorState } from "../components/states/errorState"
 import { useLeaderboard } from "../hooks/useLeaderboard"
 import { useWallet } from "../hooks/useWallet"
 import { type LeaderboardEntry } from "../util/mockLeaderboardData"
+import { getReputationRankFromLrn } from "../util/reputationRank"
+
+const PAGE_SIZE = 10
 
 const PAGE_SIZE = 10
 
 const Leaderboard: React.FC = () => {
 	const { t } = useTranslation()
 	const { address: currentUserAddress } = useWallet()
+<<<<<<< HEAD
 	const [page, setPage] = useState(1)
+=======
+	const [leaders, setLeaders] = useState<LeaderboardEntry[]>([])
+	const [myRank, setMyRank] = useState<number | null>(null)
+	const [currentPage, setCurrentPage] = useState(1)
+	const [isLoading, setIsLoading] = useState(true)
+	const [error, setError] = useState<string | null>(null)
+>>>>>>> 342a14b (feat(deploy): automate multi-contract Stellar deployment with CI support, verification, and frontend sync)
 
 	const {
 		data: result,
@@ -61,6 +73,11 @@ const Leaderboard: React.FC = () => {
 			})),
 		[leaders],
 	)
+	const totalPages = Math.max(1, Math.ceil(leaderboardRows.length / PAGE_SIZE))
+	const pageRows = leaderboardRows.slice(
+		(currentPage - 1) * PAGE_SIZE,
+		currentPage * PAGE_SIZE,
+	)
 
 	const isCurrentUser = (fullAddress: string) =>
 		currentUserAddress?.toLowerCase() === fullAddress.toLowerCase()
@@ -85,13 +102,8 @@ const Leaderboard: React.FC = () => {
 			</header>
 
 			{isLoading ? (
-				<div className="space-y-4">
-					{[...Array(3)].map((_, i) => (
-						<div
-							key={i}
-							className="h-24 rounded-[2.5rem] bg-white/5 animate-pulse"
-						/>
-					))}
+				<div data-testid="leaderboard-loading">
+					<LeaderboardRowSkeleton />
 				</div>
 			) : error ? (
 				<ErrorState
@@ -121,13 +133,25 @@ const Leaderboard: React.FC = () => {
 								<th className="py-6 px-8 text-sm font-bold uppercase tracking-widest text-white/40 text-right">
 									Milestones
 								</th>
+								<th className="py-6 px-8 text-sm font-bold uppercase tracking-widest text-white/40 text-right">
+									Rank Tier
+								</th>
 							</tr>
 						</thead>
 						<tbody className="divide-y divide-white/5">
-							{leaderboardRows.map((leader) => (
+							{pageRows.map((leader) => {
+								const reputation = getReputationRankFromLrn(
+									BigInt(leader.balance),
+								)
+								return (
 								<tr
 									key={leader.fullAddress}
+<<<<<<< HEAD
 									data-testid="leaderboard-row"
+=======
+									data-testid={`leader-row-${leader.rank}`}
+									data-current-user={isCurrentUser(leader.fullAddress)}
+>>>>>>> 342a14b (feat(deploy): automate multi-contract Stellar deployment with CI support, verification, and frontend sync)
 									className={`group hover:bg-white/[0.02] transition-colors ${
 										isCurrentUser(leader.fullAddress) ? "bg-brand-cyan/10" : ""
 									}`}
@@ -151,6 +175,7 @@ const Leaderboard: React.FC = () => {
 									<td className="py-6 px-8 overflow-hidden">
 										<div className="flex items-center gap-4">
 											<div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-cyan to-brand-purple flex-shrink-0 opacity-80" />
+<<<<<<< HEAD
 											<div className="min-w-0">
 												<div data-testid="leaderboard-address">
 													<AddressDisplay
@@ -163,6 +188,17 @@ const Leaderboard: React.FC = () => {
 														fullOnHover={false}
 													/>
 												</div>
+=======
+											<div>
+												<AddressDisplay
+													address={leader.fullAddress}
+													className="max-w-full"
+													addressClassName="font-bold text-white group-hover:text-brand-cyan transition-colors"
+													buttonClassName="h-6 w-6"
+													prefixLength={6}
+													suffixLength={4}
+												/>
+>>>>>>> 342a14b (feat(deploy): automate multi-contract Stellar deployment with CI support, verification, and frontend sync)
 												{isCurrentUser(leader.fullAddress) && (
 													<span className="text-[10px] uppercase font-black tracking-tighter text-brand-cyan bg-brand-cyan/10 px-2 py-0.5 rounded">
 														You
@@ -187,13 +223,23 @@ const Leaderboard: React.FC = () => {
 											<span className="w-2 h-2 bg-brand-purple rounded-full" />
 										</div>
 									</td>
+									<td className="py-6 px-8 text-right">
+										<span
+											className="inline-flex rounded-full border border-brand-cyan/20 bg-brand-cyan/10 px-3 py-2 text-xs font-black uppercase tracking-widest text-brand-cyan"
+											data-testid={`leader-tier-${leader.rank}`}
+										>
+											{reputation.label}
+										</span>
+									</td>
 								</tr>
-							))}
+								)
+							})}
 						</tbody>
 					</table>
 
 					<div className="p-6 bg-white/5 border-t border-white/5 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
 						<div className="text-sm font-medium text-white/40">
+<<<<<<< HEAD
 							Showing {leaderboardRows.length} scholars
 							{currentUserAddress || myRank !== null ? (
 								<span data-testid="leaderboard-your-rank">
@@ -229,6 +275,34 @@ const Leaderboard: React.FC = () => {
 							>
 								Next
 								<ChevronRight className="h-4 w-4" />
+=======
+							Showing {(currentPage - 1) * PAGE_SIZE + 1}-
+							{Math.min(currentPage * PAGE_SIZE, leaderboardRows.length)} of{" "}
+							{leaderboardRows.length} top learners
+							{myRank ? ` | Your rank: #${myRank}` : ""}
+						</div>
+						<div className="flex items-center gap-3">
+							<button
+								type="button"
+								onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+								disabled={currentPage === 1}
+								className="rounded-full border border-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white/60 disabled:opacity-40"
+							>
+								Previous
+							</button>
+							<span className="text-[10px] uppercase tracking-widest font-black text-white/20">
+								Page {currentPage} of {totalPages}
+							</span>
+							<button
+								type="button"
+								onClick={() =>
+									setCurrentPage((page) => Math.min(totalPages, page + 1))
+								}
+								disabled={currentPage === totalPages}
+								className="rounded-full border border-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white/60 disabled:opacity-40"
+							>
+								Next
+>>>>>>> 342a14b (feat(deploy): automate multi-contract Stellar deployment with CI support, verification, and frontend sync)
 							</button>
 						</div>
 					</div>

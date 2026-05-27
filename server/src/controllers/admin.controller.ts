@@ -1,8 +1,17 @@
 import { type Request, type Response } from "express"
-import { logger } from "../lib/logger"
 import { pool } from "../db/index"
+<<<<<<< HEAD
+import { logger } from "../lib/logger"
 
 const log = logger.child({ module: "admin" })
+=======
+import { type AdminRequest } from "../middleware/admin.middleware"
+import { getRequestIp, recordAdminAuditEvent } from "../services/admin-audit.service"
+import {
+	getAdminKeyRotationStatus,
+	rotateAdminApiKey,
+} from "../services/admin-key.service"
+>>>>>>> 342a14b (feat(deploy): automate multi-contract Stellar deployment with CI support, verification, and frontend sync)
 
 const STELLAR_NETWORK = process.env.STELLAR_NETWORK ?? "testnet"
 const STELLAR_SECRET_KEY = process.env.STELLAR_SECRET_KEY ?? ""
@@ -63,7 +72,7 @@ async function queryContractI128(
 }
 
 export async function getAdminStats(
-	_req: Request,
+	req: AdminRequest,
 	res: Response,
 ): Promise<void> {
 	try {
@@ -83,6 +92,18 @@ export async function getAdminStats(
 			queryContractI128(SCHOLARSHIP_TREASURY_CONTRACT_ID, "treasury_balance"),
 		])
 
+		const keyRotation = await getAdminKeyRotationStatus()
+
+		await recordAdminAuditEvent({
+			actorAddress: req.adminAddress,
+			authMethod: req.adminAuthMethod ?? "jwt",
+			operation: "admin.stats.read",
+			targetType: "dashboard",
+			outcome: "success",
+			requestId: req.requestId,
+			ipAddress: getRequestIp(req),
+		})
+
 		res.status(200).json({
 			pending_milestones: Number(row.pending_milestones ?? 0),
 			approved_milestones_today: Number(row.approved_milestones_today ?? 0),
@@ -91,9 +112,72 @@ export async function getAdminStats(
 			total_lrn_minted: totalLrnMinted,
 			open_proposals: Number(row.open_proposals ?? 0),
 			treasury_balance_usdc: treasuryBalanceUsdc,
+			admin_api_key: keyRotation,
 		})
 	} catch (err) {
 		log.error({ err }, "getAdminStats error")
 		res.status(500).json({ error: "Failed to fetch admin stats" })
+	}
+}
+
+export async function postRotateAdminKey(
+	req: AdminRequest,
+	res: Response,
+): Promise<void> {
+	const { currentKey } = req.body as { currentKey: string }
+
+	try {
+		const result = await rotateAdminApiKey({
+			currentKey,
+			rotatedBy: req.adminAddress ?? null,
+		})
+
+		await recordAdminAuditEvent({
+			actorAddress: req.adminAddress,
+			authMethod: req.adminAuthMethod ?? "jwt",
+			operation: "admin.api_key.rotate",
+			targetType: "admin_api_key",
+			outcome: "success",
+			requestId: req.requestId,
+			ipAddress: getRequestIp(req),
+			metadata: {
+				transitionExpiresAt: result.transitionExpiresAt,
+			},
+		})
+
+		res.status(200).json({
+			data: result,
+			message:
+				"Admin API key rotated. Store the new key now; it will only be returned once.",
+		})
+	} catch (err) {
+		const message =
+			err instanceof Error ? err.message : "Failed to rotate admin API key"
+
+		await recordAdminAuditEvent({
+			actorAddress: req.adminAddress,
+			authMethod: req.adminAuthMethod ?? "jwt",
+			operation: "admin.api_key.rotate",
+			targetType: "admin_api_key",
+			outcome: "failure",
+			requestId: req.requestId,
+			ipAddress: getRequestIp(req),
+			metadata: {
+				error: message,
+			},
+		})
+
+		if (message === "Current admin API key is invalid") {
+			res.status(401).json({ error: message })
+			return
+		}
+
+		if (message === "ADMIN_API_KEY is not configured") {
+			res.status(503).json({ error: message })
+			return
+		}
+
+		console.error("[admin] rotateAdminKey error:", err)
+		res.status(500).json({ error: "Failed to rotate admin API key" })
 	}
 }

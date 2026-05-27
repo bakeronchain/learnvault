@@ -188,9 +188,15 @@ export const batchRejectMilestonesBodySchema = z
 	})
 	.strict()
 
+<<<<<<< HEAD
 export const updateCommentBodySchema = z
 	.object({
 		content: requiredString("content", 2000),
+=======
+export const rotateAdminApiKeyBodySchema = z
+	.object({
+		currentKey: requiredString("currentKey"),
+>>>>>>> 342a14b (feat(deploy): automate multi-contract Stellar deployment with CI support, verification, and frontend sync)
 	})
 	.strict()
 

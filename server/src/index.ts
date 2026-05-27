@@ -44,6 +44,7 @@ import { createUploadRouter } from "./routes/upload.routes"
 import { validatorRouter } from "./routes/validator.routes"
 import { wikiRouter } from "./routes/wiki.routes"
 import { createAuthService } from "./services/auth.service"
+import { emitAdminKeyRotationAlertIfNeeded } from "./services/admin-key.service"
 import {
 	createJwtService,
 	generateEphemeralDevJwtKeys,
@@ -175,6 +176,7 @@ if (!isProduction) {
 
 app.use(errorHandler)
 
+<<<<<<< HEAD
 async function start() {
 	if (process.env.SKIP_DB !== "true") {
 		await initDb()
@@ -182,6 +184,25 @@ async function start() {
 
 	app.listen(env.PORT, () => {
 		logger.info({ port: env.PORT }, "Server listening")
+=======
+initDb()
+	.then(() => {
+		if (process.env.NODE_ENV !== "test") {
+			void emitAdminKeyRotationAlertIfNeeded()
+			setInterval(
+				() => void emitAdminKeyRotationAlertIfNeeded(),
+				12 * 60 * 60 * 1000,
+			).unref()
+		}
+
+		app.listen(env.PORT, () => {
+			console.log(`Server listening on port ${env.PORT}`)
+		})
+	})
+	.catch((err) => {
+		console.error("Failed to initialize database:", err)
+		process.exit(1)
+>>>>>>> 342a14b (feat(deploy): automate multi-contract Stellar deployment with CI support, verification, and frontend sync)
 	})
 
 	if (process.env.NODE_ENV !== "production") {

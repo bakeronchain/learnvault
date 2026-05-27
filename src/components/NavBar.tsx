@@ -11,6 +11,7 @@ import {
 } from "../hooks/useTreasury"
 import { useWallet } from "../hooks/useWallet"
 import { fetchHistory } from "../pages/History"
+import { getAuthToken } from "../util/auth"
 import GlobalSearch from "./GlobalSearch"
 import { LanguageSelector } from "./LanguageSelector"
 import NetworkIndicator from "./NetworkIndicator"
@@ -18,7 +19,6 @@ import { NotificationBell } from "./NotificationBell"
 import { ReputationBadge } from "./ReputationBadge"
 import { ThemeToggle } from "./ThemeToggle"
 import { WalletButton } from "./WalletButton"
-import { getAuthToken } from "../util/auth"
 
 export default function NavBar() {
 	const [menuOpen, setMenuOpen] = useState(false)
@@ -35,6 +35,7 @@ export default function NavBar() {
 
 	const navLinks = [
 		{ to: "/courses", label: t("nav.learn") },
+		{ to: "/tracks", label: "Tracks" },
 		{ to: "/peer-review", label: "Peer review" },
 		{ to: "/dao", label: t("nav.dao") },
 		{ to: "/community", label: "Community" },

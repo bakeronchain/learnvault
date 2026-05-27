@@ -3,8 +3,8 @@ import { Outlet, Route, Routes } from "react-router-dom"
 import ErrorBoundary from "./components/ErrorBoundary"
 import Footer from "./components/Footer"
 import NavBar from "./components/NavBar"
-import { OnboardingTour } from "./components/OnboardingTour"
 import NetworkPreconnect from "./components/NetworkPreconnect"
+import { OnboardingTour } from "./components/OnboardingTour"
 import TestnetBanner from "./components/TestnetBanner"
 import { ToastProvider } from "./components/Toast/ToastProvider"
 import { WalletToastWatcher } from "./components/WalletToastWatcher"
@@ -34,6 +34,7 @@ const PeerReview = lazy(() => import("./pages/PeerReview"))
 const Profile = lazy(() => import("./pages/Profile"))
 const ScholarshipApply = lazy(() => import("./pages/ScholarshipApply"))
 const SponsorPortal = lazy(() => import("./pages/SponsorPortal"))
+const Tracks = lazy(() => import("./pages/Tracks"))
 const Treasury = lazy(() => import("./pages/Treasury"))
 const Wiki = lazy(() => import("./pages/Wiki"))
 const WikiPage = lazy(() => import("./pages/WikiPage"))
@@ -61,25 +62,41 @@ function App() {
 					/>
 					<Route path="/learn" element={renderRoute(<Learn />)} />
 					<Route path="/dao" element={renderRoute(<Dao />)} />
-					<Route path="/dao/proposals" element={renderRoute(<DaoProposals />)} />
+					<Route
+						path="/dao/proposals"
+						element={renderRoute(<DaoProposals />)}
+					/>
 					<Route path="/dao/propose" element={renderRoute(<DaoPropose />)} />
 					<Route path="/leaderboard" element={renderRoute(<Leaderboard />)} />
 					<Route path="/peer-review" element={renderRoute(<PeerReview />)} />
 					<Route path="/community" element={renderRoute(<Community />)} />
 					<Route path="/history" element={renderRoute(<History />)} />
 					<Route path="/profile" element={renderRoute(<Profile />)} />
-					<Route path="/profile/:walletAddress" element={renderRoute(<Profile />)} />
-					<Route path="/scholarships/apply" element={renderRoute(<ScholarshipApply />)} />
+					<Route
+						path="/profile/:walletAddress"
+						element={renderRoute(<Profile />)}
+					/>
+					<Route
+						path="/scholarships/apply"
+						element={renderRoute(<ScholarshipApply />)}
+					/>
 					<Route path="/admin" element={renderRoute(<Admin />)} />
-					<Route path="/admin/lesson-diff" element={renderRoute(<LessonVersionDiff />)} />
+					<Route
+						path="/admin/lesson-diff"
+						element={renderRoute(<LessonVersionDiff />)}
+					/>
 					<Route path="/wiki" element={renderRoute(<Wiki />)} />
 					<Route path="/wiki/:slug" element={renderRoute(<WikiPage />)} />
+					<Route path="/tracks" element={renderRoute(<Tracks />)} />
 					<Route path="/treasury" element={renderRoute(<Treasury />)} />
 					<Route path="/donor" element={renderRoute(<Donor />)} />
 					<Route path="/sponsor" element={renderRoute(<SponsorPortal />)} />
 					<Route path="/impact" element={renderRoute(<ImpactDashboard />)} />
 					<Route path="/peer-review" element={renderRoute(<PeerReview />)} />
-					<Route path="/credentials/:id" element={renderRoute(<Credential />)} />
+					<Route
+						path="/credentials/:id"
+						element={renderRoute(<Credential />)}
+					/>
 					<Route path="/dashboard" element={renderRoute(<Dashboard />)} />
 					<Route path="/debug" element={renderRoute(<Debug />)} />
 					<Route path="/debug/:contractName" element={renderRoute(<Debug />)} />

@@ -8,6 +8,7 @@ import {
 import { getRpcCache, CacheKey } from "../lib/rpc-cache"
 import { leaderboardEmitter } from "../lib/leaderboard-emitter"
 import { logger } from "../lib/logger"
+import { createNotification } from "../db/notifications-store"
 
 const log = logger.child({ module: "indexer" })
 
@@ -172,6 +173,35 @@ export async function indexEventsBatch(
 						// Notify leaderboard of potential balance changes
 						if (topic === "LearnToken_Mint" || topic === "ScholarNFT::minted") {
 							leaderboardEmitter.emitUpdate()
+						}
+
+						// In-app notification: tranche disbursement
+						if (
+							topic === "ScholarshipTreasury_Disburse" ||
+							topic === "disburse" ||
+							topic === "Disburse"
+						) {
+							const scholarAddress =
+								typeof data.scholar === "string" ? data.scholar : null
+							const amount =
+								typeof data.amount !== "undefined"
+									? String(data.amount)
+									: null
+							if (scholarAddress) {
+								void createNotification({
+									recipient_address: scholarAddress,
+									type: "disbursement",
+									message: amount
+										? `A tranche disbursement of ${amount} stroops has been sent to your wallet.`
+										: "A tranche disbursement has been sent to your wallet.",
+									href: "/treasury",
+									data: {
+										tx_hash: txHash,
+										amount,
+										ledger,
+									},
+								})
+							}
 						}
 					} else {
 						skipped++

@@ -196,6 +196,16 @@ export const templates: Record<string, (vars: EmailVariables) => string> = {
   `,
 			vars,
 		),
+	"general-notification": (vars) =>
+		baseLayout(
+			`
+    <p>Hi ${vars.name},</p>
+    <p>${vars.body}</p>
+    <p><a href="${vars.actionUrl || "#"}" class="button info">Open LearnVault</a></p>
+    <p>Best,<br>The LearnVault Team</p>
+  `,
+			vars,
+		),
 }
 
 /**

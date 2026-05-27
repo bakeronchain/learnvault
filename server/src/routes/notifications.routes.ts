@@ -2,9 +2,13 @@ import { Router, type Response } from "express"
 
 import {
 	getNotifications,
+	getPreferences,
 	markAllRead,
 	markManyRead,
 	markOneRead,
+	subscribePush,
+	unsubscribePush,
+	updatePreferences,
 } from "../controllers/notifications.controller"
 import { authMiddleware, type AuthRequest } from "../middleware/auth.middleware"
 
@@ -131,5 +135,29 @@ notificationsRouter.patch(
 	authMiddleware,
 	(req, res) => {
 		void markOneRead(req as AuthRequest, res as Response)
+	},
+)
+
+notificationsRouter.post("/notifications/subscribe", authMiddleware, (req, res) => {
+	void subscribePush(req as AuthRequest, res as Response)
+})
+
+notificationsRouter.delete(
+	"/notifications/subscribe",
+	authMiddleware,
+	(req, res) => {
+		void unsubscribePush(req as AuthRequest, res as Response)
+	},
+)
+
+notificationsRouter.get("/notifications/preferences", authMiddleware, (req, res) => {
+	void getPreferences(req as AuthRequest, res as Response)
+})
+
+notificationsRouter.patch(
+	"/notifications/preferences",
+	authMiddleware,
+	(req, res) => {
+		void updatePreferences(req as AuthRequest, res as Response)
 	},
 )

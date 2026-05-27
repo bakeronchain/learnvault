@@ -10,6 +10,7 @@ import { leaderboardEmitter } from "../lib/leaderboard-emitter"
 import { invalidateApiResponseCacheType } from "../lib/api-response-cache"
 import { logger } from "../lib/logger"
 import { createNotification } from "../db/notifications-store"
+import { deliverNotificationChannels } from "./notification-delivery.service"
 
 const log = logger.child({ module: "indexer" })
 
@@ -196,13 +197,7 @@ export async function indexEventsBatch(
 							leaderboardEmitter.emitUpdate()
 						}
 
-					// Invalidate cached API responses derived from indexed events.
-					if (affectsLeaderboard(topic)) {
-						void invalidateApiResponseCacheType("leaderboard")
-					}
-					if (affectsTreasuryStats(topic)) {
-						void invalidateApiResponseCacheType("treasury_stats")
-					}
+
 					} else {
 						skipped++
 					}

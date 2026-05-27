@@ -2,8 +2,13 @@ import { type Request, type Response } from "express"
 
 import {
 	getNotificationsForUser,
+	getNotificationPreferences,
+	removePushSubscription,
+	type NotificationPreferences,
 	markAllNotificationsRead,
 	markNotificationRead,
+	updateNotificationPreferences,
+	upsertPushSubscription,
 } from "../db/notifications-store"
 import { type AuthRequest } from "../middleware/auth.middleware"
 
@@ -148,5 +153,120 @@ export async function markManyRead(
 	} catch (err) {
 		console.error("[notifications] markManyRead error:", err)
 		res.status(500).json({ error: "Failed to mark notifications as read" })
+	}
+}
+
+const ALLOWED_PREFERENCE_KEYS: Array<keyof NotificationPreferences> = [
+	"milestone_approved",
+	"milestone_rejected",
+	"vote_result",
+	"disbursement",
+	"email_milestone_approved",
+	"email_milestone_rejected",
+	"email_vote_result",
+	"email_disbursement",
+	"quiet_hours_start",
+	"quiet_hours_end",
+	"quiet_hours_timezone",
+]
+
+export async function subscribePush(
+	req: AuthRequest,
+	res: Response,
+): Promise<void> {
+	const address = req.user?.address
+	if (!address) {
+		res.status(401).json({ error: "Unauthorized" })
+		return
+	}
+
+	const { endpoint, keys } = req.body as {
+		endpoint?: unknown
+		keys?: { p256dh?: unknown; auth?: unknown }
+	}
+	if (
+		typeof endpoint !== "string" ||
+		!endpoint ||
+		typeof keys?.p256dh !== "string" ||
+		typeof keys?.auth !== "string"
+	) {
+		res.status(400).json({ error: "Invalid push subscription payload" })
+		return
+	}
+
+	try {
+		await upsertPushSubscription(address, {
+			endpoint,
+			keys: { p256dh: keys.p256dh, auth: keys.auth },
+		})
+		res.status(201).json({ success: true })
+	} catch (err) {
+		console.error("[notifications] subscribePush error:", err)
+		res.status(500).json({ error: "Failed to save push subscription" })
+	}
+}
+
+export async function unsubscribePush(
+	req: AuthRequest,
+	res: Response,
+): Promise<void> {
+	const address = req.user?.address
+	if (!address) {
+		res.status(401).json({ error: "Unauthorized" })
+		return
+	}
+	const { endpoint } = req.body as { endpoint?: unknown }
+	if (typeof endpoint !== "string" || !endpoint) {
+		res.status(400).json({ error: "Invalid endpoint" })
+		return
+	}
+	try {
+		const removed = await removePushSubscription(address, endpoint)
+		res.status(200).json({ removed })
+	} catch (err) {
+		console.error("[notifications] unsubscribePush error:", err)
+		res.status(500).json({ error: "Failed to remove push subscription" })
+	}
+}
+
+export async function getPreferences(
+	req: AuthRequest,
+	res: Response,
+): Promise<void> {
+	const address = req.user?.address
+	if (!address) {
+		res.status(401).json({ error: "Unauthorized" })
+		return
+	}
+	try {
+		const preferences = await getNotificationPreferences(address)
+		res.status(200).json({ preferences })
+	} catch (err) {
+		console.error("[notifications] getPreferences error:", err)
+		res.status(500).json({ error: "Failed to load notification preferences" })
+	}
+}
+
+export async function updatePreferences(
+	req: AuthRequest,
+	res: Response,
+): Promise<void> {
+	const address = req.user?.address
+	if (!address) {
+		res.status(401).json({ error: "Unauthorized" })
+		return
+	}
+	const payload = req.body as Record<string, unknown>
+	const updates: Partial<NotificationPreferences> = {}
+	for (const key of ALLOWED_PREFERENCE_KEYS) {
+		if (!(key in payload)) continue
+		updates[key] = payload[key] as never
+	}
+	try {
+		const preferences = await updateNotificationPreferences(address, updates)
+		res.status(200).json({ preferences })
+	} catch (err) {
+		console.error("[notifications] updatePreferences error:", err)
+		res.status(500).json({ error: "Failed to update notification preferences" })
 	}
 }

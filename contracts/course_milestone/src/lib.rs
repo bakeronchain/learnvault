@@ -579,6 +579,15 @@ impl CourseMilestone {
         Self::require_initialized(&env);
         admin.require_auth();
 
+        let oracle_config: Option<OracleConfig> =
+            env.storage().persistent().get(&DataKey::OracleConfig);
+        if let Some(config) = oracle_config {
+            Self::extend_persistent(&env, &DataKey::OracleConfig);
+            if !config.manual_fallback_enabled {
+                panic_with_error!(&env, Error::ManualFallbackDisabled);
+            }
+        }
+
         let stored_admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap();
         if admin != stored_admin {
             panic_with_error!(&env, Error::Unauthorized);

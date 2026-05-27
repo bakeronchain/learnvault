@@ -7,6 +7,9 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
@@ -40,6 +43,13 @@ jobs:
             npx @lhci/cli@0.15.x autorun --collect.url="http://127.0.0.1:4173"
             kill "$PREVIEW_PID"
           fi
+
+      - name: Upload Lighthouse report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report
+          path: .lighthouseci/
 
       - name: Upload test artifacts (on failure)
         if: failure()

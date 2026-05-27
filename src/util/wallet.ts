@@ -2,6 +2,7 @@ import { StellarWalletsKit } from "@creit.tech/stellar-wallets-kit"
 import { defaultModules } from "@creit.tech/stellar-wallets-kit/modules/utils"
 import { Horizon } from "@stellar/stellar-sdk"
 import { networkPassphrase, stellarNetwork } from "../contracts/util"
+import { logoutSession } from "../lib/auth"
 import storage from "./storage"
 
 // Initialize the kit globally with static config (v2 SDK approach)
@@ -49,9 +50,13 @@ export const connectWallet = async () => {
 }
 
 export const disconnectWallet = async () => {
+	await logoutSession()
 	await StellarWalletsKit.disconnect().catch(() => {})
 	storage.removeItem("walletId")
 	storage.removeItem("walletType")
+	storage.removeItem("walletAddress")
+	storage.removeItem("walletNetwork")
+	storage.removeItem("networkPassphrase")
 }
 
 function getHorizonHost(mode: string) {

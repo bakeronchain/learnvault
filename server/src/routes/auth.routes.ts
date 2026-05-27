@@ -1,14 +1,25 @@
 import { Router } from "express"
 
 import { createAuthControllers } from "../controllers/auth.controller"
+import { createRequireAuth } from "../middleware/auth.middleware"
 import { nonceRateLimiter } from "../middleware/nonce-rate-limit.middleware"
 import { authVerifyLimiter } from "../middleware/rate-limit.middleware"
 import { type AuthService } from "../services/auth.service"
+import { type JwtService } from "../services/jwt.service"
 
-export function createAuthRouter(authService: AuthService): Router {
+export function createAuthRouter(
+	authService: AuthService,
+	jwtService: JwtService,
+): Router {
 	const router = Router()
-	const { getNonce, postVerify, getChallenge, postChallengeVerify } =
-		createAuthControllers(authService)
+	const requireAuth = createRequireAuth(jwtService)
+	const {
+		getNonce,
+		postVerify,
+		getChallenge,
+		postChallengeVerify,
+		postLogout,
+	} = createAuthControllers(authService)
 
 	router.get("/challenge", nonceRateLimiter, (req, res) => {
 		void getChallenge(req, res)
@@ -24,6 +35,10 @@ export function createAuthRouter(authService: AuthService): Router {
 
 	router.post("/verify", authVerifyLimiter, (req, res) => {
 		void postVerify(req, res)
+	})
+
+	router.post("/logout", requireAuth, (req, res) => {
+		void postLogout(req, res)
 	})
 
 	return router

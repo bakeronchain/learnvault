@@ -121,5 +121,25 @@ export function createAuthControllers(authService: AuthService) {
 				res.status(401).json({ error: message })
 			}
 		},
+
+		async postLogout(req: Request, res: Response): Promise<void> {
+			const header = req.headers.authorization
+			const token = header?.startsWith("Bearer ")
+				? header.slice("Bearer ".length).trim()
+				: ""
+
+			if (!token) {
+				res.status(401).json({ error: "Unauthorized" })
+				return
+			}
+
+			try {
+				await authService.revokeToken(token)
+				res.status(200).json({ message: "Logged out successfully" })
+			} catch (err) {
+				const message = err instanceof Error ? err.message : "Unauthorized"
+				res.status(401).json({ error: message })
+			}
+		},
 	}
 }

@@ -8,6 +8,8 @@
   },
   "scripts": {
     "dev": "npm start",
+    "dev:docker": "docker compose --profile frontend up --build",
+    "dev:docker:clean": "docker compose --profile frontend down --volumes --remove-orphans",
     "dev:server": "npm run dev --prefix server",
     "dev:ui": "vite",
     "start": "node scripts/start-dev.mjs",

@@ -142,7 +142,7 @@ app.use(express.json())
 app.use(globalLimiter)
 
 app.use("/api", healthRouter)
-app.use("/api/auth", createAuthRouter(authService))
+app.use("/api/auth", createAuthRouter(authService, jwtService))
 app.use("/api", createMeRouter(jwtService))
 app.use("/api", coursesRouter)
 app.use("/api", enrollmentsRouter)

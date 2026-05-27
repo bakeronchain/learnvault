@@ -2,18 +2,26 @@ import express from "express"
 import request from "supertest"
 import { createAuthRouter } from "../routes/auth.routes"
 import { type AuthService } from "../services/auth.service"
+import { type JwtService } from "../services/jwt.service"
 
 const mockAuthService: jest.Mocked<AuthService> = {
 	getOrCreateNonce: jest.fn(),
 	verifyAndIssueToken: jest.fn(),
 	createChallenge: jest.fn(),
 	verifySignedTransaction: jest.fn(),
+	revokeToken: jest.fn(),
+}
+
+const mockJwtService: jest.Mocked<JwtService> = {
+	signWalletToken: jest.fn(),
+	verifyWalletToken: jest.fn(),
+	revokeToken: jest.fn(),
 }
 
 function buildApp() {
 	const app = express()
 	app.use(express.json())
-	app.use("/api/auth", createAuthRouter(mockAuthService))
+	app.use("/api/auth", createAuthRouter(mockAuthService, mockJwtService))
 	return app
 }
 
@@ -107,5 +115,25 @@ describe("Auth Routes", () => {
 		})
 	})
 
-	// Logout was removed from the API (token revocation is handled by the JWT blocklist service).
+	describe("POST /api/auth/logout", () => {
+		it("revokes the current bearer token", async () => {
+			mockJwtService.verifyWalletToken.mockResolvedValue({
+				sub: "GABC",
+				jti: "jwt-id",
+			})
+
+			const res = await request(buildApp())
+				.post("/api/auth/logout")
+				.set("Authorization", "Bearer live-token")
+
+			expect(res.status).toBe(200)
+			expect(res.body.message).toBe("Logged out successfully")
+			expect(mockAuthService.revokeToken).toHaveBeenCalledWith("live-token")
+		})
+
+		it("returns 401 without a bearer token", async () => {
+			const res = await request(buildApp()).post("/api/auth/logout")
+			expect(res.status).toBe(401)
+		})
+	})
 })

@@ -25,6 +25,8 @@ LearnToken contract.
 | `enroll(learner, course_id)` | `learner` auth | Requires active course and prevents duplicate enrollment. |
 | `submit_milestone(learner, course_id, milestone_id, evidence_uri)` | `learner` auth | Requires enrollment, valid milestone ID, and no prior submission. |
 | `verify_milestone(admin, learner, course_id, milestone_id, tokens_amount)` | Stored admin | Requires pending submission, valid milestone ID, and positive reward. |
+| `set_oracle_config(admin, oracle, manual_fallback_enabled)` | Stored admin | Configures the authorized verification oracle and manual fallback policy. |
+| `oracle_verify_milestone(oracle, learner, course_id, milestone_id, tokens_amount, evidence_hash)` | Oracle auth | Approves a pending milestone using an off-chain evidence hash. |
 | `batch_verify_milestones(admin, submissions)` | Stored admin | Atomically verifies multiple valid pending submissions. |
 | `reject_milestone(admin, learner, course_id, milestone_id)` | Stored admin | Rejects a pending submission and removes evidence. |
 | `complete_milestone(learner, course_id, milestone_id)` | Stored admin | Marks a valid enrolled milestone complete without minting. |
@@ -36,6 +38,8 @@ LearnToken contract.
 ## Audit Focus
 
 - Admin-only verification and rejection cannot be bypassed.
+- Oracle-only verification cannot be bypassed when manual fallback is disabled.
+- Oracle evidence hashes are immutable audit anchors for GitHub verification payloads.
 - Milestone IDs are bounded by registered course configuration.
 - Duplicate completion and duplicate submissions are rejected.
 - Cross-contract mint call cannot leave stale local state exploitable.

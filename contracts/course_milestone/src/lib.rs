@@ -40,6 +40,8 @@ pub enum DataKey {
     Course(String),
     CourseIds,
     CompletedCount(Address, String),
+    OracleConfig,
+    OracleEvidence(Address, String, u32),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -67,10 +69,33 @@ pub struct MilestoneSubmission {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[contracttype]
+pub struct OracleConfig {
+    pub oracle: Address,
+    pub manual_fallback_enabled: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+pub struct OracleEvidence {
+    pub evidence_hash: String,
+    pub verified_at: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
 pub struct SubmittedEventData {
     pub learner: Address,
     pub course_id: String,
     pub evidence_uri: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+pub struct OracleVerificationRecorded {
+    pub learner: Address,
+    pub course_id: String,
+    pub milestone_id: u32,
+    pub evidence_hash: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -104,6 +129,8 @@ pub enum Error {
     AlreadyCompleted = 14,
     InvalidReward = 15,
     ArithmeticOverflow = 16,
+    OracleUnavailable = 17,
+    ManualFallbackDisabled = 18,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -641,6 +641,120 @@ impl CourseMilestone {
         Self::emit_course_completed_if_ready(&env, &learner, &course_id);
     }
 
+    pub fn oracle_verify_milestone(
+        env: Env,
+        oracle: Address,
+        learner: Address,
+        course_id: String,
+        milestone_id: u32,
+        tokens_amount: i128,
+        evidence_hash: String,
+    ) {
+        if Self::is_paused(env.clone()) {
+            panic_with_error!(&env, Error::ContractPaused);
+        }
+
+        Self::require_initialized(&env);
+        oracle.require_auth();
+
+        let config: OracleConfig = env
+            .storage()
+            .persistent()
+            .get(&DataKey::OracleConfig)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::OracleUnavailable));
+        Self::extend_persistent(&env, &DataKey::OracleConfig);
+
+        if oracle != config.oracle {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
+
+        if tokens_amount < 0 {
+            panic_with_error!(&env, Error::InvalidReward);
+        }
+
+        if !Self::is_enrolled(env.clone(), learner.clone(), course_id.clone()) {
+            panic_with_error!(&env, Error::NotEnrolled);
+        }
+        Self::ensure_valid_milestone(&env, &course_id, milestone_id);
+
+        let state_key = DataKey::MilestoneState(learner.clone(), course_id.clone(), milestone_id);
+        let current_state = env
+            .storage()
+            .persistent()
+            .get::<_, MilestoneStatus>(&state_key)
+            .unwrap_or(MilestoneStatus::NotStarted);
+
+        if current_state != MilestoneStatus::Pending {
+            panic_with_error!(&env, Error::InvalidState);
+        }
+
+        env.storage()
+            .persistent()
+            .set(&state_key, &MilestoneStatus::Approved);
+        let completed_key = DataKey::Completed(learner.clone(), course_id.clone(), milestone_id);
+        env.storage().persistent().set(&completed_key, &true);
+
+        if tokens_amount > 0 {
+            let learn_token_address: Address =
+                env.storage().instance().get(&LEARN_TOKEN_KEY).unwrap();
+            let learn_token_client = LearnTokenClient::new(&env, &learn_token_address);
+            learn_token_client.mint(&learner, &tokens_amount);
+        }
+
+        let evidence_key =
+            DataKey::OracleEvidence(learner.clone(), course_id.clone(), milestone_id);
+        let evidence = OracleEvidence {
+            evidence_hash: evidence_hash.clone(),
+            verified_at: env.ledger().timestamp(),
+        };
+        env.storage().persistent().set(&evidence_key, &evidence);
+
+        Self::extend_persistent(&env, &state_key);
+        Self::extend_persistent(&env, &completed_key);
+        Self::extend_persistent(&env, &evidence_key);
+
+        let count_key = DataKey::CompletedCount(learner.clone(), course_id.clone());
+        let count: u32 = env.storage().persistent().get(&count_key).unwrap_or(0);
+        env.storage().persistent().set(&count_key, &(count + 1));
+        Self::extend_persistent(&env, &count_key);
+
+        env.events().publish(
+            (symbol_short!("orcl_ok"),),
+            OracleVerificationRecorded {
+                learner: learner.clone(),
+                course_id: course_id.clone(),
+                milestone_id,
+                evidence_hash,
+            },
+        );
+
+        env.events().publish(
+            (symbol_short!("ms_done"),),
+            MilestoneCompleted {
+                learner: learner.clone(),
+                course_id: course_id.clone(),
+                milestone_id,
+                lrn_reward: tokens_amount,
+            },
+        );
+
+        Self::emit_course_completed_if_ready(&env, &learner, &course_id);
+    }
+
+    pub fn get_oracle_evidence(
+        env: Env,
+        learner: Address,
+        course_id: String,
+        milestone_id: u32,
+    ) -> Option<OracleEvidence> {
+        let key = DataKey::OracleEvidence(learner, course_id, milestone_id);
+        let evidence: Option<OracleEvidence> = env.storage().persistent().get(&key);
+        if evidence.is_some() {
+            Self::extend_persistent(&env, &key);
+        }
+        evidence
+    }
+
     /// Verify multiple milestone submissions in a single atomic transaction.
     ///
     /// Each [`VerifyBatchEntry`] is `(learner, course_id, milestone_id, lrn_reward)`.

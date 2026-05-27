@@ -197,7 +197,29 @@ export async function indexEventsBatch(
 							leaderboardEmitter.emitUpdate()
 						}
 
-
+						// Tranche disbursement notification
+						if (topic.toLowerCase().includes("disburse") || topic.toLowerCase().includes("fundsdisbursed")) {
+							try {
+								const { scValToNative } = await import("@stellar/stellar-sdk")
+								const eventData = scValToNative(ev.value) as any
+								const scholarAddress = eventData.scholar || eventData.beneficiary
+								const amountStr = eventData.amount?.toString() || "0"
+								const amount = Number(amountStr) / 10000000 // Convert stroops to USDC
+								const proposalId = eventData.proposal_id || eventData.proposalId || "unknown"
+								
+								if (scholarAddress) {
+									void createNotification({
+										recipient_address: scholarAddress,
+										type: "disbursement",
+										message: \`A tranche of \${amount} USDC has been disbursed for proposal "\${proposalId}".\`,
+										href: \`/dao/proposals/\${proposalId}\`,
+										data: { amount: amountStr, proposalId }
+									})
+								}
+							} catch (e) {
+								log.error({ err: e }, "Failed to parse disbursement event for notification")
+							}
+						}
 					} else {
 						skipped++
 					}

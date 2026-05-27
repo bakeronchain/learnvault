@@ -44,6 +44,7 @@ import { treasuryRouter } from "./routes/treasury.routes"
 import { createUploadRouter } from "./routes/upload.routes"
 import { validatorRouter } from "./routes/validator.routes"
 import { wikiRouter } from "./routes/wiki.routes"
+import { createRecommendationsRouter } from "./routes/recommendations.routes"
 import { createAuthService } from "./services/auth.service"
 import {
 	createJwtService,
@@ -152,6 +153,7 @@ app.use("/api", coursesRouter)
 app.use("/api", createEnrollmentsRouter(jwtService))
 app.use("/api", createScholarsRouter(jwtService))
 app.use("/api", scholarshipsRouter)
+app.use("/api", createRecommendationsRouter(jwtService))
 app.use("/api", createForumRouter(jwtService))
 app.use("/api", createCredentialsRouter(jwtService))
 app.use("/api", validatorRouter)

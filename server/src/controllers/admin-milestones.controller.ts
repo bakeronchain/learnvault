@@ -13,6 +13,7 @@ import { type AdminRequest } from "../middleware/admin.middleware"
 import { credentialService } from "../services/credential.service"
 import { createEmailService } from "../services/email.service"
 import { markEscrowActivity } from "../services/escrow-timeout.service"
+import { deliverNotificationChannels } from "../services/notification-delivery.service"
 import { stellarContractService } from "../services/stellar-contract.service"
 import { templates, toPlainText } from "../templates/email-templates"
 
@@ -182,6 +183,14 @@ export async function approveMilestone(
 				contract_tx_hash: contractResult.txHash,
 			},
 		})
+		void deliverNotificationChannels({
+			recipientAddress: report.scholar_address,
+			type: "milestone_approved",
+			title: "Milestone Approved",
+			message: `Your milestone "${report.milestone_title ?? `Milestone ${report.milestone_number ?? report.milestone_id}`}" was approved.`,
+			href: "/scholar/milestones",
+			email: report.scholar_email,
+		})
 
 		try {
 			if (report.scholar_email) {
@@ -328,6 +337,14 @@ export async function rejectMilestone(
 				contract_tx_hash: contractResult.txHash,
 			},
 		})
+		void deliverNotificationChannels({
+			recipientAddress: report.scholar_address,
+			type: "milestone_rejected",
+			title: "Milestone Rejected",
+			message: `Your milestone "${report.milestone_title ?? `Milestone ${report.milestone_number ?? report.milestone_id}`}" was rejected.`,
+			href: "/scholar/milestones",
+			email: report.scholar_email,
+		})
 
 		try {
 			if (report.scholar_email) {
@@ -455,6 +472,14 @@ export async function batchApproveMilestones(
 					contract_tx_hash: contractResult.txHash,
 				},
 			})
+			void deliverNotificationChannels({
+				recipientAddress: report.scholar_address,
+				type: "milestone_approved",
+				title: "Milestone Approved",
+				message: `Your milestone "${report.milestone_title ?? `Milestone ${report.milestone_number ?? report.milestone_id}`}" was approved.`,
+				href: "/scholar/milestones",
+				email: report.scholar_email,
+			})
 			results.push({
 				reportId: id,
 				success: true,
@@ -557,6 +582,14 @@ export async function batchRejectMilestones(
 					rejection_reason: reason,
 					contract_tx_hash: contractResult.txHash,
 				},
+			})
+			void deliverNotificationChannels({
+				recipientAddress: report.scholar_address,
+				type: "milestone_rejected",
+				title: "Milestone Rejected",
+				message: `Your milestone "${report.milestone_title ?? `Milestone ${report.milestone_number ?? report.milestone_id}`}" was rejected.`,
+				href: "/scholar/milestones",
+				email: report.scholar_email,
 			})
 			results.push({
 				reportId: id,

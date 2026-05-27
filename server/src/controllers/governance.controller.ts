@@ -6,6 +6,7 @@ import { pool } from "../db/index"
 import { createNotification } from "../db/notifications-store"
 import { logger } from "../lib/logger"
 import { trackEscrowTimeout } from "../services/escrow-timeout.service"
+import { deliverNotificationChannels } from "../services/notification-delivery.service"
 
 const log = logger.child({ module: "governance" })
 import { stellarContractService } from "../services/stellar-contract.service"
@@ -500,6 +501,13 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 						voting_power: votingPower.toString(),
 						tx_hash: contractResult.txHash,
 					},
+				})
+				void deliverNotificationChannels({
+					recipientAddress: voter_address,
+					type: "vote_result",
+					title: "Vote Recorded",
+					message: `Your vote ${voteLabel} on proposal "${proposalTitle}" was recorded.`,
+					href: `/dao/proposals/${proposal_id}`,
 				})
 
 				// Notify the proposal author when votes_for first exceeds votes_against

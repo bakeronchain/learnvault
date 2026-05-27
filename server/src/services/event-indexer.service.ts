@@ -9,6 +9,7 @@ import { getRpcCache, CacheKey } from "../lib/rpc-cache"
 import { leaderboardEmitter } from "../lib/leaderboard-emitter"
 import { logger } from "../lib/logger"
 import { createNotification } from "../db/notifications-store"
+import { deliverNotificationChannels } from "./notification-delivery.service"
 
 const log = logger.child({ module: "indexer" })
 
@@ -200,6 +201,15 @@ export async function indexEventsBatch(
 										amount,
 										ledger,
 									},
+								})
+								void deliverNotificationChannels({
+									recipientAddress: scholarAddress,
+									type: "disbursement",
+									title: "Disbursement Received",
+									message: amount
+										? `A tranche disbursement of ${amount} stroops has been sent to your wallet.`
+										: "A tranche disbursement has been sent to your wallet.",
+									href: "/treasury",
 								})
 							}
 						}

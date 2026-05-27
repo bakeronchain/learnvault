@@ -103,7 +103,7 @@ pub enum DataKey {
 // Events
 // ---------------------------------------------------------------------------
 
-#[contractevent(topics = ["upgrade_queued"])]
+#[contractevent(topics = ["upg_queue"])]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UpgradeQueued {
     #[topic]
@@ -113,7 +113,7 @@ pub struct UpgradeQueued {
     pub admin: Address,
 }
 
-#[contractevent(topics = ["upgrade_executed"])]
+#[contractevent(topics = ["upg_exec"])]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UpgradeExecuted {
     #[topic]
@@ -122,13 +122,28 @@ pub struct UpgradeExecuted {
     pub executed_at: u64,
 }
 
-#[contractevent(topics = ["upgrade_cancelled"])]
+#[contractevent(topics = ["upg_cncl"])]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UpgradeCancelled {
     #[topic]
     pub contract_address: Address,
     pub new_wasm_hash: BytesN<32>,
     pub cancelled_at: u64,
+}
+
+#[contractevent(topics = ["init"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Initialized {
+    pub admin: Address,
+    pub timelock_duration: u64,
+}
+
+#[contractevent(topics = ["tl_upd"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TimelockUpdated {
+    pub old_duration: u64,
+    pub new_duration: u64,
+    pub admin: Address,
 }
 
 // ---------------------------------------------------------------------------
@@ -148,21 +163,31 @@ impl UpgradeTimelockVault {
             panic_with_error!(&env, UpgradeTimelockError::AlreadyInitialized);
         }
         admin.require_auth();
-        env.storage().instance().set(&ADMIN_KEY, &admin);
-        env.storage()
-            .instance()
-            .set(&TIMELOCK_KEY, &DEFAULT_TIMELOCK_DURATION);
+        let config = Config {
+            admin: admin.clone(),
+            timelock_duration: DEFAULT_TIMELOCK_DURATION,
+        };
+        env.storage().instance().set(&CONFIG_KEY, &config);
+        env.events().publish(
+            (symbol_short!("init"),),
+            (admin, DEFAULT_TIMELOCK_DURATION),
+        );
     }
 
     /// Set the timelock duration. Admin only.
     pub fn set_timelock_duration(env: Env, duration_seconds: u64) {
-        Self::admin(&env).require_auth();
+        let mut config = Self::get_config(&env);
+        config.admin.require_auth();
         if duration_seconds == 0 {
             panic_with_error!(&env, UpgradeTimelockError::InvalidTimelockDuration);
         }
-        env.storage()
-            .instance()
-            .set(&TIMELOCK_KEY, &duration_seconds);
+        let old_duration = config.timelock_duration;
+        config.timelock_duration = duration_seconds;
+        env.storage().instance().set(&CONFIG_KEY, &config);
+        env.events().publish(
+            (symbol_short!("tl_upd"),),
+            (old_duration, duration_seconds, config.admin),
+        );
     }
 
     /// Get the current timelock duration.
@@ -191,13 +216,10 @@ impl UpgradeTimelockVault {
 
         env.storage().persistent().set(&key, &proposal);
 
-        UpgradeQueued {
-            contract_address,
-            new_wasm_hash,
-            queued_at: proposal.queued_at,
-            admin: proposal.admin,
-        }
-        .publish(&env);
+        env.events().publish(
+            (symbol_short!("upg_queue"), contract_address),
+            (new_wasm_hash, proposal.queued_at, proposal.admin),
+        );
     }
 
     /// Execute an upgrade proposal.
@@ -206,7 +228,7 @@ impl UpgradeTimelockVault {
     /// The caller (governance contract) is responsible for performing the actual upgrade.
     /// Removes the proposal from storage after successful execution.
     pub fn execute_upgrade(env: Env, contract_address: Address) -> BytesN<32> {
-        Self::admin(&env).require_auth();
+        Self::get_config(&env).admin.require_auth();
         let key = DataKey::UpgradeProposal(contract_address.clone());
         let proposal: UpgradeProposal = env
             .storage()
@@ -217,7 +239,7 @@ impl UpgradeTimelockVault {
         let current_time = env.ledger().timestamp();
         let ready_at = proposal
             .queued_at
-            .checked_add(timelock_duration)
+            .checked_add(Self::get_config(&env).timelock_duration)
             .unwrap_or_else(|| panic_with_error!(&env, UpgradeTimelockError::ArithmeticOverflow));
         if current_time < ready_at {
             panic_with_error!(&env, UpgradeTimelockError::TimelockNotExpired);
@@ -226,12 +248,10 @@ impl UpgradeTimelockVault {
         // Remove the proposal from storage
         env.storage().persistent().remove(&key);
 
-        UpgradeExecuted {
-            contract_address,
-            new_wasm_hash: proposal.new_wasm_hash.clone(),
-            executed_at: current_time,
-        }
-        .publish(&env);
+        env.events().publish(
+            (symbol_short!("upg_exec"), contract_address),
+            (proposal.new_wasm_hash.clone(), current_time),
+        );
 
         proposal.new_wasm_hash
     }
@@ -252,12 +272,10 @@ impl UpgradeTimelockVault {
 
         env.storage().persistent().remove(&key);
 
-        UpgradeCancelled {
-            contract_address,
-            new_wasm_hash: proposal.new_wasm_hash,
-            cancelled_at: env.ledger().timestamp(),
-        }
-        .publish(&env);
+        env.events().publish(
+            (symbol_short!("upg_cncl"), contract_address),
+            (proposal.new_wasm_hash, env.ledger().timestamp()),
+        );
     }
 
     /// Get an upgrade proposal for a contract.
@@ -275,7 +293,7 @@ impl UpgradeTimelockVault {
         if let Some(proposal) = Self::get_upgrade_proposal(env.clone(), contract_address) {
             let config = Self::get_config(&env);
             let current_time = env.ledger().timestamp();
-            if let Some(ready_at) = proposal.queued_at.checked_add(timelock_duration) {
+            if let Some(ready_at) = proposal.queued_at.checked_add(config.timelock_duration) {
                 current_time >= ready_at
             } else {
                 false
@@ -421,6 +439,26 @@ mod test {
     }
 
     #[test]
+    #[should_panic(expected = "Error(Contract, #7)")]
+    fn test_set_timelock_duration_zero_fails() {
+        let env = create_env();
+        let admin = create_admin(&env);
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
+        initialize_contract(&env, &contract, &admin);
+        authorize_call(
+            &env,
+            &contract.address,
+            &admin,
+            "set_timelock_duration",
+            (0_u64,),
+        );
+        contract.set_timelock_duration(&0);
+    }
+
+    #[test]
     #[should_panic(expected = "Unauthorized")]
     fn test_set_timelock_duration_unauthorized() {
         let env = create_env();
@@ -475,6 +513,29 @@ mod test {
         assert_eq!(proposal.new_wasm_hash, wasm_hash);
         assert_eq!(proposal.admin, admin);
         assert!(proposal.queued_at > 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Unauthorized")]
+    fn test_queue_upgrade_unauthorized() {
+        let env = create_env();
+        let admin = create_admin(&env);
+        let unauthorized = create_admin(&env);
+        let contract_addr = create_contract(&env);
+        let wasm_hash = create_wasm_hash(&env);
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
+        initialize_contract(&env, &contract, &admin);
+        authorize_call(
+            &env,
+            &contract.address,
+            &unauthorized,
+            "queue_upgrade",
+            (contract_addr.clone(), wasm_hash.clone()),
+        );
+        contract.queue_upgrade(&contract_addr, &wasm_hash);
     }
 
     #[test]
@@ -596,6 +657,60 @@ mod test {
     }
 
     #[test]
+    #[should_panic(expected = "Unauthorized")]
+    fn test_execute_upgrade_unauthorized() {
+        let env = create_env();
+        let admin = create_admin(&env);
+        let unauthorized = create_admin(&env);
+        let contract_addr = create_contract(&env);
+        let wasm_hash = create_wasm_hash(&env);
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
+        initialize_contract(&env, &contract, &admin);
+        authorize_call(
+            &env,
+            &contract.address,
+            &admin,
+            "queue_upgrade",
+            (contract_addr.clone(), wasm_hash.clone()),
+        );
+        contract.queue_upgrade(&contract_addr, &wasm_hash);
+        env.ledger()
+            .set_timestamp(env.ledger().timestamp() + DEFAULT_TIMELOCK_DURATION + 1);
+        authorize_call(
+            &env,
+            &contract.address,
+            &unauthorized,
+            "execute_upgrade",
+            (contract_addr.clone(),),
+        );
+        contract.execute_upgrade(&contract_addr);
+    }
+
+    #[test]
+    #[should_panic(expected = "Error(Contract, #4)")]
+    fn test_execute_upgrade_not_found() {
+        let env = create_env();
+        let admin = create_admin(&env);
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
+        initialize_contract(&env, &contract, &admin);
+        let missing = create_contract(&env);
+        authorize_call(
+            &env,
+            &contract.address,
+            &admin,
+            "execute_upgrade",
+            (missing.clone(),),
+        );
+        contract.execute_upgrade(&missing);
+    }
+
+    #[test]
     fn test_cancel_upgrade() {
         let env = create_env();
         let admin = create_admin(&env);
@@ -634,6 +749,58 @@ mod test {
 
         // Proposal should be removed
         assert!(contract.get_upgrade_proposal(&contract_addr).is_none());
+    }
+
+    #[test]
+    #[should_panic(expected = "Unauthorized")]
+    fn test_cancel_upgrade_unauthorized() {
+        let env = create_env();
+        let admin = create_admin(&env);
+        let unauthorized = create_admin(&env);
+        let contract_addr = create_contract(&env);
+        let wasm_hash = create_wasm_hash(&env);
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
+        initialize_contract(&env, &contract, &admin);
+        authorize_call(
+            &env,
+            &contract.address,
+            &admin,
+            "queue_upgrade",
+            (contract_addr.clone(), wasm_hash.clone()),
+        );
+        contract.queue_upgrade(&contract_addr, &wasm_hash);
+        authorize_call(
+            &env,
+            &contract.address,
+            &unauthorized,
+            "cancel_upgrade",
+            (contract_addr.clone(),),
+        );
+        contract.cancel_upgrade(&contract_addr);
+    }
+
+    #[test]
+    #[should_panic(expected = "Error(Contract, #4)")]
+    fn test_cancel_upgrade_not_found() {
+        let env = create_env();
+        let admin = create_admin(&env);
+        let contract = UpgradeTimelockVaultClient::new(
+            &env,
+            &env.register_contract(None, UpgradeTimelockVault {}),
+        );
+        initialize_contract(&env, &contract, &admin);
+        let missing = create_contract(&env);
+        authorize_call(
+            &env,
+            &contract.address,
+            &admin,
+            "cancel_upgrade",
+            (missing.clone(),),
+        );
+        contract.cancel_upgrade(&missing);
     }
 
     #[test]
@@ -686,6 +853,7 @@ mod test {
             &env.register_contract(None, UpgradeTimelockVault {}),
         );
 
+        env.mock_all_auths();
         contract.initialize(&admin);
 
         // 1. Benchmark queue_upgrade

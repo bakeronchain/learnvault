@@ -10,6 +10,10 @@ import {
 	updateCourse,
 } from "../controllers/courses.controller"
 import {
+	generateCertificate,
+	verifyCertificate,
+} from "../controllers/certificates.controller"
+import {
 	requireCourseAdmin,
 	requireCourseAdminIfRequested,
 } from "../middleware/course-admin.middleware"
@@ -35,3 +39,7 @@ coursesRouter.patch(
 
 coursesRouter.post("/courses", requireCourseAdmin, createCourse)
 coursesRouter.patch("/courses/:id", requireCourseAdmin, updateCourse)
+
+// Certificate endpoints (Issue #667)
+coursesRouter.get("/courses/:courseId/certificate", generateCertificate)
+coursesRouter.get("/certificates/:certificateId/verify", verifyCertificate)

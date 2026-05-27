@@ -240,6 +240,32 @@ impl CourseMilestone {
         Self::extend_persistent(&env, &course_key);
     }
 
+    pub fn set_oracle_config(
+        env: Env,
+        admin: Address,
+        oracle: Address,
+        manual_fallback_enabled: bool,
+    ) {
+        Self::assert_not_paused(&env);
+        Self::require_initialized(&env);
+        Self::require_admin(&env, &admin);
+
+        let config = OracleConfig {
+            oracle,
+            manual_fallback_enabled,
+        };
+        env.storage().persistent().set(&DataKey::OracleConfig, &config);
+        Self::extend_persistent(&env, &DataKey::OracleConfig);
+    }
+
+    pub fn get_oracle_config(env: Env) -> Option<OracleConfig> {
+        let config: Option<OracleConfig> = env.storage().persistent().get(&DataKey::OracleConfig);
+        if config.is_some() {
+            Self::extend_persistent(&env, &DataKey::OracleConfig);
+        }
+        config
+    }
+
     pub fn get_course(env: Env, course_id: String) -> Option<CourseConfig> {
         let course_key = DataKey::Course(course_id);
         let course: Option<CourseConfig> = env.storage().persistent().get(&course_key);

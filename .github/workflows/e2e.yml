@@ -24,6 +24,23 @@ jobs:
       - name: Run E2E tests
         run: npm run test:e2e
 
+      - name: Run Lighthouse CI
+        env:
+          STAGING_URL: ${{ vars.STAGING_URL }}
+        run: |
+          if [ -n "$STAGING_URL" ]; then
+            echo "Running Lighthouse against staging: $STAGING_URL"
+            npx @lhci/cli@0.15.x autorun --collect.url="$STAGING_URL"
+          else
+            echo "STAGING_URL repository variable is not set; running Lighthouse against local preview."
+            npm run build
+            npm run preview -- --host 127.0.0.1 --port 4173 --strictPort > /tmp/learnvault-preview.log 2>&1 &
+            PREVIEW_PID=$!
+            npx wait-on http://127.0.0.1:4173
+            npx @lhci/cli@0.15.x autorun --collect.url="http://127.0.0.1:4173"
+            kill "$PREVIEW_PID"
+          fi
+
       - name: Upload test artifacts (on failure)
         if: failure()
         uses: actions/upload-artifact@v4

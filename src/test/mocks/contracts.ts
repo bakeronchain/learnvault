@@ -36,12 +36,7 @@ export const mockContractMethods = {
 	}),
 	withdraw: createMockContractMethod(undefined),
 
-	// Guess the number contract methods
-	guess: createMockContractMethod({ correct: true, reward: 100n }),
-	getGameState: createMockContractMethod({
-		number: 42,
-		reward_pool: 1000n,
-	}),
+
 }
 
 // Contract client factory
@@ -85,10 +80,7 @@ export const mockContracts = {
 		has_voted: createMockContractMethod(false),
 	}),
 
-	guessTheNumber: createMockContractClient("guess_the_number", {
-		guess: mockContractMethods.guess,
-		getGameState: mockContractMethods.getGameState,
-	}),
+	
 }
 
 // Dynamic import mock for contract clients
@@ -96,7 +88,7 @@ export const mockContractImports: Record<string, any> = {
 	"../contracts/learn_token": mockContracts.learnToken,
 	"../contracts/governance_token": mockContracts.governanceToken,
 	"../contracts/scholarship_treasury": mockContracts.scholarshipTreasury,
-	"../contracts/guess_the_number": mockContracts.guessTheNumber,
+	
 }
 
 // Helper to mock contract imports in tests

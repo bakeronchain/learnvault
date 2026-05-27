@@ -4,6 +4,7 @@ import {
 	getTreasuryStats,
 	getTreasuryActivity,
 } from "../controllers/treasury.controller"
+import { apiResponseCache } from "../middleware/api-response-cache.middleware"
 
 export const treasuryRouter = Router()
 
@@ -47,7 +48,11 @@ export const treasuryRouter = Router()
  *       503:
  *         description: Treasury contract not configured
  */
-treasuryRouter.get("/treasury/stats", getTreasuryStats)
+treasuryRouter.get(
+	"/treasury/stats",
+	apiResponseCache("treasury_stats"),
+	getTreasuryStats,
+)
 
 /**
  * @openapi

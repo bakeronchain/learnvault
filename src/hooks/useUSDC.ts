@@ -16,10 +16,13 @@ export interface UseUSDCResult {
 	/** Whether the USDC contract is configured in env vars. */
 	isConfigured: boolean
 	isLoading: boolean
+	/** Timestamp (ms since epoch) of the last successful on-chain balance fetch. */
+	dataUpdatedAt: number
 }
 
 /**
  * Fetches the USDC balance for a given Stellar address.
+ * Polls every 30 seconds to keep the on-chain balance fresh.
  *
  * @param address - The Stellar address to query. Pass undefined to skip fetching.
  */
@@ -27,7 +30,11 @@ export function useUSDC(address: string | undefined): UseUSDCResult {
 	const { showError } = useToast()
 	const isConfigured = Boolean(getUSDCContractId())
 
-	const { data: rawBalance, isLoading } = useQuery({
+	const {
+		data: rawBalance,
+		isLoading,
+		dataUpdatedAt,
+	} = useQuery({
 		queryKey: ["usdc", "balance", address],
 		queryFn: async (): Promise<bigint> => {
 			try {
@@ -40,6 +47,7 @@ export function useUSDC(address: string | undefined): UseUSDCResult {
 		},
 		enabled: Boolean(address) && isConfigured,
 		staleTime: BALANCE_STALE_TIME,
+		refetchInterval: BALANCE_STALE_TIME,
 	})
 
 	const balance =
@@ -52,5 +60,6 @@ export function useUSDC(address: string | undefined): UseUSDCResult {
 		balance: address ? balance : undefined,
 		isConfigured,
 		isLoading,
+		dataUpdatedAt,
 	}
 }

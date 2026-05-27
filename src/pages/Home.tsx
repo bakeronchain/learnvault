@@ -3,7 +3,9 @@ import React, { lazy, Suspense } from "react"
 import { Helmet } from "react-helmet"
 import { Link } from "react-router-dom"
 import DeferredSection from "../components/DeferredSection"
+import { useWallet } from "../hooks/useWallet"
 import { useEnrolledCourses } from "../hooks/useCourses"
+import { useImpactWidgetData } from "../hooks/useImpactMetrics"
 
 const MilestoneTracker = lazy(() =>
 	import("../components/MilestoneTracker").then((module) => ({
@@ -64,6 +66,8 @@ const FEATURES = [
 
 const Home: React.FC = () => {
 	const { enrolledCourses, isLoading: isLoadingCourses } = useEnrolledCourses()
+	const { address } = useWallet()
+	const { data: impactData, isLoading: isLoadingImpact } = useImpactWidgetData()
 
 	const siteUrl = "https://learnvault.app"
 	const title = "LearnVault — Learning is the proof of work"
@@ -114,10 +118,10 @@ const Home: React.FC = () => {
 					{/* CTA buttons */}
 					<div className="flex flex-wrap justify-center gap-4">
 						<Link
-							to="/courses"
+							to={address ? "/dashboard" : "/courses"}
 							className="iridescent-border px-10 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 active:scale-95 transition-transform shadow-xl shadow-brand-cyan/10"
 						>
-							Start Learning
+							{address ? "Go to Dashboard" : "Start Learning"}
 						</Link>
 						<Link
 							to="/treasury"
@@ -127,6 +131,42 @@ const Home: React.FC = () => {
 						</Link>
 					</div>
 				</section>
+
+				{/* ── IMPACT STATS ──────────────────────────────────────────────── */}
+				<div
+					data-testid="impact-stats"
+					className="glass-card rounded-2xl border border-white/8 px-8 py-6 animate-in fade-in duration-700 delay-150"
+				>
+					<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+						<div>
+							<p className="text-xs uppercase tracking-[0.35em] text-white/40">
+								Impact Stats
+							</p>
+							<h2 className="text-2xl font-black">Real on-chain impact</h2>
+						</div>
+						{isLoadingImpact && (
+							<p className="text-sm text-white/50">Loading platform statistics…</p>
+						)}
+					</div>
+					<div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-6 text-center">
+						<div>
+							<p className="text-3xl font-black text-brand-cyan">
+								{impactData?.total_scholars_funded ?? "—"}
+							</p>
+							<p className="text-xs text-white/40 uppercase tracking-widest mt-1">
+								Scholars funded
+							</p>
+						</div>
+						<div>
+							<p className="text-3xl font-black text-brand-cyan">
+								{impactData?.total_lrn_minted ?? "—"}
+							</p>
+							<p className="text-xs text-white/40 uppercase tracking-widest mt-1">
+								LRN minted
+							</p>
+						</div>
+					</div>
+				</div>
 
 				{/* ── STATS BAR ────────────────────────────────────────────────── */}
 				<div className="glass-card rounded-2xl border border-white/8 px-8 py-6 animate-in fade-in duration-700 delay-200">

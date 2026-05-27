@@ -7,6 +7,7 @@ import {
 } from "../lib/event-config"
 import { getRpcCache, CacheKey } from "../lib/rpc-cache"
 import { leaderboardEmitter } from "../lib/leaderboard-emitter"
+import { invalidateApiResponseCacheType } from "../lib/api-response-cache"
 import { logger } from "../lib/logger"
 import { createNotification } from "../db/notifications-store"
 import { deliverNotificationChannels } from "./notification-delivery.service"
@@ -51,6 +52,26 @@ function extractEventIndex(eventId: string): number | undefined {
 		}
 	}
 	return undefined
+}
+
+function affectsLeaderboard(topic: string): boolean {
+	const t = topic.toLowerCase()
+	return (
+		(t.includes("learntoken") && t.includes("mint")) ||
+		(t.includes("coursemilestone") && t.includes("milestonecomplete")) ||
+		(t.includes("scholarnft") && t.includes("minted"))
+	)
+}
+
+function affectsTreasuryStats(topic: string): boolean {
+	const t = topic.toLowerCase()
+	return (
+		(t.includes("scholarshiptreasury") &&
+			(t.includes("deposit") ||
+				t.includes("proposalcreated") ||
+				t.includes("votecastevent"))) ||
+		(t.includes("milestoneescrow") && t.includes("fundsdisbursed"))
+	)
 }
 
 /**
@@ -176,43 +197,7 @@ export async function indexEventsBatch(
 							leaderboardEmitter.emitUpdate()
 						}
 
-						// In-app notification: tranche disbursement
-						if (
-							topic === "ScholarshipTreasury_Disburse" ||
-							topic === "disburse" ||
-							topic === "Disburse"
-						) {
-							const scholarAddress =
-								typeof data.scholar === "string" ? data.scholar : null
-							const amount =
-								typeof data.amount !== "undefined"
-									? String(data.amount)
-									: null
-							if (scholarAddress) {
-								void createNotification({
-									recipient_address: scholarAddress,
-									type: "disbursement",
-									message: amount
-										? `A tranche disbursement of ${amount} stroops has been sent to your wallet.`
-										: "A tranche disbursement has been sent to your wallet.",
-									href: "/treasury",
-									data: {
-										tx_hash: txHash,
-										amount,
-										ledger,
-									},
-								})
-								void deliverNotificationChannels({
-									recipientAddress: scholarAddress,
-									type: "disbursement",
-									title: "Disbursement Received",
-									message: amount
-										? `A tranche disbursement of ${amount} stroops has been sent to your wallet.`
-										: "A tranche disbursement has been sent to your wallet.",
-									href: "/treasury",
-								})
-							}
-						}
+
 					} else {
 						skipped++
 					}

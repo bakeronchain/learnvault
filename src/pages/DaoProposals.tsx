@@ -5,6 +5,7 @@ import CommentSection from "../components/CommentSection"
 import ConfirmDialog from "../components/ConfirmDialog"
 import Pagination from "../components/Pagination"
 import { NoProposalsEmptyState } from "../components/SkeletonLoader"
+import { EmptyState as StateEmpty } from "../components/states/emptyState"
 import { ErrorState } from "../components/states/errorState"
 import { useToast } from "../components/Toast/ToastProvider"
 import {
@@ -352,11 +353,10 @@ const DaoProposals: React.FC = () => {
 						key={item}
 						type="button"
 						onClick={() => handleFilterChange(item)}
-						className={`px-5 py-2.5 rounded-full border text-xs font-black uppercase tracking-widest transition-all ${
-							filter === item
+						className={`px-5 py-2.5 rounded-full border text-xs font-black uppercase tracking-widest transition-all ${filter === item
 								? "bg-brand-cyan/10 border-brand-cyan/40 text-brand-cyan"
 								: "bg-white/5 border-white/10 text-white/70 hover:border-brand-cyan/30"
-						}`}
+							}`}
 					>
 						{item}
 					</button>
@@ -550,11 +550,10 @@ const DaoProposals: React.FC = () => {
 						key={proposal.id}
 						type="button"
 						onClick={() => handleSelectProposal(proposal.id)}
-						className={`glass-card p-8 rounded-[2.5rem] border text-left transition-all ${
-							selectedProposal?.id === proposal.id
+						className={`glass-card p-8 rounded-[2.5rem] border text-left transition-all ${selectedProposal?.id === proposal.id
 								? "border-brand-cyan/40"
 								: "border-white/5 hover:border-brand-cyan/20"
-						}`}
+							}`}
 					>
 						<div className="flex justify-between items-start gap-4 mb-4">
 							<div>
@@ -587,7 +586,13 @@ const DaoProposals: React.FC = () => {
 
 			{filteredProposals.length === 0 && (
 				<div className="py-20 text-center opacity-50">
-					<p>No proposals found for this filter.</p>
+					<StateEmpty
+						icon="📑"
+						title="No proposals found"
+						description="Try a different filter or view all proposals."
+						ctaLabel="Show all proposals"
+						onCtaClick={() => handleFilterChange("All")}
+					/>
 				</div>
 			)}
 

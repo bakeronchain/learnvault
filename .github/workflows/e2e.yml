@@ -51,6 +51,42 @@ jobs:
           name: lighthouse-report
           path: .lighthouseci/
 
+      - name: Comment Lighthouse summary
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            const manifestPath = '.lighthouseci/manifest.json'
+            if (!fs.existsSync(manifestPath)) {
+              core.info('No Lighthouse manifest found; skipping PR comment.')
+              return
+            }
+
+            const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+            const rows = manifest.map((entry) => {
+              const summary = entry.summary || {}
+              const format = (value) => typeof value === 'number' ? Math.round(value * 100) : 'n/a'
+              return `| ${entry.url} | ${format(summary.performance)} | ${format(summary.accessibility)} | ${format(summary['best-practices'])} | ${format(summary.seo)} |`
+            })
+
+            const body = [
+              '## Lighthouse CI',
+              '',
+              '| URL | Performance | Accessibility | Best Practices | SEO |',
+              '| --- | ---: | ---: | ---: | ---: |',
+              ...rows,
+              '',
+              'Required minimums: Performance 80, Accessibility 90, Best Practices 90, SEO 80.',
+            ].join('\n')
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            })
+
       - name: Upload test artifacts (on failure)
         if: failure()
         uses: actions/upload-artifact@v4

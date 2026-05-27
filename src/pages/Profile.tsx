@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useState } from "react"
+import React, { useContext, useEffect, useState } from "react"
 import { Helmet } from "react-helmet"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
@@ -11,10 +11,11 @@ import {
 	ProfileSkeleton,
 } from "../components/SkeletonLoader"
 import { ErrorState } from "../components/states/errorState"
-import { useScholarCredentials } from "../hooks/useScholarCredentials"
+import { useUserScholarNfts } from "../hooks/useScholarNft"
 import { WalletContext } from "../providers/WalletProvider"
 import { formatDuration, getLearningTimeSummary } from "../util/learningTime"
 import { shortenAddress } from "../util/scholarshipApplications"
+import confetti from "canvas-confetti"
 
 type UserNft = {
 	id: string
@@ -22,67 +23,63 @@ type UserNft = {
 	program: string
 	date: string
 	artwork?: string
+	isNew?: boolean
 }
 
 const Profile: React.FC = () => {
 	const { t } = useTranslation()
 	const { address: walletAddress } = useContext(WalletContext)
-	const [isLoading, setIsLoading] = useState(true)
-	const [error, setError] = useState<string | null>(null)
+	const { credentials, isLoading, error, refetch } = useUserScholarNfts(walletAddress)
 	const [nfts, setNfts] = useState<UserNft[]>([])
 	const [learningTimeLabel, setLearningTimeLabel] = useState("0m")
 
-	const fetchCredentials = useCallback(async () => {
-		if (!walletAddress) {
-			setNfts([])
-			setIsLoading(false)
-			return
-		}
-
-		try {
-			setIsLoading(true)
-			setError(null)
-
-			const response = await fetch(`/api/credentials/${walletAddress}`, {
-				method: "GET",
-			})
-
-			if (!response.ok) {
-				const payload = await response.json().catch(() => ({}))
-				throw new Error(
-					payload.message || payload.error || "Unable to load credentials",
-				)
+	useEffect(() => {
+		if (credentials.length > 0) {
+			const now = Math.floor(Date.now() / 1000)
+			const seenNftsStr = localStorage.getItem("learnvault_seen_nfts")
+			let seenIds: string[] = []
+			if (seenNftsStr) {
+				try {
+					seenIds = JSON.parse(seenNftsStr) as string[]
+				} catch {}
 			}
 
-			const data = await response.json()
-			setNfts(
-				Array.isArray(data.data)
-					? data.data.map((item: any) => ({
-							id: String(item.token_id ?? item.course_id ?? Math.random()),
-							course_id: item.course_id,
-							program: item.course_id ?? "Unknown course",
-							date: item.minted_at
-								? new Date(item.minted_at).toLocaleDateString()
-								: "Unknown",
-							artwork: item.metadata_uri
-								? `https://gateway.pinata.cloud/ipfs/${item.metadata_uri.replace("ipfs://", "")}`
-								: undefined,
-						}))
-					: [],
-			)
-		} catch (err) {
-			console.error("[profile] error loading credentials", err)
-			setError(
-				err instanceof Error ? err.message : "Failed to load credentials",
-			)
-		} finally {
-			setIsLoading(false)
-		}
-	}, [walletAddress])
+			let hasNewNft = false
+			const mapped = credentials.map((cred) => {
+				const isMintedRecently = cred.issuedAt ? (now - cred.issuedAt < 600) : false
+				const isUnseen = seenIds.length > 0 && !seenIds.includes(cred.id)
+				const isNew = isMintedRecently || isUnseen
 
-	useEffect(() => {
-		void fetchCredentials()
-	}, [fetchCredentials])
+				if (isNew) {
+					hasNewNft = true
+				}
+
+				return {
+					id: cred.id,
+					program: cred.programName,
+					date: cred.completionDate,
+					artwork: cred.artworkUrl || undefined,
+					isNew,
+				}
+			})
+
+			setNfts(mapped)
+
+			if (hasNewNft) {
+				confetti({
+					particleCount: 150,
+					spread: 80,
+					origin: { y: 0.6 },
+					colors: ["#00d2ff", "#8e2de2", "#00ff80", "#3a7bd5"],
+				})
+			}
+
+			const allIds = credentials.map((c) => c.id)
+			localStorage.setItem("learnvault_seen_nfts", JSON.stringify(allIds))
+		} else {
+			setNfts([])
+		}
+	}, [credentials])
 
 	useEffect(() => {
 		const summary = getLearningTimeSummary()
@@ -111,7 +108,7 @@ const Profile: React.FC = () => {
 	if (error) {
 		return (
 			<div className="p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
-				<ErrorState message={error} onRetry={fetchCredentials} />
+				<ErrorState message={error} onRetry={refetch} />
 			</div>
 		)
 	}
@@ -182,9 +179,12 @@ const Profile: React.FC = () => {
 				) : (
 					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
 						{nfts.map((nft, index) => (
-							<div
+							<Link
 								key={nft.id}
-								className="glass-card rounded-[2.5rem] overflow-hidden hover:border-brand-cyan/40 hover:-translate-y-3 transition-all duration-700 group animate-in fade-in zoom-in"
+								to={`/credentials/${nft.id}`}
+								className={`glass-card rounded-[2.5rem] overflow-hidden hover:border-brand-cyan/40 hover:-translate-y-3 transition-all duration-700 group animate-in fade-in zoom-in block ${
+									nft.isNew ? "new-nft-card" : ""
+								}`}
 								style={{ animationDelay: `${index * 150}ms` }}
 							>
 								<div className="relative aspect-square overflow-hidden mb-2">
@@ -225,7 +225,7 @@ const Profile: React.FC = () => {
 										</span>
 									</div>
 								</div>
-							</div>
+							</Link>
 						))}
 					</div>
 				)}

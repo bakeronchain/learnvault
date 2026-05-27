@@ -9,6 +9,8 @@ import {
 	useForumThreadDetail,
 } from "../../hooks/useForum"
 import { WalletAddressPill } from "../WalletAddressPill"
+import { EmptyState as StateEmpty } from "../states/emptyState"
+import { connectWallet } from "../../util/wallet"
 
 interface ThreadDetailProps {
 	courseId: string
@@ -138,9 +140,20 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 				</h3>
 
 				{thread.replies?.length === 0 ? (
-					<div className="text-white/40 text-center py-6 glass-card rounded-2xl">
-						No replies yet.
-					</div>
+					<StateEmpty
+						icon="💬"
+						title="No replies yet"
+						description="Be the first to reply to this discussion."
+						ctaLabel={currentAddress ? "Add a reply" : "Connect Wallet"}
+						onCtaClick={async () => {
+							if (currentAddress) {
+								const el = document.querySelector<HTMLTextAreaElement>("textarea[placeholder*='Type your response']")
+								el?.focus()
+							} else {
+								await connectWallet()
+							}
+						}}
+					/>
 				) : (
 					<div className="space-y-4">
 						{thread.replies.map((reply) => (

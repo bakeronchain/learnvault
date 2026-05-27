@@ -8,6 +8,7 @@ import {
 	type ActivityEventFilter,
 } from "../hooks/useActivityFeed"
 import { useWallet } from "../hooks/useWallet"
+import { EmptyState as StateEmpty } from "./states/emptyState"
 
 export interface ActivityFeedProps {
 	address: string | undefined
@@ -169,21 +170,19 @@ export function ActivityFeed({
 					<div className="flex bg-white/5 p-1 rounded-full border border-white/10 self-start">
 						<button
 							onClick={() => setActiveFilter(address ? "all" : "all")}
-							className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
-								activeFilter !== "followed"
+							className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${activeFilter !== "followed"
 									? "bg-brand-cyan text-black"
 									: "text-white/40 hover:text-white/70"
-							}`}
+								}`}
 						>
 							{address ? "Mine" : "All"}
 						</button>
 						<button
 							onClick={() => setActiveFilter("followed")}
-							className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
-								activeFilter === "followed"
+							className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${activeFilter === "followed"
 									? "bg-brand-cyan text-black"
 									: "text-white/40 hover:text-white/70"
-							}`}
+								}`}
 						>
 							Following
 						</button>
@@ -200,14 +199,21 @@ export function ActivityFeed({
 					</div>
 				) : events.length === 0 ? (
 					<div className="text-center py-16">
-						<div className="text-4xl mb-4">
-							{activeFilter === "followed" ? "\u{1F465}" : "\u{1F680}"}
-						</div>
-						<p className="text-white/40 text-sm font-medium">
-							{activeFilter === "followed"
-								? "No activity from scholars you follow"
-								: "No activity yet \u2014 start learning!"}
-						</p>
+						<StateEmpty
+							icon={activeFilter === "followed" ? "👥" : "🚀"}
+							title={
+								activeFilter === "followed"
+									? "No activity from scholars you follow"
+									: "No activity yet"
+							}
+							description={
+								activeFilter === "followed"
+									? "Find and follow scholars to see their activity here."
+									: "Start learning to see activity from your progress."
+							}
+							ctaLabel={activeFilter === "followed" ? "Browse scholars" : "Browse courses"}
+							ctaHref={activeFilter === "followed" ? "/leaderboard" : "/learn"}
+						/>
 					</div>
 				) : (
 					<>

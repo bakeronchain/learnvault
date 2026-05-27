@@ -60,7 +60,7 @@ export const enrollmentsRouter = Router()
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       409:
  *         description: Already enrolled in this course
  *       500:

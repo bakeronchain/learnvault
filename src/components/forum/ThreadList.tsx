@@ -1,4 +1,5 @@
 import React, { useState } from "react"
+import { EmptyState as StateEmpty } from "../states/emptyState"
 import { Button } from "@stellar/design-system"
 import { useQueryClient } from "@tanstack/react-query"
 import ReactMarkdown from "react-markdown"
@@ -141,13 +142,13 @@ export const ThreadList: React.FC<ThreadListProps> = ({
       )}
 
       {!threads?.length && !isComposing && (
-        <div className="text-center py-12 text-white/50 border border-white/5 border-dashed rounded-2xl p-8">
-          <p className="text-4xl mb-4">💭</p>
-          <p>
-            No discussions yet. Be the first to start a conversation about this
-            course!
-          </p>
-        </div>
+        <StateEmpty
+          icon="💭"
+          title="No discussions yet"
+          description="Be the first to start a conversation about this course!"
+          ctaLabel="Start a discussion"
+          onCtaClick={() => setIsComposing(true)}
+        />
       )}
 
       <div className="space-y-4">

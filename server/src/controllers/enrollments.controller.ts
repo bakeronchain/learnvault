@@ -76,6 +76,50 @@ export const createEnrollment = async (
 			return
 		}
 
+		// Validate prerequisites
+		const courseResult = await pool.query(
+			"SELECT id, slug, title, prerequisites FROM courses WHERE slug = $1 OR id::text = $1",
+			[course_id],
+		)
+		if (courseResult.rows.length === 0) {
+			res.status(404).json({
+				error: "Course not found",
+			})
+			return
+		}
+
+		const course = courseResult.rows[0]
+		const prerequisites = course.prerequisites || []
+
+		if (prerequisites.length > 0) {
+			const prereqsResult = await pool.query(
+				"SELECT id, slug, title FROM courses WHERE id = ANY($1::integer[])",
+				[prerequisites],
+			)
+			const prereqSlugs = prereqsResult.rows.map((r: { slug: string }) => r.slug)
+
+			const completedResult = await pool.query(
+				"SELECT course_id FROM scholar_nfts WHERE scholar_address = $1 AND course_id = ANY($2::text[]) AND revoked = FALSE",
+				[learner_address, prereqSlugs],
+			)
+
+			const completedSlugs = new Set(completedResult.rows.map((r: { course_id: string }) => r.course_id))
+			const unmet = []
+			for (const r of prereqsResult.rows) {
+				if (!completedSlugs.has(r.slug)) {
+					unmet.push({ id: r.id, slug: r.slug, title: r.title })
+				}
+			}
+
+			if (unmet.length > 0) {
+				res.status(409).json({
+					error: "Prerequisites not met",
+					unmetPrerequisites: unmet,
+				})
+				return
+			}
+		}
+
 		// Insert enrollment record
 		const versionResult = await pool.query(
 			`SELECT COALESCE(MAX(l.version), 1)::int AS content_version

@@ -20,7 +20,7 @@
     "test:e2e": "playwright test",
     "format": "prettier . --write",
     "docs:generate": "npm run docs:generate --prefix server",
-    "prepare": "husky",
+    "prepare": "command -v husky >/dev/null 2>&1 && husky || true",
     "typecheck": "tsc",
     "test": "cargo test --workspace",
     "test:frontend": "vitest run",

@@ -14,6 +14,7 @@ import { logger } from "./lib/logger"
 import { setupConsoleRequestTracing } from "./lib/request-context"
 import { createRequireTrustedOrigin } from "./middleware/csrf.middleware"
 import { errorHandler } from "./middleware/error.middleware"
+import { maybeMountOpenApiValidator } from "./middleware/openapi-validator.middleware"
 import { globalLimiter } from "./middleware/rate-limit.middleware"
 import { requestLogger } from "./middleware/request-logger.middleware"
 import { buildOpenApiSpec } from "./openapi"
@@ -140,6 +141,9 @@ app.use(
 app.use(createRequireTrustedOrigin(allowedOrigins))
 app.use(express.json())
 app.use(globalLimiter)
+
+// Optional request/response validation against docs/openapi.yaml (CI/test only)
+void maybeMountOpenApiValidator(app)
 
 app.use("/api", healthRouter)
 app.use("/api/auth", createAuthRouter(authService))

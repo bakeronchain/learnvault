@@ -1,4 +1,4 @@
-import React, { useMemo } from "react"
+import React, { useEffect, useMemo, useRef, useState } from "react"
 import { Helmet } from "react-helmet"
 import { useTranslation } from "react-i18next"
 import {
@@ -6,6 +6,7 @@ import {
 	DashboardStatsSkeleton,
 	ActivityFeedSkeleton,
 } from "../components/SkeletonLoader"
+import { EmptyState as StateEmpty } from "../components/states/emptyState"
 import { ErrorState } from "../components/states/errorState"
 import { useToast } from "../components/Toast/ToastProvider"
 import TreasuryHealthChart, {
@@ -97,8 +98,11 @@ const Treasury: React.FC = () => {
 	const { address } = useWallet()
 	const { showInfo } = useToast()
 	const { scholarshipTreasury } = useContractIds()
-	const { balance: treasuryUSDC, isLoading: treasuryLoading } =
-		useUSDC(scholarshipTreasury)
+	const {
+		balance: treasuryUSDC,
+		isLoading: treasuryLoading,
+		dataUpdatedAt: balanceUpdatedAt,
+	} = useUSDC(scholarshipTreasury)
 
 	const {
 		stats,
@@ -110,6 +114,32 @@ const Treasury: React.FC = () => {
 		isLoadingMoreActivity,
 		loadMoreActivity,
 	} = useTreasury()
+
+	const [secondsSinceUpdate, setSecondsSinceUpdate] = useState(0)
+	const [balanceFlash, setBalanceFlash] = useState(false)
+	const prevBalanceRef = useRef<number | undefined>(undefined)
+
+	useEffect(() => {
+		if (balanceUpdatedAt === 0) return
+		setSecondsSinceUpdate(0)
+		const interval = setInterval(() => {
+			setSecondsSinceUpdate(Math.floor((Date.now() - balanceUpdatedAt) / 1000))
+		}, 1000)
+		return () => clearInterval(interval)
+	}, [balanceUpdatedAt])
+
+	useEffect(() => {
+		if (
+			treasuryUSDC !== undefined &&
+			prevBalanceRef.current !== undefined &&
+			prevBalanceRef.current !== treasuryUSDC
+		) {
+			setBalanceFlash(true)
+			const t = setTimeout(() => setBalanceFlash(false), 1200)
+			return () => clearTimeout(t)
+		}
+		prevBalanceRef.current = treasuryUSDC
+	}, [treasuryUSDC])
 
 	const activityLoading = isLoading
 	const statsLoading = isLoading
@@ -163,29 +193,50 @@ const Treasury: React.FC = () => {
 
 	const siteUrl = "https://learnvault.app"
 
+	const lastUpdatedLabel =
+		balanceUpdatedAt === 0
+			? null
+			: secondsSinceUpdate < 5
+				? "Just updated"
+				: `Updated ${secondsSinceUpdate}s ago`
+
+	const availableBalance = treasuryUSDC
+	const totalDisbursedNum = stats
+		? Number(stats.total_disbursed_usdc) / STROOPS_PER_USDC
+		: undefined
+	const totalDepositedNum = stats
+		? Number(stats.total_deposited_usdc) / STROOPS_PER_USDC
+		: undefined
+	const inEscrowBalance =
+		availableBalance !== undefined &&
+		totalDepositedNum !== undefined &&
+		totalDisbursedNum !== undefined
+			? Math.max(0, totalDepositedNum - totalDisbursedNum - availableBalance)
+			: undefined
+
 	const displayStats = stats
 		? {
-				totalTreasury: treasuryLoading
-					? "Loading..."
-					: treasuryUSDC !== undefined
-						? `${treasuryUSDC.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC`
-						: `${formatUSDC(stats.total_deposited_usdc)} USDC`,
-				totalDisbursed: `${formatUSDC(stats.total_disbursed_usdc)} USDC`,
-				scholarsFunded: stats.scholars_funded.toString(),
-				donorsCount: stats.donors_count.toString(),
-			}
+			totalTreasury: treasuryLoading
+				? "Loading..."
+				: treasuryUSDC !== undefined
+					? `${treasuryUSDC.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC`
+					: `${formatUSDC(stats.total_deposited_usdc)} USDC`,
+			totalDisbursed: `${formatUSDC(stats.total_disbursed_usdc)} USDC`,
+			scholarsFunded: stats.scholars_funded.toString(),
+			donorsCount: stats.donors_count.toString(),
+		}
 		: {
-				totalTreasury: treasuryLoading
-					? "Loading..."
-					: treasuryUSDC !== undefined
-						? `${treasuryUSDC.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC`
-						: isError
-							? "Unavailable"
-							: "Loading...",
-				totalDisbursed: isLoading ? "Loading..." : "Unavailable",
-				scholarsFunded: isLoading ? "..." : "—",
-				donorsCount: isLoading ? "..." : "—",
-			}
+			totalTreasury: treasuryLoading
+				? "Loading..."
+				: treasuryUSDC !== undefined
+					? `${treasuryUSDC.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC`
+					: isError
+						? "Unavailable"
+						: "Loading...",
+			totalDisbursed: isLoading ? "Loading..." : "Unavailable",
+			scholarsFunded: isLoading ? "..." : "—",
+			donorsCount: isLoading ? "..." : "—",
+		}
 
 	const deposits = (activity ?? [])
 		.filter((e) => e.type === "deposit")
@@ -238,12 +289,14 @@ const Treasury: React.FC = () => {
 					Failed to load treasury stats.
 				</div>
 			) : (
-				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-20">
-					<StatCard
-						label="Total in Treasury"
+				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-6">
+					<TreasuryBalanceCard
 						value={displayStats.totalTreasury}
-						icon={"💰"}
-						color="text-brand-cyan"
+						isFlashing={balanceFlash}
+						lastUpdatedLabel={lastUpdatedLabel}
+						availableBalance={availableBalance}
+						inEscrowBalance={inEscrowBalance}
+						locale={locale}
 					/>
 					<StatCard
 						label="Total Disbursed"
@@ -310,12 +363,12 @@ const Treasury: React.FC = () => {
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
 				{(activity ?? []).length === 0 ? (
 					<div className="lg:col-span-2">
-						<EmptyState
+						<StateEmpty
 							icon="📭"
 							title="No treasury transactions yet"
 							description="No deposits or disbursements have been recorded yet. Check back soon for updates."
-							ctaLabel="Refresh"
-							ctaHref="#"
+							ctaLabel="View treasury overview"
+							ctaHref="/treasury"
 						/>
 					</div>
 				) : (
@@ -361,6 +414,77 @@ const Treasury: React.FC = () => {
 		</div>
 	)
 }
+
+const TreasuryBalanceCard: React.FC<{
+	value: string
+	isFlashing: boolean
+	lastUpdatedLabel: string | null
+	availableBalance: number | undefined
+	inEscrowBalance: number | undefined
+	locale: string | undefined
+}> = ({
+	value,
+	isFlashing,
+	lastUpdatedLabel,
+	availableBalance,
+	inEscrowBalance,
+	locale,
+}) => (
+	<div className="glass-card p-8 rounded-4xl hover:border-white/20 transition-all hover:-translate-y-2 group sm:col-span-2 lg:col-span-1">
+		<div className="flex items-start justify-between mb-4">
+			<span className="text-3xl group-hover:scale-125 transition-transform duration-500">
+				💰
+			</span>
+			<span className="flex items-center gap-1.5">
+				<span className="w-1.5 h-1.5 rounded-full bg-brand-emerald animate-pulse" />
+				{lastUpdatedLabel && (
+					<span className="text-[9px] font-black uppercase tracking-[1.5px] text-white/30">
+						{lastUpdatedLabel}
+					</span>
+				)}
+			</span>
+		</div>
+		<p className="text-[10px] uppercase font-black text-white/30 tracking-[2px] mb-1">
+			Total in Treasury
+		</p>
+		<p
+			className={`text-2xl font-black text-brand-cyan tracking-tight transition-all duration-300 ${isFlashing ? "scale-105 text-brand-emerald drop-shadow-[0_0_12px_rgba(52,211,153,0.6)]" : ""}`}
+			style={{ transitionProperty: "color, transform, filter" }}
+		>
+			{value}
+		</p>
+		{(availableBalance !== undefined || inEscrowBalance !== undefined) && (
+			<div className="mt-4 pt-4 border-t border-white/5 space-y-1.5">
+				{availableBalance !== undefined && (
+					<div className="flex justify-between items-center">
+						<span className="text-[9px] uppercase font-black text-white/30 tracking-[1.5px]">
+							Available
+						</span>
+						<span className="text-xs font-bold text-brand-emerald">
+							{availableBalance.toLocaleString(locale, {
+								maximumFractionDigits: 2,
+							})}{" "}
+							USDC
+						</span>
+					</div>
+				)}
+				{inEscrowBalance !== undefined && inEscrowBalance > 0 && (
+					<div className="flex justify-between items-center">
+						<span className="text-[9px] uppercase font-black text-white/30 tracking-[1.5px]">
+							In Escrow
+						</span>
+						<span className="text-xs font-bold text-brand-purple">
+							{inEscrowBalance.toLocaleString(locale, {
+								maximumFractionDigits: 2,
+							})}{" "}
+							USDC
+						</span>
+					</div>
+				)}
+			</div>
+		)}
+	</div>
+)
 
 const StatCard: React.FC<{
 	label: string
@@ -451,71 +575,77 @@ const ActivityFeed: React.FC<{
 	loadingMore = false,
 	onLoadMore,
 }) => (
-	<div className="glass p-8 rounded-[2.5rem] border border-white/5">
-		<h3 className="text-xl font-black mb-8 border-l-4 border-brand-cyan pl-4">
-			{title}
-		</h3>
-		<div className="flex flex-col gap-4">
-			{loading ? (
-				<div className="space-y-4 py-2">
-					{Array.from({ length: 3 }).map((_, index) => (
-						<div
-							key={index}
-							className="rounded-2xl border border-white/5 bg-white/5 p-5 animate-pulse"
-						>
-							<div className="h-4 w-24 rounded-full bg-white/10" />
-							<div className="mt-3 h-3 w-16 rounded-full bg-white/5" />
-							<div className="mt-4 h-4 w-28 rounded-full bg-white/10" />
-						</div>
-					))}
-				</div>
-			) : error ? (
-				<div className="text-center text-white/40 py-8">{error}</div>
-			) : items.length === 0 ? (
-				<div className="text-center text-white/40 py-8">{emptyMessage}</div>
-			) : (
-				<>
-					{items.map((item, i) => (
-						<div
-							key={`${item.txHash}-${i}`}
-							className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-colors group"
-						>
-							<div className="flex items-center gap-4">
-								<div
-									className={`w-2 h-2 rounded-full ${item.type === "deposit" ? "bg-brand-emerald animate-pulse" : "bg-brand-purple"}`}
-								/>
-								<div>
-									<p className="font-bold text-sm">{item.user}</p>
-									<p className="text-[10px] text-white/30 uppercase font-black tracking-widest">
-										{item.time}
-									</p>
-									<TxHashLink
-										hash={item.txHash}
-										className="mt-2 inline-flex text-[10px] font-black uppercase tracking-widest text-brand-cyan hover:underline"
-									/>
-								</div>
-							</div>
-							<p
-								className={`font-black ${item.type === "deposit" ? "text-brand-emerald" : "text-white/80"}`}
+		<div className="glass p-8 rounded-[2.5rem] border border-white/5">
+			<h3 className="text-xl font-black mb-8 border-l-4 border-brand-cyan pl-4">
+				{title}
+			</h3>
+			<div className="flex flex-col gap-4">
+				{loading ? (
+					<div className="space-y-4 py-2">
+						{Array.from({ length: 3 }).map((_, index) => (
+							<div
+								key={index}
+								className="rounded-2xl border border-white/5 bg-white/5 p-5 animate-pulse"
 							>
-								{item.amount}
-							</p>
-						</div>
-					))}
-					{showLoadMore && onLoadMore ? (
-						<button
-							type="button"
-							onClick={onLoadMore}
-							disabled={loadingMore}
-							className="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black uppercase tracking-[0.2em] text-white/80 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-						>
-							{loadingMore ? "Loading..." : "Load More"}
-						</button>
-					) : null}
-				</>
-			)}
+								<div className="h-4 w-24 rounded-full bg-white/10" />
+								<div className="mt-3 h-3 w-16 rounded-full bg-white/5" />
+								<div className="mt-4 h-4 w-28 rounded-full bg-white/10" />
+							</div>
+						))}
+					</div>
+				) : error ? (
+					<div className="text-center text-white/40 py-8">{error}</div>
+				) : items.length === 0 ? (
+					<StateEmpty
+						icon="📜"
+						title={emptyMessage}
+						description="There aren't any transactions yet. Once activity appears, it'll show up here."
+						ctaLabel="View treasury overview"
+						ctaHref="/treasury"
+					/>
+				) : (
+					<>
+						{items.map((item, i) => (
+							<div
+								key={`${item.txHash}-${i}`}
+								className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-colors group"
+							>
+								<div className="flex items-center gap-4">
+									<div
+										className={`w-2 h-2 rounded-full ${item.type === "deposit" ? "bg-brand-emerald animate-pulse" : "bg-brand-purple"}`}
+									/>
+									<div>
+										<p className="font-bold text-sm">{item.user}</p>
+										<p className="text-[10px] text-white/30 uppercase font-black tracking-widest">
+											{item.time}
+										</p>
+										<TxHashLink
+											hash={item.txHash}
+											className="mt-2 inline-flex text-[10px] font-black uppercase tracking-widest text-brand-cyan hover:underline"
+										/>
+									</div>
+								</div>
+								<p
+									className={`font-black ${item.type === "deposit" ? "text-brand-emerald" : "text-white/80"}`}
+								>
+									{item.amount}
+								</p>
+							</div>
+						))}
+						{showLoadMore && onLoadMore ? (
+							<button
+								type="button"
+								onClick={onLoadMore}
+								disabled={loadingMore}
+								className="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black uppercase tracking-[0.2em] text-white/80 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+							>
+								{loadingMore ? "Loading..." : "Load More"}
+							</button>
+						) : null}
+					</>
+				)}
+			</div>
 		</div>
-	</div>
-)
+	)
 
 export default Treasury

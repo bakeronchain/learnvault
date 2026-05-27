@@ -31,6 +31,7 @@ const DONORS_KEY: Symbol = symbol_short!("DONORS");
 const PAUSED_KEY: Symbol = symbol_short!("PAUSED");
 const TOTAL_GOV_KEY: Symbol = symbol_short!("TOTALGOV");
 const MIN_LRN_TO_PROPOSE_KEY: Symbol = symbol_short!("MINPROP");
+const SUPPORTED_ASSETS_KEY: Symbol = symbol_short!("ASSETS");
 const GOV_PER_USDC: i128 = 100;
 const PROPOSAL_DEADLINE_LEDGERS: u32 = 100_800;
 const QUORUM_KEY: Symbol = symbol_short!("QUORUM");
@@ -49,6 +50,7 @@ pub enum DataKey {
     VoteCast(u32, Address), // (proposal_id, voter) -> bool
     FinalizedProposal(u32), // proposal_id -> ProposalStatus (set by finalize_proposal)
     VetoCast(u32, Address), // (proposal_id, voter) -> bool
+    AssetDeposited(Address), // total deposited per asset (atomic units)
 }
 
 #[contractevent(topics = ["proposal_executed"])]
@@ -142,6 +144,8 @@ pub enum Error {
     NotQueued = 21,
     /// Supermajority veto threshold has not been reached.
     VetoNotMet = 22,
+    /// Asset is not in the supported assets list.
+    UnsupportedAsset = 23,
 }
 
 #[contract]
@@ -153,6 +157,7 @@ pub struct DepositRecorded {
     #[topic]
     pub donor: Address,
     pub amount: i128,
+    pub asset: Address,
 }
 
 #[contractevent(topics = ["gov_issued"])]
@@ -219,6 +224,13 @@ impl ScholarshipTreasury {
         env.storage().instance().set(&ADMIN_KEY, &admin);
         upgrade::init(&env);
         env.storage().instance().set(&USDC_KEY, &usdc_token);
+
+        // Seed supported assets list with USDC as the primary asset
+        let mut initial_assets: Vec<Address> = Vec::new(&env);
+        initial_assets.push_back(usdc_token.clone());
+        env.storage()
+            .instance()
+            .set(&SUPPORTED_ASSETS_KEY, &initial_assets);
         env.storage().instance().set(&GOV_KEY, &governance_contract);
         env.storage().instance().set(&TOTAL_KEY, &0_i128);
         env.storage().instance().set(&NEXT_PROPOSAL_KEY, &1_u32);
@@ -335,7 +347,7 @@ impl ScholarshipTreasury {
             .unwrap_or(false)
     }
 
-    pub fn deposit(env: Env, donor: Address, amount: i128) {
+    pub fn deposit(env: Env, donor: Address, amount: i128, asset: Address) {
         Self::assert_not_paused(&env);
 
         if amount <= 0 {
@@ -343,8 +355,19 @@ impl ScholarshipTreasury {
         }
         donor.require_auth();
 
-        let usdc = token::client(&env);
-        usdc.transfer(&donor, env.current_contract_address(), &amount);
+        // Validate asset is in the supported list
+        let supported: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&SUPPORTED_ASSETS_KEY)
+            .unwrap_or(Vec::new(&env));
+        if !supported.contains(&asset) {
+            panic_with_error!(&env, Error::UnsupportedAsset);
+        }
+
+        // Transfer the deposited asset to the contract
+        soroban_sdk::token::TokenClient::new(&env, &asset)
+            .transfer(&donor, &env.current_contract_address(), &amount);
 
         let gov_contract = Self::governance_contract(&env);
         let gov_client = governance::client(&env, &gov_contract);
@@ -368,6 +391,17 @@ impl ScholarshipTreasury {
         let new_total_gov = Self::checked_add_i128(&env, total_gov, gov_amount);
         env.storage().instance().set(&TOTAL_GOV_KEY, &new_total_gov);
 
+        // Track per-asset total deposited
+        let asset_key = DataKey::AssetDeposited(asset.clone());
+        let asset_current = env
+            .storage()
+            .persistent()
+            .get::<_, i128>(&asset_key)
+            .unwrap_or(0);
+        let new_asset_total = Self::checked_add_i128(&env, asset_current, amount);
+        env.storage().persistent().set(&asset_key, &new_asset_total);
+        Self::extend_persistent(&env, &asset_key);
+
         let donor_key = DataKey::Donor(donor.clone());
         let current = env
             .storage()
@@ -390,15 +424,23 @@ impl ScholarshipTreasury {
 
         Self::extend_persistent(&env, &donor_key);
 
-        let total = env
+        // Only USDC deposits count toward the disbursable TOTAL_KEY balance
+        let usdc_address: Address = env
             .storage()
             .instance()
-            .get::<_, i128>(&TOTAL_KEY)
-            .unwrap_or(0);
-        let new_total = Self::checked_add_i128(&env, total, amount);
-        env.storage().instance().set(&TOTAL_KEY, &new_total);
+            .get::<_, Address>(&USDC_KEY)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::NotInitialized));
+        if asset == usdc_address {
+            let total = env
+                .storage()
+                .instance()
+                .get::<_, i128>(&TOTAL_KEY)
+                .unwrap_or(0);
+            let new_total = Self::checked_add_i128(&env, total, amount);
+            env.storage().instance().set(&TOTAL_KEY, &new_total);
+        }
 
-        DepositRecorded { donor, amount }.publish(&env);
+        DepositRecorded { donor, amount, asset }.publish(&env);
     }
 
     pub fn disburse(env: Env, recipient: Address, amount: i128) {
@@ -603,6 +645,41 @@ impl ScholarshipTreasury {
         env.storage()
             .persistent()
             .get::<_, i128>(&DataKey::Donor(donor))
+            .unwrap_or(0)
+    }
+
+    /// Admin-only: add an asset to the supported assets list for deposits.
+    pub fn add_supported_asset(env: Env, asset: Address) {
+        let admin = Self::admin(&env);
+        admin.require_auth();
+
+        let mut assets: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&SUPPORTED_ASSETS_KEY)
+            .unwrap_or(Vec::new(&env));
+
+        if !assets.contains(&asset) {
+            assets.push_back(asset);
+            env.storage().instance().set(&SUPPORTED_ASSETS_KEY, &assets);
+        }
+        Self::extend_instance(&env);
+    }
+
+    /// Returns the list of token addresses accepted for deposits.
+    pub fn get_supported_assets(env: Env) -> Vec<Address> {
+        Self::extend_instance(&env);
+        env.storage()
+            .instance()
+            .get::<_, Vec<Address>>(&SUPPORTED_ASSETS_KEY)
+            .unwrap_or(Vec::new(&env))
+    }
+
+    /// Returns the cumulative amount deposited for a given asset (in atomic units).
+    pub fn get_asset_deposited(env: Env, asset: Address) -> i128 {
+        env.storage()
+            .persistent()
+            .get::<_, i128>(&DataKey::AssetDeposited(asset))
             .unwrap_or(0)
     }
 

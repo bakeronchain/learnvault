@@ -24,21 +24,37 @@ const API_BASE = import.meta.env.VITE_SERVER_URL || "http://localhost:4000"
 const CHART_WINDOW_DAYS = 7
 const STROOPS_PER_USDC = 10000000
 
+interface AssetBalance {
+	asset: string
+	symbol: string
+	deposited: string
+	usd_equivalent: string
+}
+
 interface TreasuryStats {
 	total_deposited_usdc: string
 	total_disbursed_usdc: string
 	scholars_funded: number
 	active_proposals: number
 	donors_count: number
+	asset_balances?: AssetBalance[]
 }
 
 interface TreasuryEvent {
 	type: "deposit" | "disburse"
 	amount?: string
+	asset?: string
+	asset_symbol?: string
 	address?: string
 	scholar?: string
 	tx_hash: string
 	created_at: string
+}
+
+const ASSET_COLORS: Record<string, string> = {
+	USDC: "text-brand-cyan",
+	EURC: "text-brand-blue",
+	XLM: "text-brand-purple",
 }
 
 const startOfDay = (value: Date) =>
@@ -317,6 +333,22 @@ const Treasury: React.FC = () => {
 				</div>
 			)}
 
+			{/* Per-currency treasury balances */}
+			{stats?.asset_balances && stats.asset_balances.length > 0 && (
+				<div className="mb-8">
+					<div className="glass-card rounded-[3rem] border border-white/5 p-8">
+						<h3 className="mb-6 text-lg font-black uppercase tracking-widest text-white/60">
+							Treasury Holdings by Currency
+						</h3>
+						<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+							{stats.asset_balances.map((ab) => (
+								<AssetBalanceCard key={ab.asset} balance={ab} locale={locale} />
+							))}
+						</div>
+					</div>
+				</div>
+			)}
+
 			<div className="mb-20">
 				<div className="glass-card p-10 rounded-[3rem] relative overflow-hidden">
 					<div className="flex justify-between items-end mb-12">
@@ -375,7 +407,7 @@ const Treasury: React.FC = () => {
 							title="Recent Community Deposits"
 							items={deposits.map((event) => ({
 								user: formatAddress(event.address || "unknown"),
-								amount: `+${formatAmount(event.amount || "0")} USDC`,
+								amount: `+${formatAmount(event.amount || "0")} ${event.asset_symbol || "USDC"}`,
 								time: formatTime(event.created_at),
 								type: "deposit" as const,
 								txHash: event.tx_hash,
@@ -664,5 +696,34 @@ const ActivityFeed: React.FC<{
 			</div>
 		</div>
 	)
+
+const AssetBalanceCard: React.FC<{
+	balance: AssetBalance
+	locale: string | undefined
+}> = ({ balance, locale }) => {
+	const colorClass = ASSET_COLORS[balance.symbol] ?? "text-white"
+	const deposited = Number(balance.deposited) / STROOPS_PER_USDC
+	const usdValue = parseFloat(balance.usd_equivalent)
+
+	return (
+		<div className="flex flex-col gap-2 rounded-2xl border border-white/5 bg-white/5 p-5">
+			<div className="flex items-center justify-between">
+				<span className="text-xs font-black uppercase tracking-widest text-white/40">
+					{balance.symbol}
+				</span>
+				<span className={`text-xs font-black uppercase tracking-widest ${colorClass}`}>
+					●
+				</span>
+			</div>
+			<p className={`text-xl font-black tracking-tight ${colorClass}`}>
+				{deposited.toLocaleString(locale, { maximumFractionDigits: 2 })}{" "}
+				{balance.symbol}
+			</p>
+			<p className="text-xs text-white/30">
+				≈ ${usdValue.toLocaleString(locale, { maximumFractionDigits: 2 })} USD
+			</p>
+		</div>
+	)
+}
 
 export default Treasury

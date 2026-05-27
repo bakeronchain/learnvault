@@ -15,10 +15,49 @@ interface DepositMoreProps {
 	onDepositSuccess?: () => void
 }
 
+type CurrencyCode = "USDC" | "EURC" | "XLM"
+
+interface CurrencyOption {
+	code: CurrencyCode
+	label: string
+	envKey: string
+	description: string
+}
+
+const CURRENCIES: CurrencyOption[] = [
+	{
+		code: "USDC",
+		label: "USDC",
+		envKey: "VITE_USDC_CONTRACT_ID",
+		description: "USD Coin",
+	},
+	{
+		code: "EURC",
+		label: "EURC",
+		envKey: "VITE_EURC_CONTRACT_ID",
+		description: "Euro Coin",
+	},
+	{
+		code: "XLM",
+		label: "XLM",
+		envKey: "VITE_XLM_SAC_CONTRACT_ID",
+		description: "Native Stellar",
+	},
+]
+
+function getAssetContractId(currency: CurrencyCode): string | undefined {
+	const env = import.meta.env as Record<string, unknown>
+	const option = CURRENCIES.find((c) => c.code === currency)
+	if (!option) return undefined
+	const value = env[option.envKey]
+	return typeof value === "string" && value.trim() ? value.trim() : undefined
+}
+
 export const DepositMore: React.FC<DepositMoreProps> = ({
 	onDepositSuccess,
 }) => {
 	const [amount, setAmount] = useState("")
+	const [currency, setCurrency] = useState<CurrencyCode>("USDC")
 	const [isLoading, setIsLoading] = useState(false)
 	const [lastTxHash, setLastTxHash] = useState<string | null>(null)
 	const { scholarshipTreasury } = useContractIds()
@@ -60,6 +99,14 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 			return
 		}
 
+		const assetContractId = getAssetContractId(currency)
+		if (!assetContractId) {
+			showError(
+				`${currency} contract address is not configured. Set VITE_${currency === "XLM" ? "XLM_SAC" : currency}_CONTRACT_ID in your environment.`,
+			)
+			return
+		}
+
 		setIsLoading(true)
 		setLastTxHash(null)
 
@@ -69,11 +116,15 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 				contractId,
 				address,
 			)
-			const txHash = await treasuryContract.deposit(amount, signTransaction)
+			const txHash = await treasuryContract.deposit(
+				amount,
+				assetContractId,
+				signTransaction,
+			)
 			setLastTxHash(txHash)
 			await updateBalances()
 			showSuccess(
-				`Deposit of ${formatUsdcAmount(amount)} submitted. Tx: ${txHash.slice(0, 8)}...`,
+				`Deposit of ${formatUsdcAmount(amount)} ${currency} submitted. Tx: ${txHash.slice(0, 8)}...`,
 			)
 			setAmount("")
 			onDepositSuccess?.()
@@ -88,6 +139,8 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 		}
 	}
 
+	const govAmount = amount ? parseFloat(amount).toLocaleString() : "0.00"
+
 	return (
 		<section className="mb-20">
 			<div className="mb-12 flex items-center gap-4">
@@ -97,13 +150,39 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 
 			<form onSubmit={handleDeposit}>
 				<div className="glass-card max-w-2xl rounded-[3rem] border border-white/5 p-12">
+					{/* Currency selector */}
+					<div className="mb-8">
+						<p className="mb-4 text-xs font-black uppercase tracking-widest text-white/40">
+							Currency
+						</p>
+						<div className="grid grid-cols-3 gap-3">
+							{CURRENCIES.map((c) => (
+								<button
+									key={c.code}
+									type="button"
+									onClick={() => setCurrency(c.code)}
+									className={`rounded-xl px-4 py-3 text-sm font-black uppercase tracking-widest transition-all ${
+										currency === c.code
+											? "bg-brand-cyan text-black shadow-[0_0_20px_rgba(0,210,255,0.3)]"
+											: "border border-white/10 bg-white/5 text-white/40 hover:border-white/30 hover:text-white"
+									}`}
+								>
+									<span className="block">{c.label}</span>
+									<span className="block text-[10px] font-medium normal-case tracking-normal opacity-70">
+										{c.description}
+									</span>
+								</button>
+							))}
+						</div>
+					</div>
+
 					<div className="mb-8">
 						<label className="mb-4 block text-sm font-black uppercase tracking-widest text-white/40">
 							Deposit Amount
 						</label>
 						<div className="relative">
 							<span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-brand-cyan">
-								$
+								{currency === "USDC" || currency === "EURC" ? "$" : "✦"}
 							</span>
 							<input
 								type="text"
@@ -113,7 +192,7 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 								className="w-full rounded-2xl border border-white/10 bg-white/5 px-12 py-4 text-2xl font-black text-white placeholder:text-white/20 transition-all focus:border-brand-cyan/50 focus:outline-none focus:ring-2 focus:ring-brand-cyan/20"
 							/>
 							<span className="absolute right-6 top-1/2 -translate-y-1/2 text-sm font-black uppercase tracking-widest text-white/40">
-								USDC
+								{currency}
 							</span>
 						</div>
 					</div>
@@ -134,7 +213,7 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 											: "border border-white/10 bg-white/5 text-white/40 hover:border-white/30 hover:text-white"
 									}`}
 								>
-									${value}
+									{currency === "XLM" ? value : `$${value}`}
 								</button>
 							))}
 						</div>
@@ -146,15 +225,23 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 						<div className="flex items-center justify-between text-sm">
 							<span className="text-white/40">You will receive</span>
 							<span className="font-black text-brand-cyan">
-								{amount
-									? `${parseFloat(amount).toLocaleString()} GOV`
-									: "0.00 GOV"}
+								{govAmount} GOV
 							</span>
 						</div>
 						<div className="flex items-center justify-between text-xs">
 							<span className="text-white/30">Exchange rate</span>
-							<span className="text-white/40">1 USDC = 1 GOV</span>
+							<span className="text-white/40">
+								1 {currency} = 1 GOV
+							</span>
 						</div>
+						{currency !== "USDC" && (
+							<div className="flex items-center justify-between text-xs">
+								<span className="text-white/30">Note</span>
+								<span className="text-white/40">
+									{currency} deposits fund the treasury directly
+								</span>
+							</div>
+						)}
 					</div>
 
 					<button
@@ -169,7 +256,7 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 						{isLoading
 							? "Processing..."
 							: address
-								? `Deposit ${amount ? `$${parseFloat(amount).toLocaleString()}` : "USDC"}`
+								? `Deposit ${amount ? `${currency === "XLM" ? "" : "$"}${parseFloat(amount || "0").toLocaleString()}` : ""} ${currency}`
 								: "Connect Wallet to Deposit"}
 					</button>
 

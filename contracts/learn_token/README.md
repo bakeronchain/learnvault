@@ -1,33 +1,68 @@
 # LearnToken Contract
 
-Soulbound SEP-41 style LRN reputation token minted to learners after verified
-course milestones.
+## Purpose and Role
 
-## Authority and Trust Assumptions
+`learn_token` implements the soulbound LRN token. It represents learner
+reputation earned from verified milestones and intentionally cannot be traded or
+approved for transfer.
 
-- `initialize(admin)` requires `admin` authorization and can run once.
-- Stored `ADMIN` can mint, transfer admin authority, and upgrade the contract.
-- Production `ADMIN` should be the `CourseMilestone` controller or a multisig
-  that only mints from verified milestone flows.
+## Key Functions
 
-## Functions
+| Function | Parameters | Access | Description |
+| --- | --- | --- | --- |
+| `initialize` | `admin` | `admin` auth | Sets token metadata, admin, decimals, and upgrade tracking. |
+| `mint` | `to`, `amount` | stored admin | Mints LRN for a learner after verified progress. |
+| `set_admin` | `new_admin` | stored admin | Transfers admin control. |
+| `transfer`, `transfer_from`, `approve` | token args | always rejects | Reverts because LRN is soulbound. |
+| `allowance` | `from`, `spender` | public read | Always returns `0`. |
+| `balance` | `account` | public read | Returns a learner balance. |
+| `total_supply` | none | public read | Returns minted LRN supply. |
+| `reputation_score` | `account` | public read | Returns `balance / 100`. |
+| `decimals`, `name`, `symbol`, `get_version` | none | public read | Metadata and version helpers. |
+| `upgrade` | `new_wasm_hash` | stored admin | Upgrades the contract WASM through the shared helper. |
 
-| Function | Access | Notes |
-| --- | --- | --- |
-| `initialize(admin)` | Admin auth | Sets token metadata, admin, decimals, and upgrade hash tracking. |
-| `mint(to, amount)` | Stored admin | Rejects non-positive amount and uses checked balance/supply arithmetic. |
-| `set_admin(new_admin)` | Stored admin | Transfers admin authority. |
-| `upgrade(new_wasm_hash)` | Stored admin | Replaces current WASM through shared upgrade helper. |
-| `transfer`, `transfer_from`, `approve` | Always rejected | Enforces soulbound behavior. |
-| `allowance` | Public read | Always returns `0`. |
-| `balance(account)` | Public read | Returns account LRN balance. |
-| `total_supply()` | Public read | Returns total minted LRN. |
-| `decimals`, `name`, `symbol`, `get_version` | Public read | Token metadata and version. |
-| `reputation_score(account)` | Public read | Integer `balance / 100` score. |
+## Authorization Model
 
-## Audit Focus
+- `initialize` requires the provided admin address to authorize once.
+- Stored admin can mint, rotate admin, and upgrade.
+- No holder can transfer, approve, or delegate LRN because the token is
+  soulbound.
+- Read methods are public.
 
-- Admin-only minting cannot be bypassed.
-- Soulbound methods always revert.
-- Balance and total supply cannot overflow.
-- Upgrade authority matches production key-management policy.
+## State Variables
+
+| Storage Key | Meaning |
+| --- | --- |
+| `ADMIN` | Current administrator address. |
+| `NAME`, `SYMBOL`, `DECIMALS` | Token metadata. |
+| `Balance(account)` | LRN balance for an account. |
+| `TotalSupply` | Total minted LRN. |
+| `WASMHASH` | Last tracked managed upgrade hash from the shared helper. |
+
+## Events Emitted
+
+- `lrn_mint` with topic data `(to)` and payload `amount`
+- `set_admin` with payload `new_admin`
+- `contract_upgraded` from the shared upgrade helper
+
+## Deploy with Stellar CLI
+
+From the repository root:
+
+```bash
+stellar contract build --package learn-token
+stellar contract deploy \
+  --wasm target/wasm32v1-none/release/learn_token.wasm \
+  --source <IDENTITY> \
+  --network <NETWORK>
+```
+
+Initialize after deploy by invoking `initialize(admin)`.
+
+## Run Tests
+
+From the repository root:
+
+```bash
+cargo test -p learn-token
+```

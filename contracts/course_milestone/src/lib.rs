@@ -40,6 +40,8 @@ pub enum DataKey {
     Course(String),
     CourseIds,
     CompletedCount(Address, String),
+    OracleConfig,
+    OracleEvidence(Address, String, u32),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -67,10 +69,33 @@ pub struct MilestoneSubmission {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[contracttype]
+pub struct OracleConfig {
+    pub oracle: Address,
+    pub manual_fallback_enabled: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+pub struct OracleEvidence {
+    pub evidence_hash: String,
+    pub verified_at: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
 pub struct SubmittedEventData {
     pub learner: Address,
     pub course_id: String,
     pub evidence_uri: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+pub struct OracleVerificationRecorded {
+    pub learner: Address,
+    pub course_id: String,
+    pub milestone_id: u32,
+    pub evidence_hash: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -104,6 +129,8 @@ pub enum Error {
     AlreadyCompleted = 14,
     InvalidReward = 15,
     ArithmeticOverflow = 16,
+    OracleUnavailable = 17,
+    ManualFallbackDisabled = 18,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -211,6 +238,32 @@ impl CourseMilestone {
         config.active = false;
         env.storage().persistent().set(&course_key, &config);
         Self::extend_persistent(&env, &course_key);
+    }
+
+    pub fn set_oracle_config(
+        env: Env,
+        admin: Address,
+        oracle: Address,
+        manual_fallback_enabled: bool,
+    ) {
+        Self::assert_not_paused(&env);
+        Self::require_initialized(&env);
+        Self::require_admin(&env, &admin);
+
+        let config = OracleConfig {
+            oracle,
+            manual_fallback_enabled,
+        };
+        env.storage().persistent().set(&DataKey::OracleConfig, &config);
+        Self::extend_persistent(&env, &DataKey::OracleConfig);
+    }
+
+    pub fn get_oracle_config(env: Env) -> Option<OracleConfig> {
+        let config: Option<OracleConfig> = env.storage().persistent().get(&DataKey::OracleConfig);
+        if config.is_some() {
+            Self::extend_persistent(&env, &DataKey::OracleConfig);
+        }
+        config
     }
 
     pub fn get_course(env: Env, course_id: String) -> Option<CourseConfig> {
@@ -526,6 +579,15 @@ impl CourseMilestone {
         Self::require_initialized(&env);
         admin.require_auth();
 
+        let oracle_config: Option<OracleConfig> =
+            env.storage().persistent().get(&DataKey::OracleConfig);
+        if let Some(config) = oracle_config {
+            Self::extend_persistent(&env, &DataKey::OracleConfig);
+            if !config.manual_fallback_enabled {
+                panic_with_error!(&env, Error::ManualFallbackDisabled);
+            }
+        }
+
         let stored_admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap();
         if admin != stored_admin {
             panic_with_error!(&env, Error::Unauthorized);
@@ -586,6 +648,120 @@ impl CourseMilestone {
         );
 
         Self::emit_course_completed_if_ready(&env, &learner, &course_id);
+    }
+
+    pub fn oracle_verify_milestone(
+        env: Env,
+        oracle: Address,
+        learner: Address,
+        course_id: String,
+        milestone_id: u32,
+        tokens_amount: i128,
+        evidence_hash: String,
+    ) {
+        if Self::is_paused(env.clone()) {
+            panic_with_error!(&env, Error::ContractPaused);
+        }
+
+        Self::require_initialized(&env);
+        oracle.require_auth();
+
+        let config: OracleConfig = env
+            .storage()
+            .persistent()
+            .get(&DataKey::OracleConfig)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::OracleUnavailable));
+        Self::extend_persistent(&env, &DataKey::OracleConfig);
+
+        if oracle != config.oracle {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
+
+        if tokens_amount < 0 {
+            panic_with_error!(&env, Error::InvalidReward);
+        }
+
+        if !Self::is_enrolled(env.clone(), learner.clone(), course_id.clone()) {
+            panic_with_error!(&env, Error::NotEnrolled);
+        }
+        Self::ensure_valid_milestone(&env, &course_id, milestone_id);
+
+        let state_key = DataKey::MilestoneState(learner.clone(), course_id.clone(), milestone_id);
+        let current_state = env
+            .storage()
+            .persistent()
+            .get::<_, MilestoneStatus>(&state_key)
+            .unwrap_or(MilestoneStatus::NotStarted);
+
+        if current_state != MilestoneStatus::Pending {
+            panic_with_error!(&env, Error::InvalidState);
+        }
+
+        env.storage()
+            .persistent()
+            .set(&state_key, &MilestoneStatus::Approved);
+        let completed_key = DataKey::Completed(learner.clone(), course_id.clone(), milestone_id);
+        env.storage().persistent().set(&completed_key, &true);
+
+        if tokens_amount > 0 {
+            let learn_token_address: Address =
+                env.storage().instance().get(&LEARN_TOKEN_KEY).unwrap();
+            let learn_token_client = LearnTokenClient::new(&env, &learn_token_address);
+            learn_token_client.mint(&learner, &tokens_amount);
+        }
+
+        let evidence_key =
+            DataKey::OracleEvidence(learner.clone(), course_id.clone(), milestone_id);
+        let evidence = OracleEvidence {
+            evidence_hash: evidence_hash.clone(),
+            verified_at: env.ledger().timestamp(),
+        };
+        env.storage().persistent().set(&evidence_key, &evidence);
+
+        Self::extend_persistent(&env, &state_key);
+        Self::extend_persistent(&env, &completed_key);
+        Self::extend_persistent(&env, &evidence_key);
+
+        let count_key = DataKey::CompletedCount(learner.clone(), course_id.clone());
+        let count: u32 = env.storage().persistent().get(&count_key).unwrap_or(0);
+        env.storage().persistent().set(&count_key, &(count + 1));
+        Self::extend_persistent(&env, &count_key);
+
+        env.events().publish(
+            (symbol_short!("orcl_ok"),),
+            OracleVerificationRecorded {
+                learner: learner.clone(),
+                course_id: course_id.clone(),
+                milestone_id,
+                evidence_hash,
+            },
+        );
+
+        env.events().publish(
+            (symbol_short!("ms_done"),),
+            MilestoneCompleted {
+                learner: learner.clone(),
+                course_id: course_id.clone(),
+                milestone_id,
+                lrn_reward: tokens_amount,
+            },
+        );
+
+        Self::emit_course_completed_if_ready(&env, &learner, &course_id);
+    }
+
+    pub fn get_oracle_evidence(
+        env: Env,
+        learner: Address,
+        course_id: String,
+        milestone_id: u32,
+    ) -> Option<OracleEvidence> {
+        let key = DataKey::OracleEvidence(learner, course_id, milestone_id);
+        let evidence: Option<OracleEvidence> = env.storage().persistent().get(&key);
+        if evidence.is_some() {
+            Self::extend_persistent(&env, &key);
+        }
+        evidence
     }
 
     /// Verify multiple milestone submissions in a single atomic transaction.

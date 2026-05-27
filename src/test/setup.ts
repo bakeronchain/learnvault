@@ -45,9 +45,7 @@ vi.mock("../contracts/scholarship_treasury", () => ({
 	default: mockContracts.scholarshipTreasury,
 }))
 
-vi.mock("../contracts/guess_the_number", () => ({
-	default: mockContracts.guessTheNumber,
-}))
+
 
 // Mock @stellar/design-system to avoid CSS import issues
 vi.mock("@stellar/design-system", () => ({
@@ -100,8 +98,7 @@ const mockEnv = {
 		"CGOV1234567890ABCDEFGHIJKLMN9876543210ZYXWVUTSRQPO",
 	PUBLIC_SCHOLARSHIP_TREASURY_CONTRACT_ID:
 		"CSCHOL1234567890ABCDEFGHIJKLMN9876543210ZYXWVUTSRQPO",
-	PUBLIC_GUESS_THE_NUMBER_CONTRACT_ID:
-		"CGUESS1234567890ABCDEFGHIJKLMN9876543210ZYXWVUTSRQPO",
+	
 }
 
 // Stub import.meta.env for modules that read contract addresses at load time
@@ -129,7 +126,6 @@ vi.mock("../hooks/useContractIds", () => ({
 		learnToken: mockEnv.PUBLIC_LEARN_TOKEN_CONTRACT_ID,
 		governanceToken: mockEnv.PUBLIC_GOVERNANCE_TOKEN_CONTRACT_ID,
 		scholarshipTreasury: mockEnv.PUBLIC_SCHOLARSHIP_TREASURY_CONTRACT_ID,
-		guessTheNumber: mockEnv.PUBLIC_GUESS_THE_NUMBER_CONTRACT_ID,
 		isDeployed: (id: string | undefined) => Boolean(id),
 	}),
 }))

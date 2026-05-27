@@ -1,6 +1,7 @@
 import { type Request, type Response } from "express"
 import sanitizeHtml from "sanitize-html"
 import { milestoneStore, type MilestoneReport } from "../db/milestone-store"
+import { createNotification } from "../db/notifications-store"
 import {
 	attachPeerSummariesToReports,
 	listRecentPeerReviewsForReport,
@@ -168,6 +169,20 @@ export async function approveMilestone(
 			contract_tx_hash: contractResult.txHash,
 		})
 
+		// In-app notification (non-blocking)
+		void createNotification({
+			recipient_address: report.scholar_address,
+			type: "milestone_approved",
+			message: `Your milestone "${report.milestone_title ?? `Milestone ${report.milestone_number ?? report.milestone_id}`}" for course "${report.course_title ?? report.course_id}" was approved.`,
+			href: "/scholar/milestones",
+			data: {
+				report_id: id,
+				course_id: report.course_id,
+				milestone_id: report.milestone_id,
+				contract_tx_hash: contractResult.txHash,
+			},
+		})
+
 		try {
 			if (report.scholar_email) {
 				await emailService.sendNotification({
@@ -299,6 +314,21 @@ export async function rejectMilestone(
 			contract_tx_hash: contractResult.txHash,
 		})
 
+		// In-app notification (non-blocking)
+		void createNotification({
+			recipient_address: report.scholar_address,
+			type: "milestone_rejected",
+			message: `Your milestone "${report.milestone_title ?? `Milestone ${report.milestone_number ?? report.milestone_id}`}" for course "${report.course_title ?? report.course_id}" was rejected. Reason: ${sanitizedReason}`,
+			href: "/scholar/milestones",
+			data: {
+				report_id: id,
+				course_id: report.course_id,
+				milestone_id: report.milestone_id,
+				rejection_reason: sanitizedReason,
+				contract_tx_hash: contractResult.txHash,
+			},
+		})
+
 		try {
 			if (report.scholar_email) {
 				await emailService.sendNotification({
@@ -413,6 +443,18 @@ export async function batchApproveMilestones(
 				rejection_reason: null,
 				contract_tx_hash: contractResult.txHash,
 			})
+			void createNotification({
+				recipient_address: report.scholar_address,
+				type: "milestone_approved",
+				message: `Your milestone "${report.milestone_title ?? `Milestone ${report.milestone_number ?? report.milestone_id}`}" for course "${report.course_title ?? report.course_id}" was approved.`,
+				href: "/scholar/milestones",
+				data: {
+					report_id: id,
+					course_id: report.course_id,
+					milestone_id: report.milestone_id,
+					contract_tx_hash: contractResult.txHash,
+				},
+			})
 			results.push({
 				reportId: id,
 				success: true,
@@ -502,6 +544,19 @@ export async function batchRejectMilestones(
 				decision: "rejected",
 				rejection_reason: reason,
 				contract_tx_hash: contractResult.txHash,
+			})
+			void createNotification({
+				recipient_address: report.scholar_address,
+				type: "milestone_rejected",
+				message: `Your milestone "${report.milestone_title ?? `Milestone ${report.milestone_number ?? report.milestone_id}`}" for course "${report.course_title ?? report.course_id}" was rejected. Reason: ${reason}`,
+				href: "/scholar/milestones",
+				data: {
+					report_id: id,
+					course_id: report.course_id,
+					milestone_id: report.milestone_id,
+					rejection_reason: reason,
+					contract_tx_hash: contractResult.txHash,
+				},
 			})
 			results.push({
 				reportId: id,

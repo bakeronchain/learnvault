@@ -1,6 +1,7 @@
 import { Icon } from "@stellar/design-system"
 import React, { useState, useEffect, useRef } from "react"
 import { Link, useNavigate } from "react-router-dom"
+import { EmptyState as StateEmpty } from "./states/emptyState"
 import { useCourses } from "../hooks/useCourses"
 import { useWikiPages } from "../hooks/useWiki"
 
@@ -16,31 +17,31 @@ const GlobalSearch: React.FC = () => {
 	const results =
 		query.length >= 2
 			? [
-					...courses
-						.filter(
-							(c) =>
-								c.title.toLowerCase().includes(query.toLowerCase()) ||
-								c.description.toLowerCase().includes(query.toLowerCase()),
-						)
-						.map((c) => ({
-							id: `course-${c.id}`,
-							title: c.title,
-							category: "Course",
-							link: `/courses`,
-						})),
-					...wikiPages
-						.filter(
-							(p) =>
-								p.title.toLowerCase().includes(query.toLowerCase()) ||
-								p.content.toLowerCase().includes(query.toLowerCase()),
-						)
-						.map((p) => ({
-							id: `wiki-${p.id}`,
-							title: p.title,
-							category: "Wiki",
-							link: `/wiki/${p.slug}`,
-						})),
-				].slice(0, 8)
+				...courses
+					.filter(
+						(c) =>
+							c.title.toLowerCase().includes(query.toLowerCase()) ||
+							c.description.toLowerCase().includes(query.toLowerCase()),
+					)
+					.map((c) => ({
+						id: `course-${c.id}`,
+						title: c.title,
+						category: "Course",
+						link: `/courses`,
+					})),
+				...wikiPages
+					.filter(
+						(p) =>
+							p.title.toLowerCase().includes(query.toLowerCase()) ||
+							p.content.toLowerCase().includes(query.toLowerCase()),
+					)
+					.map((p) => ({
+						id: `wiki-${p.id}`,
+						title: p.title,
+						category: "Wiki",
+						link: `/wiki/${p.slug}`,
+					})),
+			].slice(0, 8)
 			: []
 
 	useEffect(() => {
@@ -106,8 +107,14 @@ const GlobalSearch: React.FC = () => {
 							))}
 						</div>
 					) : (
-						<div className="p-4 text-center text-xs text-white/40 italic">
-							No results for "{query}"
+						<div className="p-4">
+							<StateEmpty
+								icon="🔎"
+								title={`No results for "${query}"`}
+								description="Try different keywords or browse popular courses."
+								ctaLabel="Browse courses"
+								ctaHref="/learn"
+							/>
 						</div>
 					)}
 				</div>

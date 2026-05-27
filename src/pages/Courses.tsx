@@ -180,22 +180,13 @@ const Courses: React.FC = () => {
 					description="There are no courses yet. Check back soon!"
 				/>
 			) : filtered.length === 0 ? (
-				<div className="glass-card rounded-[2.5rem] border border-white/5 p-16 text-center">
-					<p className="mb-6 text-5xl">Search</p>
-					<h2 className="mb-3 text-2xl font-black tracking-tight">
-						No courses match your filters
-					</h2>
-					<p className="mx-auto mb-8 max-w-sm text-white/50">
-						Try a different search term or adjust the difficulty and track filters.
-					</p>
-					<button
-						type="button"
-						onClick={handleClear}
-						className="w-full rounded-full border border-brand-cyan/30 px-6 py-2.5 text-sm font-bold uppercase tracking-widest text-brand-cyan transition-all hover:bg-brand-cyan/10 sm:w-auto"
-					>
-						Clear all filters
-					</button>
-				</div>
+				<EmptyState
+					icon="🔎"
+					title="No courses match your filters"
+					description="Try a different search term or adjust the difficulty and track filters."
+					ctaLabel="Clear all filters"
+					onCtaClick={handleClear}
+				/>
 			) : (
 				<>
 					<div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

@@ -8,6 +8,7 @@ import { ToastProvider } from "./components/Toast/ToastProvider"
 import { WalletToastWatcher } from "./components/WalletToastWatcher"
 
 const Admin = lazy(() => import("./pages/Admin"))
+const AdminModeration = lazy(() => import("./pages/AdminModeration"))
 const Community = lazy(() => import("./pages/Community"))
 const Courses = lazy(() => import("./pages/Courses"))
 const Credential = lazy(() => import("./pages/Credential"))
@@ -68,7 +69,8 @@ function App() {
 						path="/scholarships/apply"
 						element={renderRoute(<ScholarshipApply />)}
 					/>
-					<Route path="/admin" element={renderRoute(<Admin />)} />
+						<Route path="/admin" element={renderRoute(<Admin />)} />
+					<Route path="/admin/moderation" element={renderRoute(<AdminModeration />)} />
 					<Route path="/wiki" element={renderRoute(<Wiki />)} />
 					<Route path="/wiki/:slug" element={renderRoute(<WikiPage />)} />
 					<Route path="/faq" element={renderRoute(<FAQPage />)} />

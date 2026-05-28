@@ -36,6 +36,7 @@ const PROPOSAL_DEADLINE_LEDGERS: u32 = 100_800;
 const VOTING_PERIOD_KEY: Symbol = symbol_short!("VOTINGPERIOD");
 const QUORUM_KEY: Symbol = symbol_short!("QUORUM");
 const APPROVAL_BPS_KEY: Symbol = symbol_short!("APPBPS");
+const MILESTONE_COUNT_KEY: Symbol = symbol_short!("MSCNT");
 
 #[derive(Clone)]
 #[contracttype]
@@ -129,6 +130,8 @@ pub enum Error {
     ProposalCancelled = 16,
     Unauthorized = 17,
     ArithmeticOverflow = 18,
+    /// Milestone titles/dates count does not match the configured milestone count.
+    InvalidMilestoneCount = 19,
 }
 
 #[contract]
@@ -181,6 +184,7 @@ pub struct VoteCastEvent {
 }
 
 #[contractimpl]
+#[allow(clippy::too_many_arguments)]
 impl ScholarshipTreasury {
     pub fn initialize(
         env: Env,
@@ -220,6 +224,10 @@ impl ScholarshipTreasury {
         env.storage()
             .instance()
             .set(&APPROVAL_BPS_KEY, &approval_bps);
+        // Default to 3 milestones; use set_milestone_count to override.
+        env.storage()
+            .instance()
+            .set(&MILESTONE_COUNT_KEY, &3_u32);
 
         Self::extend_instance(&env);
     }
@@ -592,8 +600,19 @@ impl ScholarshipTreasury {
         Self::assert_initialized(&env);
         Self::assert_not_paused(&env);
 
-        if amount <= 0 || milestone_titles.len() != 3 || milestone_dates.len() != 3 {
+        if amount <= 0 {
             panic_with_error!(&env, Error::InvalidAmount);
+        }
+
+        let required_milestones = env
+            .storage()
+            .instance()
+            .get::<_, u32>(&MILESTONE_COUNT_KEY)
+            .unwrap_or(3);
+        if milestone_titles.len() != required_milestones
+            || milestone_dates.len() != required_milestones
+        {
+            panic_with_error!(&env, Error::InvalidMilestoneCount);
         }
 
         applicant.require_auth();
@@ -897,12 +916,50 @@ impl ScholarshipTreasury {
         if proposal.cancelled {
             return ProposalStatus::Rejected;
         }
+
+        // If finalize_proposal has already been called, return its stored result
+        // authoritatively — this is the single source of truth.
+        if let Some(status) = env
+            .storage()
+            .persistent()
+            .get::<_, ProposalStatus>(&DataKey::FinalizedProposal(proposal.id))
+        {
+            return status;
+        }
+
         if env.ledger().sequence() <= proposal.deadline_ledger {
             ProposalStatus::Pending
-        } else if proposal.yes_votes > proposal.no_votes {
-            ProposalStatus::Approved
         } else {
-            ProposalStatus::Rejected
+            // Apply the same quorum + approval_bps formula used in finalize_proposal
+            // and execute_proposal so all code paths are consistent.
+            let total_votes = proposal
+                .yes_votes
+                .checked_add(proposal.no_votes)
+                .unwrap_or(i128::MAX);
+            let quorum_threshold = env
+                .storage()
+                .instance()
+                .get::<_, i128>(&QUORUM_KEY)
+                .unwrap_or(0);
+            let approval_bps = env
+                .storage()
+                .instance()
+                .get::<_, u32>(&APPROVAL_BPS_KEY)
+                .unwrap_or(0);
+
+            let passed = total_votes >= quorum_threshold
+                && total_votes > 0
+                && proposal
+                    .yes_votes
+                    .checked_mul(10_000)
+                    .map(|v| (v / total_votes) as u32 > approval_bps)
+                    .unwrap_or(false);
+
+            if passed {
+                ProposalStatus::Approved
+            } else {
+                ProposalStatus::Rejected
+            }
         }
     }
 
@@ -1061,3 +1118,6 @@ mod token {
 
 #[cfg(test)]
 mod test;
+
+#[cfg(test)]
+mod tests;

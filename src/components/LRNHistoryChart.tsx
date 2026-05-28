@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react"
+import { EmptyState as StateEmpty } from "./states/emptyState"
 import {
 	LineChart,
 	Line,
@@ -65,13 +66,14 @@ const LRNHistoryChart: React.FC<LRNHistoryChartProps> = ({ address }) => {
 
 	if (history.length === 0) {
 		return (
-			<div className="glass-card rounded-[2rem] p-8 text-center">
-				<p className="text-white/40 text-sm uppercase tracking-widest font-black">
-					No LRN history yet
-				</p>
-				<p className="text-white/25 text-xs mt-2">
-					Complete milestones to start earning LRN tokens.
-				</p>
+			<div className="p-4">
+				<StateEmpty
+					icon="📈"
+					title="No LRN history yet"
+					description="Complete milestones to start earning LRN tokens."
+					ctaLabel="Browse courses"
+					ctaHref="/learn"
+				/>
 			</div>
 		)
 	}

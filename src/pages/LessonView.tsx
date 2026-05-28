@@ -1,8 +1,9 @@
 import { Button } from "@stellar/design-system"
 import React, { useEffect, useMemo, useState } from "react"
-import { useParams } from "react-router-dom"
+import { Link, useParams } from "react-router-dom"
 import { CourseForum } from "../components/forum/CourseForum"
 import LessonContent from "../components/LessonContent"
+import CourseReviewsPanel from "../components/CourseReviewsPanel"
 import LessonSidebar from "../components/LessonSidebar"
 import MilestoneSubmitPanel from "../components/MilestoneSubmitPanel"
 import SponsorLogosForTrack from "../components/SponsorLogosForTrack"
@@ -38,8 +39,13 @@ const LessonView: React.FC = () => {
 	const lessonId = parseInt(lessonIdParam || "0", 10)
 
 	const { address } = useWallet()
-	const { getCourseProgress, completeMilestone, isCompletingMilestone } =
-		useCourse()
+	const {
+		getCourseProgress,
+		completeMilestone,
+		isCompletingMilestone,
+		enrolledCourses,
+		enroll,
+	} = useCourse()
 	const {
 		course,
 		isLoading: isLoadingCourse,
@@ -77,6 +83,24 @@ const LessonView: React.FC = () => {
 		[course, lessonId],
 	)
 	const allLessons = useMemo(() => course?.lessons ?? [], [course])
+	const isEnrolledInCourse = useMemo(
+		() => (course ? enrolledCourses.some((c) => c.id === course.slug) : false),
+		[course, enrolledCourses],
+	)
+	const prerequisites = course?.prerequisites ?? []
+	const hasPrerequisiteData = prerequisites.length > 0
+	const prerequisiteStatuses = useMemo(() => {
+		return prerequisites.map((prereq) => {
+			const progress = getCourseProgress(prereq.slug)
+			const total = progress.totalMilestones
+			const completed =
+				typeof total === "number" && total > 0
+					? progress.completedMilestoneIds.length >= total
+					: false
+			return { prereq, completed }
+		})
+	}, [getCourseProgress, prerequisites])
+	const hasUnmetPrerequisites = prerequisiteStatuses.some((p) => !p.completed)
 
 	useEffect(() => {
 		// Simulate a short content load delay
@@ -217,6 +241,8 @@ const LessonView: React.FC = () => {
 
 	const handleMarkComplete = async () => {
 		if (!courseId || !course || !lesson) return
+		if (hasPrerequisiteData && hasUnmetPrerequisites) return
+		if (!isEnrolledInCourse) return
 
 		const completedOnChain = await completeMilestone(courseId, lessonId)
 		if (completedOnChain) {
@@ -252,6 +278,49 @@ const LessonView: React.FC = () => {
 				</div>
 				<SponsorLogosForTrack track={course.track} />
 			</header>
+			{hasPrerequisiteData ? (
+				<section className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+					<div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+						<h2 className="text-sm font-black uppercase tracking-widest text-white/70">
+							Prerequisites
+						</h2>
+						<button
+							type="button"
+							onClick={() => void enroll(course.slug)}
+							disabled={hasUnmetPrerequisites || isEnrolledInCourse}
+							title={
+								hasUnmetPrerequisites
+									? "Complete all prerequisite courses first."
+									: isEnrolledInCourse
+										? "Already enrolled"
+										: "Enroll in this course"
+							}
+							className="px-4 py-2 rounded-full border border-brand-cyan/30 text-brand-cyan disabled:opacity-40 text-xs font-black uppercase tracking-widest"
+						>
+							{isEnrolledInCourse ? "Enrolled" : "Enroll"}
+						</button>
+					</div>
+					<ul className="space-y-2">
+						{prerequisiteStatuses.map(({ prereq, completed }) => (
+							<li key={prereq.slug} className="flex items-center justify-between gap-2">
+								<div className="text-sm text-white/80 flex items-center gap-2">
+									<span className={completed ? "text-emerald-300" : "text-white/40"}>
+										{completed ? "✓" : "○"}
+									</span>
+									<span>{prereq.title}</span>
+								</div>
+								<Link
+									to={`/courses/${prereq.slug}/lessons/1`}
+									title={prereq.title}
+									className="text-xs text-brand-cyan/90 underline decoration-dotted"
+								>
+									Open
+								</Link>
+							</li>
+						))}
+					</ul>
+				</section>
+			) : null}
 
 			{/* Course progress bar */}
 			{allLessons.length > 0 &&
@@ -414,6 +483,12 @@ const LessonView: React.FC = () => {
 								milestoneId={lesson.id}
 							/>
 						</div>
+					)}
+					{course && currentTab !== "forum" && (
+						<CourseReviewsPanel
+							courseId={course.slug}
+							canReview={Boolean(nextLessonId === null && isCompleted)}
+						/>
 					)}
 				</div>
 			</div>

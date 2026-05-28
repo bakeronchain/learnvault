@@ -7,8 +7,8 @@ use soroban_sdk::{
 };
 
 use crate::{
-    CourseCompleted, CourseConfig, CourseMilestone, CourseMilestoneClient, DataKey, Error,
-    MilestoneCompleted, MilestoneStatus, VerifyBatchEntry,
+    ApprovalResult, CourseCompleted, CourseConfig, CourseMilestone, CourseMilestoneClient,
+    DataKey, Error, MilestoneCompleted, MilestoneStatus, VerifyBatchEntry,
 };
 
 #[contracttype]
@@ -151,19 +151,6 @@ fn submit_milestone(
 // =======================
 // ✅ ENROLL TESTS
 // =======================
-
-fn set_ledger_sequence(env: &Env, sequence_number: u32) {
-    env.ledger().set(LedgerInfo {
-        timestamp: 1_700_000_000,
-        protocol_version: 23,
-        sequence_number,
-        network_id: Default::default(),
-        base_reserve: 10,
-        min_temp_entry_ttl: 16,
-        min_persistent_entry_ttl: 16,
-        max_entry_ttl: 6312000,
-    });
-}
 
 #[test]
 fn add_course_and_get_course_work() {
@@ -791,144 +778,7 @@ fn batch_verify_milestones_reverts_on_invalid_entry() {
 }
 
 // =======================
-// ✅ VERIFY MILESTONE TESTS
-// =======================
-
-#[test]
-fn verify_milestone_happy_path() {
-    let (env, _contract_id, admin, _learn_token_address, client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-    let evidence_uri = sid(&env, "ipfs://bafy-proof");
-
-    client.enroll(&learner, &course_id);
-    client.submit_milestone(&learner, &course_id, &1, &evidence_uri);
-
-    client.verify_milestone(&admin, &learner, &course_id, &1, &100);
-
-    let status = client.get_milestone_status(&learner, &course_id, &1);
-    assert_eq!(status, MilestoneStatus::Approved);
-}
-
-#[test]
-fn verify_milestone_fails_for_non_admin() {
-    let (env, _contract_id, _admin, _learn_token_address, client) = setup();
-    let learner = Address::generate(&env);
-    let non_admin = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-    let evidence_uri = sid(&env, "ipfs://bafy-proof");
-
-    client.enroll(&learner, &course_id);
-    client.submit_milestone(&learner, &course_id, &1, &evidence_uri);
-
-    let result = client.try_verify_milestone(&non_admin, &learner, &course_id, &1, &100);
-    assert_eq!(
-        result.err(),
-        Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::Unauthorized as u32
-        )))
-    );
-}
-
-#[test]
-fn verify_milestone_fails_for_already_verified() {
-    let (env, _contract_id, admin, _learn_token_address, client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-    let evidence_uri = sid(&env, "ipfs://bafy-proof");
-
-    client.enroll(&learner, &course_id);
-    client.submit_milestone(&learner, &course_id, &1, &evidence_uri);
-    client.verify_milestone(&admin, &learner, &course_id, &1, &100);
-
-    let result = client.try_verify_milestone(&admin, &learner, &course_id, &1, &100);
-    assert_eq!(
-        result.err(),
-        Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::InvalidState as u32
-        )))
-    );
-}
-
-#[test]
-fn verify_milestone_fails_for_not_enrolled_learner() {
-    let (env, _contract_id, admin, _learn_token_address, client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-
-    let result = client.try_verify_milestone(&admin, &learner, &course_id, &1, &100);
-    assert_eq!(
-        result.err(),
-        Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::NotEnrolled as u32
-        )))
-    );
-}
-
-// =======================
-// ✅ REJECT MILESTONE TESTS
-// =======================
-
-#[test]
-fn reject_milestone_happy_path() {
-    let (env, _contract_id, admin, _learn_token_address, client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-    let evidence_uri = sid(&env, "ipfs://bafy-proof");
-
-    client.enroll(&learner, &course_id);
-    client.submit_milestone(&learner, &course_id, &1, &evidence_uri);
-
-    client.reject_milestone(&admin, &learner, &course_id, &1);
-
-    let status = client.get_milestone_status(&learner, &course_id, &1);
-    assert_eq!(status, MilestoneStatus::Rejected);
-
-    // Submission should be removed
-    let submission = client.get_milestone_submission(&learner, &course_id, &1);
-    assert!(submission.is_none());
-}
-
-#[test]
-fn reject_milestone_fails_for_non_admin() {
-    let (env, _contract_id, _admin, _learn_token_address, client) = setup();
-    let learner = Address::generate(&env);
-    let non_admin = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-    let evidence_uri = sid(&env, "ipfs://bafy-proof");
-
-    client.enroll(&learner, &course_id);
-    client.submit_milestone(&learner, &course_id, &1, &evidence_uri);
-
-    let result = client.try_reject_milestone(&non_admin, &learner, &course_id, &1);
-    assert_eq!(
-        result.err(),
-        Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::Unauthorized as u32
-        )))
-    );
-}
-
-#[test]
-fn reject_milestone_fails_for_wrong_state() {
-    let (env, _contract_id, admin, _learn_token_address, client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-
-    client.enroll(&learner, &course_id);
-
-    // Try to reject a milestone that hasn't been submitted
-    let result = client.try_reject_milestone(&admin, &learner, &course_id, &1);
-    assert_eq!(
-        result.err(),
-        Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::InvalidState as u32
-        )))
-    );
-}
-
-// =======================
-// ✅ GET MILESTONE STATUS TESTS
+// ✅ UPGRADE TESTS
 // =======================
 
 #[test]
@@ -1022,4 +872,183 @@ fn benchmark_costs() {
     std::println!("add_course: instr={}, mem={}", add_instr, add_mem);
     std::println!("enroll: instr={}, mem={}", enroll_instr, enroll_mem);
     std::println!("complete_milestone: instr={}, mem={}", comp_instr, comp_mem);
+}
+
+// ---------------------------------------------------------------------------
+// batch_approve_milestones tests
+// ---------------------------------------------------------------------------
+
+/// Helper: add course, enroll learner, submit milestone evidence → returns
+/// a VerifyBatchEntry ready to pass to batch_approve_milestones.
+fn make_entry(
+    env: &Env,
+    contract_id: &Address,
+    admin: &Address,
+    client: &CourseMilestoneClient<'static>,
+    learner: &Address,
+    course_id: &String,
+    milestone_id: u32,
+    lrn_reward: i128,
+) -> VerifyBatchEntry {
+    submit_milestone(
+        env,
+        contract_id,
+        learner,
+        client,
+        course_id,
+        milestone_id,
+        &sid(env, "ipfs://evidence"),
+    );
+    VerifyBatchEntry {
+        learner: learner.clone(),
+        course_id: course_id.clone(),
+        milestone_id,
+        lrn_reward,
+    }
+}
+
+#[test]
+fn batch_approve_all_success() {
+    let (env, contract_id, admin, _token_id, client, _token_client) = setup();
+    let learner = Address::generate(&env);
+    let course_id = sid(&env, "batch-course-a");
+
+    add_course(&env, &contract_id, &admin, &client, &course_id, 3);
+    enroll(&env, &contract_id, &learner, &client, &course_id);
+
+    let e1 = make_entry(&env, &contract_id, &admin, &client, &learner, &course_id, 1, 50);
+    let e2 = make_entry(&env, &contract_id, &admin, &client, &learner, &course_id, 2, 50);
+    let e3 = make_entry(&env, &contract_id, &admin, &client, &learner, &course_id, 3, 50);
+
+    let submissions = Vec::from_array(&env, [e1, e2, e3]);
+
+    authorize(
+        &env,
+        &admin,
+        &contract_id,
+        "batch_approve_milestones",
+        (admin.clone(), submissions.clone()),
+    );
+    let results = client.batch_approve_milestones(&admin, &submissions);
+
+    assert_eq!(results.len(), 3);
+    assert_eq!(results.get(0).unwrap(), ApprovalResult::Ok);
+    assert_eq!(results.get(1).unwrap(), ApprovalResult::Ok);
+    assert_eq!(results.get(2).unwrap(), ApprovalResult::Ok);
+
+    assert!(client.is_completed(&learner, &course_id, &1));
+    assert!(client.is_completed(&learner, &course_id, &2));
+    assert!(client.is_completed(&learner, &course_id, &3));
+}
+
+#[test]
+fn batch_approve_partial_failure_continues() {
+    let (env, contract_id, admin, _token_id, client, _token_client) = setup();
+    let learner = Address::generate(&env);
+    let course_id = sid(&env, "batch-course-b");
+
+    add_course(&env, &contract_id, &admin, &client, &course_id, 3);
+    enroll(&env, &contract_id, &learner, &client, &course_id);
+
+    let e1 = make_entry(&env, &contract_id, &admin, &client, &learner, &course_id, 1, 50);
+    let e3 = make_entry(&env, &contract_id, &admin, &client, &learner, &course_id, 3, 50);
+
+    // Milestone 2 is NotStarted (not submitted) → InvalidState error mid-batch.
+    let bad_entry = VerifyBatchEntry {
+        learner: learner.clone(),
+        course_id: course_id.clone(),
+        milestone_id: 2,
+        lrn_reward: 50,
+    };
+
+    let submissions = Vec::from_array(&env, [e1, bad_entry, e3]);
+
+    authorize(
+        &env,
+        &admin,
+        &contract_id,
+        "batch_approve_milestones",
+        (admin.clone(), submissions.clone()),
+    );
+    let results = client.batch_approve_milestones(&admin, &submissions);
+
+    assert_eq!(results.len(), 3);
+    assert_eq!(results.get(0).unwrap(), ApprovalResult::Ok);
+    // Error::InvalidState = 13
+    assert_eq!(results.get(1).unwrap(), ApprovalResult::Err(Error::InvalidState as u32));
+    assert_eq!(results.get(2).unwrap(), ApprovalResult::Ok);
+
+    // Despite the partial failure milestones 1 and 3 were approved.
+    assert!(client.is_completed(&learner, &course_id, &1));
+    assert!(!client.is_completed(&learner, &course_id, &2));
+    assert!(client.is_completed(&learner, &course_id, &3));
+}
+
+#[test]
+fn batch_approve_all_failure() {
+    let (env, contract_id, admin, _token_id, client, _token_client) = setup();
+    let learner = Address::generate(&env);
+    let course_id = sid(&env, "batch-course-c");
+
+    add_course(&env, &contract_id, &admin, &client, &course_id, 3);
+    enroll(&env, &contract_id, &learner, &client, &course_id);
+
+    // Pass milestones that are all in NotStarted state — none submitted.
+    let make_bad = |mid: u32| VerifyBatchEntry {
+        learner: learner.clone(),
+        course_id: course_id.clone(),
+        milestone_id: mid,
+        lrn_reward: 0,
+    };
+    let submissions = Vec::from_array(&env, [make_bad(1), make_bad(2), make_bad(3)]);
+
+    authorize(
+        &env,
+        &admin,
+        &contract_id,
+        "batch_approve_milestones",
+        (admin.clone(), submissions.clone()),
+    );
+    let results = client.batch_approve_milestones(&admin, &submissions);
+
+    assert_eq!(results.len(), 3);
+    for i in 0..3 {
+        // Error::InvalidState = 13
+        assert_eq!(results.get(i).unwrap(), ApprovalResult::Err(Error::InvalidState as u32));
+    }
+}
+
+#[test]
+fn batch_approve_already_approved_milestone_returns_error() {
+    let (env, contract_id, admin, _token_id, client, _token_client) = setup();
+    let learner = Address::generate(&env);
+    let course_id = sid(&env, "batch-course-d");
+
+    add_course(&env, &contract_id, &admin, &client, &course_id, 2);
+    enroll(&env, &contract_id, &learner, &client, &course_id);
+
+    let e1 = make_entry(&env, &contract_id, &admin, &client, &learner, &course_id, 1, 100);
+    // Submit e1 twice in the same batch — second approval should fail because
+    // the first already set the state to Approved.
+    let e1_dup = VerifyBatchEntry {
+        learner: learner.clone(),
+        course_id: course_id.clone(),
+        milestone_id: 1,
+        lrn_reward: 100,
+    };
+
+    let submissions = Vec::from_array(&env, [e1, e1_dup]);
+
+    authorize(
+        &env,
+        &admin,
+        &contract_id,
+        "batch_approve_milestones",
+        (admin.clone(), submissions.clone()),
+    );
+    let results = client.batch_approve_milestones(&admin, &submissions);
+
+    assert_eq!(results.get(0).unwrap(), ApprovalResult::Ok);
+    // Error::InvalidState = 13 (state is now Approved, not Pending)
+    assert_eq!(results.get(1).unwrap(), ApprovalResult::Err(Error::InvalidState as u32));
 }

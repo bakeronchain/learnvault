@@ -41,6 +41,7 @@ export type AuthService = {
 		networkPassphrase: string
 	}>
 	verifySignedTransaction(signedTransactionXdr: string): Promise<string>
+	revokeToken(token: string): Promise<void>
 }
 
 export function createAuthService(
@@ -162,6 +163,10 @@ export function createAuthService(
 
 			await nonceStore.deleteNonce(address)
 			return jwtService.signWalletToken(address)
+		},
+
+		async revokeToken(token: string): Promise<void> {
+			await jwtService.revokeToken(token)
 		},
 	}
 }

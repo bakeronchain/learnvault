@@ -1,9 +1,10 @@
-import { type Request, type Response } from "express"
+import { type Response } from "express"
 import { pool } from "../db/index"
 import { logger } from "../lib/logger"
+import { type AuthRequest } from "../middleware/auth.middleware"
+import { stellarContractService } from "../services/stellar-contract.service"
 
 const log = logger.child({ module: "enrollments" })
-import { stellarContractService } from "../services/stellar-contract.service"
 
 const COURSE_MILESTONE_CONTRACT_ID =
 	process.env.COURSE_MILESTONE_CONTRACT_ID ?? ""
@@ -13,16 +14,38 @@ const COURSE_MILESTONE_CONTRACT_ID =
  * Validates on-chain enrollment first.
  */
 export const createEnrollment = async (
-	req: Request,
+	req: AuthRequest,
 	res: Response,
 ): Promise<void> => {
 	try {
+		const walletAddress = req.walletAddress
+		if (!walletAddress) {
+			res.status(401).json({ error: "Unauthorized" })
+			return
+		}
+
 		const { learner_address, course_id, tx_hash } = req.body
 
 		if (!learner_address || !course_id || !tx_hash) {
 			res.status(400).json({
 				error: "learner_address, course_id, and tx_hash are required",
 			})
+			return
+		}
+
+		if (learner_address !== walletAddress) {
+			res.status(400).json({
+				error: "learner_address must match the authenticated user",
+			})
+			return
+		}
+
+		const courseResult = await pool.query(
+			`SELECT id FROM courses WHERE slug = $1 OR id::text = $1 LIMIT 1`,
+			[course_id],
+		)
+		if (courseResult.rows.length === 0) {
+			res.status(404).json({ error: "Course not found" })
 			return
 		}
 
@@ -159,7 +182,7 @@ export const createEnrollment = async (
  * Query param: learner_address
  */
 export const getEnrollments = async (
-	req: Request,
+	req: AuthRequest,
 	res: Response,
 ): Promise<void> => {
 	try {

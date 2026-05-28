@@ -14,6 +14,7 @@ import { logger } from "./lib/logger"
 import { setupConsoleRequestTracing } from "./lib/request-context"
 import { createRequireTrustedOrigin } from "./middleware/csrf.middleware"
 import { errorHandler } from "./middleware/error.middleware"
+import { maybeMountOpenApiValidator } from "./middleware/openapi-validator.middleware"
 import { globalLimiter } from "./middleware/rate-limit.middleware"
 import { requestLogger } from "./middleware/request-logger.middleware"
 import { buildOpenApiSpec } from "./openapi"
@@ -25,7 +26,7 @@ import { communityRouter } from "./routes/community.routes"
 import { coursesRouter } from "./routes/courses.routes"
 import { createCredentialsRouter } from "./routes/credentials.routes"
 import { donorsRouter } from "./routes/donors.routes"
-import { enrollmentsRouter } from "./routes/enrollments.routes"
+import { createEnrollmentsRouter } from "./routes/enrollments.routes"
 import { eventsRouter } from "./routes/events.routes"
 import { createForumRouter } from "./routes/forum.routes"
 import { governanceRouter } from "./routes/governance.routes"
@@ -43,6 +44,7 @@ import { treasuryRouter } from "./routes/treasury.routes"
 import { createUploadRouter } from "./routes/upload.routes"
 import { validatorRouter } from "./routes/validator.routes"
 import { wikiRouter } from "./routes/wiki.routes"
+import { createRecommendationsRouter } from "./routes/recommendations.routes"
 import { createAuthService } from "./services/auth.service"
 import {
 	createJwtService,
@@ -141,13 +143,17 @@ app.use(createRequireTrustedOrigin(allowedOrigins))
 app.use(express.json())
 app.use(globalLimiter)
 
+// Optional request/response validation against docs/openapi.yaml (CI/test only)
+void maybeMountOpenApiValidator(app)
+
 app.use("/api", healthRouter)
-app.use("/api/auth", createAuthRouter(authService))
+app.use("/api/auth", createAuthRouter(authService, jwtService))
 app.use("/api", createMeRouter(jwtService))
 app.use("/api", coursesRouter)
-app.use("/api", enrollmentsRouter)
+app.use("/api", createEnrollmentsRouter(jwtService))
 app.use("/api", createScholarsRouter(jwtService))
 app.use("/api", scholarshipsRouter)
+app.use("/api", createRecommendationsRouter(jwtService))
 app.use("/api", createForumRouter(jwtService))
 app.use("/api", createCredentialsRouter(jwtService))
 app.use("/api", validatorRouter)

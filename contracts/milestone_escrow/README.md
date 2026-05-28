@@ -1,33 +1,65 @@
 # MilestoneEscrow Contract
 
-Manages scholarship funds in proposal-specific escrow records and releases them
-in tranches to scholars. Unspent funds can be reclaimed after inactivity.
+## Purpose and Role
 
-## Authority and Trust Assumptions
+`milestone_escrow` holds scholarship funds per proposal and releases them in
+tranches to the scholar. It also lets an admin reclaim unspent funds after a
+configured inactivity window.
 
-- `initialize(admin, treasury, inactivity_window_seconds)` requires `admin`
-  authorization and can run once.
-- Configured `treasury` is the only authority that can create escrow records.
-- Stored escrow `admin` releases tranches, reclaims inactive balances, and
-  upgrades the contract.
-- The XLM token client follows Soroban token transfer semantics and reverts
-  failed transfers atomically.
+## Key Functions
 
-## Functions
+| Function | Parameters | Access | Description |
+| --- | --- | --- | --- |
+| `initialize` | `admin`, `treasury`, `inactivity_window_seconds` | `admin` auth | Stores the escrow admin, authorized treasury, and reclaim window. |
+| `create_escrow` | `proposal_id`, `scholar`, `amount`, `tranches` | configured treasury | Creates and funds a new escrow record for a proposal. |
+| `release_tranche` | `proposal_id` | stored escrow admin | Releases the next tranche to the scholar. |
+| `reclaim_inactive` | `proposal_id` | stored escrow admin | Returns remaining funds to treasury after inactivity. |
+| `get_escrow` | `proposal_id` | public read | Returns escrow details for a proposal. |
+| `get_version` | none | public read | Returns the contract version string. |
+| `upgrade` | `new_wasm_hash` | stored escrow admin | Upgrades the contract WASM through the shared helper. |
 
-| Function | Access | Notes |
-| --- | --- | --- |
-| `initialize(admin, treasury, inactivity_window_seconds)` | Admin auth | Stores admin, treasury, and inactivity window. |
-| `create_escrow(proposal_id, scholar, amount, tranches)` | Treasury auth | Creates a unique funded escrow with positive amount and non-zero tranches. |
-| `release_tranche(proposal_id)` | Escrow admin | Releases the next tranche with checked accounting and final-tranche rounding. |
-| `reclaim_inactive(proposal_id)` | Escrow admin | Returns unspent funds after inactivity window. |
-| `get_escrow(proposal_id)` | Public read | Returns escrow record if present. |
-| `upgrade(new_wasm_hash)` | Stored admin | Replaces current WASM through shared upgrade helper. |
-| `get_version()` | Public read | Contract version. |
+## Authorization Model
 
-## Audit Focus
+- `initialize` requires the provided admin address to authorize once.
+- Only the configured `treasury` address can create new escrow records.
+- The stored escrow admin can release tranches, reclaim inactive funds, and
+  upgrade the contract.
+- Read methods are public.
 
-- Treasury-only escrow creation.
-- Tranche math cannot overpay or overflow.
-- State is updated before token transfers.
-- Inactivity reclaim cannot withdraw before the configured window.
+## State Variables
+
+| Storage Key | Meaning |
+| --- | --- |
+| `CONFIG` | Contract-wide `Config { admin, treasury, inactivity_window }`. |
+| `Escrow(proposal_id)` | `EscrowRecord` with scholar, amount, tranche progress, last activity, treasury, and admin. |
+| `WASMHASH` | Last tracked managed upgrade hash from the shared helper. |
+
+## Events Emitted
+
+- `EscrowCreated { proposal_id, scholar, total_amount, total_tranches }`
+- `released` topic with `TrancheReleased { scholar, proposal_id, amount }`
+- `EscrowReclaimed { proposal_id, scholar, amount_reclaimed }`
+- `contract_upgraded` from the shared upgrade helper
+
+## Deploy with Stellar CLI
+
+From the repository root:
+
+```bash
+stellar contract build --package milestone-escrow
+stellar contract deploy \
+  --wasm target/wasm32v1-none/release/milestone_escrow.wasm \
+  --source <IDENTITY> \
+  --network <NETWORK>
+```
+
+Initialize after deploy by invoking
+`initialize(admin, treasury, inactivity_window_seconds)`.
+
+## Run Tests
+
+From the repository root:
+
+```bash
+cargo test -p milestone-escrow
+```

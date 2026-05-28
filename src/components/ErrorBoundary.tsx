@@ -59,6 +59,11 @@ export default class ErrorBoundary extends Component<Props, State> {
 						We apologize for the inconvenience. The application encountered an
 						unexpected error.
 					</p>
+					{import.meta.env.DEV && this.state.error?.stack && (
+						<pre className="mt-2 mb-6 text-left text-xs text-red-400/70 bg-black/20 rounded-lg p-4 max-w-lg w-full overflow-auto max-h-48 whitespace-pre-wrap break-all">
+							{this.state.error.stack}
+						</pre>
+					)}
 					<div className="flex gap-4">
 						<button
 							onClick={this.handleRetry}

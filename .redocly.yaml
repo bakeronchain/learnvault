@@ -1,0 +1,13 @@
+extends:
+  - recommended
+
+rules:
+  # This codebase has a mix of public and authenticated endpoints and does not
+  # consistently annotate security at the operation level yet.
+  security-defined: off
+
+  # Keep these as warnings (signal without blocking merges).
+  operation-operationId: warn
+  no-unused-components: warn
+  operation-4xx-response: warn
+

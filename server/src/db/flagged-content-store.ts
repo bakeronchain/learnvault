@@ -117,6 +117,18 @@ class InMemoryFlaggedContentStore {
 		})
 	}
 
+	async dismissContent(
+		contentType: "comment" | "proposal",
+		contentId: number,
+	): Promise<void> {
+		// Mark all flags for this content as not hidden
+		this.flags.forEach((f) => {
+			if (f.content_type === contentType && f.content_id === contentId) {
+				f.is_hidden = false
+			}
+		})
+	}
+
 	async addAuditEntry(
 		flaggedId: number,
 		action: string,
@@ -263,6 +275,20 @@ export const flaggedContentStore = {
 
 		await pool.query(
 			`UPDATE flagged_content SET is_hidden = TRUE WHERE content_type = $1 AND content_id = $2`,
+			[contentType, contentId],
+		)
+	},
+
+	async dismissContent(
+		contentType: "comment" | "proposal",
+		contentId: number,
+	): Promise<void> {
+		if (!isRealPool()) {
+			return inMemoryStore.dismissContent(contentType, contentId)
+		}
+
+		await pool.query(
+			`UPDATE flagged_content SET is_hidden = FALSE WHERE content_type = $1 AND content_id = $2`,
 			[contentType, contentId],
 		)
 	},

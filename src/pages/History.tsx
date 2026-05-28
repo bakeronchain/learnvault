@@ -207,8 +207,14 @@ const History: React.FC = () => {
 						{error instanceof Error ? error.message : "Failed to load activity"}
 					</div>
 				) : items.length === 0 ? (
-					<div className="rounded-2xl border border-white/10 p-8 text-center text-white/50">
-						No transactions found for this wallet yet.
+					<div className="p-8">
+						<EmptyState
+							icon="📭"
+							title="No transactions yet"
+							description="You have no on-chain transactions for this wallet. Interact with courses or the treasury to generate activity."
+							ctaLabel="Browse learning"
+							ctaHref="/learn"
+						/>
 					</div>
 				) : (
 					<div className="space-y-3">

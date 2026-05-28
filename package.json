@@ -8,6 +8,8 @@
   },
   "scripts": {
     "dev": "npm start",
+    "dev:docker": "docker compose --profile frontend up --build",
+    "dev:docker:clean": "docker compose --profile frontend down --volumes --remove-orphans",
     "dev:server": "npm run dev --prefix server",
     "dev:ui": "vite",
     "start": "node scripts/start-dev.mjs",
@@ -20,7 +22,7 @@
     "test:e2e": "playwright test",
     "format": "prettier . --write",
     "docs:generate": "npm run docs:generate --prefix server",
-    "prepare": "husky",
+    "prepare": "command -v husky >/dev/null 2>&1 && husky || true",
     "typecheck": "tsc",
     "test": "cargo test --workspace",
     "test:frontend": "vitest run",

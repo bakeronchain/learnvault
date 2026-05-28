@@ -9,6 +9,11 @@ import {
 	getGovernanceProposals,
 	getVotingPower,
 } from "../controllers/governance.controller"
+import {
+	burnLRNForGovernance,
+	getBurnHistory,
+	getGovernanceIncentives,
+} from "../controllers/lrn-burn.controller"
 import { requireAdmin } from "../middleware/admin.middleware"
 
 export const governanceRouter = Router()
@@ -205,4 +210,17 @@ governanceRouter.get("/proposals/:id/status", (req, res) => {
  */
 governanceRouter.delete("/proposals/:id", requireAdmin, (req, res) => {
 	void cancelProposal(req, res)
+})
+
+// LRN Token Burn Mechanism endpoints (Issue #775)
+governanceRouter.post("/governance/burn-lrn", (req, res) => {
+	void burnLRNForGovernance(req, res)
+})
+
+governanceRouter.get("/governance/burn-history", (req, res) => {
+	void getBurnHistory(req, res)
+})
+
+governanceRouter.get("/governance/incentives", (req, res) => {
+	void getGovernanceIncentives(req, res)
 })

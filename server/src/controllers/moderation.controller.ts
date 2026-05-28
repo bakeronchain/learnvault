@@ -90,6 +90,9 @@ export async function actionOnFlag(req: Request, res: Response): Promise<void> {
 				)
 			}
 			// For proposals, we might want to archive them instead
+		} else if (action === "dismiss") {
+			// Dismiss/unhide the content
+			await flaggedContentStore.dismissContent(flag.content_type, flag.content_id)
 		}
 
 		// Update flag status

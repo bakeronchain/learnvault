@@ -8,6 +8,7 @@ const mockAuthService: jest.Mocked<AuthService> = {
 	verifyAndIssueToken: jest.fn(),
 	createChallenge: jest.fn(),
 	verifySignedTransaction: jest.fn(),
+	refreshSession: jest.fn(),
 }
 
 function buildApp() {
@@ -48,9 +49,10 @@ describe("Auth Routes", () => {
 
 	describe("POST /api/auth/challenge/verify", () => {
 		it("returns a token on successful verification", async () => {
-			mockAuthService.verifySignedTransaction.mockResolvedValue(
-				"mock_jwt_token",
-			)
+			mockAuthService.verifySignedTransaction.mockResolvedValue({
+				accessToken: "mock_jwt_token",
+				refreshToken: "mock_refresh_token",
+			})
 
 			const res = await request(buildApp())
 				.post("/api/auth/challenge/verify")
@@ -58,6 +60,7 @@ describe("Auth Routes", () => {
 
 			expect(res.status).toBe(200)
 			expect(res.body.token).toBe("mock_jwt_token")
+			expect(res.body.refreshToken).toBe("mock_refresh_token")
 			expect(res.body.tokenType).toBe("Bearer")
 		})
 
@@ -91,7 +94,10 @@ describe("Auth Routes", () => {
 
 	describe("POST /api/auth/verify", () => {
 		it("returns a token for a valid signature", async () => {
-			mockAuthService.verifyAndIssueToken.mockResolvedValue("mock_jwt_token")
+			mockAuthService.verifyAndIssueToken.mockResolvedValue({
+				accessToken: "mock_jwt_token",
+				refreshToken: "mock_refresh_token",
+			})
 
 			const res = await request(buildApp())
 				.post("/api/auth/verify")
@@ -99,10 +105,33 @@ describe("Auth Routes", () => {
 
 			expect(res.status).toBe(200)
 			expect(res.body.token).toBe("mock_jwt_token")
+			expect(res.body.refreshToken).toBe("mock_refresh_token")
 		})
 
 		it("returns 400 if fields are missing", async () => {
 			const res = await request(buildApp()).post("/api/auth/verify").send({})
+			expect(res.status).toBe(400)
+		})
+	})
+
+	describe("POST /api/auth/refresh", () => {
+		it("rotates refresh token and returns a new pair", async () => {
+			mockAuthService.refreshSession.mockResolvedValue({
+				accessToken: "next_access",
+				refreshToken: "next_refresh",
+			})
+
+			const res = await request(buildApp())
+				.post("/api/auth/refresh")
+				.send({ refreshToken: "old_refresh" })
+
+			expect(res.status).toBe(200)
+			expect(res.body.token).toBe("next_access")
+			expect(res.body.refreshToken).toBe("next_refresh")
+		})
+
+		it("returns 400 if refreshToken is missing", async () => {
+			const res = await request(buildApp()).post("/api/auth/refresh").send({})
 			expect(res.status).toBe(400)
 		})
 	})

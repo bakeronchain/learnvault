@@ -12,7 +12,7 @@ export interface ProposalCardProps {
 	noVotes: number
 	deadlineLedger: number
 	currentLedger: number
-	status: "active" | "passed" | "rejected" | "executed"
+	status: "active" | "queued" | "passed" | "rejected" | "executed"
 	hasVoted?: boolean
 	onVoteYes?: () => void
 	onVoteNo?: () => void
@@ -45,6 +45,8 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({
 		switch (status) {
 			case "active":
 				return "success"
+			case "queued":
+				return "warning"
 			case "passed":
 				return "success"
 			case "rejected":

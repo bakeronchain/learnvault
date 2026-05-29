@@ -5,7 +5,7 @@ import ActivityFeed from "../components/ActivityFeed"
 import AddressDisplay from "../components/AddressDisplay"
 import CourseCard from "../components/CourseCard"
 import LRNBalanceWidget from "../components/LRNBalanceWidget"
-import MyBookmarks from "../components/MyBookmarks"
+import { DashboardStatsSkeleton } from "../components/SkeletonLoader"
 import { useCourse } from "../hooks/useCourse"
 import { useLearnerProfile } from "../hooks/useLearnerProfile"
 import { useLearnToken } from "../hooks/useLearnToken"
@@ -61,10 +61,7 @@ const Dashboard: React.FC = () => {
 
 	if (isInitializing && !address) {
 		return (
-			<div
-				aria-busy="true"
-				className="min-h-screen p-6 md:p-12 max-w-7xl mx-auto"
-			>
+			<div aria-busy="true" className="min-h-screen p-6 md:p-12 max-w-7xl mx-auto">
 				<DashboardStatsSkeleton />
 			</div>
 		)

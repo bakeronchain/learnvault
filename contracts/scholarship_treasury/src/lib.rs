@@ -36,6 +36,8 @@ const PROPOSAL_DEADLINE_LEDGERS: u32 = 100_800;
 const QUORUM_KEY: Symbol = symbol_short!("QUORUM");
 const APPROVAL_BPS_KEY: Symbol = symbol_short!("APPBPS");
 const MILESTONE_COUNT_KEY: Symbol = symbol_short!("MSCNT");
+const TIMELOCK_LEDGER_KEY: Symbol = symbol_short!("TLOCK");
+const DEFAULT_TIMELOCK_LEDGERS: u32 = DAY_IN_LEDGERS * 2; // 48 hours
 
 #[derive(Clone)]
 #[contracttype]
@@ -46,6 +48,7 @@ pub enum DataKey {
     Scholar(Address),
     VoteCast(u32, Address), // (proposal_id, voter) -> bool
     FinalizedProposal(u32), // proposal_id -> ProposalStatus (set by finalize_proposal)
+    VetoCast(u32, Address), // (proposal_id, voter) -> bool
 }
 
 #[contractevent(topics = ["proposal_executed"])]
@@ -63,6 +66,15 @@ pub struct ProposalCancelled {
     #[topic]
     pub proposal_id: u32,
     pub cancelled_by: Address,
+}
+
+#[contractevent(topics = ["proposal_queued"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProposalQueued {
+    #[topic]
+    pub proposal_id: u32,
+    pub queued_at: u32,
+    pub execution_ready_at: u32,
 }
 
 #[derive(Clone)]
@@ -83,14 +95,18 @@ pub struct Proposal {
     pub deadline_ledger: u32,
     pub executed: bool,
     pub cancelled: bool,
+    pub queued_at: u32,
+    pub veto_votes: i128,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[contracttype]
 pub enum ProposalStatus {
     Pending,
+    Queued,
     Approved,
     Rejected,
+    Executed,
 }
 
 #[contracterror]
@@ -120,6 +136,12 @@ pub enum Error {
     ArithmeticOverflow = 18,
     /// Milestone titles/dates count does not match the configured milestone count.
     InvalidMilestoneCount = 19,
+    /// Timelock period has not elapsed yet.
+    TimelockNotExpired = 20,
+    /// Proposal is not in Queued status.
+    NotQueued = 21,
+    /// Supermajority veto threshold has not been reached.
+    VetoNotMet = 22,
 }
 
 #[contract]
@@ -252,6 +274,27 @@ impl ScholarshipTreasury {
             panic_with_error!(&env, Error::InvalidAmount);
         }
         env.storage().instance().set(&APPROVAL_BPS_KEY, &new_bps);
+    }
+
+    /// Admin-only: set the timelock delay in ledgers.
+    pub fn set_timelock_delay(env: Env, admin: Address, ledgers: u32) {
+        admin.require_auth();
+        if admin != Self::admin(&env) {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
+        if ledgers == 0 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
+        env.storage().instance().set(&TIMELOCK_LEDGER_KEY, &ledgers);
+    }
+
+    /// Get the current timelock delay in ledgers.
+    pub fn get_timelock_delay(env: Env) -> u32 {
+        Self::extend_instance(&env);
+        env.storage()
+            .instance()
+            .get::<_, u32>(&TIMELOCK_LEDGER_KEY)
+            .unwrap_or(DEFAULT_TIMELOCK_LEDGERS)
     }
 
     /// Returns the configured number of milestones required per proposal.
@@ -422,12 +465,32 @@ impl ScholarshipTreasury {
             panic_with_error!(&env, Error::ProposalCancelled);
         }
 
-        if env.ledger().sequence() <= proposal.deadline_ledger {
-            panic_with_error!(&env, Error::VotingNotClosed);
-        }
-
         if proposal.executed {
             panic_with_error!(&env, Error::ProposalAlreadyExecuted);
+        }
+
+        // Must be in queued state (or legacy Approved state)
+        let finalized_status = env
+            .storage()
+            .persistent()
+            .get::<_, ProposalStatus>(&DataKey::FinalizedProposal(proposal_id));
+        let is_queued = match finalized_status {
+            Some(ProposalStatus::Queued) => true,
+            Some(ProposalStatus::Approved) => !proposal.executed, // legacy pre-timelock
+            _ => false,
+        };
+        if !is_queued {
+            panic_with_error!(&env, Error::NotQueued);
+        }
+
+        let timelock_delay = Self::get_timelock_delay(env.clone());
+        let ready_at = Self::checked_add_u32(
+            &env,
+            proposal.queued_at,
+            timelock_delay,
+        );
+        if env.ledger().sequence() < ready_at {
+            panic_with_error!(&env, Error::TimelockNotExpired);
         }
 
         let total_votes = Self::checked_add_i128(&env, proposal.yes_votes, proposal.no_votes);
@@ -447,6 +510,12 @@ impl ScholarshipTreasury {
             .persistent()
             .set(&DataKey::Proposal(proposal_id), &proposal);
         Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
+
+        // Update finalized status to Executed
+        env.storage()
+            .persistent()
+            .set(&DataKey::FinalizedProposal(proposal_id), &ProposalStatus::Executed);
+        Self::extend_persistent(&env, &DataKey::FinalizedProposal(proposal_id));
 
         if passed {
             Self::disburse_internal(&env, &proposal.applicant, proposal.amount);
@@ -471,12 +540,18 @@ impl ScholarshipTreasury {
             .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
             .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
 
-        if env.ledger().sequence() > proposal.deadline_ledger {
-            panic_with_error!(&env, Error::VotingClosed);
-        }
-
         if proposal.executed {
             panic_with_error!(&env, Error::ProposalAlreadyExecuted);
+        }
+
+        // Determine current public status
+        let status = Self::proposal_status(&env, &proposal);
+        if status == ProposalStatus::Rejected || status == ProposalStatus::Executed {
+            panic_with_error!(&env, Error::ProposalAlreadyExecuted);
+        }
+        // Allow cancellation during Pending (before deadline) or Queued (after finalize)
+        if status == ProposalStatus::Pending && env.ledger().sequence() > proposal.deadline_ledger {
+            panic_with_error!(&env, Error::VotingClosed);
         }
 
         proposal.cancelled = true;
@@ -619,6 +694,8 @@ impl ScholarshipTreasury {
             ),
             executed: false,
             cancelled: false,
+            queued_at: 0,
+            veto_votes: 0,
         };
 
         env.storage()
@@ -823,8 +900,31 @@ impl ScholarshipTreasury {
                 .map(|v| (v / total_votes) as u32 > approval_bps)
                 .unwrap_or(false);
 
+        let mut proposal = env
+            .storage()
+            .persistent()
+            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
+
         let status = if passed {
-            ProposalStatus::Approved
+            let current_ledger = env.ledger().sequence();
+            proposal.queued_at = current_ledger;
+            env.storage()
+                .persistent()
+                .set(&DataKey::Proposal(proposal_id), &proposal);
+            Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
+
+            let timelock_delay = Self::get_timelock_delay(env.clone());
+            let execution_ready_at = Self::checked_add_u32(&env, current_ledger, timelock_delay);
+
+            ProposalQueued {
+                proposal_id,
+                queued_at: current_ledger,
+                execution_ready_at,
+            }
+            .publish(&env);
+
+            ProposalStatus::Queued
         } else {
             ProposalStatus::Rejected
         };
@@ -846,6 +946,118 @@ impl ScholarshipTreasury {
         env.storage()
             .persistent()
             .get::<_, ProposalStatus>(&DataKey::FinalizedProposal(proposal_id))
+    }
+
+    /// Register an objection to a queued proposal.
+    ///
+    /// Voters can object during the timelock period. Objections accumulate
+    /// in `proposal.veto_votes`. If veto votes reach a 2/3 supermajority of
+    /// total GOV supply, anyone can call `veto_proposal` to reject it.
+    pub fn object_to_proposal(env: Env, voter: Address, proposal_id: u32) {
+        Self::assert_initialized(&env);
+        Self::assert_not_paused(&env);
+
+        voter.require_auth();
+
+        let mut proposal = env
+            .storage()
+            .persistent()
+            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
+
+        if proposal.cancelled {
+            panic_with_error!(&env, Error::ProposalCancelled);
+        }
+
+        if proposal.executed {
+            panic_with_error!(&env, Error::ProposalAlreadyExecuted);
+        }
+
+        let finalized_status = env
+            .storage()
+            .persistent()
+            .get::<_, ProposalStatus>(&DataKey::FinalizedProposal(proposal_id));
+        if finalized_status != Some(ProposalStatus::Queued) {
+            panic_with_error!(&env, Error::NotQueued);
+        }
+
+        let veto_key = DataKey::VetoCast(proposal_id, voter.clone());
+        if env
+            .storage()
+            .persistent()
+            .get::<_, bool>(&veto_key)
+            .unwrap_or(false)
+        {
+            panic_with_error!(&env, Error::AlreadyVoted);
+        }
+
+        let gov_contract = Self::governance_contract(&env);
+        let gov_client = governance::client(&env, &gov_contract);
+        let weight = gov_client.get_voting_power(&voter);
+        if weight < 0 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
+
+        proposal.veto_votes = Self::checked_add_i128(&env, proposal.veto_votes, weight);
+        env.storage().persistent().set(&veto_key, &true);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Proposal(proposal_id), &proposal);
+
+        Self::extend_persistent(&env, &veto_key);
+        Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
+    }
+
+    /// Veto a queued proposal.
+    ///
+    /// Either the admin may veto directly, or any caller may veto if the
+    /// accumulated `veto_votes` represent a 2/3 supermajority of the total GOV
+    /// token supply.
+    pub fn veto_proposal(env: Env, caller: Address, proposal_id: u32) {
+        caller.require_auth();
+
+        let mut proposal = env
+            .storage()
+            .persistent()
+            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
+
+        if proposal.cancelled || proposal.executed {
+            panic_with_error!(&env, Error::ProposalAlreadyExecuted);
+        }
+
+        let finalized_status = env
+            .storage()
+            .persistent()
+            .get::<_, ProposalStatus>(&DataKey::FinalizedProposal(proposal_id));
+        if finalized_status != Some(ProposalStatus::Queued) {
+            panic_with_error!(&env, Error::NotQueued);
+        }
+
+        let admin = Self::admin(&env);
+        let is_admin = caller == admin;
+        let total_gov = Self::get_total_gov_issued(env.clone());
+        // 2/3 supermajority threshold (multiply by 2, divide by 3)
+        let supermajority_met = total_gov > 0
+            && proposal.veto_votes >= (total_gov * 2) / 3;
+
+        if !is_admin && !supermajority_met {
+            panic_with_error!(&env, Error::VetoNotMet);
+        }
+
+        env.storage()
+            .persistent()
+            .set(
+                &DataKey::FinalizedProposal(proposal_id),
+                &ProposalStatus::Rejected,
+            );
+        Self::extend_persistent(&env, &DataKey::FinalizedProposal(proposal_id));
+
+        ProposalCancelled {
+            proposal_id,
+            cancelled_by: caller,
+        }
+        .publish(&env);
     }
 
     /// Returns the total GOV tokens issued so far (used for quorum calculation).
@@ -889,7 +1101,17 @@ impl ScholarshipTreasury {
             .persistent()
             .get::<_, ProposalStatus>(&DataKey::FinalizedProposal(proposal.id))
         {
-            return status;
+            return match status {
+                // Legacy pre-timelock: Approved proposals become Queued or Executed
+                ProposalStatus::Approved => {
+                    if proposal.executed {
+                        ProposalStatus::Executed
+                    } else {
+                        ProposalStatus::Queued
+                    }
+                }
+                s => s,
+            };
         }
 
         if env.ledger().sequence() <= proposal.deadline_ledger {
@@ -921,7 +1143,7 @@ impl ScholarshipTreasury {
                     .unwrap_or(false);
 
             if passed {
-                ProposalStatus::Approved
+                ProposalStatus::Queued
             } else {
                 ProposalStatus::Rejected
             }

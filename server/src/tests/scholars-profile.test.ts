@@ -4,16 +4,7 @@ import request from "supertest"
 // Mock internal modules
 jest.mock("../db/index", () => ({
 	pool: {
-		query: jest.fn().mockResolvedValue({ rows: [] }),
-	},
-}))
-
-jest.mock("../db/social-store", () => ({
-	socialStore: {
-		getFollowCounts: jest
-			.fn()
-			.mockResolvedValue({ followerCount: 0, followingCount: 0 }),
-		isFollowing: jest.fn().mockResolvedValue(false),
+		query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
 	},
 }))
 

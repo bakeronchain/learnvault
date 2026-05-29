@@ -105,12 +105,13 @@ describe("GET /api/courses", () => {
 		expect(res.body.pagination.total).toBe(1)
 		expect(mockedQuery).toHaveBeenNthCalledWith(
 			1,
-			expect.stringContaining("SELECT COUNT(*) AS count FROM courses c"),
+			expect.stringContaining("c.title ILIKE $1 OR c.description ILIKE $1"),
+			["%stellar%", 12, 0],
 			["%stellar%"],
 		)
 		expect(mockedQuery).toHaveBeenNthCalledWith(
 			2,
-			expect.stringContaining("SELECT"),
+			expect.stringContaining("c.title ILIKE $1 OR c.description ILIKE $1"),
 			["%stellar%", 12, 0],
 		)
 	})

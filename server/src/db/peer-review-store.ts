@@ -1,5 +1,5 @@
-import { inMemoryMilestoneStore, type MilestoneReport } from "./milestone-store"
 import { pool } from "./index"
+import { inMemoryMilestoneStore, type MilestoneReport } from "./milestone-store"
 
 export type PeerVerdict = "approve" | "reject"
 
@@ -153,7 +153,8 @@ export async function getPeerReviewQueue(
 				(r) =>
 					!inMemoryPeerReviews.some(
 						(pr) =>
-							pr.report_id === r.id && pr.reviewer_address === reviewerAddress,
+							pr.report_id === r.id &&
+							pr.reviewer_address === reviewerAddress,
 					),
 			)
 			.map((r) => ({
@@ -165,12 +166,7 @@ export async function getPeerReviewQueue(
 	}
 
 	const minLrn = minLrnThreshold()
-	const result = await pool.query<
-		MilestoneReport & {
-			peer_approval_count: number
-			peer_rejection_count: number
-		}
-	>(
+	const result = await pool.query<MilestoneReport & { peer_approval_count: number; peer_rejection_count: number }>(
 		`SELECT mr.*,
         COALESCE(stats.approve, 0)::int AS peer_approval_count,
         COALESCE(stats.reject, 0)::int AS peer_rejection_count
@@ -236,8 +232,7 @@ export async function submitPeerReview(params: {
 		}
 		if (
 			inMemoryPeerReviews.some(
-				(pr) =>
-					pr.report_id === reportId && pr.reviewer_address === reviewerAddress,
+				(pr) => pr.report_id === reportId && pr.reviewer_address === reviewerAddress,
 			)
 		) {
 			return { ok: false, code: "ALREADY_REVIEWED" }
@@ -299,8 +294,7 @@ export async function submitPeerReview(params: {
 		const balStr = balRes.rows[0]?.bal ?? "0"
 		let eligible = false
 		try {
-			eligible =
-				BigInt(balStr.split(".")[0] ?? "0") >= BigInt(minLrnThreshold())
+			eligible = BigInt(balStr.split(".")[0] ?? "0") >= BigInt(minLrnThreshold())
 		} catch {
 			eligible = false
 		}

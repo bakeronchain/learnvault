@@ -1,11 +1,6 @@
 import { Router } from "express"
 import { getProfile, updateProfile } from "../controllers/profiles.controller"
-import {
-	verifyScholarIdentity,
-	confirmIdentityVerification,
-	getSybilScore,
-	getVerificationStatus,
-} from "../controllers/anti-sybil.controller"
+
 import { authMiddleware } from "../middleware/auth.middleware"
 
 export const profilesRouter = Router()
@@ -80,19 +75,3 @@ profilesRouter.put("/profiles/me", authMiddleware, (req, res) => {
 	void updateProfile(req, res)
 })
 
-// Anti-Sybil Identity Verification endpoints (Issue #774)
-profilesRouter.post("/profiles/verify-identity", authMiddleware, (req, res) => {
-	void verifyScholarIdentity(req, res)
-})
-
-profilesRouter.post("/profiles/confirm-verification", authMiddleware, (req, res) => {
-	void confirmIdentityVerification(req, res)
-})
-
-profilesRouter.get("/profiles/sybil-score", authMiddleware, (req, res) => {
-	void getSybilScore(req, res)
-})
-
-profilesRouter.get("/profiles/verification-status", authMiddleware, (req, res) => {
-	void getVerificationStatus(req, res)
-})

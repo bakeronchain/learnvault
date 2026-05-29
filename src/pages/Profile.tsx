@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next"
 import { Link, useParams } from "react-router-dom"
 import { ActivityFeed } from "../components/ActivityFeed"
 import AddressDisplay from "../components/AddressDisplay"
-import { FollowButton } from "../components/FollowButton"
+
 import IdenticonAvatar from "../components/IdenticonAvatar"
 import LRNHistoryChart from "../components/LRNHistoryChart"
 import ProfileEditForm, {
@@ -169,6 +169,38 @@ const Profile: React.FC = () => {
 		void fetchProfileData()
 	}, [fetchProfileData])
 
+	// Determine which address to view (from URL param or connected wallet)
+	useEffect(() => {
+		const pathMatch = window.location.pathname.match(/\/profile\/(.+)/)
+		if (pathMatch?.[1]) {
+			setViewAddress(pathMatch[1])
+		} else if (walletAddress) {
+			setViewAddress(walletAddress)
+		}
+	}, [walletAddress])
+
+	// Fetch rich profile data
+	const fetchProfileData = useCallback(async () => {
+		if (!viewAddress) return
+
+		try {
+			const response = await fetch(`/api/profile/${viewAddress}`)
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}))
+				throw new Error(errorData.error || "Failed to load profile")
+			}
+			const data = await response.json()
+			setUserProfile(data.profile)
+			setStats(data.stats)
+		} catch (err) {
+			console.error("[profile] Error loading profile data:", err)
+		}
+	}, [viewAddress])
+
+	useEffect(() => {
+		void fetchProfileData()
+	}, [fetchProfileData])
+
 	useEffect(() => {
 		void fetchCredentials()
 	}, [fetchCredentials])
@@ -201,14 +233,12 @@ const Profile: React.FC = () => {
 				})
 
 				if (!response.ok) {
-					const errorData = (await response.json().catch(() => ({}))) as {
-						error?: string
-					}
+					const errorData = await response.json().catch(() => ({}))
 					throw new Error(errorData.error || "Failed to save profile")
 				}
 
-				const data = (await response.json()) as { profile?: UserProfile }
-				setUserProfile(data.profile ?? null)
+				const data = await response.json()
+				setUserProfile(data.profile)
 				setIsEditing(false)
 			} catch (err) {
 				console.error("[profile] Error saving profile:", err)
@@ -230,10 +260,7 @@ const Profile: React.FC = () => {
 		Object.values(userProfile.socialLinks).some(Boolean)
 
 	const siteUrl = "https://learnvault.app"
-	const lrnBalance =
-		stats?.lrnBalance?.toLocaleString() ||
-		profile?.lrn_balance?.toLocaleString() ||
-		"0"
+	const lrnBalance = stats?.lrnBalance.toLocaleString() ?? "0"
 	const coursesCompleted = stats?.coursesCompleted ?? nfts.length
 	const title = `${displayName} — ${lrnBalance} LRN · ${coursesCompleted} Course${
 		coursesCompleted !== 1 ? "s" : ""
@@ -303,36 +330,25 @@ const Profile: React.FC = () => {
 							{bio}
 						</p>
 					)}
-					<div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mb-4">
-						{displayAddress ? (
-							<div className="flex items-center gap-6">
-								<AddressDisplay
-									address={displayAddress}
-									addressClassName="text-white/30 text-sm tracking-widest"
-									buttonClassName="h-6 w-6"
-								/>
-								{!isOwnProfile && (
-									<FollowButton
-										targetAddress={displayAddress}
-										isFollowingInitial={profile?.is_following}
-									/>
-								)}
-							</div>
+					<div className="mb-6">
+						{viewAddress ? (
+							<AddressDisplay
+								address={viewAddress}
+								addressClassName="text-white/30 text-sm tracking-widest"
+								buttonClassName="h-6 w-6"
+							/>
 						) : (
 							<code className="text-white/30 text-sm block font-mono tracking-widest">
 								{t("wallet.connect")}
 							</code>
 						)}
 					</div>
-					<div className="flex flex-wrap justify-center md:justify-start gap-6 mb-6">
-						<div className="flex gap-4">
-							<div className="text-center md:text-left">
-								<div className="text-xl font-black text-white">
-									{profile?.follower_count || 0}
-								</div>
-								<div className="text-[10px] uppercase font-black tracking-widest text-white/30">
-									Followers
-								</div>
+					<div className="flex flex-wrap justify-center md:justify-start gap-4">
+						{viewAddress ? (
+							<ReputationBadge size="md" showBalance />
+						) : (
+							<div className="px-5 py-2 glass rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-white/40">
+								{t("wallet.connect")}
 							</div>
 							<div className="text-center md:text-left">
 								<div className="text-xl font-black text-white">
@@ -366,6 +382,16 @@ const Profile: React.FC = () => {
 								</div>
 							)}
 						</div>
+						{stats?.reputationRank && (
+							<div className="px-5 py-2 glass rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-brand-purple">
+								Rank #{stats.reputationRank}
+							</div>
+						)}
+						{stats?.percentile && (
+							<div className="px-5 py-2 glass rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-brand-emerald">
+								Top {stats.percentile}%
+							</div>
+						)}
 					</div>
 
 					{/* Social Links */}
@@ -465,6 +491,8 @@ const Profile: React.FC = () => {
 					/>
 				</section>
 			)}
+
+			<ProfileLinkedWallets />
 
 			<section>
 				<div className="flex items-center gap-4 mb-12">

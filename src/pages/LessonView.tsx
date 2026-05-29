@@ -6,7 +6,7 @@ import LessonContent from "../components/LessonContent"
 import CourseReviewsPanel from "../components/CourseReviewsPanel"
 import LessonSidebar from "../components/LessonSidebar"
 import MilestoneSubmitPanel from "../components/MilestoneSubmitPanel"
-import SponsorLogosForTrack from "../components/SponsorLogosForTrack"
+
 import { LessonListSkeleton } from "../components/skeletons/LessonListSkeleton"
 import { useCourse } from "../hooks/useCourse"
 import { useCourseDetail } from "../hooks/useCourses"
@@ -264,64 +264,17 @@ const LessonView: React.FC = () => {
 					</span>
 					<span className="text-white/40 text-sm">{course.title}</span>
 				</div>
-				{course.hasUpdatedContent && (
-					<div className="mb-4 rounded-2xl border border-amber-300/30 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
-						Updated content is available. You are currently on version{" "}
-						<strong>{course.enrollmentContentVersion ?? 1}</strong>, while the
-						latest is <strong>{course.latestContentVersion ?? 1}</strong>.
-					</div>
-				)}
+				<h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
+					{lesson.title}
+				</h1>
+			</header>
+
 				<div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
 					<h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
 						{currentTab === "forum" ? "Community Forum" : lesson.title}
 					</h1>
 				</div>
-				<SponsorLogosForTrack track={course.track} />
 			</header>
-			{hasPrerequisiteData ? (
-				<section className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
-					<div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-						<h2 className="text-sm font-black uppercase tracking-widest text-white/70">
-							Prerequisites
-						</h2>
-						<button
-							type="button"
-							onClick={() => void enroll(course.slug)}
-							disabled={hasUnmetPrerequisites || isEnrolledInCourse}
-							title={
-								hasUnmetPrerequisites
-									? "Complete all prerequisite courses first."
-									: isEnrolledInCourse
-										? "Already enrolled"
-										: "Enroll in this course"
-							}
-							className="px-4 py-2 rounded-full border border-brand-cyan/30 text-brand-cyan disabled:opacity-40 text-xs font-black uppercase tracking-widest"
-						>
-							{isEnrolledInCourse ? "Enrolled" : "Enroll"}
-						</button>
-					</div>
-					<ul className="space-y-2">
-						{prerequisiteStatuses.map(({ prereq, completed }) => (
-							<li key={prereq.slug} className="flex items-center justify-between gap-2">
-								<div className="text-sm text-white/80 flex items-center gap-2">
-									<span className={completed ? "text-emerald-300" : "text-white/40"}>
-										{completed ? "✓" : "○"}
-									</span>
-									<span>{prereq.title}</span>
-								</div>
-								<Link
-									to={`/courses/${prereq.slug}/lessons/1`}
-									title={prereq.title}
-									className="text-xs text-brand-cyan/90 underline decoration-dotted"
-								>
-									Open
-								</Link>
-							</li>
-						))}
-					</ul>
-				</section>
-			) : null}
-
 			{/* Course progress bar */}
 			{allLessons.length > 0 &&
 				(() => {
@@ -457,24 +410,36 @@ const LessonView: React.FC = () => {
 				</div>
 
 				<div>
+					<LessonContent
+						lesson={lesson ?? loadingLesson}
+						isLoading={isLoadingCourse || isLoadingContent}
+						isCompleted={isCompleted}
+						isCompleting={isCompletingMilestone}
+						timeSpentLabel={timeSpentLabel}
+						onMarkComplete={handleMarkComplete}
+						prevLessonId={prevLessonId}
+						nextLessonId={nextLessonId}
+						isNextLocked={isNextLocked}
+					/>
+
 					{currentTab === "forum" ? (
 						<div className="animate-in fade-in">
 							<CourseForum courseId={course.slug} />
 						</div>
 					) : (
-						<LessonContent
-							lesson={lesson ?? loadingLesson}
-							isLoading={isLoadingCourse || isLoadingContent}
-							isCompleted={isCompleted}
-							isCompleting={isCompletingMilestone}
-							timeSpentLabel={timeSpentLabel}
-							onMarkComplete={handleMarkComplete}
-							onScrolledToBottom={() => markLessonRead(lessonId)}
-							prevLessonId={prevLessonId}
-							nextLessonId={nextLessonId}
-							isNextLocked={isNextLocked}
-						/>
-					)}
+						<>
+							<LessonContent
+								lesson={lesson ?? loadingLesson}
+								isLoading={isLoadingCourse || isLoadingContent}
+								isCompleted={isCompleted}
+								isCompleting={isCompletingMilestone}
+								timeSpentLabel={timeSpentLabel}
+								onMarkComplete={handleMarkComplete}
+								onScrolledToBottom={() => markLessonRead(lessonId)}
+								prevLessonId={prevLessonId}
+								nextLessonId={nextLessonId}
+								isNextLocked={isNextLocked}
+							/>
 
 					{lesson?.isMilestone && !isLoadingCourse && !isLoadingContent && (
 						<div className="mt-12 animate-in fade-in slide-in-from-top-4 duration-1000">

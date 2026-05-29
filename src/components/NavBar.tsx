@@ -24,7 +24,6 @@ export default function NavBar() {
 	const [menuOpen, setMenuOpen] = useState(false)
 	const mobileMenuId = useId()
 	const { t } = useTranslation()
-
 	useEffect(() => {
 		if (typeof document === "undefined") return
 		const previousOverflow = document.body.style.overflow

@@ -1,4 +1,6 @@
-import { type Request, type Response } from "express"
+import { type Response } from "express"
+
+import { type AuthRequest } from "../middleware/auth.middleware"
 import { flaggedContentStore } from "../db/flagged-content-store"
 import { pool } from "../db/index"
 import { createEmailService } from "../services/email.service"
@@ -11,7 +13,10 @@ interface FlagContentRequestBody {
 	reason: string
 }
 
-export async function flagContent(req: Request, res: Response): Promise<void> {
+export async function flagContent(
+	req: AuthRequest,
+	res: Response,
+): Promise<void> {
 	const body = req.body as FlagContentRequestBody
 	const { contentType, contentId, reason } = body
 
@@ -30,7 +35,10 @@ export async function flagContent(req: Request, res: Response): Promise<void> {
 		return
 	}
 
-	const reporterAddress = (req as any).user?.address
+	const reporterAddress = (req as any).user?.address || (req as any).walletAddress
+
+	const reporterAddress = req.user?.address
+ main
 
 	if (!reporterAddress) {
 		res.status(401).json({ error: "Authentication required" })

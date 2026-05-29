@@ -39,10 +39,8 @@ export const getTreasuryStats = async (
 
 		// Fetch events from the ScholarshipTreasury contract
 		const response = await server.getEvents({
-			filters: [
-				{ type: "contract", contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] },
-			],
-			startLedger: Number(process.env.STARTING_LEDGER ?? "460000000"),
+			filters: [{ contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] }],
+			startLedger: parseInt(process.env.STARTING_LEDGER || "460000000", 10),
 			limit: 1000,
 		})
 
@@ -108,7 +106,10 @@ export const getTreasuryActivity = async (
 		1,
 		Math.min(parsePositiveInt(req.query.limit, 20), 100),
 	)
-	const offset = Math.max(0, parsePositiveInt(req.query.offset, 0))
+	const pageParam = parsePositiveInt(req.query.page, 1)
+	const offsetParam = parsePositiveInt(req.query.offset, -1)
+	const offset = offsetParam >= 0 ? offsetParam : (pageParam - 1) * limit
+	const page = offsetParam >= 0 ? Math.floor(offset / limit) + 1 : pageParam
 
 	try {
 		const server = new rpc.Server(
@@ -119,10 +120,8 @@ export const getTreasuryActivity = async (
 
 		// Fetch events from the ScholarshipTreasury contract
 		const response = await server.getEvents({
-			filters: [
-				{ type: "contract", contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] },
-			],
-			startLedger: Number(process.env.STARTING_LEDGER ?? "460000000"),
+			filters: [{ contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] }],
+			startLedger: parseInt(process.env.STARTING_LEDGER || "460000000", 10),
 			limit: 1000,
 		})
 
@@ -171,9 +170,11 @@ export const getTreasuryActivity = async (
 
 		// Apply pagination
 		const paginatedEvents = events.slice(offset, offset + limit)
+		const total = events.length
 
 		res.status(200).json({
-			events: paginatedEvents,
+			data: paginatedEvents,
+			pagination: { page, limit, total },
 		})
 	} catch (err) {
 		log.error({ err }, "Failed to fetch activity")

@@ -1,27 +1,63 @@
 import { Icon } from "@stellar/design-system"
 import React, { useState, useEffect, useRef } from "react"
-import { Link, useNavigate } from "react-router-dom"
-import { EmptyState as StateEmpty } from "./states/emptyState"
+import { useNavigate } from "react-router-dom"
 import { useCourses } from "../hooks/useCourses"
 import { useWikiPages } from "../hooks/useWiki"
 
 const GlobalSearch: React.FC = () => {
 	const [query, setQuery] = useState("")
+	const [debouncedQuery, setDebouncedQuery] = useState("")
 	const [isOpen, setIsOpen] = useState(false)
+	const [activeIndex, setActiveIndex] = useState(-1)
 	const navigate = useNavigate()
 	const containerRef = useRef<HTMLDivElement>(null)
+	const inputRef = useRef<HTMLInputElement>(null)
+	const listboxId = "global-search-listbox"
+	const abortControllerRef = useRef<AbortController | null>(null)
+	const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
 	const { courses = [] } = useCourses()
 	const { data: wikiPages = [] } = useWikiPages()
 
+	// Debounce search query
+	useEffect(() => {
+		if (debounceTimerRef.current) {
+			clearTimeout(debounceTimerRef.current)
+		}
+
+		debounceTimerRef.current = setTimeout(() => {
+			setDebouncedQuery(query)
+		}, 300)
+
+		return () => {
+			if (debounceTimerRef.current) {
+				clearTimeout(debounceTimerRef.current)
+			}
+		}
+	}, [query])
+
+	// Cancel in-flight requests when query changes
+	useEffect(() => {
+		if (abortControllerRef.current) {
+			abortControllerRef.current.abort()
+		}
+		abortControllerRef.current = new AbortController()
+
+		return () => {
+			if (abortControllerRef.current) {
+				abortControllerRef.current.abort()
+			}
+		}
+	}, [debouncedQuery])
+
 	const results =
-		query.length >= 2
+		debouncedQuery.length >= 2
 			? [
 				...courses
 					.filter(
 						(c) =>
-							c.title.toLowerCase().includes(query.toLowerCase()) ||
-							c.description.toLowerCase().includes(query.toLowerCase()),
+							c.title.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
+							c.description.toLowerCase().includes(debouncedQuery.toLowerCase()),
 					)
 					.map((c) => ({
 						id: `course-${c.id}`,
@@ -32,8 +68,8 @@ const GlobalSearch: React.FC = () => {
 				...wikiPages
 					.filter(
 						(p) =>
-							p.title.toLowerCase().includes(query.toLowerCase()) ||
-							p.content.toLowerCase().includes(query.toLowerCase()),
+							p.title.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
+							p.content.toLowerCase().includes(debouncedQuery.toLowerCase()),
 					)
 					.map((p) => ({
 						id: `wiki-${p.id}`,
@@ -44,6 +80,11 @@ const GlobalSearch: React.FC = () => {
 			].slice(0, 8)
 			: []
 
+	// Reset active index whenever results change
+	useEffect(() => {
+		setActiveIndex(-1)
+	}, [results.length, debouncedQuery])
+
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
 			if (
@@ -51,6 +92,7 @@ const GlobalSearch: React.FC = () => {
 				!containerRef.current.contains(event.target as Node)
 			) {
 				setIsOpen(false)
+				setActiveIndex(-1)
 			}
 		}
 		document.addEventListener("mousedown", handleClickOutside)
@@ -60,8 +102,43 @@ const GlobalSearch: React.FC = () => {
 	const handleSelect = (link: string) => {
 		setQuery("")
 		setIsOpen(false)
+		setActiveIndex(-1)
 		void navigate(link)
 	}
+
+	const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+		if (!isOpen || results.length === 0) {
+			if (e.key === "Escape") {
+				setIsOpen(false)
+				setActiveIndex(-1)
+			}
+			return
+		}
+
+		switch (e.key) {
+			case "ArrowDown":
+				e.preventDefault()
+				setActiveIndex((prev) => (prev < results.length - 1 ? prev + 1 : 0))
+				break
+			case "ArrowUp":
+				e.preventDefault()
+				setActiveIndex((prev) => (prev > 0 ? prev - 1 : results.length - 1))
+				break
+			case "Enter":
+				e.preventDefault()
+				if (activeIndex >= 0 && activeIndex < results.length) {
+					handleSelect(results[activeIndex].link)
+				}
+				break
+			case "Escape":
+				e.preventDefault()
+				setIsOpen(false)
+				setActiveIndex(-1)
+				break
+		}
+	}
+
+	const showDropdown = isOpen && query.length >= 2
 
 	return (
 		<div className="relative" ref={containerRef}>
@@ -71,7 +148,15 @@ const GlobalSearch: React.FC = () => {
 					size="sm"
 				/>
 				<input
+					ref={inputRef}
 					type="text"
+					role="combobox"
+					aria-expanded={showDropdown}
+					aria-autocomplete="list"
+					aria-controls={showDropdown ? listboxId : undefined}
+					aria-activedescendant={
+						activeIndex >= 0 ? `search-option-${activeIndex}` : undefined
+					}
 					placeholder="Search..."
 					aria-label="Search"
 					className="glass border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm w-[180px] focus:w-[240px] focus:border-brand-cyan/40 focus:outline-none transition-all"
@@ -81,18 +166,30 @@ const GlobalSearch: React.FC = () => {
 						setIsOpen(true)
 					}}
 					onFocus={() => setIsOpen(true)}
+					onKeyDown={handleKeyDown}
 				/>
 			</div>
 
-			{isOpen && query.length >= 2 && (
-				<div className="absolute top-full mt-2 left-0 right-0 glass-card border border-white/10 rounded-2xl overflow-hidden shadow-2xl min-w-[300px] animate-in fade-in slide-in-from-top-2 duration-200">
+			{showDropdown && (
+				<div
+					id={listboxId}
+					role="listbox"
+					aria-label="Search results"
+					className="absolute top-full mt-2 left-0 right-0 glass-card border border-white/10 rounded-2xl overflow-hidden shadow-2xl min-w-[300px] animate-in fade-in slide-in-from-top-2 duration-200"
+				>
 					{results.length > 0 ? (
 						<div className="flex flex-col">
-							{results.map((result) => (
+							{results.map((result, index) => (
 								<button
 									key={result.id}
+									id={`search-option-${index}`}
+									role="option"
+									aria-selected={index === activeIndex}
 									onClick={() => handleSelect(result.link)}
-									className="flex items-center justify-between px-4 py-3 hover:bg-white/5 text-left border-b border-white/5 last:border-none transition-colors group"
+									onMouseEnter={() => setActiveIndex(index)}
+									className={`flex items-center justify-between px-4 py-3 text-left border-b border-white/5 last:border-none transition-colors group ${
+										index === activeIndex ? "bg-white/10" : "hover:bg-white/5"
+									}`}
 								>
 									<div className="flex flex-col">
 										<span className="text-xs font-black uppercase tracking-widest text-white/30 group-hover:text-brand-cyan/50 transition-colors">

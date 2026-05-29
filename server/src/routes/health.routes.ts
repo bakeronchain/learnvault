@@ -4,13 +4,6 @@ import path from "node:path"
 import { Router } from "express"
 import Redis from "ioredis"
 
-import { getHealth } from "../controllers/health.controller"
-import {
-	getPoolMetrics,
-	resetPoolAlerts,
-} from "../controllers/metrics.controller"
-import { pool } from "../db"
-import { logger } from "../lib/logger"
 
 import { getPgStatStatementsSnapshot, pool } from "../db/index"
 import { getRpcCacheStats, resetRpcCacheStats } from "../lib/rpc-cache"
@@ -256,28 +249,41 @@ healthRouter.get("/health", async (req, res) => {
 		checkHorizon(),
 	])
 
-	const overallStatus = deriveOverallStatus(
+	const [database, redis, stellarHorizon] = await Promise.all([
+		checkDatabase(),
+		checkRedis(),
+		checkHorizon(),
+	])
+
+	const status = deriveOverallStatus(
 		database.status,
 		redis.status,
 		stellarHorizon.status,
 	)
+	const dbConnectionState: DbConnectionState =
+		database.status === "healthy" ? "connected" : "disconnected"
 
-	const statusCode = overallStatus === "unhealthy" ? 503 : 200
-
-	res.status(statusCode).json({
-		status: overallStatus,
+	const payload = {
+		status,
+		db: dbConnectionState,
+		uptime,
+		timestamp,
 		version: appVersion,
 		commitHash: resolveGitCommitHash(),
-		timestamp: new Date().toISOString(),
-		db: database.status === "healthy" ? "connected" : "disconnected",
 		dbPool: getDbPoolStats(),
 		checks: {
 			database,
 			redis,
 			stellarHorizon,
 		},
-		stellarRpc: stellarRpcCircuitBreaker.getStatus(),
-	})
+	}
+
+	if (status === "unhealthy") {
+		res.status(503).json(payload)
+		return
+	}
+
+	res.status(200).json(payload)
 })
 
 healthRouter.get("/health/db/performance", async (_req, res) => {

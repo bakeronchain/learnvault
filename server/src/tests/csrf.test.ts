@@ -31,8 +31,7 @@ const DISALLOWED_ORIGIN = "https://malicious-site.example"
 const ALLOWED_ORIGINS = [ALLOWED_ORIGIN]
 
 const testJwtService = {
-	signWalletToken: (addr: string) =>
-		jwt.sign({ sub: addr, jti: "test-jti" }, JWT_SECRET),
+	signWalletToken: (addr: string) => jwt.sign({ sub: addr }, JWT_SECRET),
 	verifyWalletToken: async (token: string) => {
 		const d = jwt.verify(token, JWT_SECRET) as {
 			sub?: string
@@ -43,7 +42,7 @@ const testJwtService = {
 		if (!sub) throw new Error("Invalid token")
 		return { sub, jti: d.jti ?? "test-jti" }
 	},
-	revokeToken: jest.fn().mockResolvedValue(undefined),
+	revokeToken: async () => {},
 }
 
 function validToken(address = "GUSER123") {

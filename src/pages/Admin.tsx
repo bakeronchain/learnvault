@@ -2,6 +2,14 @@ import { useQuery } from "@tanstack/react-query"
 import React, { useEffect, useMemo, useState } from "react"
 import ReactMarkdown from "react-markdown"
 import { useNavigate } from "react-router-dom"
+import {
+	RadialBarChart,
+	RadialBar,
+	Legend,
+	ResponsiveContainer,
+	Tooltip,
+} from "recharts"
+import AddressDisplay from "../components/AddressDisplay"
 import TxHashLink from "../components/TxHashLink"
 import {
 	useAdminStats,
@@ -26,12 +34,15 @@ import { apiFetchJson } from "../lib/api"
 import { getAuthToken } from "../util/auth"
 import { shortenContractId } from "../util/contract"
 
+const API_BASE = import.meta.env.VITE_SERVER_URL || "http://localhost:4000"
+
 type AdminSection =
 	| "courses"
 	| "milestones"
 	| "users"
 	| "wiki"
 	| "treasury"
+	| "scholarships"
 	| "contracts"
 	| "moderation"
 type CourseStatus = "draft" | "published"
@@ -76,10 +87,30 @@ const sectionDescriptions: Record<AdminSection, string> = {
 	milestones: "Review milestone reports and approvals.",
 	users: "Lookup learner profiles by wallet address.",
 	wiki: "Create and edit platform documentation and guides.",
-	treasury: "Monitor and manage live treasury controls.",
-	contracts: "Inspect deployed contract addresses and on-chain state.",
-	moderation: "Review and moderate flagged comments and content.",
+	treasury: "Monitor and manage treasury controls.",
+	scholarships: "View scholarship program health metrics.",
+	contracts: "Inspect deployed on-chain contract records.",
 }
+
+const initialCourses: AdminCourse[] = [
+	{ id: 1, title: "Soroban Basics", status: "published", students: 84 },
+	{ id: 2, title: "Stellar Security", status: "draft", students: 0 },
+]
+
+const contractRecords: ContractRecord[] = [
+	{
+		name: "Scholarship Treasury",
+		tag: "prod",
+		address: "CXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+		updated: "2026-03-20",
+	},
+	{
+		name: "Governance Token",
+		tag: "prod",
+		address: "CYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY",
+		updated: "2026-03-20",
+	},
+]
 
 const STATUSES = ["pending", "approved", "rejected"] as const
 
@@ -98,6 +129,18 @@ const formatDate = (value: string | undefined): string => {
 
 const formatCount = (value: number): string =>
 	value.toLocaleString(i18n.resolvedLanguage, { maximumFractionDigits: 0 })
+
+const formatPercent = (value: number): string => {
+	if (!Number.isFinite(value)) return "0.0%"
+	return `${value.toFixed(1)}%`
+}
+
+const formatReviewTime = (seconds: number): string => {
+	if (!Number.isFinite(seconds) || seconds < 0) return "-"
+	if (seconds < 60) return `${Math.round(seconds)}s`
+	if (seconds < 3600) return `${(seconds / 60).toFixed(1)}m`
+	return `${(seconds / 3600).toFixed(1)}h`
+}
 
 const renderAddress = (value: string | undefined) =>
 	value ? shortenContractId(value, 6, 6) : "Not available"
@@ -148,7 +191,10 @@ const ConfirmDialog: React.FC<{
 			<p className="text-sm text-white/60 mb-1">
 				Learner:{" "}
 				<span className="font-mono text-white/90">
-					{milestone.learnerAddress}
+					<AddressDisplay
+						address={milestone.learnerAddress}
+						showExplorerLink={false}
+					/>
 				</span>
 			</p>
 			<p className="text-sm text-white/60 mb-4">
@@ -285,6 +331,7 @@ const Admin: React.FC = () => {
 							"users",
 							"wiki",
 							"treasury",
+							"scholarships",
 							"contracts",
 							"moderation",
 						] as const
@@ -314,6 +361,8 @@ const Admin: React.FC = () => {
 				{activeSection === "users" && <UserLookup />}
 				{activeSection === "wiki" && <WikiManagement />}
 				{activeSection === "treasury" && <TreasuryControls />}
+				{activeSection === "wiki" && <WikiManagement />}
+				{activeSection === "scholarships" && <ScholarshipMetrics />}
 				{activeSection === "contracts" && <ContractInfo />}
 				{activeSection === "moderation" && <ModerationQueue />}
 			</main>
@@ -420,6 +469,13 @@ const MilestoneQueue: React.FC = () => {
 	const { data: courseOptionsData = [], error: courseOptionsError } =
 		useAdminCoursesList()
 	const {
+		analytics,
+		reviewQueue,
+		loading: analyticsLoading,
+		error: analyticsError,
+		fetchAnalytics,
+	} = useValidatorAnalytics()
+	const {
 		milestones,
 		total,
 		page,
@@ -463,6 +519,10 @@ const MilestoneQueue: React.FC = () => {
 		})
 	}, [courseFilter, statusFilter, fetchMilestones])
 
+	useEffect(() => {
+		void fetchAnalytics()
+	}, [fetchAnalytics])
+
 	const handlePageChange = (newPage: number) => {
 		void fetchMilestones(newPage, {
 			course: courseFilter !== "All" ? courseFilter : undefined,
@@ -479,6 +539,7 @@ const MilestoneQueue: React.FC = () => {
 		} else {
 			await rejectMilestone(milestone.id)
 		}
+		await fetchAnalytics()
 	}
 
 	const pendingMilestones = milestones.filter(
@@ -571,8 +632,7 @@ const MilestoneQueue: React.FC = () => {
 						Validator review queue is above threshold
 					</p>
 					<p className="mt-1 text-xs text-yellow-100/80">
-						Pending: {formatCount(reviewQueue.pendingReviews)} | Threshold:{" "}
-						{formatCount(reviewQueue.threshold)}
+						Pending: {formatCount(reviewQueue.pendingReviews)} | Threshold: {formatCount(reviewQueue.threshold)}
 					</p>
 				</div>
 			)}
@@ -612,10 +672,7 @@ const MilestoneQueue: React.FC = () => {
 
 						{!analyticsLoading && analytics.length === 0 && (
 							<tr>
-								<td
-									colSpan={5}
-									className="py-8 text-center text-sm text-white/40"
-								>
+								<td colSpan={5} className="py-8 text-center text-sm text-white/40">
 									No validator analytics available.
 								</td>
 							</tr>
@@ -647,6 +704,7 @@ const MilestoneQueue: React.FC = () => {
 					</tbody>
 				</table>
 			</div>
+
 			<div className="flex flex-wrap gap-3 mb-4 items-center">
 				<div className="flex items-center gap-2">
 					<label
@@ -712,6 +770,7 @@ const MilestoneQueue: React.FC = () => {
 							<th className="py-3 px-4 font-medium">Course</th>
 							<th className="py-3 px-4 font-medium">Submitted</th>
 							<th className="py-3 px-4 font-medium">Evidence</th>
+							<th className="py-3 px-4 font-medium">Peer signals</th>
 							<th className="py-3 px-4 font-medium">Status</th>
 							<th className="py-3 px-4 font-medium">Actions</th>
 						</tr>
@@ -720,7 +779,7 @@ const MilestoneQueue: React.FC = () => {
 						{loading && (
 							<tr>
 								<td
-									colSpan={6}
+									colSpan={7}
 									className="py-12 text-center text-sm text-white/40 animate-pulse"
 								>
 									Loading milestones…
@@ -730,7 +789,7 @@ const MilestoneQueue: React.FC = () => {
 
 						{!loading && milestones.length === 0 && (
 							<tr>
-								<td colSpan={6} className="py-12 text-center">
+								<td colSpan={7} className="py-12 text-center">
 									<p className="text-white/40 text-sm">
 										No milestone submissions found.
 									</p>
@@ -760,9 +819,13 @@ const MilestoneQueue: React.FC = () => {
 										className="border-b border-white/5 hover:bg-white/3 transition-colors"
 									>
 										<td className="py-3 px-4">
-											<span className="font-mono text-xs text-white/50">
-												{shortenContractId(milestone.learnerAddress, 8, 4)}
-											</span>
+											<AddressDisplay
+												address={milestone.learnerAddress}
+												prefixLength={8}
+												suffixLength={4}
+												showExplorerLink={false}
+												addressClassName="text-xs text-white/50"
+											/>
 										</td>
 										<td className="py-3 px-4 text-sm text-white/80">
 											{milestone.course}
@@ -772,6 +835,10 @@ const MilestoneQueue: React.FC = () => {
 										</td>
 										<td className="py-3 px-4">
 											<EvidenceLink value={milestone.evidenceLink} />
+										</td>
+										<td className="py-3 px-4 text-xs font-mono text-white/55 whitespace-nowrap">
+											+{milestone.peerApprovalCount} / −
+											{milestone.peerRejectionCount}
 										</td>
 										<td className="py-3 px-4">
 											<span
@@ -856,6 +923,8 @@ const MilestoneQueue: React.FC = () => {
 		</section>
 	)
 }
+
+export default Admin
 
 const UserLookup: React.FC = () => {
 	const [search, setSearch] = useState("")
@@ -1510,422 +1579,124 @@ const WikiManagement: React.FC = () => {
 	)
 }
 
-interface FlaggedContent {
-	id: number
-	content_type: "comment" | "proposal"
-	content_id: number
-	reporter_address: string
-	reason: string
-	flag_count: number
-	status: "pending" | "reviewed" | "dismissed"
-	admin_action?: "deleted" | "dismissed" | "warned"
-	admin_address?: string
-	admin_notes?: string
-	is_hidden: boolean
-	created_at: string
-	reviewed_at?: string
+interface ScholarshipMetricsData {
+	active_scholarships: number
+	total_scholars: number
+	completion_rate: number
+	avg_milestones_per_scholar: number
+	dropout_rate: number
+	total_usdc_disbursed: number
 }
 
-interface FlagDetails {
-	flag: FlaggedContent
-	content: {
-		id: number
-		content: string
-		author_address: string
-		created_at: string
-	} | null
-	auditLog: Array<{
-		id: number
-		action: string
-		actor_address: string
-		notes: string
-		created_at: string
-	}>
-}
-
-const ModerationQueue: React.FC = () => {
-	const [statusFilter, setStatusFilter] = useState<"pending" | "reviewed">("pending")
-	const [flags, setFlags] = useState<FlaggedContent[]>([])
-	const [loading, setLoading] = useState(false)
+const ScholarshipMetrics: React.FC = () => {
+	const [metrics, setMetrics] = useState<ScholarshipMetricsData | null>(null)
+	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 
-	const [selectedFlagId, setSelectedFlagId] = useState<number | null>(null)
-	const [selectedDetails, setSelectedDetails] = useState<FlagDetails | null>(null)
-	const [detailsLoading, setDetailsLoading] = useState(false)
-	const [adminNotes, setAdminNotes] = useState("")
-	const [actionInProgress, setActionInProgress] = useState(false)
-
-	const loadFlags = async () => {
-		try {
-			setLoading(true)
-			setError(null)
-			const res = await apiFetchJson<{ data: FlaggedContent[] }>(
-				`/api/admin/moderation?status=${statusFilter}`,
-				{ auth: true },
-			)
-			setFlags(res.data || [])
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to load flags")
-		} finally {
-			setLoading(false)
-		}
-	}
-
 	useEffect(() => {
-		void loadFlags()
-		setSelectedFlagId(null)
-		setSelectedDetails(null)
-	}, [statusFilter])
-
-	const handleSelectFlag = async (flagId: number) => {
-		try {
-			setSelectedFlagId(flagId)
-			setDetailsLoading(true)
-			const res = await apiFetchJson<{ data: FlagDetails }>(
-				`/api/admin/moderation/${flagId}`,
-				{ auth: true },
-			)
-			setSelectedDetails(res.data)
-			setAdminNotes("")
-		} catch (err) {
-			console.error("Failed to load flag details", err)
-		} finally {
-			setDetailsLoading(false)
+		const fetchMetrics = async () => {
+			try {
+				const res = await fetch(`${API_BASE}/api/scholarships/metrics`)
+				if (!res.ok) throw new Error(`HTTP ${res.status}`)
+				const data = await res.json()
+				setMetrics(data)
+			} catch (err) {
+				setError("Failed to load metrics")
+			} finally {
+				setLoading(false)
+			}
 		}
-	}
+		void fetchMetrics()
+	}, [])
 
-	const handleTakeAction = async (action: "delete" | "dismiss" | "warn") => {
-		if (!selectedFlagId) return
-		try {
-			setActionInProgress(true)
-			await apiFetchJson(`/api/admin/moderation/${selectedFlagId}/action`, {
-				method: "POST",
-				auth: true,
-				headers: {
-					"Content-Type": "application/json",
+	const chartData = metrics
+		? [
+				{
+					name: "Completion Rate",
+					value: metrics.completion_rate,
+					fill: "#00d2ff",
 				},
-				body: JSON.stringify({ action, adminNotes }),
-			})
-			await loadFlags()
-			setSelectedFlagId(null)
-			setSelectedDetails(null)
-		} catch (err) {
-			console.error("Action failed", err)
-		} finally {
-			setActionInProgress(false)
-		}
-	}
+				{
+					name: "Dropout Rate",
+					value: metrics.dropout_rate,
+					fill: "#ff4d4d",
+				},
+			]
+		: []
 
 	return (
-		<section className="space-y-6">
-			<div>
-				<h1 className="text-3xl font-black text-white tracking-tight">
-					Content Moderation Queue
-				</h1>
-				<p className="text-sm text-white/50 mt-1">
-					Review flags submitted by users and take corrective action.
-				</p>
-			</div>
+		<section aria-busy={loading}>
+			<h2 className="text-2xl font-black mb-6">Scholarship Program Health</h2>
 
-			<div className="flex gap-2 p-1 bg-white/5 border border-white/5 rounded-2xl w-fit">
-				<button
-					type="button"
-					onClick={() => setStatusFilter("pending")}
-					className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
-						statusFilter === "pending"
-							? "bg-yellow-500/20 text-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.1)] border border-yellow-500/30"
-							: "text-white/60 hover:text-white"
-					}`}
-				>
-					Pending Review
-				</button>
-				<button
-					type="button"
-					onClick={() => setStatusFilter("reviewed")}
-					className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
-						statusFilter === "reviewed"
-							? "bg-emerald-500/20 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.1)] border border-emerald-500/30"
-							: "text-white/60 hover:text-white"
-					}`}
-				>
-					Reviewed & Acted On
-				</button>
-			</div>
-
-			{error && (
-				<p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
-					Error: {error}
-				</p>
+			{loading && (
+				<div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+					{Array.from({ length: 6 }).map((_, i) => (
+						<div
+							key={i}
+							className="h-24 rounded-2xl bg-white/5 animate-pulse"
+						/>
+					))}
+				</div>
 			)}
 
-			<div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-				<div className="lg:col-span-7 space-y-4">
-					<div className="overflow-hidden rounded-3xl border border-white/5 glass">
-						<table className="w-full text-left border-collapse">
-							<thead>
-								<tr className="border-b border-white/5 text-xs uppercase tracking-widest text-white/40 bg-white/3">
-									<th className="py-4 px-6 font-black">Content</th>
-									<th className="py-4 px-6 font-black text-center">Flags</th>
-									<th className="py-4 px-6 font-black">Reporter</th>
-									<th className="py-4 px-6 font-black">Reason</th>
-								</tr>
-							</thead>
-							<tbody>
-								{loading && (
-									<tr>
-										<td
-											colSpan={4}
-											className="py-12 text-center text-sm text-white/40 animate-pulse"
-										>
-											Loading flagged items…
-										</td>
-									</tr>
-								)}
+			{error && <p className="text-red-400 mb-6">{error}</p>}
 
-								{!loading && flags.length === 0 && (
-									<tr>
-										<td colSpan={4} className="py-12 text-center text-white/30">
-											<p className="text-sm font-bold uppercase tracking-wider">
-												All Clean!
-											</p>
-											<p className="text-xs text-white/20 mt-1">
-												No content in this queue requires moderation.
-											</p>
-										</td>
-									</tr>
-								)}
-
-								{!loading &&
-									flags.map((flag) => (
-										<tr
-											key={flag.id}
-											onClick={() => void handleSelectFlag(flag.id)}
-											className={`border-b border-white/5 hover:bg-white/5 transition-all cursor-pointer ${
-												selectedFlagId === flag.id ? "bg-white/10" : ""
-											}`}
-										>
-											<td className="py-4 px-6 text-sm text-white font-bold capitalize">
-												{flag.content_type} #{flag.content_id}
-											</td>
-											<td className="py-4 px-6 text-sm text-center">
-												<span className="px-2.5 py-1 rounded-full text-xs font-black bg-red-500/10 text-red-400 border border-red-500/20">
-													{flag.flag_count}
-												</span>
-											</td>
-											<td className="py-4 px-6 font-mono text-xs text-white/60">
-												{flag.reporter_address.slice(0, 6)}...
-												{flag.reporter_address.slice(-4)}
-											</td>
-											<td className="py-4 px-6 text-xs text-white/70 max-w-[200px] truncate">
-												{flag.reason}
-											</td>
-										</tr>
-									))}
-							</tbody>
-						</table>
-					</div>
-				</div>
-
-				<div className="lg:col-span-5">
-					{selectedFlagId === null ? (
-						<div className="glass border border-white/5 rounded-[2rem] p-8 text-center text-white/30 flex flex-col items-center justify-center min-h-[300px]">
-							<span className="text-4xl mb-4" aria-hidden="true">
-								🔎
-							</span>
-							<p className="text-sm font-bold uppercase tracking-wider">
-								Select an Item
-							</p>
-							<p className="text-xs text-white/20 mt-1 max-w-[240px]">
-								Click any item in the moderation queue to view details and take
-								actions.
-							</p>
-						</div>
-					) : detailsLoading ? (
-						<div className="glass border border-white/5 rounded-[2rem] p-8 text-center text-white/30 animate-pulse flex flex-col items-center justify-center min-h-[300px]">
-							Loading details…
-						</div>
-					) : selectedDetails ? (
-						<div className="glass-card border border-white/10 rounded-[2.5rem] p-8 space-y-6 shadow-2xl animate-in zoom-in-95 duration-300">
-							<header className="flex justify-between items-start">
-								<div>
-									<h2 className="text-xl font-black text-white">
-										Moderation Details
-									</h2>
-									<p className="text-xs text-white/40 uppercase tracking-widest mt-1">
-										{selectedDetails.flag.content_type} #{selectedDetails.flag.content_id}
-									</p>
-								</div>
-								{selectedDetails.flag.is_hidden && (
-									<span className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
-										Auto-Hidden
-									</span>
-								)}
-							</header>
-
-							<div className="space-y-4">
-								<div>
-									<label className="block text-[10px] font-black uppercase tracking-wider text-white/40 mb-2">
-										Flagged Content
-									</label>
-									{selectedDetails.content ? (
-										<div className="bg-black/40 border border-white/5 rounded-2xl p-5 text-sm text-white/80 leading-relaxed font-medium">
-											<p className="text-white/60 mb-3 text-xs italic">
-												Comment by:{" "}
-												<span className="font-mono not-italic text-white">
-													{selectedDetails.content.author_address.slice(0, 6)}...
-													{selectedDetails.content.author_address.slice(-4)}
-												</span>
-											</p>
-											<p>{selectedDetails.content.content}</p>
-										</div>
-									) : (
-										<p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5 font-bold">
-											Content has been soft-deleted or does not exist.
-										</p>
-									)}
-								</div>
-
-								<div className="bg-white/3 border border-white/5 rounded-2xl p-5 space-y-3">
-									<div>
-										<span className="text-[10px] font-black uppercase tracking-wider text-white/40 block">
-											Reporter
-										</span>
-										<span className="font-mono text-xs text-white/80">
-											{selectedDetails.flag.reporter_address}
-										</span>
-									</div>
-									<div>
-										<span className="text-[10px] font-black uppercase tracking-wider text-white/40 block">
-											Reason Given
-										</span>
-										<p className="text-xs text-white/80 mt-1 leading-relaxed font-medium">
-											{selectedDetails.flag.reason}
-										</p>
-									</div>
-								</div>
-
-								{statusFilter === "pending" && selectedDetails.content && (
-									<div className="space-y-4 pt-4 border-t border-white/5">
-										<div className="space-y-2">
-											<label
-												htmlFor="admin-notes"
-												className="block text-[10px] font-black uppercase tracking-wider text-white/40"
-											>
-												Admin Notes / Warn Message
-											</label>
-											<textarea
-												id="admin-notes"
-												rows={3}
-												value={adminNotes}
-												onChange={(e) => setAdminNotes(e.target.value)}
-												placeholder="Add audit justification or explanation for warning..."
-												className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-xs text-white focus:outline-none focus:border-brand-cyan/40 resize-none placeholder-white/20"
-											/>
-										</div>
-
-										<div className="grid grid-cols-3 gap-2">
-											<button
-												type="button"
-												disabled={actionInProgress}
-												onClick={() => void handleTakeAction("dismiss")}
-												className="px-3 py-3 text-[10px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-xl hover:bg-emerald-500/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
-											>
-												Dismiss Flag
-											</button>
-											<button
-												type="button"
-												disabled={actionInProgress || !adminNotes.trim()}
-												onClick={() => void handleTakeAction("warn")}
-												className="px-3 py-3 text-[10px] font-black uppercase tracking-wider bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 rounded-xl hover:bg-yellow-500/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
-											>
-												Warn User
-											</button>
-											<button
-												type="button"
-												disabled={actionInProgress}
-												onClick={() => void handleTakeAction("delete")}
-												className="px-3 py-3 text-[10px] font-black uppercase tracking-wider bg-red-500/10 text-red-400 border border-red-500/30 rounded-xl hover:bg-red-500/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
-											>
-												Delete Content
-											</button>
-										</div>
-									</div>
-								)}
-
-								{statusFilter === "reviewed" && (
-									<div className="space-y-4 pt-4 border-t border-white/5">
-										<div className="bg-white/3 border border-white/5 rounded-2xl p-5 space-y-3">
-											<h3 className="text-xs font-black uppercase tracking-widest text-white/50 border-b border-white/5 pb-2">
-												Moderation Outcome
-											</h3>
-											<div className="grid grid-cols-2 gap-2 text-xs">
-												<div>
-													<span className="text-[10px] font-black uppercase tracking-wider text-white/40 block">
-														Action Taken
-													</span>
-													<span className="text-white capitalize font-black">
-														{selectedDetails.flag.admin_action || "Reviewed"}
-													</span>
-												</div>
-												<div>
-													<span className="text-[10px] font-black uppercase tracking-wider text-white/40 block">
-														Moderator
-													</span>
-													<span className="font-mono text-white/80">
-														{selectedDetails.flag.admin_address
-															? `${selectedDetails.flag.admin_address.slice(0, 6)}...${selectedDetails.flag.admin_address.slice(-4)}`
-															: "System"}
-													</span>
-												</div>
-											</div>
-											{selectedDetails.flag.admin_notes && (
-												<div>
-													<span className="text-[10px] font-black uppercase tracking-wider text-white/40 block">
-														Audit Notes
-													</span>
-													<p className="text-xs text-white/80 leading-relaxed font-medium mt-1">
-														{selectedDetails.flag.admin_notes}
-													</p>
-												</div>
-											)}
-										</div>
-
-										{selectedDetails.auditLog.length > 0 && (
-											<div className="space-y-3">
-												<label className="block text-[10px] font-black uppercase tracking-wider text-white/40">
-													Audit Log
-												</label>
-												<div className="space-y-2">
-													{selectedDetails.auditLog.map((log) => (
-														<div
-															key={log.id}
-															className="bg-black/25 border border-white/5 rounded-xl p-3 text-xs leading-relaxed"
-														>
-															<div className="flex justify-between items-center mb-1 text-[10px] text-white/40">
-																<span className="font-black uppercase text-brand-cyan/80">
-																	{log.action}
-																</span>
-																<span>
-																	{new Date(log.created_at).toLocaleDateString()}
-																</span>
-															</div>
-															<p className="text-white/80 font-medium">
-																{log.notes || "No notes provided."}
-															</p>
-														</div>
-													))}
-												</div>
-											</div>
-										)}
-									</div>
-								)}
+			{metrics && (
+				<>
+					<div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+						{[
+							{
+								label: "Active Scholarships",
+								value: metrics.active_scholarships,
+							},
+							{ label: "Total Scholars", value: metrics.total_scholars },
+							{
+								label: "Completion Rate",
+								value: `${metrics.completion_rate}%`,
+							},
+							{
+								label: "Avg Milestones / Scholar",
+								value: metrics.avg_milestones_per_scholar,
+							},
+							{ label: "Dropout Rate", value: `${metrics.dropout_rate}%` },
+							{
+								label: "Total USDC Disbursed",
+								value: `$${(metrics.total_usdc_disbursed / 1e7).toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
+							},
+						].map(({ label, value }) => (
+							<div
+								key={label}
+								className="glass-card p-5 rounded-2xl border border-white/5"
+							>
+								<p className="text-xs uppercase tracking-widest text-white/40 mb-1">
+									{label}
+								</p>
+								<p className="text-2xl font-black text-brand-cyan">{value}</p>
 							</div>
-						</div>
-					) : null}
-				</div>
-			</div>
+						))}
+					</div>
+
+					<div className="glass-card p-6 rounded-2xl border border-white/5">
+						<h3 className="text-lg font-bold mb-4">Completion vs Dropout</h3>
+						<ResponsiveContainer width="100%" height={260}>
+							<RadialBarChart
+								cx="50%"
+								cy="50%"
+								innerRadius="30%"
+								outerRadius="80%"
+								data={chartData}
+							>
+								<RadialBar
+									dataKey="value"
+									label={{ position: "insideStart", fill: "#fff" }}
+								/>
+								<Legend />
+								<Tooltip formatter={(value: number) => `${value}%`} />
+							</RadialBarChart>
+						</ResponsiveContainer>
+					</div>
+				</>
+			)}
 		</section>
 	)
 }
-
-export default Admin

@@ -1,5 +1,20 @@
 import { createPublicKey } from "node:crypto"
 import path from "path"
+import dotenv from "dotenv"
+
+// Load server/.env whether you run from repo root or from server/
+dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
+
+// Initialize Sentry FIRST before any other imports that might throw
+import { initSentry, sentryRequestHandler } from "./lib/sentry"
+
+initSentry({
+	dsn: process.env.SENTRY_DSN,
+	environment: process.env.NODE_ENV || "development",
+	release: process.env.SENTRY_RELEASE || process.env.GIT_COMMIT_HASH,
+	tracesSampleRate: env.NODE_ENV === "production" ? 0.1 : 1.0,
+	profilesSampleRate: env.NODE_ENV === "production" ? 0.1 : 1.0,
+})
 import cors from "cors"
 import dotenv from "dotenv"
 import express from "express"
@@ -28,23 +43,24 @@ import { createCredentialsRouter } from "./routes/credentials.routes"
 import { donorsRouter } from "./routes/donors.routes"
 import { createEnrollmentsRouter } from "./routes/enrollments.routes"
 import { eventsRouter } from "./routes/events.routes"
-import { createForumRouter } from "./routes/forum.routes"
 import { governanceRouter } from "./routes/governance.routes"
 import { healthRouter } from "./routes/health.routes"
 import { impactRouter } from "./routes/impact.routes"
 import { leaderboardRouter } from "./routes/leaderboard.routes"
 import { createMeRouter } from "./routes/me.routes"
+import { mentorshipRouter } from "./routes/mentorship.routes"
 import { moderationRouter } from "./routes/moderation.routes"
 import { notificationsRouter } from "./routes/notifications.routes"
 import { createPeerReviewRouter } from "./routes/peer-review.routes"
+import { createRecommendationsRouter } from "./routes/recommendations.routes"
 import { createScholarsRouter } from "./routes/scholars.routes"
 import { scholarshipsRouter } from "./routes/scholarships.routes"
 import { sponsorsRouter } from "./routes/sponsors.routes"
 import { treasuryRouter } from "./routes/treasury.routes"
 import { createUploadRouter } from "./routes/upload.routes"
+import { createUserProfileRouter } from "./routes/user-profile.routes"
 import { validatorRouter } from "./routes/validator.routes"
 import { wikiRouter } from "./routes/wiki.routes"
-import { createRecommendationsRouter } from "./routes/recommendations.routes"
 import { createAuthService } from "./services/auth.service"
 import {
 	createJwtService,
@@ -67,6 +83,7 @@ const env = envSchema.parse(process.env)
 setupConsoleRequestTracing()
 const isProduction = env.NODE_ENV === "production"
 
+import { allowedOrigins } from "./config/cors-config"
 let jwtPrivateKey = env.JWT_PRIVATE_KEY
 let jwtPublicKey = env.JWT_PUBLIC_KEY
 
@@ -101,6 +118,7 @@ const app = express()
 
 app.set("trust proxy", 1)
 app.use(requestLogger)
+app.use(sentryRequestHandler)
 app.use(
 	helmet({
 		contentSecurityPolicy: {
@@ -153,6 +171,7 @@ app.use("/api", coursesRouter)
 app.use("/api", createEnrollmentsRouter(jwtService))
 app.use("/api", createScholarsRouter(jwtService))
 app.use("/api", scholarshipsRouter)
+app.use("/api", mentorshipRouter)
 app.use("/api", createRecommendationsRouter(jwtService))
 app.use("/api", createForumRouter(jwtService))
 app.use("/api", createCredentialsRouter(jwtService))
@@ -160,6 +179,7 @@ app.use("/api", validatorRouter)
 app.use("/api", eventsRouter)
 app.use("/api/community", communityRouter)
 app.use("/api", createCommentsRouter(jwtService))
+app.use("/api", createPeerReviewRouter(jwtService))
 app.use("/api", leaderboardRouter)
 app.use("/api", governanceRouter)
 app.use("/api", treasuryRouter)
@@ -167,12 +187,34 @@ app.use("/api", wikiRouter)
 app.use("/api", adminRouter)
 app.use("/api", adminMilestonesRouter)
 app.use("/api", moderationRouter)
+app.use("/api", scholarsRouter)
+app.use("/api", createUserProfileRouter(jwtService))
 app.use("/api", createUploadRouter(jwtService))
+app.use("/api", enrollmentsRouter)
+app.use("/api", profilesRouter)
+app.use("/api", scholarshipsRouter)
+app.use("/api", treasuryRouter)
 app.use("/api", notificationsRouter)
-app.use("/api", createPeerReviewRouter(jwtService))
-app.use("/api", donorsRouter)
-app.use("/api", sponsorsRouter)
-app.use("/api", impactRouter)
+app.use("/api/wiki", wikiRouter)
+
+// Start event poller (non-prod only for now)
+if (process.env.NODE_ENV !== "production") {
+	void import("./workers/event-poller").then(({ startEventPoller }) => {
+		void startEventPoller().catch(console.error)
+	})
+}
+
+if (process.env.NODE_ENV !== "test") {
+	void import("./workers/escrow-timeout-worker").then(
+		({ startEscrowTimeoutWorker }) => {
+			void startEscrowTimeoutWorker().catch(console.error)
+		},
+	)
+}
+
+app.get("/api/docs", (_req, res) => {
+	res.type("application/yaml").send(openApiYaml)
+})
 
 if (!isProduction) {
 	const openApiSpec = buildOpenApiSpec()

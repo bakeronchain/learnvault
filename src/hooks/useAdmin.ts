@@ -11,6 +11,20 @@ export interface AdminStats {
 	treasuryBalanceUsdc: string
 }
 
+export interface ValidatorAnalytics {
+	validatorAddress: string
+	milestonesReviewed: number
+	averageReviewTimeSeconds: number
+	approvalRate: number
+	appealReversalRate: number
+}
+
+export interface ValidatorReviewQueue {
+	pendingReviews: number
+	threshold: number
+	exceeded: boolean
+}
+
 export interface MilestoneSubmission {
 	id: string
 	learnerAddress: string
@@ -18,6 +32,9 @@ export interface MilestoneSubmission {
 	evidenceLink: string
 	submittedAt: string
 	status: "pending" | "approved" | "rejected"
+	/** Non-binding peer review counts (inform admin decisions). */
+	peerApprovalCount: number
+	peerRejectionCount: number
 }
 
 export interface PaginatedMilestones {
@@ -55,6 +72,23 @@ type AdminStatsResponse = {
 	treasury_balance_usdc: string
 }
 
+type ValidatorAnalyticsApi = {
+	validator_address: string
+	milestones_reviewed: number
+	average_review_time_seconds: number
+	approval_rate: number
+	appeal_reversal_rate: number
+}
+
+type ValidatorAnalyticsResponse = {
+	validators: ValidatorAnalyticsApi[]
+	review_queue: {
+		pending_reviews: number
+		threshold: number
+		exceeded: boolean
+	}
+}
+
 type MilestoneSubmissionApi = {
 	id: number
 	scholar_address: string
@@ -64,6 +98,8 @@ type MilestoneSubmissionApi = {
 	evidence_description?: string | null
 	submitted_at: string
 	status: "pending" | "approved" | "rejected"
+	peer_approval_count?: number
+	peer_rejection_count?: number
 }
 
 type PaginatedMilestonesApi = {
@@ -107,6 +143,8 @@ const mapMilestoneSubmission = (
 		"",
 	submittedAt: milestone.submitted_at,
 	status: milestone.status,
+	peerApprovalCount: milestone.peer_approval_count ?? 0,
+	peerRejectionCount: milestone.peer_rejection_count ?? 0,
 })
 
 const mapBatchMilestoneResult = (
@@ -149,6 +187,58 @@ export function useAdminStats() {
 	}, [])
 
 	return { stats, loading, error, fetchStats }
+}
+
+export function useValidatorAnalytics() {
+	const [analytics, setAnalytics] = useState<ValidatorAnalytics[]>([])
+	const [reviewQueue, setReviewQueue] = useState<ValidatorReviewQueue | null>(
+		null,
+	)
+	const [loading, setLoading] = useState(false)
+	const [error, setError] = useState<string | null>(null)
+
+	const fetchAnalytics = useCallback(async () => {
+		setLoading(true)
+		setError(null)
+		try {
+			const data = await apiFetchJson<ValidatorAnalyticsResponse>(
+				"/api/admin/validators/analytics",
+				{
+					auth: true,
+				},
+			)
+
+			setAnalytics(
+				(data.validators ?? []).map((item) => ({
+					validatorAddress: item.validator_address,
+					milestonesReviewed: Number(item.milestones_reviewed ?? 0),
+					averageReviewTimeSeconds: Number(
+						item.average_review_time_seconds ?? 0,
+					),
+					approvalRate: Number(item.approval_rate ?? 0),
+					appealReversalRate: Number(item.appeal_reversal_rate ?? 0),
+				})),
+			)
+
+			setReviewQueue({
+				pendingReviews: Number(data.review_queue?.pending_reviews ?? 0),
+				threshold: Number(data.review_queue?.threshold ?? 0),
+				exceeded: Boolean(data.review_queue?.exceeded),
+			})
+		} catch (err: unknown) {
+			setError(err instanceof Error ? err.message : "Unknown error")
+		} finally {
+			setLoading(false)
+		}
+	}, [])
+
+	return {
+		analytics,
+		reviewQueue,
+		loading,
+		error,
+		fetchAnalytics,
+	}
 }
 
 export function useAdminMilestones() {

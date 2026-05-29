@@ -1,4 +1,4 @@
-import { Router, type Response } from "express"
+import { Router } from "express"
 
 import {
 	getNotifications,
@@ -10,49 +10,19 @@ import {
 	unsubscribePush,
 	updatePreferences,
 } from "../controllers/notifications.controller"
-import { authMiddleware, type AuthRequest } from "../middleware/auth.middleware"
+import { authMiddleware } from "../middleware/auth.middleware"
+import type { AuthRequest } from "../middleware/auth.middleware"
+import { type Response } from "express"
 
 export const notificationsRouter = Router()
 
-/**
- * @openapi
- * /api/notifications:
- *   get:
- *     tags: [Notifications]
- *     summary: Get paginated notifications for the authenticated user
- *     description: Returns notifications ordered by unread first, then newest first.
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema: { type: integer, minimum: 1, default: 1 }
- *       - in: query
- *         name: pageSize
- *         schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
- *     responses:
- *       200:
- *         description: Paginated notification list
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 notifications:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Notification'
- *                 unread_count: { type: integer }
- *                 total:        { type: integer }
- *                 page:         { type: integer }
- *                 pageSize:     { type: integer }
- *                 totalPages:   { type: integer }
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
- */
-notificationsRouter.get("/notifications", authMiddleware, (req, res) => {
-	void getNotifications(req as AuthRequest, res as Response)
-})
+notificationsRouter.get(
+	"/notifications",
+	authMiddleware,
+	(req, res) => {
+		void getNotifications(req as AuthRequest, res as Response)
+	},
+)
 
 /**
  * @openapi

@@ -30,7 +30,7 @@ export const governanceRouter = Router()
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, approved, rejected]
+ *           enum: [pending, approved, queued, rejected]
  *         description: Filter proposals by status
  *       - in: query
  *         name: page

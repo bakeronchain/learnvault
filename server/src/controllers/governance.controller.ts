@@ -11,8 +11,13 @@ import { deliverNotificationChannels } from "../services/notification-delivery.s
 const log = logger.child({ module: "governance" })
 import { stellarContractService } from "../services/stellar-contract.service"
 
-type ProposalStatus = "pending" | "approved" | "rejected"
-type ProposalPublicState = "open" | "closed" | "cancelled" | "executed"
+type ProposalStatus = "pending" | "approved" | "queued" | "rejected"
+type ProposalPublicState =
+	| "open"
+	| "queued"
+	| "closed"
+	| "cancelled"
+	| "executed"
 
 const stellarAddressSchema = z.string().min(56).max(56).startsWith("G")
 
@@ -22,6 +27,7 @@ function parseStatus(value: unknown): ProposalStatus | undefined {
 	if (
 		normalized === "pending" ||
 		normalized === "approved" ||
+		normalized === "queued" ||
 		normalized === "rejected"
 	) {
 		return normalized
@@ -47,8 +53,11 @@ function deriveProposalState(proposal: {
 	status: string
 	cancelled?: boolean | null
 	deadline?: Date | string | null
+	queuedAt?: Date | string | null
+	executionReadyAt?: Date | string | null
 }): ProposalPublicState {
 	if (proposal.cancelled) return "cancelled"
+	if (proposal.status === "queued") return "queued"
 	if (proposal.status === "approved") return "executed"
 	if (proposal.status === "rejected") return "closed"
 
@@ -89,6 +98,8 @@ function buildProposalSelect(viewerParamIndex?: number) {
 			p.votes_against,
 			p.status,
 			p.deadline,
+			p.queued_at,
+			p.execution_ready_at,
 			p.created_at${viewerVoteSelect}
 		FROM proposals p${viewerJoin}`
 }
@@ -136,10 +147,8 @@ export async function getGovernanceProposals(
 		)
 
 		res.status(200).json({
-			proposals: proposalsResult.rows,
-			total,
-			page,
-			totalPages: Math.ceil(total / limit),
+			data: proposalsResult.rows,
+			pagination: { page, limit, total },
 		})
 	} catch {
 		res.status(500).json({ error: "Failed to fetch governance proposals" })
@@ -553,7 +562,7 @@ export async function getProposalStatus(
 
 	try {
 		const result = await pool.query(
-			"SELECT id, status, deadline, cancelled FROM proposals WHERE id = $1",
+			"SELECT id, status, deadline, queued_at, execution_ready_at, cancelled FROM proposals WHERE id = $1",
 			[proposalId],
 		)
 
@@ -569,6 +578,8 @@ export async function getProposalStatus(
 			status: proposal.status,
 			cancelled: Boolean(proposal.cancelled),
 			deadline: proposal.deadline ?? null,
+			queuedAt: proposal.queued_at ?? null,
+			executionReadyAt: proposal.execution_ready_at ?? null,
 		})
 	} catch (err) {
 		log.error({ err }, "Get proposal status failed")
@@ -604,8 +615,11 @@ export async function cancelProposal(
 			return
 		}
 
-		if (deriveProposalState(proposal) !== "open") {
-			res.status(409).json({ error: "Only open proposals can be cancelled" })
+		const state = deriveProposalState(proposal)
+		if (state !== "open" && state !== "queued") {
+			res
+				.status(409)
+				.json({ error: "Only open or queued proposals can be cancelled" })
 			return
 		}
 

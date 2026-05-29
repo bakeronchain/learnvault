@@ -15,7 +15,7 @@ export interface Proposal {
 	title: string
 	description: string
 	author: string
-	status: "Active" | "Passed" | "Rejected"
+	status: "Active" | "Queued" | "Passed" | "Rejected" | "Executed"
 	votesFor: bigint
 	votesAgainst: bigint
 	endDate: number // ledger sequence or unix timestamp

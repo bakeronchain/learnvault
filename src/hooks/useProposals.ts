@@ -3,7 +3,11 @@ import { useWallet } from "./useWallet"
 
 const API_BASE = import.meta.env.VITE_SERVER_URL ?? "http://localhost:4000"
 
-export type BackendProposalStatus = "pending" | "approved" | "rejected"
+export type BackendProposalStatus =
+	| "pending"
+	| "approved"
+	| "queued"
+	| "rejected"
 
 export interface ProposalRecord {
 	id: number
@@ -15,10 +19,17 @@ export interface ProposalRecord {
 	votesAgainst: bigint
 	status: BackendProposalStatus
 	deadline: string | null
+	queuedAt: string | null
+	executionReadyAt: string | null
 	createdAt: string | null
 	userVoteSupport: boolean | null
 	isVotingOpen: boolean
-	displayStatus: "Voting Open" | "Voting Closed" | "Passed" | "Rejected"
+	displayStatus:
+		| "Voting Open"
+		| "Voting Closed"
+		| "Queued"
+		| "Passed"
+		| "Rejected"
 }
 
 export interface ProposalVoteRecord {
@@ -51,6 +62,8 @@ interface ProposalApiRow {
 	votes_against: number | string
 	status: BackendProposalStatus
 	deadline: string | null
+	queued_at: string | null
+	execution_ready_at: string | null
 	created_at: string | null
 	user_vote_support: boolean | null
 }
@@ -76,6 +89,7 @@ export const getProposalDisplayStatus = (proposal: {
 	status: BackendProposalStatus
 	deadline: string | null
 }) => {
+	if (proposal.status === "queued") return "Queued" as const
 	if (proposal.status === "approved") return "Passed" as const
 	if (proposal.status === "rejected") return "Rejected" as const
 	return isVotingOpen(proposal.status, proposal.deadline)
@@ -98,6 +112,8 @@ export const mapProposal = (row: ProposalApiRow): ProposalRecord => {
 		votesAgainst: parseBigInt(row.votes_against),
 		status: row.status,
 		deadline,
+		queuedAt: row.queued_at ?? null,
+		executionReadyAt: row.execution_ready_at ?? null,
 		createdAt: row.created_at ?? null,
 		userVoteSupport:
 			typeof row.user_vote_support === "boolean" ? row.user_vote_support : null,

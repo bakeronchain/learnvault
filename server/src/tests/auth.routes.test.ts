@@ -7,6 +7,7 @@ import { type JwtService } from "../services/jwt.service"
 const mockAuthService: jest.Mocked<AuthService> = {
 	getOrCreateNonce: jest.fn(),
 	verifyAndIssueToken: jest.fn(),
+	verifyLinkSignature: jest.fn(),
 	createChallenge: jest.fn(),
 	verifySignedTransaction: jest.fn(),
 	revokeToken: jest.fn(),

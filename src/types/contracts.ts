@@ -57,7 +57,7 @@ export interface Vote {
 	proposalTitle: string
 	voteChoice: "for" | "against"
 	votePower: number
-	status: "active" | "passed" | "rejected"
+	status: "active" | "queued" | "passed" | "rejected"
 }
 
 export interface Scholar {

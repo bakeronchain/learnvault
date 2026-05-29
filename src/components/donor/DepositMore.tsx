@@ -10,6 +10,7 @@ import {
 	createScholarshipTreasuryContract,
 } from "../../util/scholarshipTreasury"
 import { useToast } from "../Toast/ToastProvider"
+import { useAdminContracts } from "../../hooks/useAdminContracts"
 
 interface DepositMoreProps {
 	onDepositSuccess?: () => void
@@ -24,6 +25,8 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 	const { scholarshipTreasury } = useContractIds()
 	const { address, signTransaction, updateBalances } = useWallet()
 	const { showSuccess, showError, showInfo } = useToast()
+	const { data: adminData, isLoading: adminLoading } = useAdminContracts()
+	const isPaused = adminData?.scholarshipTreasuryState?.paused ?? false
 
 	const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const value = e.target.value
@@ -92,6 +95,11 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 		<section className="mb-20">
 			<div className="mb-12 flex items-center gap-4">
 				<h2 className="text-2xl font-black tracking-tight">Deposit More</h2>
+				{isPaused && (
+					<div className="mb-4 rounded-xl bg-red-500/20 border border-red-500/30 p-4 text-center text-red-400 font-black">
+						Emergency Pause Active – Deposits are disabled.
+					</div>
+				)}
 				<div className="h-px flex-1 bg-linear-to-r from-white/10 to-transparent" />
 			</div>
 
@@ -110,6 +118,7 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 								value={amount}
 								onChange={handleAmountChange}
 								placeholder="0.00"
+								disabled={isPaused}
 								className="w-full rounded-2xl border border-white/10 bg-white/5 px-12 py-4 text-2xl font-black text-white placeholder:text-white/20 transition-all focus:border-brand-cyan/50 focus:outline-none focus:ring-2 focus:ring-brand-cyan/20"
 							/>
 							<span className="absolute right-6 top-1/2 -translate-y-1/2 text-sm font-black uppercase tracking-widest text-white/40">
@@ -127,6 +136,7 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 								<button
 									key={value}
 									type="button"
+									disabled={isPaused}
 									onClick={() => handleQuickAmount(value)}
 									className={`rounded-xl px-4 py-3 text-sm font-black uppercase tracking-widest transition-all ${
 										amount === value.toString()
@@ -159,7 +169,7 @@ export const DepositMore: React.FC<DepositMoreProps> = ({
 
 					<button
 						type="submit"
-						disabled={!address || !amount || isLoading}
+						disabled={!address || !amount || isLoading || isPaused}
 						className={`w-full rounded-2xl px-6 py-4 font-black uppercase tracking-widest transition-all ${
 							!address || !amount || isLoading
 								? "cursor-not-allowed bg-white/5 text-white/40"

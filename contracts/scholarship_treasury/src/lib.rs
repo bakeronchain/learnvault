@@ -316,16 +316,59 @@ impl ScholarshipTreasury {
         env.storage().instance().set(&MILESTONE_COUNT_KEY, &count);
     }
 
+    // New constant for optional timelock vault integration
+    const TIMELOCK_VAULT_KEY: Symbol = symbol_short!("TIMELockVault");
+
+    // New PauseChanged event emitted on pause/unpause
+    #[contractevent(topics = ["pause_changed"])]
+    pub struct PauseChanged {
+        #[topic]
+        pub paused: bool,
+    }
+
+    /// Public getter for admin address
+    pub fn get_admin(env: Env) -> Address {
+        Self::admin(&env)
+    }
+
+    /// Set the timelock vault address (admin only)
+    pub fn set_timelock_vault(env: Env, vault: Address) {
+        let admin = Self::admin(&env);
+        admin.require_auth();
+        env.storage().instance().set(&TIMELOCK_VAULT_KEY, &vault);
+    }
+
+    /// Get the timelock vault address if configured
+    pub fn get_timelock_vault(env: Env) -> Option<Address> {
+        env.storage().instance().get(&TIMELOCK_VAULT_KEY)
+    }
+
     pub fn pause(env: Env) {
         let admin = Self::admin(&env);
         admin.require_auth();
         env.storage().instance().set(&PAUSED_KEY, &true);
+        // Emit pause event
+        PauseChanged { paused: true }.publish(&env);
     }
 
     pub fn unpause(env: Env) {
+        // Allow admin or timelock vault to unpause
+        let caller = env.invoker();
         let admin = Self::admin(&env);
-        admin.require_auth();
+        let authorized = if caller == admin {
+            true
+        } else {
+            match Self::get_timelock_vault(&env) {
+                Some(vault) => caller == vault,
+                None => false,
+            }
+        };
+        if !authorized {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
         env.storage().instance().set(&PAUSED_KEY, &false);
+        // Emit unpause event
+        PauseChanged { paused: false }.publish(&env);
     }
 
     pub fn is_paused(env: Env) -> bool {

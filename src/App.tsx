@@ -18,6 +18,7 @@ import { useLocalizeDocumentAttributes } from "./hooks/uselocalizeDocumentAttrib
 import { NetworkProvider } from "./providers/NetworkProvider"
 
 const Admin = lazy(() => import("./pages/Admin"))
+const AdminModeration = lazy(() => import("./pages/AdminModeration"))
 const Community = lazy(() => import("./pages/Community"))
 const Courses = lazy(() => import("./pages/Courses"))
 const Credential = lazy(() => import("./pages/Credential"))
@@ -45,6 +46,8 @@ const Tracks = lazy(() => import("./pages/Tracks"))
 const Treasury = lazy(() => import("./pages/Treasury"))
 const Wiki = lazy(() => import("./pages/Wiki"))
 const WikiPage = lazy(() => import("./pages/WikiPage"))
+const FAQPage = lazy(() => import("./pages/FAQPage"))
+const SponsorCheckoutPage = lazy(() => import("./pages/SponsorCheckoutPage"))
 
 const renderRoute = (element: ReactNode) => (
 	<ErrorBoundary>
@@ -92,13 +95,13 @@ function App() {
 						element={renderRoute(<ScholarshipApply />)}
 					/>
 					<Route path="/admin" element={renderRoute(<Admin />)} />
-					<Route
-						path="/admin/lesson-diff"
-						element={renderRoute(<LessonVersionDiff />)}
-					/>
+					<Route path="/admin/lesson-diff" element={renderRoute(<LessonVersionDiff />)} />
+					<Route path="/admin/moderation" element={renderRoute(<AdminModeration />)} />
 					<Route path="/wiki" element={renderRoute(<Wiki />)} />
 					<Route path="/wiki/:slug" element={renderRoute(<WikiPage />)} />
 					<Route path="/tracks" element={renderRoute(<Tracks />)} />
+					<Route path="/faq" element={renderRoute(<FAQPage />)} />
+					<Route path="/sponsor/checkout" element={renderRoute(<SponsorCheckoutPage />)} />
 					<Route path="/treasury" element={renderRoute(<Treasury />)} />
 					<Route path="/donor" element={renderRoute(<Donor />)} />
 					<Route path="/sponsor" element={renderRoute(<SponsorPortal />)} />

@@ -4,6 +4,7 @@ import { useWallet } from "../hooks/useWallet"
 import { getAuthToken } from "../util/auth"
 import ConfirmDialog from "./ConfirmDialog"
 import SafeMarkdown from "./SafeMarkdown"
+import FlagDialog from "./FlagDialog"
 
 export interface Comment {
 	id: number
@@ -47,6 +48,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 }) => {
 	const { address } = useWallet()
 	const [isReplying, setIsReplying] = useState(false)
+	const { address } = useWallet()
 	const [replyText, setReplyText] = useState("")
 	const [replyError, setReplyError] = useState<string | null>(null)
 	const [isFlagging, setIsFlagging] = useState(false)
@@ -223,6 +225,14 @@ const CommentCard: React.FC<CommentCardProps> = ({
 					isDestructive
 				/>
 			)}
+			{showFlagDialog && (
+				<FlagDialog
+					title="Flag Comment"
+					description="Flagging this comment will notify administrators for review. Please provide a brief explanation below."
+					onConfirm={(reason) => void handleFlag(reason)}
+					onCancel={() => setShowFlagDialog(false)}
+				/>
+			)}
 			{comment.is_pinned && (
 				<div className="absolute -top-3 left-6 px-3 py-1 bg-brand-cyan text-black text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-1 shadow-xl">
 					Pinned by Author
@@ -292,6 +302,15 @@ const CommentCard: React.FC<CommentCardProps> = ({
 							className="text-[10px] font-black uppercase text-red-400/70 hover:text-red-400 transition-colors"
 						>
 							Delete
+						</button>
+					)}
+					{address && address.toLowerCase() !== comment.author_address.toLowerCase() && (
+						<button
+							type="button"
+							onClick={() => setShowFlagDialog(true)}
+							className="text-[10px] font-black uppercase text-red-400/70 hover:text-red-400 transition-colors"
+						>
+							Flag
 						</button>
 					)}
 					{!isReply && (

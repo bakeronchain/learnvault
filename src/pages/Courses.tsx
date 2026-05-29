@@ -2,6 +2,7 @@ import { BookOpen } from "lucide-react"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import BookmarkButton from "../components/BookmarkButton"
+import CourseCategoryBadge from "../components/CourseCategoryBadge"
 import { CourseFilter } from "../components/CourseFilter"
 import Pagination from "../components/Pagination"
 import SponsorLogosForTrack from "../components/SponsorLogosForTrack"
@@ -180,22 +181,13 @@ const Courses: React.FC = () => {
 					description="There are no courses yet. Check back soon!"
 				/>
 			) : filtered.length === 0 ? (
-				<div className="glass-card rounded-[2.5rem] border border-white/5 p-16 text-center">
-					<p className="mb-6 text-5xl">Search</p>
-					<h2 className="mb-3 text-2xl font-black tracking-tight">
-						No courses match your filters
-					</h2>
-					<p className="mx-auto mb-8 max-w-sm text-white/50">
-						Try a different search term or adjust the difficulty and track filters.
-					</p>
-					<button
-						type="button"
-						onClick={handleClear}
-						className="w-full rounded-full border border-brand-cyan/30 px-6 py-2.5 text-sm font-bold uppercase tracking-widest text-brand-cyan transition-all hover:bg-brand-cyan/10 sm:w-auto"
-					>
-						Clear all filters
-					</button>
-				</div>
+				<EmptyState
+					icon="🔎"
+					title="No courses match your filters"
+					description="Try a different search term or adjust the difficulty and track filters."
+					ctaLabel="Clear all filters"
+					onCtaClick={handleClear}
+				/>
 			) : (
 				<>
 					<div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -212,9 +204,7 @@ const Courses: React.FC = () => {
 								/>
 								<div className="flex h-full flex-col p-6">
 									<div className="mb-4 flex items-center justify-between gap-3">
-										<span className="rounded-full border border-brand-cyan/20 bg-brand-blue/20 px-3 py-1 text-xs font-semibold text-brand-cyan">
-											{course.track}
-										</span>
+										<CourseCategoryBadge category={course.track} />
 										<span
 											className={`rounded-full border px-3 py-1 text-xs font-semibold ${levelStyles[course.level]}`}
 										>
@@ -228,6 +218,16 @@ const Courses: React.FC = () => {
 									<p className="mb-5 text-sm leading-relaxed text-white/55">
 										{course.description}
 									</p>
+									{course.ratingSummary && course.ratingSummary.count > 0 ? (
+										<div className="mb-5 flex items-center gap-2 text-xs text-white/70">
+											<span className="text-yellow-300">
+												{"★".repeat(Math.max(1, Math.min(5, Math.round(course.ratingSummary.average))))}
+											</span>
+											<span>
+												{course.ratingSummary.average.toFixed(1)} ({course.ratingSummary.count})
+											</span>
+										</div>
+									) : null}
 
 									<SponsorLogosForTrack track={course.track} compact />
 

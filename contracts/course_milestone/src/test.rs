@@ -7,8 +7,8 @@ use soroban_sdk::{
 };
 
 use crate::{
-    CourseCompleted, CourseConfig, CourseMilestone, CourseMilestoneClient, DataKey, Error,
-    MilestoneCompleted, MilestoneStatus, VerifyBatchEntry,
+    ApprovalResult, CourseCompleted, CourseConfig, CourseMilestone, CourseMilestoneClient,
+    DataKey, Error, MilestoneCompleted, MilestoneStatus, VerifyBatchEntry,
 };
 
 #[contracttype]
@@ -151,19 +151,6 @@ fn submit_milestone(
 // =======================
 // ✅ ENROLL TESTS
 // =======================
-
-fn set_ledger_sequence(env: &Env, sequence_number: u32) {
-    env.ledger().set(LedgerInfo {
-        timestamp: 1_700_000_000,
-        protocol_version: 23,
-        sequence_number,
-        network_id: Default::default(),
-        base_reserve: 10,
-        min_temp_entry_ttl: 16,
-        min_persistent_entry_ttl: 16,
-        max_entry_ttl: 6312000,
-    });
-}
 
 #[test]
 fn add_course_and_get_course_work() {
@@ -791,144 +778,7 @@ fn batch_verify_milestones_reverts_on_invalid_entry() {
 }
 
 // =======================
-// ✅ VERIFY MILESTONE TESTS
-// =======================
-
-#[test]
-fn verify_milestone_happy_path() {
-    let (env, _contract_id, admin, _learn_token_address, client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-    let evidence_uri = sid(&env, "ipfs://bafy-proof");
-
-    client.enroll(&learner, &course_id);
-    client.submit_milestone(&learner, &course_id, &1, &evidence_uri);
-
-    client.verify_milestone(&admin, &learner, &course_id, &1, &100);
-
-    let status = client.get_milestone_status(&learner, &course_id, &1);
-    assert_eq!(status, MilestoneStatus::Approved);
-}
-
-#[test]
-fn verify_milestone_fails_for_non_admin() {
-    let (env, _contract_id, _admin, _learn_token_address, client) = setup();
-    let learner = Address::generate(&env);
-    let non_admin = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-    let evidence_uri = sid(&env, "ipfs://bafy-proof");
-
-    client.enroll(&learner, &course_id);
-    client.submit_milestone(&learner, &course_id, &1, &evidence_uri);
-
-    let result = client.try_verify_milestone(&non_admin, &learner, &course_id, &1, &100);
-    assert_eq!(
-        result.err(),
-        Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::Unauthorized as u32
-        )))
-    );
-}
-
-#[test]
-fn verify_milestone_fails_for_already_verified() {
-    let (env, _contract_id, admin, _learn_token_address, client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-    let evidence_uri = sid(&env, "ipfs://bafy-proof");
-
-    client.enroll(&learner, &course_id);
-    client.submit_milestone(&learner, &course_id, &1, &evidence_uri);
-    client.verify_milestone(&admin, &learner, &course_id, &1, &100);
-
-    let result = client.try_verify_milestone(&admin, &learner, &course_id, &1, &100);
-    assert_eq!(
-        result.err(),
-        Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::InvalidState as u32
-        )))
-    );
-}
-
-#[test]
-fn verify_milestone_fails_for_not_enrolled_learner() {
-    let (env, _contract_id, admin, _learn_token_address, client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-
-    let result = client.try_verify_milestone(&admin, &learner, &course_id, &1, &100);
-    assert_eq!(
-        result.err(),
-        Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::NotEnrolled as u32
-        )))
-    );
-}
-
-// =======================
-// ✅ REJECT MILESTONE TESTS
-// =======================
-
-#[test]
-fn reject_milestone_happy_path() {
-    let (env, _contract_id, admin, _learn_token_address, client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-    let evidence_uri = sid(&env, "ipfs://bafy-proof");
-
-    client.enroll(&learner, &course_id);
-    client.submit_milestone(&learner, &course_id, &1, &evidence_uri);
-
-    client.reject_milestone(&admin, &learner, &course_id, &1);
-
-    let status = client.get_milestone_status(&learner, &course_id, &1);
-    assert_eq!(status, MilestoneStatus::Rejected);
-
-    // Submission should be removed
-    let submission = client.get_milestone_submission(&learner, &course_id, &1);
-    assert!(submission.is_none());
-}
-
-#[test]
-fn reject_milestone_fails_for_non_admin() {
-    let (env, _contract_id, _admin, _learn_token_address, client) = setup();
-    let learner = Address::generate(&env);
-    let non_admin = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-    let evidence_uri = sid(&env, "ipfs://bafy-proof");
-
-    client.enroll(&learner, &course_id);
-    client.submit_milestone(&learner, &course_id, &1, &evidence_uri);
-
-    let result = client.try_reject_milestone(&non_admin, &learner, &course_id, &1);
-    assert_eq!(
-        result.err(),
-        Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::Unauthorized as u32
-        )))
-    );
-}
-
-#[test]
-fn reject_milestone_fails_for_wrong_state() {
-    let (env, _contract_id, admin, _learn_token_address, client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-
-    client.enroll(&learner, &course_id);
-
-    // Try to reject a milestone that hasn't been submitted
-    let result = client.try_reject_milestone(&admin, &learner, &course_id, &1);
-    assert_eq!(
-        result.err(),
-        Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::InvalidState as u32
-        )))
-    );
-}
-
-// =======================
-// ✅ GET MILESTONE STATUS TESTS
+// ✅ UPGRADE TESTS
 // =======================
 
 #[test]

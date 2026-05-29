@@ -1,4 +1,5 @@
 import React from "react"
+import { EmptyState as StateEmpty } from "../states/emptyState"
 import { useTranslation } from "react-i18next"
 import { type DonorContribution } from "../../hooks/useDonor"
 
@@ -83,11 +84,13 @@ export const MyContributions: React.FC<MyContributionsProps> = ({
 					))}
 				</div>
 			) : (
-				<div className="glass-card p-12 rounded-[3rem] border border-white/5 text-center">
-					<p className="text-white/40 font-medium">
-						No contributions yet. Make your first deposit to support scholars.
-					</p>
-				</div>
+				<StateEmpty
+					icon="💸"
+					title="No contributions yet"
+					description="Make your first deposit to support scholars and earn governance tokens."
+					ctaLabel="Donate to treasury"
+					ctaHref="/treasury"
+				/>
 			)}
 		</section>
 	)

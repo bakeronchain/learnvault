@@ -1,1 +1,4 @@
-declare module "swagger-jsdoc"
+declare module "swagger-jsdoc" {
+	const swaggerJSDoc: any
+	export default swaggerJSDoc
+}

@@ -6,7 +6,9 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "docs:generate": "node scripts/generate-openapi.cjs",
+    "docs:generate": "ts-node scripts/generate-openapi.ts",
+    "openapi:lint": "npm run docs:generate && redocly lint ../docs/openapi.yaml --config ../.redocly.yaml",
+    "openapi:check": "npm run openapi:lint && git diff --exit-code -- ../docs/openapi.yaml",
     "test": "jest --runInBand",
     "migrate": "ts-node scripts/migrate.ts up",
     "migrate:rollback": "ts-node scripts/migrate.ts down",
@@ -45,6 +47,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@redocly/cli": "^2.31.4",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/helmet": "^4.0.0",
@@ -57,6 +60,7 @@
     "@types/sanitize-html": "^2.16.0",
     "@types/supertest": "^7.2.0",
     "@types/swagger-ui-express": "^4.1.8",
+    "express-openapi-validator": "^5.6.2",
     "jest": "^30.3.0",
     "side-channel": "^1.1.0",
     "supertest": "^7.2.2",

@@ -7,6 +7,7 @@ import {
 	useState,
 	useTransition,
 } from "react"
+import { logoutSession } from "../lib/auth"
 import storage from "../util/storage"
 import { type MappedBalances } from "../util/wallet"
 
@@ -74,7 +75,11 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 	const [isPending, startTransition] = useTransition()
 	const popupLock = useRef(false)
 
-	const nullify = () => {
+	const nullify = (shouldLogout = false) => {
+		const hadWalletSession = Boolean(
+			address || storage.getItem("walletAddress", "safe"),
+		)
+
 		setAddress(undefined)
 		setNetwork(undefined)
 		setNetworkPassphrase(undefined)
@@ -84,6 +89,10 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 		storage.setItem("walletNetwork", "")
 		storage.setItem("networkPassphrase", "")
 		storage.setItem("walletType", "")
+
+		if (shouldLogout && hadWalletSession) {
+			void logoutSession()
+		}
 	}
 
 	const updateBalances = useCallback(async () => {
@@ -125,7 +134,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 		}
 
 		if (!walletId) {
-			nullify()
+			nullify(true)
 		} else {
 			if (popupLock.current) return
 			// If our storage item is there, then we try to get the user's address &
@@ -154,7 +163,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 				}
 			} catch (e) {
 				// If `getNetwork` or `getAddress` throw errors... sign the user out???
-				nullify()
+				nullify(true)
 				// then log the error (instead of throwing) so we have visibility
 				// into the error while working on LearnVault but we do not
 				// crash the app process

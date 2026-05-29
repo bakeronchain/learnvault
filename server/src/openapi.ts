@@ -1,3 +1,4 @@
+/// <reference path="./types.d.ts" />
 import path from "node:path"
 
 import swaggerJSDoc from "swagger-jsdoc"
@@ -414,6 +415,43 @@ export const buildOpenApiSpec = () => {
 							"metadata_uri",
 							"revoked",
 						],
+					},
+					CourseImportRow: {
+						type: "object",
+						properties: {
+							title: { type: "string" },
+							slug: { type: "string" },
+							track: { type: "string" },
+							difficulty: { type: "string" },
+							description: { type: "string", nullable: true },
+							coverImage: { type: "string", nullable: true },
+							published: { type: "boolean" },
+						},
+						required: ["title", "slug", "track", "difficulty"],
+					},
+					UserProfile: {
+						type: "object",
+						properties: {
+							address: { type: "string" },
+							display_name: { type: "string", nullable: true },
+							bio: { type: "string", nullable: true },
+							avatar_url: { type: "string", nullable: true },
+							twitter: { type: "string", nullable: true },
+							github: { type: "string", nullable: true },
+							website: { type: "string", nullable: true },
+							created_at: { type: "string", format: "date-time" },
+							updated_at: { type: "string", format: "date-time" },
+						},
+						required: ["address"],
+					},
+					ProfileStats: {
+						type: "object",
+						properties: {
+							lrn_balance: { type: "string" },
+							enrolled_courses: { type: "array", items: { type: "string" } },
+							completed_milestones: { type: "integer" },
+							pending_milestones: { type: "integer" },
+						},
 					},
 				},
 				responses: {

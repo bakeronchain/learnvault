@@ -3,8 +3,10 @@ import sanitizeHtml from "sanitize-html"
 import { z } from "zod"
 
 import { pool } from "../db/index"
+import { createNotification } from "../db/notifications-store"
 import { logger } from "../lib/logger"
 import { trackEscrowTimeout } from "../services/escrow-timeout.service"
+import { deliverNotificationChannels } from "../services/notification-delivery.service"
 
 const log = logger.child({ module: "governance" })
 import { stellarContractService } from "../services/stellar-contract.service"
@@ -466,14 +468,67 @@ export async function castVote(req: Request, res: Response): Promise<void> {
 
 		// 8. Fetch updated vote counts for response
 		const updatedProposal = await pool.query(
-			"SELECT votes_for, votes_against FROM proposals WHERE id = $1",
+			"SELECT votes_for, votes_against, title, author_address FROM proposals WHERE id = $1",
 			[proposal_id],
 		)
 
+		const proposalRow = updatedProposal.rows[0]
+		const votesFor = BigInt(proposalRow?.votes_for ?? "0")
+		const votesAgainst = BigInt(proposalRow?.votes_against ?? "0")
+		const proposalTitle: string = proposalRow?.title ?? `Proposal #${proposal_id}`
+		const authorAddress: string = proposalRow?.author_address ?? ""
+
+		// 9. Check if the proposal has crossed a quorum threshold and notify the author
+		//    We use a simple heuristic: if total votes just crossed 1 (i.e. this is the
+		//    first vote) or if votes_for > votes_against by a significant margin, emit a
+		//    "vote_result" notification to the proposal author.
+		//    A "proposal_passed" notification is emitted when votes_for > votes_against
+		//    and total votes >= 1 (can be refined with a real quorum rule later).
+		if (authorAddress) {
+			const totalVotes = votesFor + votesAgainst
+			if (totalVotes > 0n) {
+				const voteLabel = support ? "in favour" : "against"
+				void createNotification({
+					recipient_address: voter_address,
+					type: "vote_result",
+					message: `Your vote ${voteLabel} on proposal "${proposalTitle}" was recorded.`,
+					href: `/dao/proposals/${proposal_id}`,
+					data: {
+						proposal_id,
+						support,
+						voting_power: votingPower.toString(),
+						tx_hash: contractResult.txHash,
+					},
+				})
+				void deliverNotificationChannels({
+					recipientAddress: voter_address,
+					type: "vote_result",
+					title: "Vote Recorded",
+					message: `Your vote ${voteLabel} on proposal "${proposalTitle}" was recorded.`,
+					href: `/dao/proposals/${proposal_id}`,
+				})
+
+				// Notify the proposal author when votes_for first exceeds votes_against
+				if (votesFor > votesAgainst) {
+					void createNotification({
+						recipient_address: authorAddress,
+						type: "proposal_passed",
+						message: `Your proposal "${proposalTitle}" is currently passing with ${votesFor.toString()} votes for and ${votesAgainst.toString()} against.`,
+						href: `/dao/proposals/${proposal_id}`,
+						data: {
+							proposal_id,
+							votes_for: votesFor.toString(),
+							votes_against: votesAgainst.toString(),
+						},
+					})
+				}
+			}
+		}
+
 		res.status(201).json({
 			tx_hash: contractResult.txHash,
-			votes_for: updatedProposal.rows[0]?.votes_for ?? "0",
-			votes_against: updatedProposal.rows[0]?.votes_against ?? "0",
+			votes_for: proposalRow?.votes_for ?? "0",
+			votes_against: proposalRow?.votes_against ?? "0",
 		})
 	} catch (err) {
 		log.error({ err }, "Vote casting failed")

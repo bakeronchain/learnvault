@@ -15,6 +15,28 @@ export interface CourseLesson {
 	changeSummary?: string | null
 }
 
+export interface CoursePrerequisite {
+	id: string
+	slug: string
+	title: string
+}
+
+export interface CourseRatingSummary {
+	average: number
+	count: number
+}
+
+export interface CourseReview {
+	id: string
+	courseId: string
+	walletAddress: string
+	rating: number
+	text: string
+	createdAt: string
+	updatedAt?: string
+	isOwn?: boolean
+}
+
 export interface CourseSummary {
 	id: string
 	slug: string
@@ -29,6 +51,7 @@ export interface CourseSummary {
 	createdAt: string
 	updatedAt: string
 	accentClassName: string
+	ratingSummary?: CourseRatingSummary | null
 }
 
 export interface CourseDetail extends CourseSummary {
@@ -36,4 +59,5 @@ export interface CourseDetail extends CourseSummary {
 	latestContentVersion?: number
 	hasUpdatedContent?: boolean
 	lessons: CourseLesson[]
+	prerequisites?: CoursePrerequisite[]
 }

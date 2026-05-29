@@ -667,6 +667,10 @@ impl GovernanceToken {
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
+#[path = "test.rs"]
+mod dedicated_test_suite;
+
+#[cfg(test)]
 mod test {
     extern crate std;
 

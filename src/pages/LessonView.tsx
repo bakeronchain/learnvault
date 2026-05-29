@@ -1,8 +1,9 @@
 import { Button } from "@stellar/design-system"
 import React, { useEffect, useMemo, useState } from "react"
-import { useParams } from "react-router-dom"
+import { Link, useParams } from "react-router-dom"
 import { CourseForum } from "../components/forum/CourseForum"
 import LessonContent from "../components/LessonContent"
+import CourseReviewsPanel from "../components/CourseReviewsPanel"
 import LessonSidebar from "../components/LessonSidebar"
 import MilestoneSubmitPanel from "../components/MilestoneSubmitPanel"
 
@@ -38,8 +39,13 @@ const LessonView: React.FC = () => {
 	const lessonId = parseInt(lessonIdParam || "0", 10)
 
 	const { address } = useWallet()
-	const { getCourseProgress, completeMilestone, isCompletingMilestone } =
-		useCourse()
+	const {
+		getCourseProgress,
+		completeMilestone,
+		isCompletingMilestone,
+		enrolledCourses,
+		enroll,
+	} = useCourse()
 	const {
 		course,
 		isLoading: isLoadingCourse,
@@ -77,6 +83,24 @@ const LessonView: React.FC = () => {
 		[course, lessonId],
 	)
 	const allLessons = useMemo(() => course?.lessons ?? [], [course])
+	const isEnrolledInCourse = useMemo(
+		() => (course ? enrolledCourses.some((c) => c.id === course.slug) : false),
+		[course, enrolledCourses],
+	)
+	const prerequisites = course?.prerequisites ?? []
+	const hasPrerequisiteData = prerequisites.length > 0
+	const prerequisiteStatuses = useMemo(() => {
+		return prerequisites.map((prereq) => {
+			const progress = getCourseProgress(prereq.slug)
+			const total = progress.totalMilestones
+			const completed =
+				typeof total === "number" && total > 0
+					? progress.completedMilestoneIds.length >= total
+					: false
+			return { prereq, completed }
+		})
+	}, [getCourseProgress, prerequisites])
+	const hasUnmetPrerequisites = prerequisiteStatuses.some((p) => !p.completed)
 
 	useEffect(() => {
 		// Simulate a short content load delay
@@ -217,6 +241,8 @@ const LessonView: React.FC = () => {
 
 	const handleMarkComplete = async () => {
 		if (!courseId || !course || !lesson) return
+		if (hasPrerequisiteData && hasUnmetPrerequisites) return
+		if (!isEnrolledInCourse) return
 
 		const completedOnChain = await completeMilestone(courseId, lessonId)
 		if (completedOnChain) {
@@ -422,6 +448,12 @@ const LessonView: React.FC = () => {
 								milestoneId={lesson.id}
 							/>
 						</div>
+					)}
+					{course && currentTab !== "forum" && (
+						<CourseReviewsPanel
+							courseId={course.slug}
+							canReview={Boolean(nextLessonId === null && isCompleted)}
+						/>
 					)}
 				</div>
 			</div>

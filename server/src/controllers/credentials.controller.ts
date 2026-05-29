@@ -4,6 +4,7 @@ import { type Request, type Response } from "express"
 
 import { pool } from "../db/index"
 import { logger } from "../lib/logger"
+import { verifyCredentialProof } from "../services/zk-credential-proof.service"
 
 const log = logger.child({ module: "credentials" })
 import { pinJsonToIPFS, getGatewayUrl } from "../services/pinata.service"
@@ -256,6 +257,36 @@ export async function getCredentialsByAddress(
 		res.status(500).json({
 			error: "Internal server error",
 			message: "Failed to fetch credentials",
+		})
+	}
+}
+
+interface VerifyCredentialProofRequest {
+	proof: string
+	publicSignals: {
+		credentialHash: string
+		thresholdMet: string
+		nullifierHash: string
+	}
+}
+
+export async function verifyCredentialZkProof(
+	req: Request,
+	res: Response,
+): Promise<void> {
+	const { proof, publicSignals } = req.body as VerifyCredentialProofRequest
+	if (!proof || !publicSignals) {
+		res.status(400).json({ error: "proof and publicSignals are required" })
+		return
+	}
+	try {
+		const result = await verifyCredentialProof({ proof, publicSignals })
+		res.status(200).json({ data: result })
+	} catch (error) {
+		log.error({ err: error }, "Error verifying credential proof")
+		res.status(500).json({
+			error: "Internal server error",
+			message: "Failed to verify credential proof",
 		})
 	}
 }

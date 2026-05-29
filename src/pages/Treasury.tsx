@@ -6,6 +6,7 @@ import {
 	DashboardStatsSkeleton,
 	ActivityFeedSkeleton,
 } from "../components/SkeletonLoader"
+import { EmptyState as StateEmpty } from "../components/states/emptyState"
 import { ErrorState } from "../components/states/errorState"
 import { useToast } from "../components/Toast/ToastProvider"
 import TreasuryHealthChart, {
@@ -216,27 +217,27 @@ const Treasury: React.FC = () => {
 
 	const displayStats = stats
 		? {
-				totalTreasury: treasuryLoading
-					? "Loading..."
-					: treasuryUSDC !== undefined
-						? `${treasuryUSDC.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC`
-						: `${formatUSDC(stats.total_deposited_usdc)} USDC`,
-				totalDisbursed: `${formatUSDC(stats.total_disbursed_usdc)} USDC`,
-				scholarsFunded: stats.scholars_funded.toString(),
-				donorsCount: stats.donors_count.toString(),
-			}
+			totalTreasury: treasuryLoading
+				? "Loading..."
+				: treasuryUSDC !== undefined
+					? `${treasuryUSDC.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC`
+					: `${formatUSDC(stats.total_deposited_usdc)} USDC`,
+			totalDisbursed: `${formatUSDC(stats.total_disbursed_usdc)} USDC`,
+			scholarsFunded: stats.scholars_funded.toString(),
+			donorsCount: stats.donors_count.toString(),
+		}
 		: {
-				totalTreasury: treasuryLoading
-					? "Loading..."
-					: treasuryUSDC !== undefined
-						? `${treasuryUSDC.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC`
-						: isError
-							? "Unavailable"
-							: "Loading...",
-				totalDisbursed: isLoading ? "Loading..." : "Unavailable",
-				scholarsFunded: isLoading ? "..." : "—",
-				donorsCount: isLoading ? "..." : "—",
-			}
+			totalTreasury: treasuryLoading
+				? "Loading..."
+				: treasuryUSDC !== undefined
+					? `${treasuryUSDC.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC`
+					: isError
+						? "Unavailable"
+						: "Loading...",
+			totalDisbursed: isLoading ? "Loading..." : "Unavailable",
+			scholarsFunded: isLoading ? "..." : "—",
+			donorsCount: isLoading ? "..." : "—",
+		}
 
 	const deposits = (activity ?? [])
 		.filter((e) => e.type === "deposit")
@@ -360,12 +361,12 @@ const Treasury: React.FC = () => {
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
 				{(activity ?? []).length === 0 ? (
 					<div className="lg:col-span-2">
-						<EmptyState
+						<StateEmpty
 							icon="📭"
 							title="No treasury transactions yet"
 							description="No deposits or disbursements have been recorded yet. Check back soon for updates."
-							ctaLabel="Refresh"
-							ctaHref="#"
+							ctaLabel="View treasury overview"
+							ctaHref="/treasury"
 						/>
 					</div>
 				) : (
@@ -630,29 +631,38 @@ const ActivityFeed: React.FC<{
 										hash={item.txHash}
 										className="mt-2 inline-flex text-[10px] font-black uppercase tracking-widest text-brand-cyan hover:underline"
 									/>
+									<div>
+										<p className="font-bold text-sm">{item.user}</p>
+										<p className="text-[10px] text-white/30 uppercase font-black tracking-widest">
+											{item.time}
+										</p>
+										<TxHashLink
+											hash={item.txHash}
+											className="mt-2 inline-flex text-[10px] font-black uppercase tracking-widest text-brand-cyan hover:underline"
+										/>
+									</div>
 								</div>
+								<p
+									className={`font-black ${item.type === "deposit" ? "text-brand-emerald" : "text-white/80"}`}
+								>
+									{item.amount}
+								</p>
 							</div>
-							<p
-								className={`font-black ${item.type === "deposit" ? "text-brand-emerald" : "text-white/80"}`}
+						))}
+						{showLoadMore && onLoadMore ? (
+							<button
+								type="button"
+								onClick={onLoadMore}
+								disabled={loadingMore}
+								className="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black uppercase tracking-[0.2em] text-white/80 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
 							>
-								{item.amount}
-							</p>
-						</div>
-					))}
-					{showLoadMore && onLoadMore ? (
-						<button
-							type="button"
-							onClick={onLoadMore}
-							disabled={loadingMore}
-							className="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black uppercase tracking-[0.2em] text-white/80 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-						>
-							{loadingMore ? "Loading..." : "Load More"}
-						</button>
-					) : null}
-				</>
-			)}
+								{loadingMore ? "Loading..." : "Load More"}
+							</button>
+						) : null}
+					</>
+				)}
+			</div>
 		</div>
-	</div>
-)
+	)
 
 export default Treasury

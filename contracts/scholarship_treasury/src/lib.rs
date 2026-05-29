@@ -172,6 +172,7 @@ pub struct VoteCastEvent {
 }
 
 #[contractimpl]
+#[allow(clippy::too_many_arguments)]
 impl ScholarshipTreasury {
     pub fn initialize(
         env: Env,
@@ -1082,3 +1083,6 @@ mod token {
 
 #[cfg(test)]
 mod test;
+
+#[cfg(test)]
+mod tests;

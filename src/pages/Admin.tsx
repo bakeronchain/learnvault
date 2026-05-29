@@ -44,6 +44,7 @@ type AdminSection =
 	| "treasury"
 	| "scholarships"
 	| "contracts"
+	| "moderation"
 type CourseStatus = "draft" | "published"
 
 interface AdminCourse {
@@ -332,6 +333,7 @@ const Admin: React.FC = () => {
 							"treasury",
 							"scholarships",
 							"contracts",
+							"moderation",
 						] as const
 					).map((section) => (
 						<button
@@ -362,6 +364,7 @@ const Admin: React.FC = () => {
 				{activeSection === "wiki" && <WikiManagement />}
 				{activeSection === "scholarships" && <ScholarshipMetrics />}
 				{activeSection === "contracts" && <ContractInfo />}
+				{activeSection === "moderation" && <ModerationQueue />}
 			</main>
 		</div>
 	)

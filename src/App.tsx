@@ -8,7 +8,7 @@ import { OnboardingTour } from "./components/OnboardingTour"
 import TestnetBanner from "./components/TestnetBanner"
 import { ToastProvider } from "./components/Toast/ToastProvider"
 import { WalletToastWatcher } from "./components/WalletToastWatcher"
-import { useLocalizeDocumentAttributes } from "./hooks/useLocalizeDocumentAttributes"
+import { useLocalizeDocumentAttributes } from "./hooks/uselocalizeDocumentAttributes"
 import { NetworkProvider } from "./providers/NetworkProvider"
 
 const Admin = lazy(() => import("./pages/Admin"))
@@ -30,6 +30,7 @@ const Learn = lazy(() => import("./pages/Learn"))
 const LessonVersionDiff = lazy(() => import("./pages/LessonVersionDiff"))
 const LessonView = lazy(() => import("./pages/LessonView"))
 const NotFound = lazy(() => import("./pages/NotFound"))
+const NotificationSettings = lazy(() => import("./pages/NotificationSettings"))
 const PeerReview = lazy(() => import("./pages/PeerReview"))
 const Profile = lazy(() => import("./pages/Profile"))
 const ScholarshipApply = lazy(() => import("./pages/ScholarshipApply"))
@@ -72,6 +73,10 @@ function App() {
 					<Route path="/community" element={renderRoute(<Community />)} />
 					<Route path="/history" element={renderRoute(<History />)} />
 					<Route path="/profile" element={renderRoute(<Profile />)} />
+					<Route
+						path="/settings/notifications"
+						element={renderRoute(<NotificationSettings />)}
+					/>
 					<Route
 						path="/profile/:walletAddress"
 						element={renderRoute(<Profile />)}

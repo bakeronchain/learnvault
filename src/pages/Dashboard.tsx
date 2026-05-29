@@ -10,6 +10,7 @@ import { useCourse } from "../hooks/useCourse"
 import { useLearnerProfile } from "../hooks/useLearnerProfile"
 import { useLearnToken } from "../hooks/useLearnToken"
 import { WalletContext } from "../providers/WalletProvider"
+import RecommendationsCarousel from "../components/RecommendationsCarousel"
 
 const Dashboard: React.FC = () => {
 	const { i18n } = useTranslation()
@@ -173,8 +174,11 @@ const Dashboard: React.FC = () => {
 				{/* ── Courses + Activity Feed ── */}
 				<div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-10">
 					{/* Courses — takes up 2/3 on large screens */}
-					<section className="lg:col-span-2 space-y-6" aria-label="My courses">
-						<h2 className="text-xl sm:text-2xl md:text-3xl font-black flex items-center gap-3">
+					<div className="lg:col-span-2 space-y-12">
+						<RecommendationsCarousel />
+
+						<section className="space-y-6" aria-label="My courses">
+							<h2 className="text-xl sm:text-2xl md:text-3xl font-black flex items-center gap-3">
 							<span className="text-2xl sm:text-3xl" aria-hidden="true">
 								📚
 							</span>
@@ -223,7 +227,8 @@ const Dashboard: React.FC = () => {
 						)}
 
 						<MyBookmarks />
-					</section>
+						</section>
+					</div>
 
 					{/* Activity Feed — takes up 1/3 on large screens, full width below */}
 					<section className="lg:col-span-1" aria-label="Activity feed">

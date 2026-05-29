@@ -2,7 +2,7 @@
 #![allow(deprecated)]
 
 use soroban_sdk::{
-    Address, BytesN, Env, String, Symbol, Vec, contract, contracterror, contractimpl, contracttype,
+    Address, BytesN, Env, String, Symbol, Vec, contract, contractimpl, contracttype,
     panic_with_error, symbol_short,
 };
 
@@ -16,7 +16,11 @@ pub struct VerifyBatchEntry {
     pub lrn_reward: i128,
 }
 
+mod errors;
 mod interface;
+use errors::{
+    ContractError, MAX_COURSE_ID_LEN, MAX_MILESTONE_COUNT, MIN_COURSE_ID_LEN, MIN_MILESTONE_COUNT,
+};
 use interface::LearnTokenClient;
 
 use learnvault_shared::upgrade;
@@ -109,29 +113,7 @@ const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
 const LEARN_TOKEN_KEY: Symbol = symbol_short!("LRN_TKN");
 const PAUSED_KEY: Symbol = symbol_short!("PAUSED");
 
-#[contracterror]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum Error {
-    AlreadyInitialized = 1,
-    NotInitialized = 2,
-    Unauthorized = 3,
-    CourseNotFound = 4,
-    MilestoneAlreadyCompleted = 5,
-    CourseAlreadyComplete = 6,
-    InvalidMilestones = 7,
-    CourseAlreadyExists = 8,
-    NotEnrolled = 9,
-    DuplicateSubmission = 10,
-    ContractPaused = 11,
-    AlreadyEnrolled = 12,
-    InvalidState = 13,
-    AlreadyCompleted = 14,
-    InvalidReward = 15,
-    ArithmeticOverflow = 16,
-    OracleUnavailable = 17,
-    ManualFallbackDisabled = 18,
-}
+pub use errors::ContractError as Error;
 
 /// Per-item result returned by `batch_approve_milestones`.
 /// `Ok` means the milestone was approved and tokens were minted.
@@ -179,17 +161,14 @@ impl CourseMilestone {
         Self::extend_instance(&env);
     }
 
-    pub fn add_course(env: Env, admin: Address, course_id: String, milestone_count: u32) {
+    pub fn register_course(env: Env, admin: Address, course_id: String, milestone_count: u32) {
         Self::require_initialized(&env);
         Self::require_admin(&env, &admin);
-
-        if milestone_count == 0 {
-            panic_with_error!(&env, Error::InvalidMilestones);
-        }
+        Self::validate_course_registration(&env, &course_id, milestone_count);
 
         let course_key = DataKey::Course(course_id.clone());
         if env.storage().persistent().has(&course_key) {
-            panic_with_error!(&env, Error::CourseAlreadyExists);
+            panic_with_error!(&env, Error::AlreadyExists);
         }
 
         let config = CourseConfig {
@@ -210,6 +189,11 @@ impl CourseMilestone {
 
         Self::extend_persistent(&env, &course_key);
         Self::extend_persistent(&env, &DataKey::CourseIds);
+    }
+
+    /// Backward-compatible alias for [`register_course`].
+    pub fn add_course(env: Env, admin: Address, course_id: String, milestone_count: u32) {
+        Self::register_course(env, admin, course_id, milestone_count);
     }
 
     pub fn set_milestone_reward(env: Env, course_id: String, milestone_id: u32, lrn: i128) {
@@ -1009,6 +993,16 @@ impl CourseMilestone {
     fn checked_add_u32(env: &Env, left: u32, right: u32) -> u32 {
         left.checked_add(right)
             .unwrap_or_else(|| panic_with_error!(env, Error::ArithmeticOverflow))
+    }
+
+    fn validate_course_registration(env: &Env, course_id: &String, milestone_count: u32) {
+        let len = course_id.len();
+        if len < MIN_COURSE_ID_LEN || len > MAX_COURSE_ID_LEN {
+            panic_with_error!(env, Error::InvalidCourseId);
+        }
+        if milestone_count < MIN_MILESTONE_COUNT || milestone_count > MAX_MILESTONE_COUNT {
+            panic_with_error!(env, Error::InvalidMilestoneCount);
+        }
     }
 
     /// Approve multiple milestone submissions in a single transaction, processing

@@ -1,5 +1,11 @@
 import { lazy, Suspense, type ReactNode } from "react"
-import { Outlet, Route, Routes } from "react-router-dom"
+import {
+	AnimatePresence,
+	motion,
+	useReducedMotion,
+	type MotionProps,
+} from "framer-motion"
+import { Outlet, Route, Routes, useLocation } from "react-router-dom"
 import ErrorBoundary from "./components/ErrorBoundary"
 import Footer from "./components/Footer"
 import NavBar from "./components/NavBar"
@@ -129,18 +135,43 @@ const RouteFallback = () => (
 	</div>
 )
 
-const AppLayout = () => (
-	<div className="min-h-screen flex flex-col pt-24 overflow-x-hidden w-full max-w-full bg-[var(--color-app-bg)] text-[var(--color-app-text)] transition-colors duration-300">
-		<NetworkPreconnect />
-		<TestnetBanner />
-		<NavBar />
-		<OnboardingTour />
-		<main id="main-content" className="flex-1 relative z-10" tabIndex={-1}>
-			<Outlet />
-		</main>
-		<Footer />
-	</div>
-)
+const AppLayout = () => {
+	const location = useLocation()
+	const shouldReduceMotion = useReducedMotion()
+
+	const pageTransition: MotionProps = shouldReduceMotion
+		? {
+				initial: false,
+				animate: { opacity: 1 },
+				exit: { opacity: 1 },
+				transition: { duration: 0 },
+			}
+		: {
+				initial: { opacity: 0 },
+				animate: { opacity: 1 },
+				exit: { opacity: 0 },
+				transition: { duration: 0.2, ease: "easeOut" },
+			}
+
+	return (
+		<div className="min-h-screen flex flex-col pt-24 overflow-x-hidden w-full max-w-full bg-[var(--color-app-bg)] text-[var(--color-app-text)] transition-colors duration-300">
+			<NetworkPreconnect />
+			<TestnetBanner />
+			<NavBar />
+			<OnboardingTour />
+
+			<main id="main-content" className="relative z-10 flex-1" tabIndex={-1}>
+				<AnimatePresence mode="wait">
+					<motion.div key={location.pathname} {...pageTransition}>
+						<Outlet />
+					</motion.div>
+				</AnimatePresence>
+			</main>
+
+			<Footer />
+		</div>
+	)
+}
 
 const AppWithProvider = () => (
 	<NetworkProvider>

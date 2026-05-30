@@ -1,11 +1,17 @@
 import { createPublicKey } from "node:crypto"
 import path from "path"
+import cors from "cors"
 import dotenv from "dotenv"
 
 // Load server/.env whether you run from repo root or from server/
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
 
 // Initialize Sentry FIRST before any other imports that might throw
+import dotenv from "dotenv"
+import express from "express"
+import helmet from "helmet"
+import swaggerUi from "swagger-ui-express"
+import { z } from "zod"
 import { initSentry, sentryRequestHandler } from "./lib/sentry"
 
 initSentry({
@@ -15,12 +21,6 @@ initSentry({
 	tracesSampleRate: env.NODE_ENV === "production" ? 0.1 : 1.0,
 	profilesSampleRate: env.NODE_ENV === "production" ? 0.1 : 1.0,
 })
-import cors from "cors"
-import dotenv from "dotenv"
-import express from "express"
-import helmet from "helmet"
-import swaggerUi from "swagger-ui-express"
-import { z } from "zod"
 
 import { initDb } from "./db/index"
 import { createNonceStore } from "./db/nonce-store"
@@ -44,6 +44,7 @@ import { donorsRouter } from "./routes/donors.routes"
 import { createEnrollmentsRouter } from "./routes/enrollments.routes"
 import { eventsRouter } from "./routes/events.routes"
 import { governanceRouter } from "./routes/governance.routes"
+import { createMilestoneAppealRouter } from "./routes/milestone-appeal.routes"
 import { healthRouter } from "./routes/health.routes"
 import { impactRouter } from "./routes/impact.routes"
 import { leaderboardRouter } from "./routes/leaderboard.routes"
@@ -61,7 +62,6 @@ import { createUploadRouter } from "./routes/upload.routes"
 import { createUserProfileRouter } from "./routes/user-profile.routes"
 import { validatorRouter } from "./routes/validator.routes"
 import { wikiRouter } from "./routes/wiki.routes"
-import { createRecommendationsRouter } from "./routes/recommendations.routes"
 import { createAuthService } from "./services/auth.service"
 import {
 	createJwtService,
@@ -187,6 +187,7 @@ app.use("/api", treasuryRouter)
 app.use("/api", wikiRouter)
 app.use("/api", adminRouter)
 app.use("/api", adminMilestonesRouter)
+app.use("/api", createMilestoneAppealRouter(jwtService))
 app.use("/api", moderationRouter)
 app.use("/api", scholarsRouter)
 app.use("/api", createUserProfileRouter(jwtService))

@@ -38,6 +38,7 @@ pub enum DataKey {
     Enrollment(Address, String),
     MilestoneState(Address, String, u32),
     MilestoneSubmission(Address, String, u32),
+    MilestoneAppeal(Address, String, u32),
     MilestoneLrn(String, u32),
     Completed(Address, String, u32),
     EnrolledCourses(Address),
@@ -62,6 +63,15 @@ pub enum MilestoneStatus {
     Pending,
     Approved,
     Rejected,
+    Appealed,
+    FinalRejected,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+pub struct AppealData {
+    pub reason: String,
+    pub submitted_at: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -880,6 +890,111 @@ impl CourseMilestone {
 
         let submission_key = DataKey::MilestoneSubmission(learner, course_id, milestone_id);
         env.storage().persistent().remove(&submission_key);
+    }
+
+    pub fn appeal_milestone(
+        env: Env,
+        learner: Address,
+        course_id: String,
+        milestone_id: u32,
+        reason: String,
+    ) {
+        if Self::is_paused(env.clone()) {
+            panic_with_error!(&env, Error::ContractPaused);
+        }
+
+        Self::require_initialized(&env);
+        learner.require_auth();
+
+        if !Self::is_enrolled(env.clone(), learner.clone(), course_id.clone()) {
+            panic_with_error!(&env, Error::NotEnrolled);
+        }
+        Self::ensure_valid_milestone(&env, &course_id, milestone_id);
+
+        let state_key = DataKey::MilestoneState(learner.clone(), course_id.clone(), milestone_id);
+        let current_state = env
+            .storage()
+            .persistent()
+            .get::<_, MilestoneStatus>(&state_key)
+            .unwrap_or(MilestoneStatus::NotStarted);
+
+        if current_state != MilestoneStatus::Rejected {
+            panic_with_error!(&env, Error::InvalidState);
+        }
+
+        env.storage()
+            .persistent()
+            .set(&state_key, &MilestoneStatus::Appealed);
+
+        let appeal_key = DataKey::MilestoneAppeal(learner.clone(), course_id.clone(), milestone_id);
+        env.storage().persistent().set(
+            &appeal_key,
+            &AppealData {
+                reason,
+                submitted_at: env.ledger().timestamp(),
+            },
+        );
+        Self::extend_persistent(&env, &appeal_key);
+
+        env.events().publish(
+            (symbol_short!("appeal"), learner.clone()),
+            (course_id.clone(), milestone_id),
+        );
+    }
+
+    pub fn resolve_appeal(
+        env: Env,
+        admin: Address,
+        learner: Address,
+        course_id: String,
+        milestone_id: u32,
+        approved: bool,
+    ) {
+        if Self::is_paused(env.clone()) {
+            panic_with_error!(&env, Error::ContractPaused);
+        }
+
+        Self::require_initialized(&env);
+        Self::require_admin(&env, &admin);
+
+        if !Self::is_enrolled(env.clone(), learner.clone(), course_id.clone()) {
+            panic_with_error!(&env, Error::NotEnrolled);
+        }
+        Self::ensure_valid_milestone(&env, &course_id, milestone_id);
+
+        let state_key = DataKey::MilestoneState(learner.clone(), course_id.clone(), milestone_id);
+        let current_state = env
+            .storage()
+            .persistent()
+            .get::<_, MilestoneStatus>(&state_key)
+            .unwrap_or(MilestoneStatus::NotStarted);
+
+        if current_state != MilestoneStatus::Appealed {
+            panic_with_error!(&env, Error::InvalidState);
+        }
+
+        let new_state = if approved {
+            MilestoneStatus::Approved
+        } else {
+            MilestoneStatus::FinalRejected
+        };
+
+        env.storage().persistent().set(&state_key, &new_state);
+
+        env.events().publish(
+            (symbol_short!("appresolv"), admin.clone()),
+            (learner.clone(), course_id.clone(), milestone_id, approved),
+        );
+    }
+
+    pub fn get_appeal(
+        env: Env,
+        learner: Address,
+        course_id: String,
+        milestone_id: u32,
+    ) -> Option<AppealData> {
+        let appeal_key = DataKey::MilestoneAppeal(learner, course_id, milestone_id);
+        env.storage().persistent().get::<_, AppealData>(&appeal_key)
     }
 
     fn require_initialized(env: &Env) {

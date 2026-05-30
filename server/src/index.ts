@@ -1,11 +1,17 @@
 import { createPublicKey } from "node:crypto"
 import path from "path"
+import cors from "cors"
 import dotenv from "dotenv"
 
 // Load server/.env whether you run from repo root or from server/
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
 
 // Initialize Sentry FIRST before any other imports that might throw
+import dotenv from "dotenv"
+import express from "express"
+import helmet from "helmet"
+import swaggerUi from "swagger-ui-express"
+import { z } from "zod"
 import { initSentry, sentryRequestHandler } from "./lib/sentry"
 
 initSentry({
@@ -15,12 +21,6 @@ initSentry({
 	tracesSampleRate: env.NODE_ENV === "production" ? 0.1 : 1.0,
 	profilesSampleRate: env.NODE_ENV === "production" ? 0.1 : 1.0,
 })
-import cors from "cors"
-import dotenv from "dotenv"
-import express from "express"
-import helmet from "helmet"
-import swaggerUi from "swagger-ui-express"
-import { z } from "zod"
 
 import { initDb } from "./db/index"
 import { createNonceStore } from "./db/nonce-store"
@@ -34,6 +34,7 @@ import { globalLimiter } from "./middleware/rate-limit.middleware"
 import { requestLogger } from "./middleware/request-logger.middleware"
 import { buildOpenApiSpec } from "./openapi"
 import { adminMilestonesRouter } from "./routes/admin-milestones.routes"
+import { adminProviderKeysRouter } from "./routes/admin-provider-keys.routes"
 import { adminRouter } from "./routes/admin.routes"
 import { createAuthRouter } from "./routes/auth.routes"
 import { createCommentsRouter } from "./routes/comments.routes"
@@ -52,6 +53,7 @@ import { mentorshipRouter } from "./routes/mentorship.routes"
 import { moderationRouter } from "./routes/moderation.routes"
 import { notificationsRouter } from "./routes/notifications.routes"
 import { createPeerReviewRouter } from "./routes/peer-review.routes"
+import { providerRouter } from "./routes/provider.routes"
 import { createRecommendationsRouter } from "./routes/recommendations.routes"
 import { createScholarsRouter } from "./routes/scholars.routes"
 import { scholarshipsRouter } from "./routes/scholarships.routes"
@@ -61,7 +63,6 @@ import { createUploadRouter } from "./routes/upload.routes"
 import { createUserProfileRouter } from "./routes/user-profile.routes"
 import { validatorRouter } from "./routes/validator.routes"
 import { wikiRouter } from "./routes/wiki.routes"
-import { createRecommendationsRouter } from "./routes/recommendations.routes"
 import { createAuthService } from "./services/auth.service"
 import {
 	createJwtService,
@@ -187,6 +188,8 @@ app.use("/api", treasuryRouter)
 app.use("/api", wikiRouter)
 app.use("/api", adminRouter)
 app.use("/api", adminMilestonesRouter)
+app.use("/api", adminProviderKeysRouter)
+app.use("/api", providerRouter)
 app.use("/api", moderationRouter)
 app.use("/api", scholarsRouter)
 app.use("/api", createUserProfileRouter(jwtService))

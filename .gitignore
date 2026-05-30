@@ -47,6 +47,7 @@ lerna-debug.log*
 packages/*
 # if you have other workspace packages, add them here
 !packages/.gitkeep
+!packages/learnvault-provider-sdk
 
 # generated contract client imports
 src/contracts/*

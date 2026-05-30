@@ -95,8 +95,10 @@ const Leaderboard: React.FC = () => {
 			) : leaderboardRows.length === 0 ? (
 				<EmptyState
 					icon={Trophy}
-					title="No scholars yet"
-					description="No scholars have earned LRN tokens yet. Be the first to complete a course!"
+					title="No learners ranked yet"
+					description="Complete a course to earn LRN tokens and claim your spot on the leaderboard!"
+					ctaLabel="Browse Courses"
+					ctaTo="/courses"
 				/>
 			) : (
 				<div className="glass-card overflow-hidden rounded-[2.5rem] border border-white/5 shadow-2xl">

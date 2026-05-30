@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { UserPlus, UserMinus, UserCheck } from "lucide-react"
 import React, { useState } from "react"
 import { useWallet } from "../hooks/useWallet"
+import { useToast } from "./Toast/ToastProvider"
 
 interface FollowButtonProps {
 	targetAddress: string
@@ -19,6 +20,8 @@ export const FollowButton: React.FC<FollowButtonProps> = ({
 	const { address: currentUserAddress } = useWallet()
 	const queryClient = useQueryClient()
 	const [isHovered, setIsHovered] = useState(false)
+	const [optimisticFollowing, setOptimisticFollowing] = useState<boolean | null>(null)
+	const { showError } = useToast()
 
 	const isOwnProfile =
 		currentUserAddress?.toLowerCase() === targetAddress.toLowerCase()
@@ -44,6 +47,7 @@ export const FollowButton: React.FC<FollowButtonProps> = ({
 		},
 		onSuccess: (data) => {
 			const isFollowing = data.data.isFollowing
+			setOptimisticFollowing(null)
 			// Invalidate queries to refresh counts
 			void queryClient.invalidateQueries({
 				queryKey: ["scholarProfile", targetAddress],
@@ -55,18 +59,30 @@ export const FollowButton: React.FC<FollowButtonProps> = ({
 			}
 			onStatusChange?.(isFollowing)
 		},
+		onError: (error) => {
+			// Revert optimistic update on error
+			setOptimisticFollowing(null)
+			// Show error toast
+			showError(error instanceof Error ? error.message : "Failed to update follow status")
+		},
 	})
 
 	if (!currentUserAddress || isOwnProfile) return null
 
-	const isFollowing = mutation.isIdle
+	// Use optimistic state if available, otherwise use initial or mutation state
+	const isFollowing = optimisticFollowing !== null 
+		? optimisticFollowing 
+		: mutation.isIdle
 		? isFollowingInitial
 		: !!mutation.variables
 
 	const handleClick = (e: React.MouseEvent) => {
 		e.preventDefault()
 		e.stopPropagation()
-		mutation.mutate(!isFollowing)
+		const newFollowState = !isFollowing
+		// Set optimistic state immediately
+		setOptimisticFollowing(newFollowState)
+		mutation.mutate(newFollowState)
 	}
 
 	return (
@@ -81,26 +97,33 @@ export const FollowButton: React.FC<FollowButtonProps> = ({
 					: "bg-brand-cyan text-black hover:scale-105 hover:shadow-brand-cyan/20"
 			} ${mutation.isPending ? "opacity-50 cursor-wait" : ""} ${className}`}
 		>
-			{isFollowing ? (
-				<>
-					{isHovered ? (
-						<>
-							<UserMinus className="w-3.5 h-3.5" />
-							<span>Unfollow</span>
-						</>
-					) : (
-						<>
-							<UserCheck className="w-3.5 h-3.5" />
-							<span>Following</span>
-						</>
-					)}
-				</>
-			) : (
-				<>
-					<UserPlus className="w-3.5 h-3.5" />
-					<span>Follow</span>
-				</>
+			{mutation.isPending && (
+				<div className="absolute inset-0 flex items-center justify-center">
+					<div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+				</div>
 			)}
+			<span className={mutation.isPending ? "opacity-0" : ""}>
+				{isFollowing ? (
+					<>
+						{isHovered ? (
+							<>
+								<UserMinus className="w-3.5 h-3.5" />
+								<span>Unfollow</span>
+							</>
+						) : (
+							<>
+								<UserCheck className="w-3.5 h-3.5" />
+								<span>Following</span>
+							</>
+						)}
+					</>
+				) : (
+					<>
+						<UserPlus className="w-3.5 h-3.5" />
+						<span>Follow</span>
+					</>
+				)}
+			</span>
 		</button>
 	)
 }

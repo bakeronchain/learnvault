@@ -4,7 +4,7 @@ extern crate std;
 
 use soroban_sdk::{
 	Address, Env, IntoVal, String,
-	testutils::{Address as _, MockAuth, MockAuthInvoke},
+	testutils::{Address as _, Ledger, MockAuth, MockAuthInvoke},
 };
 
 use crate::{GOVError, GovernanceToken, GovernanceTokenClient};
@@ -14,7 +14,7 @@ fn setup(env: &Env) -> (Address, Address, GovernanceTokenClient) {
 	let contract_id = env.register(GovernanceToken, ());
 	env.mock_all_auths();
 	let client = GovernanceTokenClient::new(env, &contract_id);
-	client.initialize(&admin);
+	client.initialize(&admin, &0);
 	(contract_id, admin, client)
 }
 
@@ -50,7 +50,7 @@ fn only_admin_can_mint() {
 	}]);
 
 	let client = GovernanceTokenClient::new(&env, &contract_id);
-	client.initialize(&admin);
+	client.initialize(&admin, &0);
 
 	env.mock_auths(&[MockAuth {
 		address: &attacker,
@@ -183,4 +183,47 @@ fn mint_overflow_is_rejected() {
 			GOVError::ArithmeticOverflow as u32,
 		))),
 	);
+}
+
+#[test]
+fn timelock_period_defaults_to_forty_eight_hours() {
+	let env = Env::default();
+	let (_, _, client) = setup(&env);
+	assert_eq!(client.get_timelock_period(), crate::TIMELOCK_PERIOD);
+}
+
+#[test]
+fn execute_proposal_fails_before_timelock_expires() {
+	let env = Env::default();
+	let (_, admin, client) = setup(&env);
+	let proposal_id = 1_u32;
+
+	client.create_proposal(&admin, &proposal_id);
+	client.mark_proposal_passed(&admin, &proposal_id);
+
+	let result = client.try_execute_proposal(&proposal_id);
+	assert_eq!(
+		result.err(),
+		Some(Ok(soroban_sdk::Error::from_contract_error(
+			GOVError::TimelockActive as u32,
+		))),
+	);
+}
+
+#[test]
+fn execute_proposal_succeeds_after_timelock() {
+	let env = Env::default();
+	let (_, admin, client) = setup(&env);
+	let proposal_id = 2_u32;
+
+	client.create_proposal(&admin, &proposal_id);
+	client.mark_proposal_passed(&admin, &proposal_id);
+
+	let proposal = client.get_proposal(&proposal_id).unwrap();
+	env.ledger().set_timestamp(proposal.execution_not_before);
+
+	client.execute_proposal(&proposal_id);
+
+	let executed = client.get_proposal(&proposal_id).unwrap();
+	assert!(executed.executed);
 }

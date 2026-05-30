@@ -38,6 +38,12 @@ export interface ProposalVoteRecord {
 	weight: bigint
 }
 
+export interface ProposalVoteRecord {
+	voterAddress: string
+	support: boolean
+	weight: bigint
+}
+
 export interface CreateProposalInput {
 	author_address: string
 	title: string

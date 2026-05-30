@@ -148,21 +148,38 @@ impl UpgradeTimelockVault {
             panic_with_error!(&env, UpgradeTimelockError::AlreadyInitialized);
         }
         admin.require_auth();
-        env.storage().instance().set(&ADMIN_KEY, &admin);
-        env.storage()
-            .instance()
-            .set(&TIMELOCK_KEY, &DEFAULT_TIMELOCK_DURATION);
+        let config = Config {
+            admin,
+            timelock_duration: DEFAULT_TIMELOCK_DURATION,
+        };
+        env.storage().instance().set(&CONFIG_KEY, &config);
+    }
+
+    /// Initialize with a custom timelock duration. Admin only.
+    pub fn initialize_with_timelock(env: Env, admin: Address, timelock_duration: u64) {
+        if env.storage().instance().has(&CONFIG_KEY) {
+            panic_with_error!(&env, UpgradeTimelockError::AlreadyInitialized);
+        }
+        admin.require_auth();
+        if timelock_duration == 0 {
+            panic_with_error!(&env, UpgradeTimelockError::InvalidTimelockDuration);
+        }
+        let config = Config {
+            admin,
+            timelock_duration,
+        };
+        env.storage().instance().set(&CONFIG_KEY, &config);
     }
 
     /// Set the timelock duration. Admin only.
     pub fn set_timelock_duration(env: Env, duration_seconds: u64) {
-        Self::admin(&env).require_auth();
+        let mut config = Self::get_config(&env);
+        config.admin.require_auth();
         if duration_seconds == 0 {
             panic_with_error!(&env, UpgradeTimelockError::InvalidTimelockDuration);
         }
-        env.storage()
-            .instance()
-            .set(&TIMELOCK_KEY, &duration_seconds);
+        config.timelock_duration = duration_seconds;
+        env.storage().instance().set(&CONFIG_KEY, &config);
     }
 
     /// Get the current timelock duration.
@@ -206,7 +223,8 @@ impl UpgradeTimelockVault {
     /// The caller (governance contract) is responsible for performing the actual upgrade.
     /// Removes the proposal from storage after successful execution.
     pub fn execute_upgrade(env: Env, contract_address: Address) -> BytesN<32> {
-        Self::admin(&env).require_auth();
+        let config = Self::get_config(&env);
+        config.admin.require_auth();
         let key = DataKey::UpgradeProposal(contract_address.clone());
         let proposal: UpgradeProposal = env
             .storage()
@@ -217,7 +235,7 @@ impl UpgradeTimelockVault {
         let current_time = env.ledger().timestamp();
         let ready_at = proposal
             .queued_at
-            .checked_add(timelock_duration)
+            .checked_add(config.timelock_duration)
             .unwrap_or_else(|| panic_with_error!(&env, UpgradeTimelockError::ArithmeticOverflow));
         if current_time < ready_at {
             panic_with_error!(&env, UpgradeTimelockError::TimelockNotExpired);
@@ -275,7 +293,7 @@ impl UpgradeTimelockVault {
         if let Some(proposal) = Self::get_upgrade_proposal(env.clone(), contract_address) {
             let config = Self::get_config(&env);
             let current_time = env.ledger().timestamp();
-            if let Some(ready_at) = proposal.queued_at.checked_add(timelock_duration) {
+            if let Some(ready_at) = proposal.queued_at.checked_add(config.timelock_duration) {
                 current_time >= ready_at
             } else {
                 false

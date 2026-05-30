@@ -138,8 +138,6 @@ impl MilestoneEscrow {
         };
         env.storage().persistent().set(&key, &record);
 
-        xlm::token_client(&env).transfer(&treasury, env.current_contract_address(), &amount);
-
         EscrowCreated {
             proposal_id,
             scholar: record.scholar.clone(),
@@ -250,18 +248,6 @@ impl MilestoneEscrow {
             .instance()
             .get(&CONFIG_KEY)
             .unwrap_or_else(|| panic_with_error!(env, Error::NotInitialized))
-    }
-
-    fn inactivity_window(env: &Env) -> u64 {
-        if let Some(window) = env
-            .storage()
-            .instance()
-            .get::<_, u64>(&INACTIVITY_WINDOW_KEY)
-        {
-            window
-        } else {
-            panic_with_error!(env, Error::NotInitialized);
-        }
     }
 
     pub fn get_version(env: Env) -> String {

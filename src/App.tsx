@@ -1,5 +1,11 @@
 import { lazy, Suspense, type ReactNode } from "react"
-import { Outlet, Route, Routes } from "react-router-dom"
+import {
+	AnimatePresence,
+	motion,
+	useReducedMotion,
+	type MotionProps,
+} from "framer-motion"
+import { Outlet, Route, Routes, useLocation } from "react-router-dom"
 import ErrorBoundary from "./components/ErrorBoundary"
 import Footer from "./components/Footer"
 import NavBar from "./components/NavBar"
@@ -12,6 +18,7 @@ import { useLocalizeDocumentAttributes } from "./hooks/uselocalizeDocumentAttrib
 import { NetworkProvider } from "./providers/NetworkProvider"
 
 const Admin = lazy(() => import("./pages/Admin"))
+const AdminModeration = lazy(() => import("./pages/AdminModeration"))
 const Community = lazy(() => import("./pages/Community"))
 const Courses = lazy(() => import("./pages/Courses"))
 const Credential = lazy(() => import("./pages/Credential"))
@@ -39,6 +46,8 @@ const Tracks = lazy(() => import("./pages/Tracks"))
 const Treasury = lazy(() => import("./pages/Treasury"))
 const Wiki = lazy(() => import("./pages/Wiki"))
 const WikiPage = lazy(() => import("./pages/WikiPage"))
+const FAQPage = lazy(() => import("./pages/FAQPage"))
+const SponsorCheckoutPage = lazy(() => import("./pages/SponsorCheckoutPage"))
 
 const renderRoute = (element: ReactNode) => (
 	<ErrorBoundary>
@@ -86,13 +95,13 @@ function App() {
 						element={renderRoute(<ScholarshipApply />)}
 					/>
 					<Route path="/admin" element={renderRoute(<Admin />)} />
-					<Route
-						path="/admin/lesson-diff"
-						element={renderRoute(<LessonVersionDiff />)}
-					/>
+					<Route path="/admin/lesson-diff" element={renderRoute(<LessonVersionDiff />)} />
+					<Route path="/admin/moderation" element={renderRoute(<AdminModeration />)} />
 					<Route path="/wiki" element={renderRoute(<Wiki />)} />
 					<Route path="/wiki/:slug" element={renderRoute(<WikiPage />)} />
 					<Route path="/tracks" element={renderRoute(<Tracks />)} />
+					<Route path="/faq" element={renderRoute(<FAQPage />)} />
+					<Route path="/sponsor/checkout" element={renderRoute(<SponsorCheckoutPage />)} />
 					<Route path="/treasury" element={renderRoute(<Treasury />)} />
 					<Route path="/donor" element={renderRoute(<Donor />)} />
 					<Route path="/sponsor" element={renderRoute(<SponsorPortal />)} />
@@ -129,18 +138,43 @@ const RouteFallback = () => (
 	</div>
 )
 
-const AppLayout = () => (
-	<div className="min-h-screen flex flex-col pt-24 overflow-x-hidden w-full max-w-full bg-[var(--color-app-bg)] text-[var(--color-app-text)] transition-colors duration-300">
-		<NetworkPreconnect />
-		<TestnetBanner />
-		<NavBar />
-		<OnboardingTour />
-		<main id="main-content" className="flex-1 relative z-10" tabIndex={-1}>
-			<Outlet />
-		</main>
-		<Footer />
-	</div>
-)
+const AppLayout = () => {
+	const location = useLocation()
+	const shouldReduceMotion = useReducedMotion()
+
+	const pageTransition: MotionProps = shouldReduceMotion
+		? {
+				initial: false,
+				animate: { opacity: 1 },
+				exit: { opacity: 1 },
+				transition: { duration: 0 },
+			}
+		: {
+				initial: { opacity: 0 },
+				animate: { opacity: 1 },
+				exit: { opacity: 0 },
+				transition: { duration: 0.2, ease: "easeOut" },
+			}
+
+	return (
+		<div className="min-h-screen flex flex-col pt-24 overflow-x-hidden w-full max-w-full bg-[var(--color-app-bg)] text-[var(--color-app-text)] transition-colors duration-300">
+			<NetworkPreconnect />
+			<TestnetBanner />
+			<NavBar />
+			<OnboardingTour />
+
+			<main id="main-content" className="relative z-10 flex-1" tabIndex={-1}>
+				<AnimatePresence mode="wait">
+					<motion.div key={location.pathname} {...pageTransition}>
+						<Outlet />
+					</motion.div>
+				</AnimatePresence>
+			</main>
+
+			<Footer />
+		</div>
+	)
+}
 
 const AppWithProvider = () => (
 	<NetworkProvider>

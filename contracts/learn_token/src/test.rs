@@ -880,6 +880,97 @@ fn state_persists_after_upgrade() {
     assert_eq!(stored_hash, wasm_hash);
 }
 
+// --- burn ---
+
+#[test]
+fn burn_reduces_balance_and_supply() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let holder = Address::generate(&e);
+
+    client.mint(&holder, &100);
+    client.burn(&holder, &40);
+
+    assert_eq!(client.balance(&holder), 60);
+    assert_eq!(client.total_supply(), 60);
+}
+
+#[test]
+fn burn_emits_event() {
+    let e = Env::default();
+    let (contract_id, _, client) = setup(&e);
+    let holder = Address::generate(&e);
+
+    client.mint(&holder, &50);
+    client.burn(&holder, &20);
+
+    let events = e.events().all();
+    let found = events.iter().any(|(cid, _topics, _data)| cid == contract_id);
+    assert!(found, "burn event not found");
+}
+
+#[test]
+fn burn_insufficient_balance_reverts() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let holder = Address::generate(&e);
+
+    client.mint(&holder, &10);
+    let result = client.try_burn(&holder, &50);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            LRNError::InsufficientBalance as u32
+        )))
+    );
+}
+
+#[test]
+fn unauthorized_burn_reverts() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let holder = Address::generate(&e);
+    let attacker = Address::generate(&e);
+    let id = e.register(LearnToken, ());
+
+    e.mock_auths(&[MockAuth {
+        address: &admin,
+        invoke: &MockAuthInvoke {
+            contract: &id,
+            fn_name: "initialize",
+            args: (admin.clone(),).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+    let client = LearnTokenClient::new(&e, &id);
+    client.initialize(&admin);
+
+    e.mock_auths(&[MockAuth {
+        address: &admin,
+        invoke: &MockAuthInvoke {
+            contract: &id,
+            fn_name: "mint",
+            args: (holder.clone(), 100_i128).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+    client.mint(&holder, &100);
+
+    e.mock_auths(&[MockAuth {
+        address: &attacker,
+        invoke: &MockAuthInvoke {
+            contract: &id,
+            fn_name: "burn",
+            args: (holder.clone(), 10_i128).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+    let result = client.try_burn(&holder, &10);
+    assert!(result.is_err());
+    assert_eq!(client.balance(&holder), 100);
+    assert_eq!(client.total_supply(), 100);
+}
+
 #[test]
 fn benchmark_costs() {
     let e = Env::default();

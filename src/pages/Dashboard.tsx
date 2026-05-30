@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useMemo } from "react"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate } from "react-router-dom"
+import { Link } from "react-router-dom"
 import ActivityFeed from "../components/ActivityFeed"
 import AddressDisplay from "../components/AddressDisplay"
 import CourseCard from "../components/CourseCard"
@@ -10,59 +10,55 @@ import { useCourse } from "../hooks/useCourse"
 import { useLearnerProfile } from "../hooks/useLearnerProfile"
 import { useLearnToken } from "../hooks/useLearnToken"
 import { WalletContext } from "../providers/WalletProvider"
-import RecommendationsCarousel from "../components/RecommendationsCarousel"
+import { getReputationRankFromLrn } from "../util/reputationRank"
 
 const Dashboard: React.FC = () => {
 	const { i18n } = useTranslation()
 	const locale = i18n.resolvedLanguage
 	const { address } = useContext(WalletContext)
-	const navigate = useNavigate()
 	const [isInitializing, setIsInitializing] = React.useState(true)
 
-	// Fetch learner profile from backend
-	const { profile, isLoading: isLoadingProfile } = useLearnerProfile()
+	const {
+		profile,
+		isLoading: isLoadingProfile,
+		error: profileError,
+	} = useLearnerProfile()
 
-	// Fetch LRN balance from contract
 	const { balance: lrnBalance, isLoading: isLoadingBalance } =
 		useLearnToken(address)
 
-	// Fetch enrolled courses and milestone progress from contract
 	const { enrolledCourses, getCourseProgress, isCompletingMilestone } =
 		useCourse()
 
 	useEffect(() => {
-		if (address) {
-			setIsInitializing(false)
-			return
-		}
+		setIsInitializing(false)
+	}, [address])
 
-		const walletId = localStorage.getItem("walletId")
-		if (!walletId) {
-			void navigate("/")
-		} else {
-			const timer = setTimeout(() => {
-				setIsInitializing(false)
-				void navigate("/")
-			}, 1000)
-			return () => clearTimeout(timer)
-		}
-	}, [address, navigate])
-
-	// Calculate milestone count from enrolled courses' progress
 	const milestonesCompleted = useMemo(() => {
 		return enrolledCourses.reduce((total, course) => {
 			return total + getCourseProgress(course.id).completedMilestoneIds.length
 		}, 0)
 	}, [enrolledCourses, getCourseProgress])
 
-	// Check if data is still loading
 	const isLoading =
 		isLoadingProfile || isLoadingBalance || isCompletingMilestone
 
+	const reputationRank =
+		lrnBalance !== undefined
+			? getReputationRankFromLrn(BigInt(Math.floor(Number(lrnBalance) / 1e7)))
+					.label
+			: "Newcomer"
+
 	if (isInitializing && !address) {
 		return (
-			<div aria-busy="true" className="min-h-screen p-6 md:p-12 max-w-7xl mx-auto">
-				<DashboardStatsSkeleton />
+			<div
+				aria-busy="true"
+				className="min-h-screen p-6 md:p-12 max-w-7xl mx-auto"
+			>
+				<div className="animate-pulse space-y-6">
+					<div className="h-12 rounded bg-white/10" />
+					<div className="h-48 rounded bg-white/10" />
+				</div>
 			</div>
 		)
 	}
@@ -78,11 +74,12 @@ const Dashboard: React.FC = () => {
 						To view your learning dashboard and on-chain reputation, please
 						connect your Stellar wallet.
 					</p>
+
 					<Link
 						to="/"
 						className="inline-block w-full sm:w-auto text-center iridescent-border px-8 py-3 rounded-xl font-bold transition-all hover:scale-105 active:scale-95"
 					>
-						<span className="relative z-10">Connect Wallet &rarr;</span>
+						<span className="relative z-10">Connect Wallet →</span>
 					</Link>
 				</div>
 			</div>
@@ -104,8 +101,14 @@ const Dashboard: React.FC = () => {
 			label: "Courses Enrolled",
 			value: isLoading ? "—" : enrolledCourses.length,
 		},
-		{ label: "Milestones", value: isLoading ? "—" : milestonesCompleted },
-		{ label: "Gov Tokens", value: "0" },
+		{
+			label: "Milestones",
+			value: isLoading ? "—" : milestonesCompleted,
+		},
+		{
+			label: "Reputation Rank",
+			value: isLoading ? "—" : reputationRank,
+		},
 	]
 
 	return (
@@ -130,6 +133,10 @@ const Dashboard: React.FC = () => {
 					<h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter text-gradient leading-tight flex flex-wrap items-center gap-x-3 min-w-0">
 						<span>Welcome back,</span>{" "}
 						<span className="min-w-0 overflow-hidden">
+			<div className="max-w-6xl mx-auto space-y-10 sm:space-y-12 relative z-10 w-full pb-20 sm:pb-24">
+				<header className="space-y-1">
+					<h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter text-gradient leading-tight flex flex-wrap items-center gap-x-3">
+						Welcome back,{" "}
 						<AddressDisplay
 							address={profile?.address || address}
 							showCopyButton={false}
@@ -138,12 +145,21 @@ const Dashboard: React.FC = () => {
 						/>
 						</span>
 					</h1>
+
 					<p className="text-white/50 text-sm sm:text-base md:text-lg font-medium">
 						Your learning dashboard and on-chain reputation.
 					</p>
 				</header>
 
-				{/* ── Reputation & Stats ── */}
+				{profileError ? (
+					<div
+						role="alert"
+						className="glass-card p-4 rounded-2xl border border-red-500/30 bg-red-500/10 text-red-200"
+					>
+						Unable to load profile data right now.
+					</div>
+				) : null}
+
 				<section aria-label="Reputation and stats">
 					<div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start min-w-0">
 						{/* Balance widget — constrained width; min-w-0 prevents flex overflow */}
@@ -152,6 +168,11 @@ const Dashboard: React.FC = () => {
 						</div>
 
 						{/* Stat cards grid — single col <480 px; 2 cols sm+; 3 cols lg+ */}
+					<div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start">
+						<div className="w-full max-w-none sm:max-w-sm md:w-auto md:flex-shrink-0 md:max-w-xs">
+							<LRNBalanceWidget address={address} size="lg" />
+						</div>
+
 						{isLoading ? (
 							<div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 flex-1 w-full min-w-0">
 								{[1, 2, 3, 4].map((i) => (
@@ -175,66 +196,60 @@ const Dashboard: React.FC = () => {
 					</div>
 				</section>
 
-				{/* ── Courses + Activity Feed ── */}
 				<div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-10">
-					{/* Courses — takes up 2/3 on large screens */}
 					<div className="lg:col-span-2 space-y-12">
-						<RecommendationsCarousel />
-
 						<section className="space-y-6" aria-label="My courses">
 							<h2 className="text-xl sm:text-2xl md:text-3xl font-black flex items-center gap-3">
-							<span className="text-2xl sm:text-3xl" aria-hidden="true">
-								📚
-							</span>
-							My Courses
-						</h2>
+								<span aria-hidden="true">📚</span>
+								My Courses
+							</h2>
 
-						{isLoading ? (
-							<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 items-start">
-								{[1, 2].map((i) => (
-									<div
-										key={i}
-										className="glass-card p-6 rounded-[2.5rem] border border-white/10 bg-white/5 animate-pulse min-h-80"
-									/>
-								))}
-							</div>
-						) : enrolledCourses.length > 0 ? (
-							<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 items-start">
-								{enrolledCourses.map((course) => (
-									<CourseCard
-										key={course.id}
-										id={course.id}
-										title={course.title || "Untitled Course"}
-										description="Active course"
-										difficulty="beginner"
-										estimatedHours={0}
-										lrnReward={0}
-										lessonCount={0}
-										isEnrolled={true}
-									/>
-								))}
-							</div>
-						) : (
-							<div className="glass-card p-8 sm:p-12 text-center rounded-2xl border border-white/10">
-								<p className="text-white/50 mb-4 text-sm sm:text-base">
-									You haven't enrolled in any courses yet.
-								</p>
-								<Link
-									to="/courses"
-									className="inline-block w-full sm:w-auto text-center iridescent-border px-6 sm:px-8 py-3 rounded-xl font-bold transition-all hover:scale-105 active:scale-95"
-								>
-									<span className="relative z-10">
-										Enroll in your first course &rarr;
-									</span>
-								</Link>
-							</div>
-						)}
+							{isLoading ? (
+								<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+									{[1, 2].map((i) => (
+										<div
+											key={i}
+											className="glass-card p-6 rounded-[2.5rem] border border-white/10 bg-white/5 animate-pulse min-h-80"
+										/>
+									))}
+								</div>
+							) : enrolledCourses.length > 0 ? (
+								<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+									{enrolledCourses.map((course) => (
+										<CourseCard
+											key={course.id}
+											id={course.id}
+											title={course.title || "Untitled Course"}
+											description="Active course"
+											difficulty="beginner"
+											estimatedHours={0}
+											lrnReward={0}
+											lessonCount={0}
+											isEnrolled={true}
+										/>
+									))}
+								</div>
+							) : (
+								<div className="glass-card p-8 sm:p-12 text-center rounded-2xl border border-white/10">
+									<p className="text-white/50 mb-4 text-sm sm:text-base">
+										You haven't enrolled in any courses yet.
+									</p>
 
-						<MyBookmarks />
+									<Link
+										to="/courses"
+										className="inline-block w-full sm:w-auto text-center iridescent-border px-6 sm:px-8 py-3 rounded-xl font-bold"
+									>
+										<span className="relative z-10">
+											Enroll in your first course →
+										</span>
+									</Link>
+								</div>
+							)}
+
+							<MyBookmarks />
 						</section>
 					</div>
 
-					{/* Activity Feed — takes up 1/3 on large screens, full width below */}
 					<section className="lg:col-span-1" aria-label="Activity feed">
 						<ActivityFeed address={address} limit={5} />
 					</section>
@@ -251,11 +266,12 @@ const StatCard = ({
 	label: string
 	value: string | number
 }) => (
-	<div className="glass-card p-4 sm:p-6 rounded-2xl border border-white/10 flex flex-col justify-center shadow-lg hover:border-white/20 transition-all duration-300 min-w-0 overflow-hidden">
-		<h3 className="text-brand-cyan/70 text-[9px] sm:text-xs font-bold uppercase tracking-widest mb-1 sm:mb-2 font-mono leading-tight">
+	<div className="glass-card p-4 sm:p-6 rounded-2xl border border-white/10 flex flex-col justify-center shadow-lg">
+		<h3 className="text-brand-cyan/70 text-xs font-bold uppercase tracking-widest mb-2">
 			{label}
 		</h3>
-		<p className="text-2xl sm:text-3xl md:text-4xl font-black text-white leading-none overflow-hidden text-ellipsis whitespace-nowrap">
+
+		<p className="text-2xl sm:text-3xl md:text-4xl font-black text-white">
 			{value}
 		</p>
 	</div>

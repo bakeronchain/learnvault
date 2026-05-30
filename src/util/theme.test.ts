@@ -5,6 +5,7 @@ import {
 	getStoredTheme,
 	resolveTheme,
 	applyTheme,
+	persistTheme,
 } from "./theme"
 
 // Mock storage
@@ -93,47 +94,55 @@ describe("theme utilities", () => {
 			expect(resolveTheme()).toBe("dark")
 		})
 
-		// it("returns system theme when no stored theme", () => {
-		// 	vi.mocked(storage.getItem).mockReturnValue(null)
-		// 	mockMatchMedia.mockReturnValue({ matches: true })
-		// 	expect(resolveTheme()).toBe("dark")
-		// })
+		it("returns stored light theme when light is saved", () => {
+			vi.mocked(storage.getItem).mockReturnValue("light")
+			expect(resolveTheme()).toBe("light")
+		})
+
+		it("falls back to system theme when no stored value", () => {
+			vi.mocked(storage.getItem).mockReturnValue(null)
+			Object.defineProperty(window, "matchMedia", {
+				writable: true,
+				value: mockMatchMedia,
+			})
+			mockMatchMedia.mockReturnValue({ matches: true })
+			expect(resolveTheme()).toBe("dark")
+		})
 	})
 
 	describe("applyTheme", () => {
-		// it("applies dark theme classes and attributes", () => {
-		// 	const theme: Theme = "dark"
-		// 	applyTheme(theme)
+		beforeEach(() => {
+			// Restore matchMedia after getSystemTheme tests may have cleared it
+			Object.defineProperty(window, "matchMedia", {
+				writable: true,
+				value: mockMatchMedia,
+			})
+		})
 
-		// 	expect(mockClassList.remove).toHaveBeenCalledWith(
-		// 		"sds-theme-light",
-		// 		"sds-theme-dark",
-		// 	)
-		// 	expect(mockClassList.add).toHaveBeenCalledWith("sds-theme-dark")
-		// 	expect(document.documentElement.setAttribute).toHaveBeenCalledWith("data-theme", "dark")
-		// 	expect(document.documentElement.setAttribute).toHaveBeenCalledWith(
-		// 		"data-sds-theme",
-		// 		"sds-theme-dark",
-		// 	)
-		// 	expect(document.documentElement.style.colorScheme).toBe("dark")
-		// })
+		it("applies dark theme classes and attributes", () => {
+			applyTheme("dark")
 
-		// it("applies light theme classes and attributes", () => {
-		// 	const theme: Theme = "light"
-		// 	applyTheme(theme)
+			expect(mockClassList.remove).toHaveBeenCalledWith(
+				"sds-theme-light",
+				"sds-theme-dark",
+				"dark",
+				"light",
+			)
+			expect(mockClassList.add).toHaveBeenCalledWith("sds-theme-dark")
+			expect(mockClassList.add).toHaveBeenCalledWith("dark")
+		})
 
-		// 	expect(mockClassList.remove).toHaveBeenCalledWith(
-		// 		"sds-theme-light",
-		// 		"sds-theme-dark",
-		// 	)
-		// 	expect(mockClassList.add).toHaveBeenCalledWith("sds-theme-light")
-		// 	expect(document.documentElement.setAttribute).toHaveBeenCalledWith("data-theme", "light")
-		// 	expect(document.documentElement.setAttribute).toHaveBeenCalledWith(
-		// 		"data-sds-theme",
-		// 		"sds-theme-light",
-		// 	)
-		// 	expect(document.documentElement.style.colorScheme).toBe("light")
-		// })
+		it("applies light theme classes and attributes", () => {
+			applyTheme("light")
+
+			expect(mockClassList.remove).toHaveBeenCalledWith(
+				"sds-theme-light",
+				"sds-theme-dark",
+				"dark",
+				"light",
+			)
+			expect(mockClassList.add).toHaveBeenCalledWith("sds-theme-light")
+		})
 
 		it("does nothing when document is undefined", () => {
 			const originalDocument = global.document
@@ -146,13 +155,36 @@ describe("theme utilities", () => {
 		})
 	})
 
-	// describe("persistTheme", () => {
-	// 	// it("stores theme and applies it", () => {
-	// 	// 	const theme: Theme = "dark"
-	// 	// 	persistTheme(theme)
+	describe("persistTheme", () => {
+		beforeEach(() => {
+			Object.defineProperty(window, "matchMedia", {
+				writable: true,
+				value: mockMatchMedia,
+			})
+		})
 
-	// 	// 	expect(storage.setItem).toHaveBeenCalledWith("learnvault:theme", theme)
-	// 	// 	expect(mockClassList.add).toHaveBeenCalledWith("sds-theme-dark")
-	// 	// })
-	// })
+		it("writes the theme to localStorage via storage.setItem", () => {
+			persistTheme("dark")
+			expect(storage.setItem).toHaveBeenCalledWith("learnvault:theme", "dark")
+		})
+
+		it("writes light theme to localStorage when toggling to light", () => {
+			persistTheme("light")
+			expect(storage.setItem).toHaveBeenCalledWith("learnvault:theme", "light")
+		})
+
+		it("calls applyTheme after persisting (classes are applied)", () => {
+			persistTheme("dark")
+			// persistTheme calls applyTheme internally; verify classList.add was called
+			expect(mockClassList.add).toHaveBeenCalledWith("sds-theme-dark")
+		})
+
+		it("overrides a previously stored theme", () => {
+			persistTheme("dark")
+			vi.clearAllMocks()
+			persistTheme("light")
+			expect(storage.setItem).toHaveBeenCalledWith("learnvault:theme", "light")
+			expect(mockClassList.add).toHaveBeenCalledWith("sds-theme-light")
+		})
+	})
 })

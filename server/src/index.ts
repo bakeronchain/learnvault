@@ -53,6 +53,7 @@ import { moderationRouter } from "./routes/moderation.routes"
 import { notificationsRouter } from "./routes/notifications.routes"
 import { createPeerReviewRouter } from "./routes/peer-review.routes"
 import { createRecommendationsRouter } from "./routes/recommendations.routes"
+import { createReviewsRouter } from "./routes/reviews.routes"
 import { createScholarsRouter } from "./routes/scholars.routes"
 import { scholarshipsRouter } from "./routes/scholarships.routes"
 import { sponsorsRouter } from "./routes/sponsors.routes"
@@ -192,7 +193,7 @@ app.use("/api", scholarsRouter)
 app.use("/api", createUserProfileRouter(jwtService))
 app.use("/api", createUploadRouter(jwtService))
 app.use("/api", enrollmentsRouter)
-app.use("/api", profilesRouter)
+app.use("/api", createReviewsRouter(jwtService))
 app.use("/api", scholarshipsRouter)
 app.use("/api", treasuryRouter)
 app.use("/api", notificationsRouter)

@@ -7,9 +7,26 @@ import { useWallet } from "../hooks/useWallet"
 import { getIpfsUrl, isCid, normaliseCid } from "../lib/ipfs"
 import {
 	type MilestoneReportFormValues,
+	type MilestoneReportStatus,
 	type SubmittedMilestoneReport,
 } from "../types/milestone"
 import { shortenAddress } from "../util/scholarshipApplications"
+
+const STATUS_LABELS: Record<MilestoneReportStatus, string> = {
+	pending: "Pending Review",
+	approved: "Approved",
+	rejected: "Rejected",
+	appealed: "Appeal Under Review",
+	final_rejected: "Appeal Rejected (Final)",
+}
+
+const STATUS_COLORS: Record<MilestoneReportStatus, string> = {
+	pending: "text-brand-cyan",
+	approved: "text-green-400",
+	rejected: "text-red-400",
+	appealed: "text-yellow-400",
+	final_rejected: "text-red-600",
+}
 
 const API_BASE =
 	(import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "/api"
@@ -168,8 +185,25 @@ export default function ScholarMilestones() {
 												<span className="font-semibold text-white">
 													Status:
 												</span>{" "}
-												{submittedReport.status}
+												<span
+													className={
+														STATUS_COLORS[submittedReport.status] ??
+														"text-white/70"
+													}
+												>
+													{STATUS_LABELS[submittedReport.status] ??
+														submittedReport.status}
+												</span>
 											</p>
+											{submittedReport.status === "appealed" &&
+												submittedReport.appeal_submitted_at && (
+													<p className="text-xs text-white/40">
+														Appeal submitted:{" "}
+														{new Date(
+															submittedReport.appeal_submitted_at,
+														).toLocaleString()}
+													</p>
+												)}
 											{submittedReport.evidence_github ? (
 												<a
 													href={submittedReport.evidence_github}

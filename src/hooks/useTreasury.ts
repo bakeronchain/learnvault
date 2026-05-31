@@ -30,7 +30,7 @@ export interface TreasuryEvent {
 const API_BASE =
 	(import.meta.env.VITE_API_BASE_URL as string | undefined) ||
 	(import.meta.env.VITE_SERVER_URL as string | undefined) ||
-	"/api"
+	"/api/v1"
 
 export async function fetchTreasuryStats(): Promise<TreasuryStats> {
 	const response = await fetch(`${API_BASE}/treasury/stats`)

@@ -18,7 +18,7 @@ export const buildOpenApiSpec = () => {
 			},
 			servers: [
 				{
-					url: "http://localhost:4000",
+					url: "http://localhost:4000/api/v1",
 					description: "Local development server",
 				},
 			],

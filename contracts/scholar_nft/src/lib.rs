@@ -5,9 +5,6 @@ use soroban_sdk::{
     Address, BytesN, Env, String, Symbol, Vec, contract, contracterror, contractimpl, contracttype,
     panic_with_error, symbol_short,
 };
-    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, Address,
-    Env, String, Symbol,
-};
 
 // ---------------------------------------------------------------------------
 // Storage Constants (assuming ~6s ledger time)
@@ -16,18 +13,12 @@ use soroban_sdk::{
 const DAY_IN_LEDGERS: u32 = 17_280;
 const INSTANCE_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
 const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30; // 30 days
-const PERSISTENT_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
-const PERSISTENT_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365; // 1 year
+const TTL_MIN: u32 = DAY_IN_LEDGERS;
+const TTL_MAX: u32 = DAY_IN_LEDGERS * 365; // 1 year
 
 use learnvault_shared::upgrade;
 
 pub use upgrade::ContractUpgraded;
-
-const DAY_IN_LEDGERS: u32 = 17_280;
-const INSTANCE_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
-const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30;
-const TTL_MIN: u32 = DAY_IN_LEDGERS;
-const TTL_MAX: u32 = DAY_IN_LEDGERS * 365;
 
 const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
 const TOKEN_COUNTER_KEY: Symbol = symbol_short!("TCOUNTER");
@@ -318,11 +309,6 @@ impl ScholarNFT {
         revoked
     }
 
-    /// Returns true if the token has been revoked.
-    pub fn is_revoked(env: Env, token_id: u64) -> bool {
-        env.storage().persistent().has(&DataKey::Revoked(token_id))
-    }
-
     pub fn get_revocation_reason(env: Env, token_id: u64) -> Option<String> {
         Self::extend_instance(&env);
         let key = DataKey::Revoked(token_id);
@@ -343,17 +329,6 @@ impl ScholarNFT {
         counter = counter
             .checked_add(1)
             .unwrap_or_else(|| panic_with_error!(env, ScholarNFTError::CounterOverflow));
-        env.storage().instance().set(&TOKEN_COUNTER_KEY, &counter);
-        counter
-    }
-
-    fn next_token_id(env: &Env) -> u64 {
-        let mut counter = env
-            .storage()
-            .instance()
-            .get(&TOKEN_COUNTER_KEY)
-            .unwrap_or(0_u64);
-        counter = counter.saturating_add(1);
         env.storage().instance().set(&TOKEN_COUNTER_KEY, &counter);
         counter
     }
@@ -379,3 +354,6 @@ impl ScholarNFT {
 
 #[cfg(test)]
 mod test;
+
+#[cfg(test)]
+mod tests;

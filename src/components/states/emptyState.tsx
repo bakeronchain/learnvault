@@ -1,10 +1,14 @@
 import { type LucideIcon } from "lucide-react"
+import { Link } from "react-router-dom"
 
 interface EmptyStateProps {
 	icon?: LucideIcon | string
 	title: string
 	description?: string
 	ctaLabel?: string
+	/** Internal route — uses React Router <Link> (preferred for in-app navigation) */
+	ctaTo?: string
+	/** External URL — uses a plain <a> tag */
 	ctaHref?: string
 	onCtaClick?: () => void
 }
@@ -14,6 +18,7 @@ export function EmptyState({
 	title,
 	description,
 	ctaLabel,
+	ctaTo,
 	ctaHref,
 	onCtaClick,
 }: EmptyStateProps) {
@@ -37,7 +42,7 @@ export function EmptyState({
 				</p>
 			)}
 
-			{(ctaLabel || ctaHref || onCtaClick) && (
+			{(ctaLabel || ctaTo || ctaHref || onCtaClick) && (
 				<div className="mt-6">
 					{onCtaClick ? (
 						<button
@@ -47,6 +52,13 @@ export function EmptyState({
 						>
 							{ctaLabel}
 						</button>
+					) : ctaTo ? (
+						<Link
+							to={ctaTo}
+							className="inline-flex items-center justify-center px-6 py-3 bg-brand-cyan text-black font-bold rounded-xl shadow-md min-h-[44px] min-w-[160px] active:scale-95 hover:scale-105 transition-all"
+						>
+							{ctaLabel}
+						</Link>
 					) : (
 						<a
 							href={ctaHref}

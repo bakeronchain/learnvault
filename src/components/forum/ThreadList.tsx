@@ -149,64 +149,67 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 				</div>
 			)}
 
-			<div className="space-y-4">
-				{threads?.map((thread) => (
-					<button
-						key={thread.id}
-						type="button"
-						onClick={() => onSelectThread(thread.id)}
-						className="w-full text-left glass-card p-5 rounded-2xl border border-white/10 hover:border-brand-cyan/50 transition-all flex flex-col gap-3 group"
-					>
-						<div className="flex justify-between items-start gap-4">
-							<h4 className="text-lg font-bold group-hover:text-brand-cyan transition-colors line-clamp-1">
-								{thread.title}
-							</h4>
-							<div className="flex items-center gap-3 shrink-0">
-								<span className="text-xs text-white/40">
-									{new Date(thread.created_at).toLocaleDateString()}
-								</span>
-								{(isAdmin || currentAddress === thread.author_address) && (
-									<span
-										role="button"
-										tabIndex={0}
-										className="text-white/30 hover:text-red-400 transition-colors px-2 py-1"
-										onClick={(e) => {
-											e.stopPropagation()
-											void handleDelete(
-												e as unknown as React.MouseEvent,
-												thread.id,
-											)
-										}}
-										onKeyDown={(e) => {
-											if (e.key === "Enter" || e.key === " ") {
-												e.preventDefault()
-												e.stopPropagation()
-												void handleDelete(
-													e as unknown as React.MouseEvent,
-													thread.id,
-												)
-											}
-										}}
-										aria-label="Delete thread"
-									>
-										×
-									</span>
-								)}
-							</div>
-						</div>
-						<div className="text-sm text-white/60 line-clamp-2 prose prose-invert max-w-none">
-							<ReactMarkdown>{thread.content}</ReactMarkdown>
-						</div>
-						<div className="flex items-center justify-between mt-2 pt-3 border-t border-white/5">
-							<WalletAddressPill address={thread.author_address} />
-							<div className="text-xs font-semibold px-3 py-1 bg-white/5 rounded-full text-brand-cyan">
-								{thread.reply_count}{" "}
-								{thread.reply_count === 1 ? "reply" : "replies"}
-							</div>
-						</div>
-					</button>
-				))}
+<div className="space-y-4">
+	{threads?.map((thread) => (
+		<button
+			key={thread.id}
+			type="button"
+			onClick={() => onSelectThread(thread.id)}
+			className="w-full text-left glass-card p-5 rounded-2xl border border-white/10 hover:border-brand-cyan/50 transition-all flex flex-col gap-3 group"
+		>
+			<div className="flex justify-between items-start gap-4">
+				<h4 className="text-lg font-bold group-hover:text-brand-cyan transition-colors line-clamp-1">
+					{thread.title}
+				</h4>
+
+				<div className="flex items-center gap-3 shrink-0">
+					<span className="text-xs text-white/40">
+						{new Date(thread.created_at).toLocaleDateString()}
+					</span>
+
+					{(isAdmin || currentAddress === thread.author_address) && (
+						<span
+							role="button"
+							tabIndex={0}
+							className="text-white/30 hover:text-red-400 transition-colors px-2 py-1"
+							onClick={(e) => {
+								e.stopPropagation()
+								void handleDelete(
+									e as unknown as React.MouseEvent,
+									thread.id,
+								)
+							}}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" || e.key === " ") {
+									e.preventDefault()
+									e.stopPropagation()
+									void handleDelete(
+										e as unknown as React.MouseEvent,
+										thread.id,
+									)
+								}
+							}}
+							aria-label="Delete thread"
+						>
+							×
+						</span>
+					)}
+				</div>
 			</div>
-		</div>
-	)
+
+			<div className="text-sm text-white/60 line-clamp-2 prose prose-invert max-w-none">
+				<ReactMarkdown>{thread.content}</ReactMarkdown>
+			</div>
+
+			<div className="flex items-center justify-between mt-2 pt-3 border-t border-white/5">
+				<WalletAddressPill address={thread.author_address} />
+
+				<div className="text-xs font-semibold px-3 py-1 bg-white/5 rounded-full text-brand-cyan">
+					{thread.reply_count}{" "}
+					{thread.reply_count === 1 ? "reply" : "replies"}
+				</div>
+			</div>
+		</button>
+	))}
+</div>
 }

@@ -30,10 +30,15 @@ import { setupConsoleRequestTracing } from "./lib/request-context"
 import { createRequireTrustedOrigin } from "./middleware/csrf.middleware"
 import { errorHandler } from "./middleware/error.middleware"
 import { maybeMountOpenApiValidator } from "./middleware/openapi-validator.middleware"
-import { globalLimiter } from "./middleware/rate-limit.middleware"
+import { apiVersionRedirect } from "./middleware/api-version.middleware"
+import {
+	generalLimiter,
+	writeLimiter,
+} from "./middleware/rate-limit.middleware"
 import { requestLogger } from "./middleware/request-logger.middleware"
 import { buildOpenApiSpec } from "./openapi"
 import { adminMilestonesRouter } from "./routes/admin-milestones.routes"
+import { adminProviderKeysRouter } from "./routes/admin-provider-keys.routes"
 import { adminRouter } from "./routes/admin.routes"
 import { createAuthRouter } from "./routes/auth.routes"
 import { createCommentsRouter } from "./routes/comments.routes"
@@ -53,6 +58,7 @@ import { mentorshipRouter } from "./routes/mentorship.routes"
 import { moderationRouter } from "./routes/moderation.routes"
 import { notificationsRouter } from "./routes/notifications.routes"
 import { createPeerReviewRouter } from "./routes/peer-review.routes"
+import { providerRouter } from "./routes/provider.routes"
 import { createRecommendationsRouter } from "./routes/recommendations.routes"
 import { createScholarsRouter } from "./routes/scholars.routes"
 import { scholarshipsRouter } from "./routes/scholarships.routes"
@@ -160,7 +166,19 @@ app.use(
 
 app.use(createRequireTrustedOrigin(allowedOrigins))
 app.use(express.json())
-app.use(globalLimiter)
+
+// Rate limiting: a general per-IP limit on every request (100 / 15 min), with a
+// stricter limit applied to mutation requests (20 / 15 min). 429 responses carry
+// a Retry-After header (see rate-limit.middleware.ts).
+app.use(generalLimiter)
+app.use((req, res, next) => {
+	const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(req.method)
+	if (isMutation) {
+		writeLimiter(req, res, next)
+		return
+	}
+	next()
+})
 
 // Optional request/response validation against docs/openapi.yaml (CI/test only)
 void maybeMountOpenApiValidator(app)

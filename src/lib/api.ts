@@ -1,4 +1,9 @@
-import { getAuthToken } from "../util/auth"
+import {
+	clearAuthSession,
+	getAuthToken,
+	getRefreshToken,
+	setAuthSession,
+} from "../util/auth"
 
 const readEnv = (...keys: string[]): string => {
 	for (const key of keys) {
@@ -37,15 +42,59 @@ export function createAuthHeaders(headers?: HeadersInit): Headers {
 	return merged
 }
 
+let refreshInFlight: Promise<boolean> | null = null
+
+async function attemptRefresh(): Promise<boolean> {
+	const refreshToken = getRefreshToken()
+	if (!refreshToken) return false
+
+	try {
+		const response = await fetch(buildApiUrl("/api/auth/refresh"), {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ refreshToken }),
+		})
+		const payload = (await response.json().catch(() => ({}))) as {
+			token?: string
+			refreshToken?: string
+		}
+		if (!response.ok || !payload.token || !payload.refreshToken) {
+			clearAuthSession()
+			return false
+		}
+		setAuthSession(payload.token, payload.refreshToken)
+		return true
+	} catch {
+		clearAuthSession()
+		return false
+	}
+}
+
 export async function apiFetchJson<T>(
 	path: string,
 	options: RequestInit & { auth?: boolean } = {},
 ): Promise<T> {
 	const { auth = false, headers, ...init } = options
-	const response = await fetch(buildApiUrl(path), {
-		...init,
-		headers: auth ? createAuthHeaders(headers) : headers,
-	})
+	const request = () =>
+		fetch(buildApiUrl(path), {
+			...init,
+			headers: auth ? createAuthHeaders(headers) : headers,
+		})
+
+	let response = await request()
+
+	if (auth && response.status === 401) {
+		if (!refreshInFlight) {
+			refreshInFlight = attemptRefresh().finally(() => {
+				refreshInFlight = null
+			})
+		}
+		const refreshed = await refreshInFlight
+		if (refreshed) {
+			response = await request()
+		}
+	}
+
 	const payload = (await response.json().catch(() => ({}))) as T & {
 		error?: string
 	}

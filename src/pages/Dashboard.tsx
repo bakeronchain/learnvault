@@ -113,6 +113,26 @@ const Dashboard: React.FC = () => {
 
 	return (
 		<div className="min-h-screen py-16 sm:py-20 px-4 sm:px-6 md:px-8 relative overflow-x-hidden">
+			{/* Background mesh */}
+			<div
+				className="absolute inset-0 animate-mesh opacity-30 -z-20 pointer-events-none"
+				aria-hidden="true"
+			/>
+
+			{/* Ambient glow — clipped to viewport; never causes horizontal scroll */}
+			<div
+				className="absolute inset-0 overflow-hidden -z-10 pointer-events-none"
+				aria-hidden="true"
+			>
+				<div className="absolute top-1/4 left-1/4 w-[min(800px,160vw)] aspect-square bg-brand-cyan/20 blur-[150px] rounded-full animate-pulse" />
+			</div>
+
+			<div className="max-w-6xl mx-auto space-y-10 sm:space-y-12 relative z-10 w-full pb-20 sm:pb-24">
+				{/* ── Header ── */}
+				<header className="space-y-1 min-w-0">
+					<h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter text-gradient leading-tight flex flex-wrap items-center gap-x-3 min-w-0">
+						<span>Welcome back,</span>{" "}
+						<span className="min-w-0 overflow-hidden">
 			<div className="max-w-6xl mx-auto space-y-10 sm:space-y-12 relative z-10 w-full pb-20 sm:pb-24">
 				<header className="space-y-1">
 					<h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter text-gradient leading-tight flex flex-wrap items-center gap-x-3">
@@ -123,6 +143,7 @@ const Dashboard: React.FC = () => {
 							showExplorerLink={false}
 							addressClassName="text-gradient"
 						/>
+						</span>
 					</h1>
 
 					<p className="text-white/50 text-sm sm:text-base md:text-lg font-medium">
@@ -140,13 +161,20 @@ const Dashboard: React.FC = () => {
 				) : null}
 
 				<section aria-label="Reputation and stats">
+					<div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start min-w-0">
+						{/* Balance widget — constrained width; min-w-0 prevents flex overflow */}
+						<div className="w-full min-w-0 max-w-none sm:max-w-sm md:w-auto md:flex-shrink-0 md:max-w-xs">
+							<LRNBalanceWidget address={address} size="lg" />
+						</div>
+
+						{/* Stat cards grid — single col <480 px; 2 cols sm+; 3 cols lg+ */}
 					<div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start">
 						<div className="w-full max-w-none sm:max-w-sm md:w-auto md:flex-shrink-0 md:max-w-xs">
 							<LRNBalanceWidget address={address} size="lg" />
 						</div>
 
 						{isLoading ? (
-							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 flex-1 w-full">
+							<div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 flex-1 w-full min-w-0">
 								{[1, 2, 3, 4].map((i) => (
 									<div
 										key={i}
@@ -155,7 +183,7 @@ const Dashboard: React.FC = () => {
 								))}
 							</div>
 						) : (
-							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 flex-1 w-full">
+							<div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 flex-1 w-full min-w-0">
 								{stats.map((stat) => (
 									<StatCard
 										key={stat.label}

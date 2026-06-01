@@ -362,6 +362,29 @@ body {
 .light ::-webkit-scrollbar-thumb:hover {
 	background: rgba(0, 150, 210, 0.4);
 }
+/* ── Newly Earned NFT Glow Animation ─────────────────────────────────────── */
+@keyframes newNftGlow {
+	0%,
+	100% {
+		box-shadow:
+			0 0 15px rgba(0, 210, 255, 0.35),
+			inset 0 0 10px rgba(0, 210, 255, 0.15);
+		border-color: rgba(0, 210, 255, 0.6);
+	}
+
+	50% {
+		box-shadow:
+			0 0 30px rgba(142, 45, 226, 0.75),
+			inset 0 0 15px rgba(142, 45, 226, 0.3);
+		border-color: rgba(142, 45, 226, 0.9);
+	}
+}
+
+.new-nft-card {
+	animation: newNftGlow 3s infinite alternate ease-in-out;
+	border: 2px solid transparent !important;
+}
+
 /* ── Driver.js Custom Styling ────────────────────────────────────────────── */
 .driver-popover {
 	background-color: var(--color-glass-bg) !important;

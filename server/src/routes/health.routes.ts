@@ -7,7 +7,6 @@ import Redis from "ioredis"
 
 import { getPgStatStatementsSnapshot, pool } from "../db/index"
 import { getRpcCacheStats, resetRpcCacheStats } from "../lib/rpc-cache"
-const log = logger.child({ module: "health" })
 
 export const healthRouter = Router()
 
@@ -143,7 +142,7 @@ const checkRedis = async (): Promise<CheckResult> => {
 	const client = new Redis(redisUrl, {
 		maxRetriesPerRequest: 1,
 		enableOfflineQueue: false,
-		connectTimeout: 2000,
+		connectTimeout: 1500,
 	})
 	const startedAt = Date.now()
 
@@ -179,7 +178,8 @@ const checkHorizon = async (): Promise<CheckResult> => {
 	try {
 		const response = await fetch(horizonUrl, {
 			headers: { Accept: "application/json" },
-			signal: AbortSignal.timeout(5000),
+			// Keep the probe well under the endpoint's 2s response budget.
+			signal: AbortSignal.timeout(1500),
 		})
 
 		if (!response.ok) {
@@ -242,13 +242,7 @@ const deriveOverallStatus = (
  *             schema:
  *               $ref: '#/components/schemas/HealthResponse'
  */
-healthRouter.get("/health", async (req, res) => {
-	const [database, redis, stellarHorizon] = await Promise.all([
-		checkDatabase(),
-		checkRedis(),
-		checkHorizon(),
-	])
-
+healthRouter.get("/health", async (_req, res) => {
 	const [database, redis, stellarHorizon] = await Promise.all([
 		checkDatabase(),
 		checkRedis(),
@@ -266,8 +260,8 @@ healthRouter.get("/health", async (req, res) => {
 	const payload = {
 		status,
 		db: dbConnectionState,
-		uptime,
-		timestamp,
+		uptime_s: Math.floor(process.uptime()),
+		timestamp: new Date().toISOString(),
 		version: appVersion,
 		commitHash: resolveGitCommitHash(),
 		dbPool: getDbPoolStats(),

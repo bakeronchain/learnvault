@@ -12,7 +12,7 @@ import {
 import { shortenAddress } from "../util/scholarshipApplications"
 
 const API_BASE =
-	(import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "/api"
+	(import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "/api/v1"
 
 export default function ScholarMilestones() {
 	const { address } = useWallet()

@@ -12,6 +12,7 @@ import jwt from "jsonwebtoken"
 import { createTokenStore } from "../db/token-store"
 import {
 	JWT_AUDIENCE,
+	JWT_REFRESH_AUDIENCE,
 	JWT_ISSUER,
 	createJwtService,
 	generateEphemeralDevJwtKeys,
@@ -154,5 +155,23 @@ describe("JWT valid token", () => {
 		const { jti: jti2 } = await service.verifyWalletToken(t2)
 
 		expect(jti1).not.toBe(jti2)
+	})
+
+	it("issues refresh token with refresh audience and verifies it", async () => {
+		const refresh = service.signRefreshToken(TEST_ADDRESS)
+		const claims = jwt.decode(refresh) as { aud?: string }
+		expect(claims.aud).toBe(JWT_REFRESH_AUDIENCE)
+		const verified = await service.verifyRefreshToken(refresh)
+		expect(verified.sub).toBe(TEST_ADDRESS)
+	})
+
+	it("rotates refresh token and revokes previous token", async () => {
+		const refresh = service.signRefreshToken(TEST_ADDRESS)
+		const rotated = await service.rotateRefreshToken(refresh)
+		expect(rotated.accessToken).toBeTruthy()
+		expect(rotated.refreshToken).toBeTruthy()
+		await expect(service.verifyRefreshToken(refresh)).rejects.toThrow(
+			/revoked/i,
+		)
 	})
 })

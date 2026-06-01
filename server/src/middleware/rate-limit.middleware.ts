@@ -4,8 +4,23 @@ import { AppError } from "../errors/app-error-handler"
 
 const createRateLimitHandler =
 	(message: string) => (req: Request, res: Response, next: NextFunction) => {
+		// Surface a Retry-After header (in seconds) so clients know how long to
+		// back off. express-rate-limit attaches `req.rateLimit.resetTime`.
+		const { rateLimit: rateLimitInfo } = req as Request & {
+			rateLimit?: { resetTime?: Date }
+		}
+		const resetTime = rateLimitInfo?.resetTime
+		if (resetTime instanceof Date) {
+			const retryAfterSeconds = Math.max(
+				0,
+				Math.ceil((resetTime.getTime() - Date.now()) / 1000),
+			)
+			res.setHeader("Retry-After", retryAfterSeconds.toString())
+		}
 		next(new AppError(message, 429))
 	}
+
+const FIFTEEN_MINUTES_MS = 15 * 60 * 1000
 
 const getBodyWalletValue = (
 	req: Request,
@@ -50,6 +65,33 @@ export const globalLimiter = rateLimit({
 	legacyHeaders: false,
 	validate: false,
 	handler: createRateLimitHandler("Too many requests, please try again later."),
+})
+
+/**
+ * General per-IP limiter for read endpoints: 100 requests / 15 minutes.
+ * Applied broadly (e.g. to /api/events) to protect against request floods.
+ */
+export const generalLimiter = rateLimit({
+	windowMs: FIFTEEN_MINUTES_MS,
+	limit: 100,
+	standardHeaders: "draft-7",
+	legacyHeaders: false,
+	validate: false,
+	handler: createRateLimitHandler("Too many requests, please try again later."),
+})
+
+/**
+ * Stricter per-IP limiter for mutation/write endpoints: 20 requests / 15 minutes.
+ */
+export const writeLimiter = rateLimit({
+	windowMs: FIFTEEN_MINUTES_MS,
+	limit: 20,
+	standardHeaders: "draft-7",
+	legacyHeaders: false,
+	validate: false,
+	handler: createRateLimitHandler(
+		"Too many write requests, please try again later.",
+	),
 })
 
 export const uploadLimiter = rateLimit({

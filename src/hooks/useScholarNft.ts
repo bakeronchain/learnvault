@@ -180,6 +180,18 @@ async function queryGetMetadata(
 	}
 }
 
+async function queryAllScholars(contractId: string): Promise<string[]> {
+	try {
+		const { scValToNative } = await import("@stellar/stellar-sdk")
+		const retval = await simulateCall(contractId, "get_all_scholars")
+		if (!retval) return []
+		return scValToNative(retval) as string[]
+	} catch (e) {
+		console.error("Error simulating get_all_scholars call:", e)
+		return []
+	}
+}
+
 // ---------------------------------------------------------------------------
 // IPFS metadata fetch
 // ---------------------------------------------------------------------------
@@ -373,4 +385,59 @@ export function useScholarNft(
 	}
 
 	return { credential: data!, status: "success", error: null }
+}
+
+export interface UseUserScholarNftsResult {
+	credentials: CredentialData[]
+	isLoading: boolean
+	error: string | null
+	refetch: () => void
+}
+
+export function useUserScholarNfts(
+	walletAddress: string | undefined,
+): UseUserScholarNftsResult {
+	const contractId = CONTRACT_IDS.scholarNft
+	const { data, isLoading, error, refetch } = useQuery({
+		queryKey: ["user-scholar-nfts", walletAddress],
+		queryFn: async () => {
+			if (!walletAddress || !contractId) return []
+
+			// 1. Query all scholar addresses from contract
+			const scholars = await queryAllScholars(contractId)
+
+			// 2. Filter to find the 1-based token IDs belonging to this wallet
+			const tokenIds: number[] = []
+			scholars.forEach((addr, index) => {
+				if (addr === walletAddress) {
+					tokenIds.push(index + 1)
+				}
+			})
+
+			if (tokenIds.length === 0) return []
+
+			// 3. Fetch metadata/IPFS details in parallel for each owned token ID
+			const fetchPromises = tokenIds.map(async (id) => {
+				try {
+					return await fetchCredentialData(id.toString())
+				} catch (err) {
+					console.error(`Failed to fetch credential data for token ID ${id}`, err)
+					return null
+				}
+			})
+
+			const results = await Promise.all(fetchPromises)
+			return results.filter((item): item is CredentialData => item !== null)
+		},
+		enabled: Boolean(walletAddress && contractId),
+		staleTime: 60_000,
+		retry: false,
+	})
+
+	return {
+		credentials: data ?? [],
+		isLoading,
+		error: error ? (error as Error).message || "Failed to fetch user Scholar NFTs" : null,
+		refetch,
+	}
 }

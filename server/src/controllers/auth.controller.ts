@@ -37,10 +37,11 @@ export function createAuthControllers(authService: AuthService) {
 			}
 
 			try {
-				const token =
+				const { accessToken, refreshToken } =
 					await authService.verifySignedTransaction(signedTransaction)
 				res.status(200).json({
-					token,
+					token: accessToken,
+					refreshToken,
 					tokenType: "Bearer",
 					expiresIn: "24h",
 				})
@@ -95,9 +96,11 @@ export function createAuthControllers(authService: AuthService) {
 			}
 
 			try {
-				const token = await authService.verifyAndIssueToken(address, signature)
+				const { accessToken, refreshToken } =
+					await authService.verifyAndIssueToken(address, signature)
 				res.status(200).json({
-					token,
+					token: accessToken,
+					refreshToken,
 					tokenType: "Bearer",
 					expiresIn: "24h",
 				})
@@ -122,23 +125,26 @@ export function createAuthControllers(authService: AuthService) {
 			}
 		},
 
-		async postLogout(req: Request, res: Response): Promise<void> {
-			const header = req.headers.authorization
-			const token = header?.startsWith("Bearer ")
-				? header.slice("Bearer ".length).trim()
-				: ""
+		async postRefresh(req: Request, res: Response): Promise<void> {
+			const body = req.body as { refreshToken?: unknown }
+			const refreshToken =
+				typeof body.refreshToken === "string" ? body.refreshToken.trim() : ""
 
-			if (!token) {
-				res.status(401).json({ error: "Unauthorized" })
+			if (!refreshToken) {
+				res.status(400).json({ error: "Missing required field: refreshToken" })
 				return
 			}
 
 			try {
-				await authService.revokeToken(token)
-				res.status(200).json({ message: "Logged out successfully" })
-			} catch (err) {
-				const message = err instanceof Error ? err.message : "Unauthorized"
-				res.status(401).json({ error: message })
+				const rotated = await authService.refreshSession(refreshToken)
+				res.status(200).json({
+					token: rotated.accessToken,
+					refreshToken: rotated.refreshToken,
+					tokenType: "Bearer",
+					expiresIn: "24h",
+				})
+			} catch {
+				res.status(401).json({ error: "Invalid or expired refresh token" })
 			}
 		},
 	}

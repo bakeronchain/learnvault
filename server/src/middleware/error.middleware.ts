@@ -1,6 +1,7 @@
 import { type NextFunction, type Request, type Response } from "express"
 import { ZodError } from "zod"
 import { AppError } from "../errors/app-error-handler"
+import * as Sentry from "@sentry/node"
 
 const isProduction = () => process.env.NODE_ENV === "production"
 

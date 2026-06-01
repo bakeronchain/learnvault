@@ -1,6 +1,7 @@
 import { Router } from "express"
 
 import { getEvents } from "../controllers/events.controller"
+import { generalLimiter } from "../middleware/rate-limit.middleware"
 
 export const eventsRouter = Router()
 
@@ -55,4 +56,4 @@ export const eventsRouter = Router()
  *       500:
  *         description: Internal error
  */
-eventsRouter.get("/events", getEvents)
+eventsRouter.get("/events", generalLimiter, getEvents)

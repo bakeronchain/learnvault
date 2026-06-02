@@ -1,0 +1,56 @@
+{
+	"courseId": "stellar-basics",
+	"passingScore": 80,
+	"questions": [
+		{
+			"id": 1,
+			"text": "What is the main purpose of a trustline on Stellar?",
+			"options": [
+				"To hold a non-native asset",
+				"To increase your transaction fee",
+				"To upgrade a Soroban contract",
+				"To generate a new keypair automatically"
+			],
+			"correctIndex": 0
+		},
+		{
+			"id": 2,
+			"text": "Which Stellar component is most commonly used by apps to submit transactions and query account data?",
+			"options": ["Freighter", "Horizon", "Stellar Core", "Soroban VM"],
+			"correctIndex": 1
+		},
+		{
+			"id": 3,
+			"text": "Why should you practice transactions on a test network first?",
+			"options": [
+				"Test networks guarantee profits",
+				"You can practice without risking real funds",
+				"You don’t need to sign transactions on test networks",
+				"Fees are always zero on test networks"
+			],
+			"correctIndex": 1
+		},
+		{
+			"id": 4,
+			"text": "Which statement about Soroban is accurate?",
+			"options": [
+				"Soroban contracts can read files from the server disk",
+				"Soroban contracts are deterministic programs that run against ledger state",
+				"Soroban replaces Stellar accounts",
+				"Soroban is required to create trustlines"
+			],
+			"correctIndex": 1
+		},
+		{
+			"id": 5,
+			"text": "A Stellar transaction is ordered and protected from replay primarily by the _____?",
+			"options": [
+				"Memo field",
+				"Sequence number",
+				"Trustline limit",
+				"Offer price"
+			],
+			"correctIndex": 1
+		}
+	]
+}

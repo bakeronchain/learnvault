@@ -15,8 +15,16 @@ crate-type = ["cdylib"]
 doctest = false
 
 [dependencies]
+learnvault-shared = { workspace = true }
 soroban-sdk = { workspace = true }
 stellar-registry = "0.0.4"
 
 [dev-dependencies]
+learnvault-shared = { workspace = true, features = ["testutils"] }
 soroban-sdk = { workspace = true, features = ["testutils"] }
+proptest = { workspace = true }
+
+[[test]]
+name = "fuzz_escrow_operations"
+path = "fuzz/fuzz_targets/escrow_operations.rs"
+harness = true

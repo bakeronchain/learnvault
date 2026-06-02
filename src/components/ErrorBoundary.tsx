@@ -1,4 +1,5 @@
 import React, { Component, type ErrorInfo, type ReactNode } from "react"
+import { logger } from "../utils/logger"
 
 interface Props {
 	children?: ReactNode
@@ -29,16 +30,18 @@ export default class ErrorBoundary extends Component<Props, State> {
 	}
 
 	private handleReport = () => {
-		// In a real app this would send to Sentry or similar service.
-		// For now we just log it and alert the user.
-		console.log("Error reported:", this.state.error)
+		// Keep local diagnostics in development until a real reporting service lands.
+		logger.info("Error reported:", this.state.error)
 		alert("Error has been reported to the team. Thank you!")
 	}
 
 	public render() {
 		if (this.state.hasError) {
 			return (
-				<div className="flex flex-col items-center justify-center p-8 m-4 border border-red-200/20 bg-red-500/10 rounded-xl h-full min-h-[50vh]">
+				<div
+					className="flex flex-col items-center justify-center p-8 m-4 border border-red-200/20 bg-red-500/10 rounded-xl h-full min-h-[50vh]"
+					data-testid="error-boundary"
+				>
 					<svg
 						className="w-12 h-12 text-red-500 mb-4"
 						fill="none"
@@ -59,16 +62,38 @@ export default class ErrorBoundary extends Component<Props, State> {
 						We apologize for the inconvenience. The application encountered an
 						unexpected error.
 					</p>
-					<div className="flex gap-4">
+					{requestId && (
+						<p className="text-xs text-gray-500 font-mono mb-6">
+							Ref: {requestId}
+						</p>
+					)}
+					<div className="flex flex-wrap gap-4 justify-center">
 						<button
+							type="button"
 							onClick={this.handleRetry}
 							className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors cursor-pointer"
+							data-testid="error-boundary-try-again"
 						>
 							Try Again
 						</button>
 						<button
-							onClick={this.handleReport}
-							className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium border border-slate-700 transition-colors cursor-pointer"
+							type="button"
+							onClick={() => window.history.back()}
+							className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors cursor-pointer"
+							data-testid="error-boundary-go-back"
+						>
+							Go back
+						</button>
+						<a
+							href="/"
+							className="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg font-medium transition-colors"
+							data-testid="error-boundary-go-home"
+						>
+							Go Home
+						</a>
+						<a
+							href={mailtoLink}
+							className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium border border-slate-700 transition-colors"
 						>
 							Report Issue
 						</button>

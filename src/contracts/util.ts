@@ -1,6 +1,21 @@
-import { WalletNetwork } from "@creit.tech/stellar-wallets-kit"
-import { type Network, type NetworkType } from "@theahaco/contract-explorer"
 import { z } from "zod"
+
+type NetworkType = "mainnet" | "testnet" | "futurenet" | "local"
+
+type Network = {
+	id: NetworkType
+	label: string
+	passphrase: string
+	rpcUrl: string
+	horizonUrl: string
+}
+
+const supportedPassphrases = [
+	"Public Global Stellar Network ; September 2015",
+	"Test SDF Network ; September 2015",
+	"Test SDF Future Network ; October 2022",
+	"Standalone Network ; February 2017",
+] as const
 
 const envSchema = z.object({
 	PUBLIC_STELLAR_NETWORK: z.enum([
@@ -10,7 +25,7 @@ const envSchema = z.object({
 		"LOCAL",
 		"STANDALONE", // deprecated in favor of LOCAL
 	] as const),
-	PUBLIC_STELLAR_NETWORK_PASSPHRASE: z.nativeEnum(WalletNetwork),
+	PUBLIC_STELLAR_NETWORK_PASSPHRASE: z.enum(supportedPassphrases),
 	PUBLIC_STELLAR_RPC_URL: z.string(),
 	PUBLIC_STELLAR_HORIZON_URL: z.string(),
 })
@@ -21,7 +36,7 @@ const env: z.infer<typeof envSchema> = parsed.success
 	? parsed.data
 	: {
 			PUBLIC_STELLAR_NETWORK: "LOCAL",
-			PUBLIC_STELLAR_NETWORK_PASSPHRASE: WalletNetwork.STANDALONE,
+			PUBLIC_STELLAR_NETWORK_PASSPHRASE: "Standalone Network ; February 2017",
 			PUBLIC_STELLAR_RPC_URL: "http://localhost:8000/rpc",
 			PUBLIC_STELLAR_HORIZON_URL: "http://localhost:8000",
 		}

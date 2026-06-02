@@ -1,15 +1,30 @@
 import { Router } from "express"
 import {
+	listMilestones,
 	getPendingMilestones,
 	getMilestoneById,
 	approveMilestone,
+	batchApproveMilestones,
+	batchRejectMilestones,
 	rejectMilestone,
 } from "../controllers/admin-milestones.controller"
 import { submitMilestoneReport } from "../controllers/milestone-submit.controller"
+import {
+	approveMilestoneBodySchema,
+	batchApproveMilestonesBodySchema,
+	batchRejectMilestonesBodySchema,
+	legacyMilestoneSubmitBodySchema,
+	milestoneReportIdParamSchema,
+	milestoneSubmitBodySchema,
+	rejectMilestoneBodySchema,
+} from "../lib/zod-schemas"
 import { requireAdmin } from "../middleware/admin.middleware"
-import { milestoneSubmitRateLimiter } from "../middleware/milestone-rate-limit.middleware"
+import { milestoneSubmissionLimiter } from "../middleware/rate-limit.middleware"
+import { validate } from "../middleware/validate.middleware"
 
 export const adminMilestonesRouter = Router()
+
+adminMilestonesRouter.get("/admin/milestones", requireAdmin, listMilestones)
 
 /**
  * @openapi
@@ -59,6 +74,9 @@ adminMilestonesRouter.get(
 adminMilestonesRouter.get(
 	"/admin/milestones/:id",
 	requireAdmin,
+	validate({
+		params: milestoneReportIdParamSchema,
+	}),
 	getMilestoneById,
 )
 
@@ -90,7 +108,20 @@ adminMilestonesRouter.get(
 adminMilestonesRouter.post(
 	"/admin/milestones/:id/approve",
 	requireAdmin,
+	validate({
+		params: milestoneReportIdParamSchema,
+		body: approveMilestoneBodySchema,
+	}),
 	approveMilestone,
+)
+
+adminMilestonesRouter.post(
+	"/admin/milestones/batch-approve",
+	requireAdmin,
+	validate({
+		body: batchApproveMilestonesBodySchema,
+	}),
+	batchApproveMilestones,
 )
 
 /**
@@ -133,7 +164,20 @@ adminMilestonesRouter.post(
 adminMilestonesRouter.post(
 	"/admin/milestones/:id/reject",
 	requireAdmin,
+	validate({
+		params: milestoneReportIdParamSchema,
+		body: rejectMilestoneBodySchema,
+	}),
 	rejectMilestone,
+)
+
+adminMilestonesRouter.post(
+	"/admin/milestones/batch-reject",
+	requireAdmin,
+	validate({
+		body: batchRejectMilestonesBodySchema,
+	}),
+	batchRejectMilestones,
 )
 
 /**
@@ -150,15 +194,15 @@ adminMilestonesRouter.post(
  *         application/json:
  *           schema:
  *             type: object
- *             required: [scholarAddress, courseId, milestoneId]
+ *             required: [scholarAddress, course_id, milestone_id]
  *             properties:
  *               scholarAddress:
  *                 type: string
- *               courseId:
+ *               course_id:
  *                 type: string
- *               milestoneId:
+ *               milestone_id:
  *                 type: integer
- *               evidenceGithub:
+ *               evidenceGitHub:
  *                 type: string
  *               evidenceIpfsCid:
  *                 type: string
@@ -176,6 +220,18 @@ adminMilestonesRouter.post(
  */
 adminMilestonesRouter.post(
 	"/milestones/submit",
-	milestoneSubmitRateLimiter,
+	milestoneSubmissionLimiter,
+	validate({
+		body: legacyMilestoneSubmitBodySchema,
+	}),
+	submitMilestoneReport,
+)
+
+adminMilestonesRouter.post(
+	"/milestones",
+	milestoneSubmissionLimiter,
+	validate({
+		body: milestoneSubmitBodySchema,
+	}),
 	submitMilestoneReport,
 )

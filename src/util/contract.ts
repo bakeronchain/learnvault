@@ -17,4 +17,3 @@ export function shortenContractId(
 }
 
 export const shortenAddress = shortenContractId
-

@@ -28,6 +28,7 @@ const QuizEngine: React.FC<QuizEngineProps> = ({
 	const [score, setScore] = useState(0)
 	const [quizEnded, setQuizEnded] = useState(false)
 	const [timer, setTimer] = useState(30)
+	const [focusedOptionIndex, setFocusedOptionIndex] = useState(0)
 
 	const currentQuestion = questions[currentQuestionIndex]
 
@@ -66,6 +67,7 @@ const QuizEngine: React.FC<QuizEngineProps> = ({
 
 	useEffect(() => {
 		setTimer(30)
+		setFocusedOptionIndex(0)
 	}, [currentQuestionIndex])
 
 	const handleOptionToggle = (index: number) => {
@@ -97,6 +99,30 @@ const QuizEngine: React.FC<QuizEngineProps> = ({
 		setIsCorrect(correct)
 		setShowFeedback(true)
 		if (correct) setScore((s) => s + 1)
+	}
+
+	const handleKeyDown = (e: React.KeyboardEvent) => {
+		if (!currentQuestion || showFeedback) return
+
+		const optionsCount = currentQuestion.options.length
+
+		switch (e.key) {
+			case "ArrowDown":
+			case "ArrowRight":
+				e.preventDefault()
+				setFocusedOptionIndex((prev) => (prev + 1) % optionsCount)
+				break
+			case "ArrowUp":
+			case "ArrowLeft":
+				e.preventDefault()
+				setFocusedOptionIndex((prev) => (prev - 1 + optionsCount) % optionsCount)
+				break
+			case "Enter":
+			case " ":
+				e.preventDefault()
+				handleOptionToggle(focusedOptionIndex)
+				break
+		}
 	}
 
 	if (quizEnded) {
@@ -135,6 +161,7 @@ const QuizEngine: React.FC<QuizEngineProps> = ({
 			className="max-w-4xl mx-auto glass-card p-16 rounded-[4rem] relative overflow-hidden animate-in fade-in slide-in-from-bottom-12 duration-1000"
 			role="form"
 			aria-label="Lesson Quiz"
+			onKeyDown={handleKeyDown}
 		>
 			{/* Immersive Accents */}
 			<div
@@ -181,9 +208,18 @@ const QuizEngine: React.FC<QuizEngineProps> = ({
 							selectedOptions.includes(index)
 								? "bg-brand-cyan/5 border-brand-cyan text-brand-cyan shadow-[0_0_30px_rgba(0,210,255,0.1)]"
 								: "bg-white/5 border-white/5 text-white/50 hover:bg-white/[0.08] hover:border-white/20 hover:text-white"
+						} ${
+							focusedOptionIndex === index && !showFeedback
+								? "ring-2 ring-brand-cyan ring-offset-2 ring-offset-black/50"
+								: ""
 						} ${showFeedback ? "cursor-default" : "cursor-pointer active:scale-[0.98]"}`}
 						onClick={() => handleOptionToggle(index)}
+						onFocus={() => setFocusedOptionIndex(index)}
 						disabled={showFeedback}
+						role="radio"
+						aria-checked={selectedOptions.includes(index)}
+						aria-label={`Option ${index + 1}: ${option}`}
+						tabIndex={showFeedback ? -1 : 0}
 					>
 						{selectedOptions.includes(index) && (
 							<div className="absolute top-0 right-0 p-4 opacity-20 transform translate-x-4 -translate-y-4 group-hover:translate-x-0 group-hover:translate-y-0 transition-transform">

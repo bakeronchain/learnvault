@@ -1,94 +1,111 @@
-export type DbClient = {
-	connected: boolean
+import { Pool } from "pg"
+
+import { logger } from "../lib/logger"
+import { poolMonitor } from "../services/pool-monitor.service"
+
+const log = logger.child({ module: "db" })
+
+// Environment-specific pool configuration
+const getPoolConfig = () => {
+	const isProduction = process.env.NODE_ENV === "production"
+	const isDevelopment = process.env.NODE_ENV === "development"
+
+	// Recommended pool sizes per environment
+	const poolSizes = {
+		production: {
+			max: 20,
+			min: 4,
+			idleTimeoutMillis: 30000,
+			connectionTimeoutMillis: 5000,
+		},
+		staging: {
+			max: 15,
+			min: 2,
+			idleTimeoutMillis: 30000,
+			connectionTimeoutMillis: 5000,
+		},
+		development: {
+			max: 5,
+			min: 1,
+			idleTimeoutMillis: 30000,
+			connectionTimeoutMillis: 5000,
+		},
+	}
+
+	const env = isProduction
+		? "production"
+		: isDevelopment
+			? "development"
+			: "staging"
+	const config = poolSizes[env as keyof typeof poolSizes]
+
+	return {
+		connectionString: process.env.DATABASE_URL,
+		max: config.max,
+		min: config.min,
+		idleTimeoutMillis: config.idleTimeoutMillis,
+		connectionTimeoutMillis: config.connectionTimeoutMillis,
+		ssl: isProduction ? { rejectUnauthorized: false } : false,
+		application_name: `learnvault-${env}`,
+	}
 }
 
-export const db: DbClient = {
-	connected: false,
+class MockPool {
+	async connect() {
+		return {
+			query: async () => ({ rows: [], rowCount: 0 }),
+			release: () => {},
+		}
+	}
+	async query(_text: string, _params?: any[]) {
+		return { rows: [], rowCount: 0 }
+	}
+}
+
+let activePool: Pool | MockPool
+
+try {
+	const poolConfig = getPoolConfig()
+	activePool = new Pool(poolConfig)
+	log.info(
+		{
+			max: poolConfig.max,
+			min: poolConfig.min,
+			idleTimeoutMillis: poolConfig.idleTimeoutMillis,
+			connectionTimeoutMillis: poolConfig.connectionTimeoutMillis,
+		},
+		"Pool configured",
+	)
+
+	// Initialize pool monitoring
+	if (activePool instanceof Pool) {
+		poolMonitor.initializeMonitor(activePool)
+	}
+} catch (err) {
+	log.warn({ err }, "Failed to create postgres pool, using mock")
+	activePool = new MockPool()
 }
 
 export const pool = activePool
 
+/**
+ * Verifies the database connection on startup.
+ * Schema is managed exclusively via migrations (`npm run migrate`).
+ * No DDL is executed here.
+ */
 export const initDb = async () => {
 	try {
 		if (activePool instanceof Pool) {
 			const client = await activePool.connect()
-			await client.query(`
-                CREATE TABLE IF NOT EXISTS comments (
-                    id SERIAL PRIMARY KEY,
-                    proposal_id TEXT NOT NULL,
-                    author_address TEXT NOT NULL,
-                    parent_id INTEGER REFERENCES comments(id) ON DELETE CASCADE,
-                    content TEXT NOT NULL,
-                    upvotes INTEGER DEFAULT 0,
-                    downvotes INTEGER DEFAULT 0,
-                    is_pinned BOOLEAN DEFAULT FALSE,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                );
-                CREATE TABLE IF NOT EXISTS comment_votes (
-                    id SERIAL PRIMARY KEY,
-                    comment_id INTEGER REFERENCES comments(id) ON DELETE CASCADE,
-                    voter_address TEXT NOT NULL,
-                    vote_type TEXT CHECK (vote_type IN ('upvote', 'downvote')),
-                    UNIQUE(comment_id, voter_address)
-                );
-                CREATE TABLE IF NOT EXISTS milestone_reports (
-                    id SERIAL PRIMARY KEY,
-                    scholar_address TEXT NOT NULL,
-                    course_id TEXT NOT NULL,
-                    milestone_id INTEGER NOT NULL,
-                    evidence_github TEXT,
-                    evidence_ipfs_cid TEXT,
-                    evidence_description TEXT,
-                    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
-                    submitted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(scholar_address, course_id, milestone_id)
-                );
-                CREATE TABLE IF NOT EXISTS milestone_audit_log (
-                    id SERIAL PRIMARY KEY,
-                    report_id INTEGER NOT NULL REFERENCES milestone_reports(id) ON DELETE CASCADE,
-                    validator_address TEXT NOT NULL,
-                    decision TEXT NOT NULL CHECK (decision IN ('approved', 'rejected')),
-                    rejection_reason TEXT,
-                    contract_tx_hash TEXT,
-                    decided_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                );
-                CREATE TABLE IF NOT EXISTS ipfs_uploads (
-                    id SERIAL PRIMARY KEY,
-                    uploader_address TEXT NOT NULL,
-                    cid TEXT NOT NULL UNIQUE,
-                    gateway_url TEXT NOT NULL,
-                    original_filename TEXT NOT NULL,
-                    mimetype TEXT NOT NULL,
-                    context TEXT,
-                    ref_id TEXT,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                );
-                CREATE TABLE IF NOT EXISTS course_assets (
-                    course_id TEXT NOT NULL,
-                    asset_type TEXT NOT NULL DEFAULT 'cover_image',
-                    cid TEXT NOT NULL,
-                    gateway_url TEXT NOT NULL,
-                    uploaded_by TEXT NOT NULL,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (course_id, asset_type)
-                );
-                CREATE TABLE IF NOT EXISTS proposal_documents (
-                    id SERIAL PRIMARY KEY,
-                    proposal_id TEXT NOT NULL,
-                    uploader_address TEXT NOT NULL,
-                    cid TEXT NOT NULL,
-                    gateway_url TEXT NOT NULL,
-                    original_filename TEXT NOT NULL,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                );
-            `)
+			await client.query("SELECT 1")
 			client.release()
-			console.log("Postgres database initialized")
+			log.info("Postgres connection verified")
+			await logPgStatStatementsSnapshot()
 		} else {
-			console.log("In-memory mock database initialized")
+			log.info("In-memory mock database initialized")
 		}
 	} catch (err) {
-		console.error("Database initialization failed, falling back to mock")
+		log.error({ err }, "Connection check failed, falling back to mock")
 		activePool = new MockPool()
 	}
 }
@@ -96,4 +113,77 @@ export const initDb = async () => {
 export const db = {
 	query: (text: string, params?: any[]) => activePool.query(text, params),
 	connected: true,
+}
+
+export async function getPgStatStatementsSnapshot(limit = 5): Promise<{
+	enabled: boolean
+	rows: Array<{
+		query: string
+		calls: number
+		total_exec_time_ms: number
+		mean_exec_time_ms: number
+		rows: number
+	}>
+}> {
+	if (!(activePool instanceof Pool)) {
+		return { enabled: false, rows: [] }
+	}
+
+	try {
+		const extensionCheck = await activePool.query(
+			`SELECT EXISTS (
+				SELECT 1
+				FROM pg_extension
+				WHERE extname = 'pg_stat_statements'
+			) AS enabled`,
+		)
+		const enabled = Boolean(extensionCheck.rows[0]?.enabled)
+		if (!enabled) return { enabled: false, rows: [] }
+
+		const statsResult = await activePool.query(
+			`SELECT
+				LEFT(REGEXP_REPLACE(query, '\\s+', ' ', 'g'), 300) AS query,
+				calls::int AS calls,
+				total_exec_time::float8 AS total_exec_time_ms,
+				mean_exec_time::float8 AS mean_exec_time_ms,
+				rows::bigint AS rows
+			 FROM pg_stat_statements
+			 ORDER BY mean_exec_time DESC
+			 LIMIT $1`,
+			[Math.max(1, Math.min(limit, 20))],
+		)
+
+		return {
+			enabled: true,
+			rows: statsResult.rows.map((row) => ({
+				query: String(row.query),
+				calls: Number(row.calls ?? 0),
+				total_exec_time_ms: Number(row.total_exec_time_ms ?? 0),
+				mean_exec_time_ms: Number(row.mean_exec_time_ms ?? 0),
+				rows: Number(row.rows ?? 0),
+			})),
+		}
+	} catch {
+		return { enabled: false, rows: [] }
+	}
+}
+
+async function logPgStatStatementsSnapshot(): Promise<void> {
+	const snapshot = await getPgStatStatementsSnapshot(3)
+	if (!snapshot.enabled) {
+		console.log("[db] pg_stat_statements not enabled")
+		return
+	}
+
+	if (snapshot.rows.length === 0) {
+		console.log("[db] pg_stat_statements enabled (no rows yet)")
+		return
+	}
+
+	console.log("[db] Slow query snapshot (pg_stat_statements):")
+	for (const row of snapshot.rows) {
+		console.log(
+			`  mean=${row.mean_exec_time_ms.toFixed(2)}ms calls=${row.calls} query=${row.query}`,
+		)
+	}
 }

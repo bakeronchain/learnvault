@@ -320,49 +320,31 @@ export const useScholarshipApplication = () => {
 				let proposalId = fallbackProposalId()
 				let txHash: string | undefined
 
-				const treasuryClient = await loadGeneratedClient(
-					scholarshipTreasuryLoader,
-				)
-				if (treasuryClient && SCHOLARSHIP_TREASURY_CONTRACT) {
-					const payload = {
-						applicant: address,
-						amount: amountToAtomicUnits(parsed.amountUsdc),
-						program_name: parsed.programName,
-						program_url: parsed.programUrl,
-						program_description: parsed.programDescription,
-						start_date: parsed.startDate,
-						milestone_titles: parsed.milestones.map(
-							(milestone) => milestone.description,
-						),
-						milestone_dates: parsed.milestones.map(
-							(milestone) => milestone.dueDate,
-						),
-					}
+				const response = await fetch("/api/scholarships/apply", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({
+						applicant_address: address,
+						full_name: parsed.programName,
+						course_id: "Scholarship", // Default or extracted
+						motivation: parsed.programDescription,
+						evidence_url: parsed.programUrl,
+					}),
+				})
 
-					const rawTx = await callFirst(
-						treasuryClient,
-						[
-							"submit_proposal",
-							"submitProposal",
-							"create_proposal",
-							"createProposal",
-						],
-						[[payload, { publicKey: address }], [payload]],
+				if (!response.ok) {
+					const errorData = await response.json().catch(() => ({}))
+					throw new Error(
+						errorData.error || "Failed to submit application to backend",
 					)
-					const sent = await sendTxIfNeeded(
-						rawTx,
-						signTransaction as (...args: unknown[]) => unknown,
-					)
-					const resolved = unwrapSendResult(sent)
-					proposalId = String(
-						extractProposalId(resolved) ??
-							extractProposalId(sent) ??
-							fallbackProposalId(),
-					)
-					txHash =
-						extractTransactionHash(sent) ?? extractTransactionHash(resolved)
-					source = txHash || proposalId ? "on-chain" : "local-fallback"
 				}
+
+				const result = await response.json()
+				proposalId = String(result.proposal_id || fallbackProposalId())
+				txHash = result.tx_hash
+				source = txHash ? "on-chain" : "local-fallback"
 
 				const proposal = createStoredScholarshipProposal(parsed, {
 					applicant: address,

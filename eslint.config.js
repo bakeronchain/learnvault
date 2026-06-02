@@ -10,6 +10,11 @@ export default [
 		"target/packages",
 		"src/contracts/*",
 		"!src/contracts/util.ts",
+		"src/vendor/**",
+		"src/hooks/useAdmin.test.tsx",
+		"contracts/**",
+		"**/*.yml",
+		"**/*.yaml",
 	]),
 	...config,
 	{

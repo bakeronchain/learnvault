@@ -11,6 +11,7 @@
 		"leaderboard": "Leaderboard",
 		"profile": "My Profile",
 		"courses": "Courses",
+		"treasury": "Treasury",
 		"discord": "Discord",
 		"twitter": "Twitter",
 		"docs": "Docs"
@@ -77,6 +78,11 @@
 		"networkConnect": "Connect your wallet using this network.",
 		"networkMismatch": "Wallet is on {{wallet}}, connect to {{app}} instead."
 	},
+	"network": {
+		"testnetWarning": "You are on Stellar Testnet — tokens have no real value",
+		"futurenetWarning": "You are on Stellar Futurenet — experimental network for testing",
+		"localWarning": "You are on Local Network — for development only"
+	},
 	"usdc": {
 		"getTestUSDC": "Get Test USDC",
 		"minting": "Minting...",
@@ -100,7 +106,8 @@
 		},
 		"dao": {
 			"title": "DAO",
-			"desc": "This is the DAO page."
+			"desc": "This is the DAO page.",
+			"lastUpdated": "Last updated: {{time}}"
 		},
 		"leaderboard": {
 			"title": "Leaderboard",

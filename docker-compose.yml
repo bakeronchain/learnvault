@@ -1,0 +1,105 @@
+name: learnvault
+
+services:
+  api:
+    image: node:22-bookworm
+    working_dir: /workspace/server
+    command: sh -lc "npm install && npm run dev"
+    ports:
+      - "${DEV_DOCKER_API_PORT:-3001}:3001"
+    environment:
+      PORT: 3001
+      NODE_ENV: development
+      FRONTEND_URL: http://localhost:${DEV_DOCKER_FRONTEND_PORT:-5173}
+      DATABASE_URL: postgresql://learnvault:learnvault@postgres:5432/learnvault?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      STELLAR_NETWORK: local
+      STELLAR_HORIZON_URL: http://stellar-quickstart:8000
+      SOROBAN_RPC_URL: http://stellar-quickstart:8000/rpc
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/api/health').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
+    networks:
+      - learnvault
+
+  frontend:
+    image: node:22-bookworm
+    profiles: ["frontend"]
+    working_dir: /workspace
+    command: sh -lc "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "${DEV_DOCKER_FRONTEND_PORT:-5173}:5173"
+    environment:
+      VITE_API_URL: http://localhost:${DEV_DOCKER_API_PORT:-3001}
+      VITE_SERVER_URL: http://localhost:${DEV_DOCKER_API_PORT:-3001}
+      PUBLIC_STELLAR_NETWORK: LOCAL
+      PUBLIC_STELLAR_NETWORK_PASSPHRASE: Standalone Network ; February 2017
+      PUBLIC_STELLAR_RPC_URL: http://localhost:${DEV_DOCKER_STELLAR_PORT:-8000}/rpc
+      PUBLIC_STELLAR_HORIZON_URL: http://localhost:${DEV_DOCKER_STELLAR_PORT:-8000}
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - learnvault
+
+  postgres:
+    image: postgres:16
+    ports:
+      - "${DEV_DOCKER_POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: learnvault
+      POSTGRES_PASSWORD: learnvault
+      POSTGRES_DB: learnvault
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U learnvault -d learnvault"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - learnvault
+
+  redis:
+    image: redis:7
+    ports:
+      - "${DEV_DOCKER_REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - redis-data:/data
+    networks:
+      - learnvault
+
+  stellar-quickstart:
+    image: stellar/quickstart:testing
+    command: ["--local"]
+    ports:
+      - "${DEV_DOCKER_STELLAR_PORT:-8000}:8000"
+    networks:
+      - learnvault
+
+networks:
+  learnvault:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:

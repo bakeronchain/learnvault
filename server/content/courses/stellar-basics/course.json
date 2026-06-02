@@ -1,0 +1,45 @@
+{
+	"id": "stellar-basics",
+	"title": "Introduction to Stellar & Soroban",
+	"level": "beginner",
+	"published": true,
+	"description": "Learn the basics of Stellar (accounts, assets, payments) and get a first look at Soroban smart contracts.",
+	"lessons": [
+		{
+			"id": "stellar-basics-1",
+			"title": "What is Stellar?",
+			"kind": "theory",
+			"markdown": "lessons/01-what-is-stellar.md",
+			"quiz": "lessons/01-what-is-stellar.quiz.json",
+			"reviewedBy": null
+		},
+		{
+			"id": "stellar-basics-2",
+			"title": "Setting up a Freighter wallet",
+			"kind": "practical",
+			"markdown": "lessons/02-setting-up-freighter-wallet.md",
+			"quiz": "lessons/02-setting-up-freighter-wallet.quiz.json",
+			"reviewedBy": null
+		},
+		{
+			"id": "stellar-basics-3",
+			"title": "Your first XLM transaction",
+			"kind": "practical",
+			"markdown": "lessons/03-your-first-xlm-transaction.md",
+			"quiz": "lessons/03-your-first-xlm-transaction.quiz.json",
+			"reviewedBy": null
+		},
+		{
+			"id": "stellar-basics-4",
+			"title": "Introduction to Soroban smart contracts",
+			"kind": "theory",
+			"markdown": "lessons/04-introduction-to-soroban-smart-contracts.md",
+			"quiz": "lessons/04-introduction-to-soroban-smart-contracts.quiz.json",
+			"reviewedBy": null
+		}
+	],
+	"milestoneQuiz": {
+		"passingScore": 80,
+		"quiz": "milestone.quiz.json"
+	}
+}

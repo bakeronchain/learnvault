@@ -1,10 +1,14 @@
 # Lesson 2: Your First Soroban Contract - A Simple Counter
 
-Welcome to your first hands-on Soroban smart contract development! In this lesson, you'll write a simple counter contract that demonstrates the fundamental patterns used in Soroban development. These same patterns are used throughout the LearnVault project, especially in the CourseMilestone contract.
+Welcome to your first hands-on Soroban smart contract development! In this
+lesson, you'll write a simple counter contract that demonstrates the fundamental
+patterns used in Soroban development. These same patterns are used throughout
+the LearnVault project, especially in the CourseMilestone contract.
 
 ## Project Structure — What a Soroban Contract Directory Looks Like
 
-A typical Soroban contract follows a standard Rust project structure with some specific conventions:
+A typical Soroban contract follows a standard Rust project structure with some
+specific conventions:
 
 ```
 my-counter/
@@ -38,13 +42,17 @@ lto = true
 ```
 
 Key points:
+
 - `soroban-sdk` is the main dependency for Soroban development
 - `testutils` feature enables testing utilities
-- `crate-type = ["cdylib"]` tells Rust to compile as a dynamic library suitable for WASM
+- `crate-type = ["cdylib"]` tells Rust to compile as a dynamic library suitable
+  for WASM
 
 ## The Contract Struct — #[contract] and #[contractimpl]
 
-Every Soroban contract starts with a struct that represents your contract. The `#[contract]` and `#[contractimpl]` attributes are crucial markers that tell the Soroban SDK how to treat your code.
+Every Soroban contract starts with a struct that represents your contract. The
+`#[contract]` and `#[contractimpl]` attributes are crucial markers that tell the
+Soroban SDK how to treat your code.
 
 ```rust
 #![no_std]
@@ -60,12 +68,12 @@ impl Counter {
         // Constructor logic here
         0
     }
-    
+
     pub fn increment(env: Env) -> i32 {
         // Increment logic here
         0
     }
-    
+
     pub fn get(env: Env) -> i32 {
         // Get current value logic here
         0
@@ -75,28 +83,34 @@ impl Counter {
 
 Breaking this down:
 
-- `#![no_std]` tells Rust not to use the standard library (smart contracts run in constrained environments)
+- `#![no_std]` tells Rust not to use the standard library (smart contracts run
+  in constrained environments)
 - `#[contract]` marks `Counter` as a contract struct
-- `#[contractimpl]` marks the implementation block as containing callable contract functions
-- Every function receives an `Env` parameter - the Soroban environment providing access to storage, crypto, and other blockchain features
+- `#[contractimpl]` marks the implementation block as containing callable
+  contract functions
+- Every function receives an `Env` parameter - the Soroban environment providing
+  access to storage, crypto, and other blockchain features
 
 ## Storage — Instance vs Persistent Storage, Contracttype Keys
 
 Soroban provides two types of storage, each with different characteristics:
 
 ### Instance Storage
+
 - Lives as long as the contract instance exists
 - Gets reset when contract code is upgraded
 - Good for configuration data that should reset on upgrades
 
 ### Persistent Storage
+
 - Survives contract upgrades
 - Good for user data that must persist across upgrades
 - More expensive gas costs than instance storage
 
 ### Storage Keys
 
-Storage keys need to be serializable and unique. The `#[contracttype]` attribute makes a type usable as a storage key:
+Storage keys need to be serializable and unique. The `#[contracttype]` attribute
+makes a type usable as a storage key:
 
 ```rust
 use soroban_sdk::{contracttype, Symbol};
@@ -148,14 +162,14 @@ impl Counter {
         if env.storage().instance().has(&OWNER_KEY) {
             panic_with_error!(&env, Error::NotInitialized);
         }
-        
+
         // Set the owner
         env.storage().instance().set(&OWNER_KEY, &owner);
-        
+
         // Initialize counter to 0
         env.storage().instance().set(&COUNTER_KEY, &0_i32);
     }
-    
+
     /// Increment the counter by 1
     pub fn increment(env: Env) -> i32 {
         // Get current value, default to 0 if not set
@@ -163,15 +177,15 @@ impl Counter {
             .instance()
             .get::<_, i32>(&COUNTER_KEY)
             .unwrap_or(0);
-        
+
         let new_value = current + 1;
-        
+
         // Store the new value
         env.storage().instance().set(&COUNTER_KEY, &new_value);
-        
+
         new_value
     }
-    
+
     /// Get the current counter value
     pub fn get(env: Env) -> i32 {
         env.storage()
@@ -179,7 +193,7 @@ impl Counter {
             .get::<_, i32>(&COUNTER_KEY)
             .unwrap_or(0)
     }
-    
+
     /// Get the contract owner
     pub fn get_owner(env: Env) -> Address {
         env.storage()
@@ -192,14 +206,16 @@ impl Counter {
 
 Key concepts in this implementation:
 
-1. **Storage Access**: `env.storage().instance()` provides access to instance storage
+1. **Storage Access**: `env.storage().instance()` provides access to instance
+   storage
 2. **Error Handling**: `panic_with_error!` provides structured error reporting
 3. **Default Values**: `unwrap_or(0)` provides sensible defaults
 4. **Type Safety**: All storage operations are type-safe at compile time
 
 ## Writing a Test — Using Env::default(), mock_all_auths(), Assertions
 
-Testing is crucial for smart contract development. Soroban provides excellent testing utilities:
+Testing is crucial for smart contract development. Soroban provides excellent
+testing utilities:
 
 ```rust
 #[cfg(test)]
@@ -212,12 +228,12 @@ mod test {
         let contract_id = env.register(Counter, ());
         let client = CounterClient::new(&env, &contract_id);
         let owner = Address::generate(&env);
-        
+
         // Mock all authentication for setup
         env.mock_all_auths();
         client.initialize(&owner);
         env.set_auths(&[]); // Clear auths for actual tests
-        
+
         (env, client, owner)
     }
 
@@ -227,14 +243,14 @@ mod test {
         let contract_id = env.register(Counter, ());
         let client = CounterClient::new(&env, &contract_id);
         let owner = Address::generate(&env);
-        
+
         // Test initialization
         client.initialize(&owner);
-        
+
         // Verify initial state
         assert_eq!(client.get(), 0);
         assert_eq!(client.get_owner(), owner);
-        
+
         // Test double initialization fails
         let result = client.try_initialize(&owner);
         assert_eq!(
@@ -248,14 +264,14 @@ mod test {
     #[test]
     fn test_increment_functionality() {
         let (env, client, _owner) = setup_test();
-        
+
         // Initial value should be 0
         assert_eq!(client.get(), 0);
-        
+
         // Increment and check
         assert_eq!(client.increment(), 1);
         assert_eq!(client.get(), 1);
-        
+
         // Multiple increments
         assert_eq!(client.increment(), 2);
         assert_eq!(client.increment(), 3);
@@ -265,15 +281,15 @@ mod test {
     #[test]
     fn test_persistence_across_calls() {
         let (env, client, _owner) = setup_test();
-        
+
         // Increment several times
         for i in 1..=5 {
             assert_eq!(client.increment(), i);
         }
-        
+
         // Value persists
         assert_eq!(client.get(), 5);
-        
+
         // New increments continue from saved value
         assert_eq!(client.increment(), 6);
         assert_eq!(client.get(), 6);
@@ -283,14 +299,17 @@ mod test {
 
 Testing patterns demonstrated:
 
-1. **Setup Function**: Reusable test setup with `Env::default()` and `env.register()`
-2. **Authentication Mocking**: `mock_all_auths()` for setup, `set_auths(&[])` for actual tests
+1. **Setup Function**: Reusable test setup with `Env::default()` and
+   `env.register()`
+2. **Authentication Mocking**: `mock_all_auths()` for setup, `set_auths(&[])`
+   for actual tests
 3. **Error Testing**: Using `try_*` methods and checking error results
 4. **State Verification**: Assertions to verify contract behavior
 
 ## Building to WASM — cargo build --target wasm32v1-none
 
-Soroban contracts compile to WebAssembly (WASM) for blockchain execution. Here's how to build your contract:
+Soroban contracts compile to WebAssembly (WASM) for blockchain execution. Here's
+how to build your contract:
 
 ```bash
 # Install the WASM target if you haven't already
@@ -315,13 +334,17 @@ soroban contract build
 # This creates a .wasm file in the target/wasm32v1-none/release directory
 ```
 
-The WASM file is what gets deployed to the Stellar network. It contains your compiled contract logic in a format that the Stellar runtime can execute.
+The WASM file is what gets deployed to the Stellar network. It contains your
+compiled contract logic in a format that the Stellar runtime can execute.
 
 ## How This Relates to LearnVault — CourseMilestone Uses the Same Patterns
 
-The patterns you've learned here are directly applicable to the LearnVault project. Let's examine how the CourseMilestone contract uses these same concepts:
+The patterns you've learned here are directly applicable to the LearnVault
+project. Let's examine how the CourseMilestone contract uses these same
+concepts:
 
-**Contract Structure**: Like our counter, CourseMilestone uses `#[contract]` and `#[contractimpl]` attributes:
+**Contract Structure**: Like our counter, CourseMilestone uses `#[contract]` and
+`#[contractimpl]` attributes:
 
 ```rust
 // From CourseMilestone contract
@@ -336,7 +359,8 @@ impl CourseMilestone {
 }
 ```
 
-**Storage Management**: CourseMilestone uses both instance and persistent storage:
+**Storage Management**: CourseMilestone uses both instance and persistent
+storage:
 
 ```rust
 // Instance storage for contract configuration
@@ -352,7 +376,8 @@ pub enum DataKey {
 }
 ```
 
-**Error Handling**: CourseMilestone defines comprehensive error types just like our counter:
+**Error Handling**: CourseMilestone defines comprehensive error types just like
+our counter:
 
 ```rust
 #[contracterror]
@@ -366,7 +391,8 @@ pub enum Error {
 }
 ```
 
-**Testing Patterns**: The CourseMilestone tests follow the same structure we used:
+**Testing Patterns**: The CourseMilestone tests follow the same structure we
+used:
 
 ```rust
 fn setup(env: &Env) -> (Address, Address, CourseMilestoneClient) {
@@ -374,32 +400,40 @@ fn setup(env: &Env) -> (Address, Address, CourseMilestoneClient) {
     let learn_token = Address::generate(env);
     let contract_id = env.register(CourseMilestone, ());
     let client = CourseMilestoneClient::new(env, &contract_id);
-    
+
     env.mock_all_auths();
     client.initialize(&admin, &learn_token);
-    
+
     (contract_id, admin, client)
 }
 ```
 
-The key difference is complexity - CourseMilestone manages course progress, token rewards, and multiple user interactions, while our counter focuses on a single value. But the fundamental patterns are identical.
+The key difference is complexity - CourseMilestone manages course progress,
+token rewards, and multiple user interactions, while our counter focuses on a
+single value. But the fundamental patterns are identical.
 
 ## Challenge Exercise
 
-Now it's your turn to apply what you've learned! Modify the counter contract to only allow the owner to increment the counter.
+Now it's your turn to apply what you've learned! Modify the counter contract to
+only allow the owner to increment the counter.
 
 **Requirements:**
+
 1. The `increment` function should check that the caller is the contract owner
 2. If an unauthorized user tries to increment, return an appropriate error
 3. Add a test case that verifies the authorization works correctly
 4. Add a test case that verifies unauthorized access is rejected
 
 **Hints:**
+
 - You'll need to use `require_auth()` to check the caller
 - The `get_owner()` function we wrote will be helpful
 - Look at how CourseMilestone handles authorization in its functions
 - Remember to mock authentication in your tests
 
-This exercise will reinforce the authentication patterns that are critical in real-world smart contracts, especially in the LearnVault ecosystem where controlling who can perform actions is essential for maintaining course integrity and token distribution fairness.
+This exercise will reinforce the authentication patterns that are critical in
+real-world smart contracts, especially in the LearnVault ecosystem where
+controlling who can perform actions is essential for maintaining course
+integrity and token distribution fairness.
 
 Good luck, and enjoy building your Soroban contracts!

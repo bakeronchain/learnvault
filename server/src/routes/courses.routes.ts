@@ -1,98 +1,51 @@
 import { Router } from "express"
 
-import { getCourseById, getCourses } from "../controllers/courses.controller"
-import * as schemas from "../lib/zod-schemas"
-import { validate } from "../middleware/validation.middleware"
+import {
+	createCourse,
+	getCourse,
+	getCourseLessonById,
+	getCourses,
+	getLessonVersionDiff,
+	updateLessonVersion,
+	updateCourse,
+} from "../controllers/courses.controller"
+import {
+	generateCertificate,
+	verifyCertificate,
+} from "../controllers/certificates.controller"
+import {
+	requireCourseAdmin,
+	requireCourseAdminIfRequested,
+} from "../middleware/course-admin.middleware"
+import { apiResponseCache } from "../middleware/api-response-cache.middleware"
 
 export const coursesRouter = Router()
 
-/**
- * @openapi
- * /api/courses:
- *   get:
- *     tags: [Courses]
- *     summary: List published courses (cursor-paginated)
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           minimum: 1
- *           maximum: 100
- *           default: 20
- *         description: Maximum number of courses to return
- *       - in: query
- *         name: cursor
- *         schema:
- *           type: string
- *         description: Opaque base64 pagination token from previous response
- *     responses:
- *       200:
- *         description: Courses fetched successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Course'
- *                 nextCursor:
- *                   type: string
- *                   nullable: true
- *                   description: Cursor token for next page, null when no more pages
- *       400:
- *         $ref: '#/components/responses/BadRequestError'
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
- *       500:
- *         $ref: '#/components/responses/InternalServerError'
- */
 coursesRouter.get(
 	"/courses",
-	validate({ query: schemas.coursesQuerySchema }),
+	requireCourseAdminIfRequested,
+	apiResponseCache("courses"),
 	getCourses,
 )
+coursesRouter.get("/courses/:idOrSlug", getCourse)
+coursesRouter.get("/courses/:idOrSlug/lessons/:id", getCourseLessonById)
 
-/**
- * @openapi
- * /api/courses/{courseId}:
- *   get:
- *     tags: [Courses]
- *     summary: Get a course by id
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: courseId
- *         required: true
- *         schema:
- *           type: string
- *         description: Unique course identifier
- *     responses:
- *       200:
- *         description: Course fetched successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 data:
- *                   $ref: '#/components/schemas/Course'
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
- *       404:
- *         $ref: '#/components/responses/NotFoundError'
- *       500:
- *         $ref: '#/components/responses/InternalServerError'
- */
+// Admin-only endpoint for content-version comparisons on a lesson order slot.
 coursesRouter.get(
-	"/courses/:courseId",
-	validate({
-		params: schemas.courseIdParamSchema,
-	}),
-	getCourseById,
+	"/courses/:idOrSlug/lessons/:orderIndex/diff",
+	requireCourseAdmin,
+	getLessonVersionDiff,
 )
+
+coursesRouter.patch(
+	"/courses/:idOrSlug/lessons/:orderIndex",
+	requireCourseAdmin,
+	updateLessonVersion,
+)
+
+coursesRouter.post("/courses", requireCourseAdmin, createCourse)
+coursesRouter.patch("/courses/:id", requireCourseAdmin, updateCourse)
+
+// Certificate endpoints (Issue #667)
+coursesRouter.get("/courses/:courseId/certificate", generateCertificate)
+coursesRouter.get("/certificates/:certificateId/verify", verifyCertificate)

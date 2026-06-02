@@ -30,9 +30,23 @@ export const CourseProgressBar: React.FC<CourseProgressBarProps> = ({
 	const prevPctRef = useRef(animate ? 0 : pct)
 	const [displayPct, setDisplayPct] = useState(animate ? 0 : pct)
 	const rafRef = useRef<number | null>(null)
+	const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
+
+	// Check for prefers-reduced-motion
+	useEffect(() => {
+		const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)")
+		setPrefersReducedMotion(mediaQuery.matches)
+
+		const handleChange = (e: MediaQueryListEvent) => {
+			setPrefersReducedMotion(e.matches)
+		}
+
+		mediaQuery.addEventListener("change", handleChange)
+		return () => mediaQuery.removeEventListener("change", handleChange)
+	}, [])
 
 	useEffect(() => {
-		if (!animate || isLoading) {
+		if (!animate || isLoading || prefersReducedMotion) {
 			setDisplayPct(pct)
 			prevPctRef.current = pct
 			return
@@ -63,7 +77,7 @@ export const CourseProgressBar: React.FC<CourseProgressBarProps> = ({
 		return () => {
 			if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
 		}
-	}, [pct, animate, isLoading])
+	}, [pct, animate, isLoading, prefersReducedMotion])
 
 	const trackHeight = size === "sm" ? "h-2" : size === "md" ? "h-2.5" : "h-3.5"
 
@@ -81,6 +95,7 @@ export const CourseProgressBar: React.FC<CourseProgressBarProps> = ({
 		overflow: "hidden",
 		height: "100%",
 		borderRadius: 9999,
+		transition: prefersReducedMotion ? "none" : "width 0.6s ease",
 	}
 
 	if (isLoading) {

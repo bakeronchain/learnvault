@@ -30,8 +30,18 @@
 				try {
 					var raw = localStorage.getItem(storageKey)
 					var stored = raw ? JSON.parse(raw) : null
-					// Default to dark — the app is designed dark-first
-					applyTheme(stored === "light" ? "light" : "dark")
+					// Prefer explicit user choice; fall back to OS colour-scheme preference
+					var prefersDark =
+						typeof window !== "undefined" &&
+						typeof window.matchMedia === "function" &&
+						window.matchMedia("(prefers-color-scheme: dark)").matches
+					var resolved =
+						stored === "light" || stored === "dark"
+							? stored
+							: prefersDark
+								? "dark"
+								: "light"
+					applyTheme(resolved)
 				} catch (e) {
 					applyTheme("dark")
 				}
@@ -81,6 +91,7 @@
 	</head>
 
 	<body>
+		<a href="#main-content" class="skip-to-content">Skip to content</a>
 		<div id="root"></div>
 		<script type="module" src="/src/main.tsx"></script>
 	</body>

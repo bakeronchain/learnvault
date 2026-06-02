@@ -326,3 +326,45 @@ export const bookmarkCourseIdParamSchema = z
 		courseId: requiredString("courseId", 100),
 	})
 	.strict()
+
+export const userProfileSchema = z
+	.object({
+		display_name: z
+			.string()
+			.trim()
+			.min(3, "Display name must be at least 3 characters")
+			.max(50, "Display name cannot exceed 50 characters")
+			.optional()
+			.nullable(),
+		bio: z
+			.string()
+			.max(2000, "Bio cannot exceed 2000 characters")
+			.optional()
+			.nullable(),
+		avatar_url: z
+			.string()
+			.url("Avatar must be a valid URL")
+			.max(2048, "URL is too long")
+			.optional()
+			.nullable(),
+		twitter: z
+			.string()
+			.trim()
+			.max(255, "Twitter handle/URL is too long")
+			.optional()
+			.nullable(),
+		github: z
+			.string()
+			.trim()
+			.max(255, "GitHub username/URL is too long")
+			.optional()
+			.nullable(),
+		website: z
+			.string()
+			.url("Website must be a valid URL")
+			.max(2048, "URL is too long")
+			.optional()
+			.nullable(),
+	})
+	.strict()
+

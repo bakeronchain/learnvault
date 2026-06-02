@@ -1,5 +1,18 @@
 import { pool } from "./index"
 
+export type MilestoneReportStatus =
+	| "pending"
+	| "approved"
+	| "rejected"
+	| "appealed"
+	| "final_rejected"
+
+export type MilestoneAuditDecision =
+	| "approved"
+	| "rejected"
+	| "appeal_approved"
+	| "appeal_rejected"
+
 export interface MilestoneReport {
 	id: number
 	scholar_address: string
@@ -8,22 +21,27 @@ export interface MilestoneReport {
 	evidence_github?: string | null
 	evidence_ipfs_cid?: string | null
 	evidence_description?: string | null
-	status: "pending" | "approved" | "rejected"
+	status: MilestoneReportStatus
 	submitted_at: string
 	resubmission_count: number
+	appeal_reason?: string | null
+	appeal_submitted_at?: string | null
 	scholar_email?: string
 	scholar_name?: string
 	course_title?: string
 	milestone_title?: string
 	milestone_number?: number
 	lrn_reward?: number
+	/** Counts from milestone_peer_reviews (informational for admins). */
+	peer_approval_count?: number
+	peer_rejection_count?: number
 }
 
 export interface MilestoneAuditEntry {
 	id: number
 	report_id: number
 	validator_address: string
-	decision: "approved" | "rejected"
+	decision: MilestoneAuditDecision
 	rejection_reason?: string | null
 	contract_tx_hash?: string | null
 	decided_at: string
@@ -31,7 +49,7 @@ export interface MilestoneAuditEntry {
 
 export interface MilestoneReportFilters {
 	courseId?: string
-	status?: "pending" | "approved" | "rejected"
+	status?: MilestoneReportStatus
 }
 
 export interface PaginatedMilestoneReports {
@@ -122,11 +140,24 @@ class InMemoryMilestoneStore {
 
 	async updateReportStatus(
 		id: number,
-		status: "approved" | "rejected",
+		status: MilestoneReportStatus,
 	): Promise<MilestoneReport | null> {
 		const report = this.reports.find((r) => r.id === id)
 		if (!report) return null
 		report.status = status
+		return report
+	}
+
+	async submitAppeal(
+		id: number,
+		reason: string,
+	): Promise<MilestoneReport | null> {
+		const report = this.reports.find((r) => r.id === id)
+		if (!report) return null
+		if (report.status !== "rejected") return null
+		report.status = "appealed"
+		report.appeal_reason = reason
+		report.appeal_submitted_at = new Date().toISOString()
 		return report
 	}
 
@@ -208,13 +239,14 @@ export const milestoneStore = {
 		const total = Number(totalResult.rows[0]?.total ?? 0)
 		const offset = (page - 1) * pageSize
 		const rowValues = [...values, pageSize, offset]
+		const limitParam = values.length + 1
+		const offsetParam = values.length + 2
 		const dataResult = await pool.query(
 			`SELECT *
 			 FROM milestone_reports
 			 ${whereClause}
 			 ORDER BY submitted_at DESC
-			 LIMIT $${rowValues.length - 1}
-			 OFFSET $${rowValues.length}`,
+			 LIMIT $${limitParam} OFFSET $${offsetParam}`,
 			rowValues,
 		)
 
@@ -317,13 +349,30 @@ export const milestoneStore = {
 
 	async updateReportStatus(
 		id: number,
-		status: "approved" | "rejected",
+		status: MilestoneReportStatus,
 	): Promise<MilestoneReport | null> {
 		if (!isRealPool())
 			return inMemoryMilestoneStore.updateReportStatus(id, status)
 		const result = await pool.query(
 			`UPDATE milestone_reports SET status = $1 WHERE id = $2 RETURNING *`,
 			[status, id],
+		)
+		return result.rows[0] ?? null
+	},
+
+	async submitAppeal(
+		id: number,
+		reason: string,
+	): Promise<MilestoneReport | null> {
+		if (!isRealPool()) return inMemoryMilestoneStore.submitAppeal(id, reason)
+		const result = await pool.query(
+			`UPDATE milestone_reports
+			 SET status = 'appealed',
+			     appeal_reason = $1,
+			     appeal_submitted_at = NOW()
+			 WHERE id = $2 AND status = 'rejected'
+			 RETURNING *`,
+			[reason, id],
 		)
 		return result.rows[0] ?? null
 	},

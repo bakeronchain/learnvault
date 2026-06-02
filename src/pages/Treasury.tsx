@@ -13,6 +13,7 @@ import TreasuryHealthChart, {
 	type TreasuryPoint,
 } from "../components/treasury/TreasuryHealthChart"
 import TxHashLink from "../components/TxHashLink"
+import { ActivityFeedSkeleton } from "../components/SkeletonLoader"
 import { useContractIds } from "../hooks/useContractIds"
 import { useTreasury } from "../hooks/useTreasury"
 import { useUSDC } from "../hooks/useUSDC"
@@ -23,21 +24,37 @@ const API_BASE = import.meta.env.VITE_SERVER_URL || "http://localhost:4000"
 const CHART_WINDOW_DAYS = 7
 const STROOPS_PER_USDC = 10000000
 
+interface AssetBalance {
+	asset: string
+	symbol: string
+	deposited: string
+	usd_equivalent: string
+}
+
 interface TreasuryStats {
 	total_deposited_usdc: string
 	total_disbursed_usdc: string
 	scholars_funded: number
 	active_proposals: number
 	donors_count: number
+	asset_balances?: AssetBalance[]
 }
 
 interface TreasuryEvent {
 	type: "deposit" | "disburse"
 	amount?: string
+	asset?: string
+	asset_symbol?: string
 	address?: string
 	scholar?: string
 	tx_hash: string
 	created_at: string
+}
+
+const ASSET_COLORS: Record<string, string> = {
+	USDC: "text-brand-cyan",
+	EURC: "text-brand-blue",
+	XLM: "text-brand-purple",
 }
 
 const startOfDay = (value: Date) =>
@@ -258,10 +275,7 @@ const Treasury: React.FC = () => {
 	const description = `LearnVault's decentralized scholarship treasury holds ${displayStats.totalTreasury} and has funded ${displayStats.scholarsFunded} scholars. View real-time inflows and disbursements.`
 
 	return (
-		<div
-			aria-busy={isLoading}
-			className="p-12 max-w-7xl mx-auto min-h-screen text-white animate-in fade-in duration-1000"
-		>
+		<div aria-busy={isLoading} className="p-12 max-w-7xl mx-auto min-h-screen text-white animate-in fade-in duration-1000">
 			<Helmet>
 				<title>{title}</title>
 				<meta property="og:title" content={title} />
@@ -316,6 +330,22 @@ const Treasury: React.FC = () => {
 						icon={"🌍"}
 						color="text-brand-blue"
 					/>
+				</div>
+			)}
+
+			{/* Per-currency treasury balances */}
+			{stats?.asset_balances && stats.asset_balances.length > 0 && (
+				<div className="mb-8">
+					<div className="glass-card rounded-[3rem] border border-white/5 p-8">
+						<h3 className="mb-6 text-lg font-black uppercase tracking-widest text-white/60">
+							Treasury Holdings by Currency
+						</h3>
+						<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+							{stats.asset_balances.map((ab) => (
+								<AssetBalanceCard key={ab.asset} balance={ab} locale={locale} />
+							))}
+						</div>
+					</div>
 				</div>
 			)}
 
@@ -377,7 +407,7 @@ const Treasury: React.FC = () => {
 							title="Recent Community Deposits"
 							items={deposits.map((event) => ({
 								user: formatAddress(event.address || "unknown"),
-								amount: `+${formatAmount(event.amount || "0")} USDC`,
+								amount: `+${formatAmount(event.amount || "0")} ${event.asset_symbol || "USDC"}`,
 								time: formatTime(event.created_at),
 								type: "deposit" as const,
 								txHash: event.tx_hash,
@@ -411,6 +441,33 @@ const Treasury: React.FC = () => {
 					<span className="relative z-10">Donate to Treasury</span>
 				</button>
 			</div>
+
+			{/* Scholarship Program Metrics */}
+			<section aria-busy={isLoading} className="mt-20">
+				<h2 className="text-4xl font-black mb-2 tracking-tighter">
+					Scholarship Program
+				</h2>
+				<p className="text-white/40 text-sm mb-10">
+					Real-time health metrics for the active scholarship cohort.
+				</p>
+
+				{isLoading && (
+					<div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+						{Array.from({ length: 6 }).map((_, i) => (
+							<div
+								key={i}
+								className="h-28 rounded-3xl bg-white/5 animate-pulse"
+							/>
+						))}
+					</div>
+				)}
+
+				{!isLoading && (
+					<p className="text-white/40 text-center py-10">
+						Scholarship metrics unavailable
+					</p>
+				)}
+			</section>
 		</div>
 	)
 }
@@ -575,44 +632,36 @@ const ActivityFeed: React.FC<{
 	loadingMore = false,
 	onLoadMore,
 }) => (
-		<div className="glass p-8 rounded-[2.5rem] border border-white/5">
-			<h3 className="text-xl font-black mb-8 border-l-4 border-brand-cyan pl-4">
-				{title}
-			</h3>
-			<div className="flex flex-col gap-4">
-				{loading ? (
-					<div className="space-y-4 py-2">
-						{Array.from({ length: 3 }).map((_, index) => (
-							<div
-								key={index}
-								className="rounded-2xl border border-white/5 bg-white/5 p-5 animate-pulse"
-							>
-								<div className="h-4 w-24 rounded-full bg-white/10" />
-								<div className="mt-3 h-3 w-16 rounded-full bg-white/5" />
-								<div className="mt-4 h-4 w-28 rounded-full bg-white/10" />
-							</div>
-						))}
-					</div>
-				) : error ? (
-					<div className="text-center text-white/40 py-8">{error}</div>
-				) : items.length === 0 ? (
-					<StateEmpty
-						icon="📜"
-						title={emptyMessage}
-						description="There aren't any transactions yet. Once activity appears, it'll show up here."
-						ctaLabel="View treasury overview"
-						ctaHref="/treasury"
-					/>
-				) : (
-					<>
-						{items.map((item, i) => (
-							<div
-								key={`${item.txHash}-${i}`}
-								className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-colors group"
-							>
-								<div className="flex items-center gap-4">
-									<div
-										className={`w-2 h-2 rounded-full ${item.type === "deposit" ? "bg-brand-emerald animate-pulse" : "bg-brand-purple"}`}
+	<div className="glass p-8 rounded-[2.5rem] border border-white/5">
+		<h3 className="text-xl font-black mb-8 border-l-4 border-brand-cyan pl-4">
+			{title}
+		</h3>
+		<div className="flex flex-col gap-4">
+			{loading ? (
+				<ActivityFeedSkeleton rows={2} />
+			) : error ? (
+				<div className="text-center text-white/40 py-8">{error}</div>
+			) : items.length === 0 ? (
+				<div className="text-center text-white/40 py-8">{emptyMessage}</div>
+			) : (
+				<>
+					{items.map((item, i) => (
+						<div
+							key={`${item.txHash}-${i}`}
+							className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-colors group"
+						>
+							<div className="flex items-center gap-4">
+								<div
+									className={`w-2 h-2 rounded-full ${item.type === "deposit" ? "bg-brand-emerald animate-pulse" : "bg-brand-purple"}`}
+								/>
+								<div>
+									<p className="font-bold text-sm">{item.user}</p>
+									<p className="text-[10px] text-white/30 uppercase font-black tracking-widest">
+										{item.time}
+									</p>
+									<TxHashLink
+										hash={item.txHash}
+										className="mt-2 inline-flex text-[10px] font-black uppercase tracking-widest text-brand-cyan hover:underline"
 									/>
 									<div>
 										<p className="font-bold text-sm">{item.user}</p>
@@ -647,5 +696,34 @@ const ActivityFeed: React.FC<{
 			</div>
 		</div>
 	)
+
+const AssetBalanceCard: React.FC<{
+	balance: AssetBalance
+	locale: string | undefined
+}> = ({ balance, locale }) => {
+	const colorClass = ASSET_COLORS[balance.symbol] ?? "text-white"
+	const deposited = Number(balance.deposited) / STROOPS_PER_USDC
+	const usdValue = parseFloat(balance.usd_equivalent)
+
+	return (
+		<div className="flex flex-col gap-2 rounded-2xl border border-white/5 bg-white/5 p-5">
+			<div className="flex items-center justify-between">
+				<span className="text-xs font-black uppercase tracking-widest text-white/40">
+					{balance.symbol}
+				</span>
+				<span className={`text-xs font-black uppercase tracking-widest ${colorClass}`}>
+					●
+				</span>
+			</div>
+			<p className={`text-xl font-black tracking-tight ${colorClass}`}>
+				{deposited.toLocaleString(locale, { maximumFractionDigits: 2 })}{" "}
+				{balance.symbol}
+			</p>
+			<p className="text-xs text-white/30">
+				≈ ${usdValue.toLocaleString(locale, { maximumFractionDigits: 2 })} USD
+			</p>
+		</div>
+	)
+}
 
 export default Treasury

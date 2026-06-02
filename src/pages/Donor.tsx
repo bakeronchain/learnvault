@@ -8,6 +8,7 @@ import { ScholarsFunded } from "../components/donor/ScholarsFunded"
 import { useDonor } from "../hooks/useDonor"
 import { useUSDC } from "../hooks/useUSDC"
 import { useWallet } from "../hooks/useWallet"
+import { EarningsAnalytics } from "../components/donor/EarningsAnalytics"
 
 const Donor: React.FC = () => {
 	const { address } = useWallet()
@@ -197,6 +198,8 @@ const Donor: React.FC = () => {
 
 			{/* Main Content */}
 			<div className="space-y-20">
+				<EarningsAnalytics />
+
 				<MyContributions
 					contributions={contributions}
 					totalContributed={Number(stats.total_contributed) / 1e7}

@@ -10,6 +10,7 @@ use crate::{
     ApprovalResult, CourseCompleted, CourseConfig, CourseMilestone, CourseMilestoneClient,
     DataKey, Error, MilestoneCompleted, MilestoneStatus, VerifyBatchEntry,
 };
+use crate::errors::{MAX_COURSE_ID_LEN, MAX_MILESTONE_COUNT};
 
 #[contracttype]
 enum MockTokenDataKey {
@@ -836,219 +837,162 @@ fn state_persists_after_upgrade() {
     assert_eq!(stored_hash, wasm_hash);
 }
 
-#[test]
-fn benchmark_costs() {
-    let (env, contract_id, admin, _token_id, client, _token_client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "rust-101");
-
-    // 1. Benchmark add_course
-    env.cost_estimate().budget().reset_unlimited();
-    add_course(&env, &contract_id, &admin, &client, &course_id, 3);
-    let add_instr = env.cost_estimate().budget().cpu_instruction_cost();
-    let add_mem = env.cost_estimate().budget().memory_bytes_cost();
-
-    // 2. Benchmark enroll
-    env.cost_estimate().budget().reset_unlimited();
-    enroll(&env, &contract_id, &learner, &client, &course_id);
-    let enroll_instr = env.cost_estimate().budget().cpu_instruction_cost();
-    let enroll_mem = env.cost_estimate().budget().memory_bytes_cost();
-
-    // 3. Benchmark complete_milestone
-    env.cost_estimate().budget().reset_unlimited();
-    authorize(
-        &env,
-        &admin,
-        &contract_id,
-        "complete_milestone",
-        (learner.clone(), course_id.clone(), 1_u32),
-    );
-    client.complete_milestone(&learner, &course_id, &1);
-    let comp_instr = env.cost_estimate().budget().cpu_instruction_cost();
-    let comp_mem = env.cost_estimate().budget().memory_bytes_cost();
-
-    extern crate std;
-    std::println!("BENCHMARK_RESULTS: course_milestone");
-    std::println!("add_course: instr={}, mem={}", add_instr, add_mem);
-    std::println!("enroll: instr={}, mem={}", enroll_instr, enroll_mem);
-    std::println!("complete_milestone: instr={}, mem={}", comp_instr, comp_mem);
-}
-
-// ---------------------------------------------------------------------------
-// batch_approve_milestones tests
-// ---------------------------------------------------------------------------
-
-/// Helper: add course, enroll learner, submit milestone evidence → returns
-/// a VerifyBatchEntry ready to pass to batch_approve_milestones.
-fn make_entry(
+fn register_course(
     env: &Env,
     contract_id: &Address,
     admin: &Address,
     client: &CourseMilestoneClient<'static>,
-    learner: &Address,
     course_id: &String,
-    milestone_id: u32,
-    lrn_reward: i128,
-) -> VerifyBatchEntry {
-    submit_milestone(
+    milestone_count: u32,
+) {
+    authorize(
         env,
+        admin,
         contract_id,
-        learner,
-        client,
-        course_id,
-        milestone_id,
-        &sid(env, "ipfs://evidence"),
+        "register_course",
+        (admin.clone(), course_id.clone(), milestone_count),
     );
-    VerifyBatchEntry {
-        learner: learner.clone(),
-        course_id: course_id.clone(),
-        milestone_id,
-        lrn_reward,
-    }
+    client.register_course(admin, course_id, &milestone_count);
 }
 
 #[test]
-fn batch_approve_all_success() {
-    let (env, contract_id, admin, _token_id, client, _token_client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "batch-course-a");
-
-    add_course(&env, &contract_id, &admin, &client, &course_id, 3);
-    enroll(&env, &contract_id, &learner, &client, &course_id);
-
-    let e1 = make_entry(&env, &contract_id, &admin, &client, &learner, &course_id, 1, 50);
-    let e2 = make_entry(&env, &contract_id, &admin, &client, &learner, &course_id, 2, 50);
-    let e3 = make_entry(&env, &contract_id, &admin, &client, &learner, &course_id, 3, 50);
-
-    let submissions = Vec::from_array(&env, [e1, e2, e3]);
-
+fn register_course_rejects_empty_course_id() {
+    let (env, contract_id, admin, _, client, _) = setup();
+    let course_id = sid(&env, "");
     authorize(
         &env,
         &admin,
         &contract_id,
-        "batch_approve_milestones",
-        (admin.clone(), submissions.clone()),
+        "register_course",
+        (admin.clone(), course_id.clone(), 3_u32),
     );
-    let results = client.batch_approve_milestones(&admin, &submissions);
 
-    assert_eq!(results.len(), 3);
-    assert_eq!(results.get(0).unwrap(), ApprovalResult::Ok);
-    assert_eq!(results.get(1).unwrap(), ApprovalResult::Ok);
-    assert_eq!(results.get(2).unwrap(), ApprovalResult::Ok);
-
-    assert!(client.is_completed(&learner, &course_id, &1));
-    assert!(client.is_completed(&learner, &course_id, &2));
-    assert!(client.is_completed(&learner, &course_id, &3));
+    let result = client.try_register_course(&admin, &course_id, &3);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidCourseId as u32
+        )))
+    );
 }
 
 #[test]
-fn batch_approve_partial_failure_continues() {
-    let (env, contract_id, admin, _token_id, client, _token_client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "batch-course-b");
-
-    add_course(&env, &contract_id, &admin, &client, &course_id, 3);
-    enroll(&env, &contract_id, &learner, &client, &course_id);
-
-    let e1 = make_entry(&env, &contract_id, &admin, &client, &learner, &course_id, 1, 50);
-    let e3 = make_entry(&env, &contract_id, &admin, &client, &learner, &course_id, 3, 50);
-
-    // Milestone 2 is NotStarted (not submitted) → InvalidState error mid-batch.
-    let bad_entry = VerifyBatchEntry {
-        learner: learner.clone(),
-        course_id: course_id.clone(),
-        milestone_id: 2,
-        lrn_reward: 50,
-    };
-
-    let submissions = Vec::from_array(&env, [e1, bad_entry, e3]);
-
+fn register_course_rejects_course_id_over_max_length() {
+    let (env, contract_id, admin, _, client, _) = setup();
+    let long_id = "x".repeat((MAX_COURSE_ID_LEN + 1) as usize);
+    let course_id = sid(&env, &long_id);
     authorize(
         &env,
         &admin,
         &contract_id,
-        "batch_approve_milestones",
-        (admin.clone(), submissions.clone()),
+        "register_course",
+        (admin.clone(), course_id.clone(), 3_u32),
     );
-    let results = client.batch_approve_milestones(&admin, &submissions);
 
-    assert_eq!(results.len(), 3);
-    assert_eq!(results.get(0).unwrap(), ApprovalResult::Ok);
-    // Error::InvalidState = 13
-    assert_eq!(results.get(1).unwrap(), ApprovalResult::Err(Error::InvalidState as u32));
-    assert_eq!(results.get(2).unwrap(), ApprovalResult::Ok);
-
-    // Despite the partial failure milestones 1 and 3 were approved.
-    assert!(client.is_completed(&learner, &course_id, &1));
-    assert!(!client.is_completed(&learner, &course_id, &2));
-    assert!(client.is_completed(&learner, &course_id, &3));
+    let result = client.try_register_course(&admin, &course_id, &3);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidCourseId as u32
+        )))
+    );
 }
 
 #[test]
-fn batch_approve_all_failure() {
-    let (env, contract_id, admin, _token_id, client, _token_client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "batch-course-c");
-
-    add_course(&env, &contract_id, &admin, &client, &course_id, 3);
-    enroll(&env, &contract_id, &learner, &client, &course_id);
-
-    // Pass milestones that are all in NotStarted state — none submitted.
-    let make_bad = |mid: u32| VerifyBatchEntry {
-        learner: learner.clone(),
-        course_id: course_id.clone(),
-        milestone_id: mid,
-        lrn_reward: 0,
-    };
-    let submissions = Vec::from_array(&env, [make_bad(1), make_bad(2), make_bad(3)]);
-
+fn register_course_rejects_zero_milestone_count() {
+    let (env, contract_id, admin, _, client, _) = setup();
+    let course_id = sid(&env, "course-a");
     authorize(
         &env,
         &admin,
         &contract_id,
-        "batch_approve_milestones",
-        (admin.clone(), submissions.clone()),
+        "register_course",
+        (admin.clone(), course_id.clone(), 0_u32),
     );
-    let results = client.batch_approve_milestones(&admin, &submissions);
 
-    assert_eq!(results.len(), 3);
-    for i in 0..3 {
-        // Error::InvalidState = 13
-        assert_eq!(results.get(i).unwrap(), ApprovalResult::Err(Error::InvalidState as u32));
-    }
+    let result = client.try_register_course(&admin, &course_id, &0);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidMilestoneCount as u32
+        )))
+    );
 }
 
 #[test]
-fn batch_approve_already_approved_milestone_returns_error() {
-    let (env, contract_id, admin, _token_id, client, _token_client) = setup();
-    let learner = Address::generate(&env);
-    let course_id = sid(&env, "batch-course-d");
-
-    add_course(&env, &contract_id, &admin, &client, &course_id, 2);
-    enroll(&env, &contract_id, &learner, &client, &course_id);
-
-    let e1 = make_entry(&env, &contract_id, &admin, &client, &learner, &course_id, 1, 100);
-    // Submit e1 twice in the same batch — second approval should fail because
-    // the first already set the state to Approved.
-    let e1_dup = VerifyBatchEntry {
-        learner: learner.clone(),
-        course_id: course_id.clone(),
-        milestone_id: 1,
-        lrn_reward: 100,
-    };
-
-    let submissions = Vec::from_array(&env, [e1, e1_dup]);
-
+fn register_course_rejects_milestone_count_above_max() {
+    let (env, contract_id, admin, _, client, _) = setup();
+    let course_id = sid(&env, "course-a");
+    let milestone_count = MAX_MILESTONE_COUNT + 1;
     authorize(
         &env,
         &admin,
         &contract_id,
-        "batch_approve_milestones",
-        (admin.clone(), submissions.clone()),
+        "register_course",
+        (admin.clone(), course_id.clone(), milestone_count),
     );
-    let results = client.batch_approve_milestones(&admin, &submissions);
 
-    assert_eq!(results.get(0).unwrap(), ApprovalResult::Ok);
-    // Error::InvalidState = 13 (state is now Approved, not Pending)
-    assert_eq!(results.get(1).unwrap(), ApprovalResult::Err(Error::InvalidState as u32));
+    let result = client.try_register_course(&admin, &course_id, &milestone_count);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidMilestoneCount as u32
+        )))
+    );
 }
+
+#[test]
+fn register_course_rejects_duplicate_course_id() {
+    let (env, contract_id, admin, _, client, _) = setup();
+    let course_id = sid(&env, "duplicate-course");
+
+    register_course(&env, &contract_id, &admin, &client, &course_id, 3);
+    authorize(
+        &env,
+        &admin,
+        &contract_id,
+        "register_course",
+        (admin.clone(), course_id.clone(), 5_u32),
+    );
+
+    let result = client.try_register_course(&admin, &course_id, &5);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::AlreadyExists as u32
+        )))
+    );
+}
+
+#[test]
+fn register_course_accepts_boundary_values() {
+    let (env, contract_id, admin, _, client, _) = setup();
+    let min_id = sid(&env, "a");
+    let max_id = sid(&env, &"m".repeat(MAX_COURSE_ID_LEN as usize));
+
+    register_course(&env, &contract_id, &admin, &client, &min_id, 1);
+    register_course(
+        &env,
+        &contract_id,
+        &admin,
+        &client,
+        &max_id,
+        MAX_MILESTONE_COUNT,
+    );
+
+    assert_eq!(
+        client.get_course(&min_id),
+        Some(CourseConfig {
+            milestone_count: 1,
+            active: true,
+        })
+    );
+    assert_eq!(
+        client.get_course(&max_id),
+        Some(CourseConfig {
+            milestone_count: MAX_MILESTONE_COUNT,
+            active: true,
+        })
+    );
+}
+

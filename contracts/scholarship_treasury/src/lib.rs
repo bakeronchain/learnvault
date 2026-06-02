@@ -31,12 +31,15 @@ const DONORS_KEY: Symbol = symbol_short!("DONORS");
 const PAUSED_KEY: Symbol = symbol_short!("PAUSED");
 const TOTAL_GOV_KEY: Symbol = symbol_short!("TOTALGOV");
 const MIN_LRN_TO_PROPOSE_KEY: Symbol = symbol_short!("MINPROP");
+const SUPPORTED_ASSETS_KEY: Symbol = symbol_short!("ASSETS");
 const GOV_PER_USDC: i128 = 100;
 const PROPOSAL_DEADLINE_LEDGERS: u32 = 100_800;
 const VOTING_PERIOD_KEY: Symbol = symbol_short!("VOTINGPERIOD");
 const QUORUM_KEY: Symbol = symbol_short!("QUORUM");
 const APPROVAL_BPS_KEY: Symbol = symbol_short!("APPBPS");
 const MILESTONE_COUNT_KEY: Symbol = symbol_short!("MSCNT");
+const TIMELOCK_LEDGER_KEY: Symbol = symbol_short!("TLOCK");
+const DEFAULT_TIMELOCK_LEDGERS: u32 = DAY_IN_LEDGERS * 2; // 48 hours
 
 #[derive(Clone)]
 #[contracttype]
@@ -47,6 +50,8 @@ pub enum DataKey {
     Scholar(Address),
     VoteCast(u32, Address), // (proposal_id, voter) -> bool
     FinalizedProposal(u32), // proposal_id -> ProposalStatus (set by finalize_proposal)
+    VetoCast(u32, Address), // (proposal_id, voter) -> bool
+    AssetDeposited(Address), // total deposited per asset (atomic units)
 }
 
 #[contractevent(topics = ["proposal_executed"])]
@@ -64,6 +69,15 @@ pub struct ProposalCancelled {
     #[topic]
     pub proposal_id: u32,
     pub cancelled_by: Address,
+}
+
+#[contractevent(topics = ["proposal_queued"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProposalQueued {
+    #[topic]
+    pub proposal_id: u32,
+    pub queued_at: u32,
+    pub execution_ready_at: u32,
 }
 
 #[derive(Clone)]
@@ -89,14 +103,18 @@ pub struct Proposal {
     pub new_quorum: i128,
     pub new_approval_bps: u32,
     pub new_voting_period: u32,
+    pub queued_at: u32,
+    pub veto_votes: i128,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[contracttype]
 pub enum ProposalStatus {
     Pending,
+    Queued,
     Approved,
     Rejected,
+    Executed,
 }
 
 #[contracttype]
@@ -132,6 +150,14 @@ pub enum Error {
     ArithmeticOverflow = 18,
     /// Milestone titles/dates count does not match the configured milestone count.
     InvalidMilestoneCount = 19,
+    /// Timelock period has not elapsed yet.
+    TimelockNotExpired = 20,
+    /// Proposal is not in Queued status.
+    NotQueued = 21,
+    /// Supermajority veto threshold has not been reached.
+    VetoNotMet = 22,
+    /// Asset is not in the supported assets list.
+    UnsupportedAsset = 23,
 }
 
 #[contract]
@@ -143,6 +169,7 @@ pub struct DepositRecorded {
     #[topic]
     pub donor: Address,
     pub amount: i128,
+    pub asset: Address,
 }
 
 #[contractevent(topics = ["gov_issued"])]
@@ -209,6 +236,13 @@ impl ScholarshipTreasury {
         env.storage().instance().set(&ADMIN_KEY, &admin);
         upgrade::init(&env);
         env.storage().instance().set(&USDC_KEY, &usdc_token);
+
+        // Seed supported assets list with USDC as the primary asset
+        let mut initial_assets: Vec<Address> = Vec::new(&env);
+        initial_assets.push_back(usdc_token.clone());
+        env.storage()
+            .instance()
+            .set(&SUPPORTED_ASSETS_KEY, &initial_assets);
         env.storage().instance().set(&GOV_KEY, &governance_contract);
         env.storage().instance().set(&TOTAL_KEY, &0_i128);
         env.storage().instance().set(&NEXT_PROPOSAL_KEY, &1_u32);
@@ -277,6 +311,38 @@ impl ScholarshipTreasury {
 
     // New admin setter for voting period
     pub fn set_voting_period(env: Env, new_period: u32) {
+    /// Admin-only: set the timelock delay in ledgers.
+    pub fn set_timelock_delay(env: Env, admin: Address, ledgers: u32) {
+        admin.require_auth();
+        if admin != Self::admin(&env) {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
+        if ledgers == 0 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
+        env.storage().instance().set(&TIMELOCK_LEDGER_KEY, &ledgers);
+    }
+
+    /// Get the current timelock delay in ledgers.
+    pub fn get_timelock_delay(env: Env) -> u32 {
+        Self::extend_instance(&env);
+        env.storage()
+            .instance()
+            .get::<_, u32>(&TIMELOCK_LEDGER_KEY)
+            .unwrap_or(DEFAULT_TIMELOCK_LEDGERS)
+    }
+
+    /// Returns the configured number of milestones required per proposal.
+    pub fn get_milestone_count(env: Env) -> u32 {
+        Self::extend_instance(&env);
+        env.storage()
+            .instance()
+            .get::<_, u32>(&MILESTONE_COUNT_KEY)
+            .unwrap_or(3)
+    }
+
+    /// Admin-only: update the required milestone count for future proposals.
+    pub fn set_milestone_count(env: Env, count: u32) {
         let admin = Self::admin(&env);
         admin.require_auth();
         if new_period == 0 {
@@ -285,16 +351,59 @@ impl ScholarshipTreasury {
         env.storage().instance().set(&VOTING_PERIOD_KEY, &new_period);
     }
 
+    // New constant for optional timelock vault integration
+    const TIMELOCK_VAULT_KEY: Symbol = symbol_short!("TIMELockVault");
+
+    // New PauseChanged event emitted on pause/unpause
+    #[contractevent(topics = ["pause_changed"])]
+    pub struct PauseChanged {
+        #[topic]
+        pub paused: bool,
+    }
+
+    /// Public getter for admin address
+    pub fn get_admin(env: Env) -> Address {
+        Self::admin(&env)
+    }
+
+    /// Set the timelock vault address (admin only)
+    pub fn set_timelock_vault(env: Env, vault: Address) {
+        let admin = Self::admin(&env);
+        admin.require_auth();
+        env.storage().instance().set(&TIMELOCK_VAULT_KEY, &vault);
+    }
+
+    /// Get the timelock vault address if configured
+    pub fn get_timelock_vault(env: Env) -> Option<Address> {
+        env.storage().instance().get(&TIMELOCK_VAULT_KEY)
+    }
+
     pub fn pause(env: Env) {
         let admin = Self::admin(&env);
         admin.require_auth();
         env.storage().instance().set(&PAUSED_KEY, &true);
+        // Emit pause event
+        PauseChanged { paused: true }.publish(&env);
     }
 
     pub fn unpause(env: Env) {
+        // Allow admin or timelock vault to unpause
+        let caller = env.invoker();
         let admin = Self::admin(&env);
-        admin.require_auth();
+        let authorized = if caller == admin {
+            true
+        } else {
+            match Self::get_timelock_vault(&env) {
+                Some(vault) => caller == vault,
+                None => false,
+            }
+        };
+        if !authorized {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
         env.storage().instance().set(&PAUSED_KEY, &false);
+        // Emit unpause event
+        PauseChanged { paused: false }.publish(&env);
     }
 
     pub fn is_paused(env: Env) -> bool {
@@ -304,7 +413,7 @@ impl ScholarshipTreasury {
             .unwrap_or(false)
     }
 
-    pub fn deposit(env: Env, donor: Address, amount: i128) {
+    pub fn deposit(env: Env, donor: Address, amount: i128, asset: Address) {
         Self::assert_not_paused(&env);
 
         if amount <= 0 {
@@ -312,8 +421,19 @@ impl ScholarshipTreasury {
         }
         donor.require_auth();
 
-        let usdc = token::client(&env);
-        usdc.transfer(&donor, env.current_contract_address(), &amount);
+        // Validate asset is in the supported list
+        let supported: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&SUPPORTED_ASSETS_KEY)
+            .unwrap_or(Vec::new(&env));
+        if !supported.contains(&asset) {
+            panic_with_error!(&env, Error::UnsupportedAsset);
+        }
+
+        // Transfer the deposited asset to the contract
+        soroban_sdk::token::TokenClient::new(&env, &asset)
+            .transfer(&donor, &env.current_contract_address(), &amount);
 
         let gov_contract = Self::governance_contract(&env);
         let gov_client = governance::client(&env, &gov_contract);
@@ -337,6 +457,17 @@ impl ScholarshipTreasury {
         let new_total_gov = Self::checked_add_i128(&env, total_gov, gov_amount);
         env.storage().instance().set(&TOTAL_GOV_KEY, &new_total_gov);
 
+        // Track per-asset total deposited
+        let asset_key = DataKey::AssetDeposited(asset.clone());
+        let asset_current = env
+            .storage()
+            .persistent()
+            .get::<_, i128>(&asset_key)
+            .unwrap_or(0);
+        let new_asset_total = Self::checked_add_i128(&env, asset_current, amount);
+        env.storage().persistent().set(&asset_key, &new_asset_total);
+        Self::extend_persistent(&env, &asset_key);
+
         let donor_key = DataKey::Donor(donor.clone());
         let current = env
             .storage()
@@ -359,15 +490,23 @@ impl ScholarshipTreasury {
 
         Self::extend_persistent(&env, &donor_key);
 
-        let total = env
+        // Only USDC deposits count toward the disbursable TOTAL_KEY balance
+        let usdc_address: Address = env
             .storage()
             .instance()
-            .get::<_, i128>(&TOTAL_KEY)
-            .unwrap_or(0);
-        let new_total = Self::checked_add_i128(&env, total, amount);
-        env.storage().instance().set(&TOTAL_KEY, &new_total);
+            .get::<_, Address>(&USDC_KEY)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::NotInitialized));
+        if asset == usdc_address {
+            let total = env
+                .storage()
+                .instance()
+                .get::<_, i128>(&TOTAL_KEY)
+                .unwrap_or(0);
+            let new_total = Self::checked_add_i128(&env, total, amount);
+            env.storage().instance().set(&TOTAL_KEY, &new_total);
+        }
 
-        DepositRecorded { donor, amount }.publish(&env);
+        DepositRecorded { donor, amount, asset }.publish(&env);
     }
 
     pub fn disburse(env: Env, recipient: Address, amount: i128) {
@@ -434,12 +573,32 @@ impl ScholarshipTreasury {
             panic_with_error!(&env, Error::ProposalCancelled);
         }
 
-        if env.ledger().sequence() <= proposal.deadline_ledger {
-            panic_with_error!(&env, Error::VotingNotClosed);
-        }
-
         if proposal.executed {
             panic_with_error!(&env, Error::ProposalAlreadyExecuted);
+        }
+
+        // Must be in queued state (or legacy Approved state)
+        let finalized_status = env
+            .storage()
+            .persistent()
+            .get::<_, ProposalStatus>(&DataKey::FinalizedProposal(proposal_id));
+        let is_queued = match finalized_status {
+            Some(ProposalStatus::Queued) => true,
+            Some(ProposalStatus::Approved) => !proposal.executed, // legacy pre-timelock
+            _ => false,
+        };
+        if !is_queued {
+            panic_with_error!(&env, Error::NotQueued);
+        }
+
+        let timelock_delay = Self::get_timelock_delay(env.clone());
+        let ready_at = Self::checked_add_u32(
+            &env,
+            proposal.queued_at,
+            timelock_delay,
+        );
+        if env.ledger().sequence() < ready_at {
+            panic_with_error!(&env, Error::TimelockNotExpired);
         }
 
         let total_votes = Self::checked_add_i128(&env, proposal.yes_votes, proposal.no_votes);
@@ -483,6 +642,16 @@ impl ScholarshipTreasury {
             .set(&DataKey::Proposal(proposal_id), &proposal);
         Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
 
+        // Update finalized status to Executed
+        env.storage()
+            .persistent()
+            .set(&DataKey::FinalizedProposal(proposal_id), &ProposalStatus::Executed);
+        Self::extend_persistent(&env, &DataKey::FinalizedProposal(proposal_id));
+
+        if passed {
+            Self::disburse_internal(&env, &proposal.applicant, proposal.amount);
+        }
+
         ProposalExecuted {
             proposal_id,
             passed,
@@ -502,12 +671,18 @@ impl ScholarshipTreasury {
             .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
             .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
 
-        if env.ledger().sequence() > proposal.deadline_ledger {
-            panic_with_error!(&env, Error::VotingClosed);
-        }
-
         if proposal.executed {
             panic_with_error!(&env, Error::ProposalAlreadyExecuted);
+        }
+
+        // Determine current public status
+        let status = Self::proposal_status(&env, &proposal);
+        if status == ProposalStatus::Rejected || status == ProposalStatus::Executed {
+            panic_with_error!(&env, Error::ProposalAlreadyExecuted);
+        }
+        // Allow cancellation during Pending (before deadline) or Queued (after finalize)
+        if status == ProposalStatus::Pending && env.ledger().sequence() > proposal.deadline_ledger {
+            panic_with_error!(&env, Error::VotingClosed);
         }
 
         proposal.cancelled = true;
@@ -559,6 +734,41 @@ impl ScholarshipTreasury {
         env.storage()
             .persistent()
             .get::<_, i128>(&DataKey::Donor(donor))
+            .unwrap_or(0)
+    }
+
+    /// Admin-only: add an asset to the supported assets list for deposits.
+    pub fn add_supported_asset(env: Env, asset: Address) {
+        let admin = Self::admin(&env);
+        admin.require_auth();
+
+        let mut assets: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&SUPPORTED_ASSETS_KEY)
+            .unwrap_or(Vec::new(&env));
+
+        if !assets.contains(&asset) {
+            assets.push_back(asset);
+            env.storage().instance().set(&SUPPORTED_ASSETS_KEY, &assets);
+        }
+        Self::extend_instance(&env);
+    }
+
+    /// Returns the list of token addresses accepted for deposits.
+    pub fn get_supported_assets(env: Env) -> Vec<Address> {
+        Self::extend_instance(&env);
+        env.storage()
+            .instance()
+            .get::<_, Vec<Address>>(&SUPPORTED_ASSETS_KEY)
+            .unwrap_or(Vec::new(&env))
+    }
+
+    /// Returns the cumulative amount deposited for a given asset (in atomic units).
+    pub fn get_asset_deposited(env: Env, asset: Address) -> i128 {
+        env.storage()
+            .persistent()
+            .get::<_, i128>(&DataKey::AssetDeposited(asset))
             .unwrap_or(0)
     }
 
@@ -650,10 +860,8 @@ impl ScholarshipTreasury {
             ),
             executed: false,
             cancelled: false,
-            kind: ProposalKind::Disbursement,
-            new_quorum: 0,
-            new_approval_bps: 0,
-            new_voting_period: 0,
+            queued_at: 0,
+            veto_votes: 0,
         };
 
         env.storage()
@@ -858,8 +1066,31 @@ impl ScholarshipTreasury {
                 .map(|v| (v / total_votes) as u32 > approval_bps)
                 .unwrap_or(false);
 
+        let mut proposal = env
+            .storage()
+            .persistent()
+            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
+
         let status = if passed {
-            ProposalStatus::Approved
+            let current_ledger = env.ledger().sequence();
+            proposal.queued_at = current_ledger;
+            env.storage()
+                .persistent()
+                .set(&DataKey::Proposal(proposal_id), &proposal);
+            Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
+
+            let timelock_delay = Self::get_timelock_delay(env.clone());
+            let execution_ready_at = Self::checked_add_u32(&env, current_ledger, timelock_delay);
+
+            ProposalQueued {
+                proposal_id,
+                queued_at: current_ledger,
+                execution_ready_at,
+            }
+            .publish(&env);
+
+            ProposalStatus::Queued
         } else {
             ProposalStatus::Rejected
         };
@@ -881,6 +1112,118 @@ impl ScholarshipTreasury {
         env.storage()
             .persistent()
             .get::<_, ProposalStatus>(&DataKey::FinalizedProposal(proposal_id))
+    }
+
+    /// Register an objection to a queued proposal.
+    ///
+    /// Voters can object during the timelock period. Objections accumulate
+    /// in `proposal.veto_votes`. If veto votes reach a 2/3 supermajority of
+    /// total GOV supply, anyone can call `veto_proposal` to reject it.
+    pub fn object_to_proposal(env: Env, voter: Address, proposal_id: u32) {
+        Self::assert_initialized(&env);
+        Self::assert_not_paused(&env);
+
+        voter.require_auth();
+
+        let mut proposal = env
+            .storage()
+            .persistent()
+            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
+
+        if proposal.cancelled {
+            panic_with_error!(&env, Error::ProposalCancelled);
+        }
+
+        if proposal.executed {
+            panic_with_error!(&env, Error::ProposalAlreadyExecuted);
+        }
+
+        let finalized_status = env
+            .storage()
+            .persistent()
+            .get::<_, ProposalStatus>(&DataKey::FinalizedProposal(proposal_id));
+        if finalized_status != Some(ProposalStatus::Queued) {
+            panic_with_error!(&env, Error::NotQueued);
+        }
+
+        let veto_key = DataKey::VetoCast(proposal_id, voter.clone());
+        if env
+            .storage()
+            .persistent()
+            .get::<_, bool>(&veto_key)
+            .unwrap_or(false)
+        {
+            panic_with_error!(&env, Error::AlreadyVoted);
+        }
+
+        let gov_contract = Self::governance_contract(&env);
+        let gov_client = governance::client(&env, &gov_contract);
+        let weight = gov_client.get_voting_power(&voter);
+        if weight < 0 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
+
+        proposal.veto_votes = Self::checked_add_i128(&env, proposal.veto_votes, weight);
+        env.storage().persistent().set(&veto_key, &true);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Proposal(proposal_id), &proposal);
+
+        Self::extend_persistent(&env, &veto_key);
+        Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
+    }
+
+    /// Veto a queued proposal.
+    ///
+    /// Either the admin may veto directly, or any caller may veto if the
+    /// accumulated `veto_votes` represent a 2/3 supermajority of the total GOV
+    /// token supply.
+    pub fn veto_proposal(env: Env, caller: Address, proposal_id: u32) {
+        caller.require_auth();
+
+        let mut proposal = env
+            .storage()
+            .persistent()
+            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
+
+        if proposal.cancelled || proposal.executed {
+            panic_with_error!(&env, Error::ProposalAlreadyExecuted);
+        }
+
+        let finalized_status = env
+            .storage()
+            .persistent()
+            .get::<_, ProposalStatus>(&DataKey::FinalizedProposal(proposal_id));
+        if finalized_status != Some(ProposalStatus::Queued) {
+            panic_with_error!(&env, Error::NotQueued);
+        }
+
+        let admin = Self::admin(&env);
+        let is_admin = caller == admin;
+        let total_gov = Self::get_total_gov_issued(env.clone());
+        // 2/3 supermajority threshold (multiply by 2, divide by 3)
+        let supermajority_met = total_gov > 0
+            && proposal.veto_votes >= (total_gov * 2) / 3;
+
+        if !is_admin && !supermajority_met {
+            panic_with_error!(&env, Error::VetoNotMet);
+        }
+
+        env.storage()
+            .persistent()
+            .set(
+                &DataKey::FinalizedProposal(proposal_id),
+                &ProposalStatus::Rejected,
+            );
+        Self::extend_persistent(&env, &DataKey::FinalizedProposal(proposal_id));
+
+        ProposalCancelled {
+            proposal_id,
+            cancelled_by: caller,
+        }
+        .publish(&env);
     }
 
     /// Returns the total GOV tokens issued so far (used for quorum calculation).
@@ -924,7 +1267,17 @@ impl ScholarshipTreasury {
             .persistent()
             .get::<_, ProposalStatus>(&DataKey::FinalizedProposal(proposal.id))
         {
-            return status;
+            return match status {
+                // Legacy pre-timelock: Approved proposals become Queued or Executed
+                ProposalStatus::Approved => {
+                    if proposal.executed {
+                        ProposalStatus::Executed
+                    } else {
+                        ProposalStatus::Queued
+                    }
+                }
+                s => s,
+            };
         }
 
         if env.ledger().sequence() <= proposal.deadline_ledger {
@@ -956,7 +1309,7 @@ impl ScholarshipTreasury {
                     .unwrap_or(false);
 
             if passed {
-                ProposalStatus::Approved
+                ProposalStatus::Queued
             } else {
                 ProposalStatus::Rejected
             }

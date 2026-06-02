@@ -39,6 +39,11 @@ jobs:
       - name: Run fuzz tests
         run: cargo test -- --include-ignored fuzz
 
+      - name: Run milestone_escrow fuzz tests (60s)
+        run: |
+          timeout 60 cargo test -p milestone-escrow fuzz -- --include-ignored --nocapture || \
+            test $? -eq 124
+
       - name: Run clippy
         run: cargo clippy -- -D warnings
 

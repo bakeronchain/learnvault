@@ -34,8 +34,7 @@ const makeToken = (address: string) =>
 	`Bearer ${jwt.sign({ sub: address, jti: "test-jti" }, TEST_SECRET)}`
 
 const testJwtService = {
-	signWalletToken: (address: string) =>
-		jwt.sign({ sub: address, jti: "test-jti" }, TEST_SECRET),
+	signWalletToken: (address: string) => jwt.sign({ sub: address }, TEST_SECRET),
 	verifyWalletToken: async (token: string) => {
 		const decoded = jwt.verify(token, TEST_SECRET) as {
 			sub?: string
@@ -46,7 +45,7 @@ const testJwtService = {
 		if (!sub) throw new Error("Invalid token")
 		return { sub, jti: decoded.jti ?? "test-jti" }
 	},
-	revokeToken: jest.fn().mockResolvedValue(undefined),
+	revokeToken: async () => {},
 }
 
 const buildApp = (): Express => {

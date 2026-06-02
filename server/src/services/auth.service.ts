@@ -35,13 +35,21 @@ function randomNoncePayload(): string {
 
 export type AuthService = {
 	getOrCreateNonce(address: string): Promise<{ nonce: string }>
-	verifyAndIssueToken(address: string, signatureBase64: string): Promise<string>
+	verifyAndIssueToken(
+		address: string,
+		signatureBase64: string,
+	): Promise<{ accessToken: string; refreshToken: string }>
 	createChallenge(address: string): Promise<{
 		transaction: string
 		networkPassphrase: string
 	}>
-	verifySignedTransaction(signedTransactionXdr: string): Promise<string>
-	revokeToken(token: string): Promise<void>
+	verifySignedTransaction(
+		signedTransactionXdr: string,
+	): Promise<{ accessToken: string; refreshToken: string }>
+	refreshSession(refreshToken: string): Promise<{
+		accessToken: string
+		refreshToken: string
+	}>
 }
 
 export function createAuthService(
@@ -78,7 +86,7 @@ export function createAuthService(
 
 		async verifySignedTransaction(
 			signedTransactionXdr: string,
-		): Promise<string> {
+		): Promise<{ accessToken: string; refreshToken: string }> {
 			const networkPassphrase = getNetworkPassphrase()
 			let tx: Transaction
 
@@ -122,7 +130,7 @@ export function createAuthService(
 			}
 
 			await nonceStore.deleteNonce(address)
-			return jwtService.signWalletToken(address)
+			return jwtService.issueTokenPair(address)
 		},
 
 		async getOrCreateNonce(address: string): Promise<{ nonce: string }> {
@@ -138,7 +146,7 @@ export function createAuthService(
 		async verifyAndIssueToken(
 			address: string,
 			signatureBase64: string,
-		): Promise<string> {
+		): Promise<{ accessToken: string; refreshToken: string }> {
 			if (!isValidStellarPublicKey(address)) {
 				throw new Error("Invalid Stellar public key")
 			}
@@ -162,7 +170,17 @@ export function createAuthService(
 			}
 
 			await nonceStore.deleteNonce(address)
-			return jwtService.signWalletToken(address)
+			return jwtService.issueTokenPair(address)
+		},
+		async refreshSession(refreshToken: string): Promise<{
+			accessToken: string
+			refreshToken: string
+		}> {
+			const rotated = await jwtService.rotateRefreshToken(refreshToken)
+			return {
+				accessToken: rotated.accessToken,
+				refreshToken: rotated.refreshToken,
+			}
 		},
 
 		async revokeToken(token: string): Promise<void> {

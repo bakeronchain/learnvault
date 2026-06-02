@@ -1,16 +1,26 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query"
 
+export interface AssetBalance {
+	asset: string
+	symbol: string
+	deposited: string
+	usd_equivalent: string
+}
+
 export interface TreasuryStats {
 	total_deposited_usdc: string
 	total_disbursed_usdc: string
 	scholars_funded: number
 	active_proposals: number
 	donors_count: number
+	asset_balances: AssetBalance[]
 }
 
 export interface TreasuryEvent {
 	type: "deposit" | "disburse"
 	amount?: string
+	asset?: string
+	asset_symbol?: string
 	address?: string
 	scholar?: string
 	tx_hash: string
@@ -20,7 +30,7 @@ export interface TreasuryEvent {
 const API_BASE =
 	(import.meta.env.VITE_API_BASE_URL as string | undefined) ||
 	(import.meta.env.VITE_SERVER_URL as string | undefined) ||
-	"/api"
+	"/api/v1"
 
 export async function fetchTreasuryStats(): Promise<TreasuryStats> {
 	const response = await fetch(`${API_BASE}/treasury/stats`)

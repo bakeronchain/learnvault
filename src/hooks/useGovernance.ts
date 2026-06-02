@@ -77,8 +77,10 @@ export function useGovernance() {
 	const toProposalStatus = useCallback(
 		(status: unknown): Proposal["status"] => {
 			const normalized = String(status ?? "pending").toLowerCase()
+			if (normalized === "queued") return "Queued"
 			if (normalized === "approved" || normalized === "passed") return "Passed"
 			if (normalized === "rejected") return "Rejected"
+			if (normalized === "executed") return "Executed"
 			return "Active"
 		},
 		[],
@@ -338,6 +340,11 @@ export function useGovernance() {
 				["get_active_proposals", "getActiveProposals"],
 				[[]],
 			)
+			const queued = await readContractArray(
+				client,
+				["get_proposals_by_status", "getProposalsByStatus"],
+				[["Queued"], [{ status: "Queued" }], [{ tag: "Queued" }]],
+			)
 			const approved = await readContractArray(
 				client,
 				["get_proposals_by_status", "getProposalsByStatus"],
@@ -352,6 +359,9 @@ export function useGovernance() {
 			const grouped = [
 				...pending.map((proposal: unknown) =>
 					mapProposal(proposal as RawContractProposal, "Active"),
+				),
+				...queued.map((proposal: unknown) =>
+					mapProposal(proposal as RawContractProposal, "Queued"),
 				),
 				...approved.map((proposal: unknown) =>
 					mapProposal(proposal as RawContractProposal, "Passed"),

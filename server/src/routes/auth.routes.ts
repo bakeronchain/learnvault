@@ -12,13 +12,12 @@ export function createAuthRouter(
 	jwtService: JwtService,
 ): Router {
 	const router = Router()
-	const requireAuth = createRequireAuth(jwtService)
 	const {
 		getNonce,
 		postVerify,
 		getChallenge,
 		postChallengeVerify,
-		postLogout,
+		postRefresh,
 	} = createAuthControllers(authService)
 
 	router.get("/challenge", nonceRateLimiter, (req, res) => {
@@ -35,6 +34,9 @@ export function createAuthRouter(
 
 	router.post("/verify", authVerifyLimiter, (req, res) => {
 		void postVerify(req, res)
+	})
+	router.post("/refresh", authVerifyLimiter, (req, res) => {
+		void postRefresh(req, res)
 	})
 
 	router.post("/logout", requireAuth, (req, res) => {

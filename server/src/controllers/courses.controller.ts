@@ -16,6 +16,8 @@ type CourseRow = {
 	updated_at: string
 	students_count: number
 	prerequisites?: number[]
+	avg_rating: string | null
+	review_count: number
 }
 
 type LessonRow = {
@@ -51,6 +53,11 @@ const toCourse = (row: CourseRow) => ({
 	updatedAt: row.updated_at,
 	studentsCount: Number(row.students_count ?? 0),
 	prerequisites: row.prerequisites ?? [],
+	avgRating:
+		row.avg_rating !== null && row.avg_rating !== undefined
+			? Number(row.avg_rating)
+			: null,
+	reviewCount: Number(row.review_count ?? 0),
 })
 
 const toLesson = (row: LessonRow) => ({
@@ -211,9 +218,12 @@ export const getCourses = async (
 				c.created_at,
 				c.updated_at,
 				c.prerequisites,
-				COUNT(DISTINCT e.learner_address)::int AS students_count
+				COUNT(DISTINCT e.learner_address)::int AS students_count,
+				ROUND(AVG(cr.rating), 1) AS avg_rating,
+				COUNT(DISTINCT cr.id)::int AS review_count
 			 FROM courses c
 			 LEFT JOIN enrollments e ON e.course_id = c.slug
+			 LEFT JOIN course_reviews cr ON cr.course_id = c.id
 			 ${whereClause}
 			 GROUP BY c.id, c.slug, c.title, c.description, c.cover_image_url, c.track, c.difficulty, c.published_at, c.created_at, c.updated_at, c.prerequisites
 			 ORDER BY c.created_at DESC
@@ -236,13 +246,23 @@ export const getCourse = async (req: Request, res: Response): Promise<void> => {
 		const isNumericId = /^\d+$/.test(idOrSlug)
 
 		const query = isNumericId
-			? `SELECT id, slug, title, description, cover_image_url, track, difficulty, published_at, created_at, updated_at, prerequisites
-			   FROM courses
-			   WHERE id = $1 AND published_at IS NOT NULL
+			? `SELECT c.id, c.slug, c.title, c.description, c.cover_image_url, c.track, c.difficulty, c.published_at, c.created_at, c.updated_at,
+			          c.prerequisites, 0 AS students_count,
+			          ROUND(AVG(cr.rating), 1) AS avg_rating,
+			          COUNT(cr.id)::int AS review_count
+			   FROM courses c
+			   LEFT JOIN course_reviews cr ON cr.course_id = c.id
+			   WHERE c.id = $1 AND c.published_at IS NOT NULL
+			   GROUP BY c.id
 			   LIMIT 1`
-			: `SELECT id, slug, title, description, cover_image_url, track, difficulty, published_at, created_at, updated_at, prerequisites
-			   FROM courses
-			   WHERE slug = $1 AND published_at IS NOT NULL
+			: `SELECT c.id, c.slug, c.title, c.description, c.cover_image_url, c.track, c.difficulty, c.published_at, c.created_at, c.updated_at,
+			          c.prerequisites, 0 AS students_count,
+			          ROUND(AVG(cr.rating), 1) AS avg_rating,
+			          COUNT(cr.id)::int AS review_count
+			   FROM courses c
+			   LEFT JOIN course_reviews cr ON cr.course_id = c.id
+			   WHERE c.slug = $1 AND c.published_at IS NOT NULL
+			   GROUP BY c.id
 			   LIMIT 1`
 
 		const courseResult = (await pool.query(query, [

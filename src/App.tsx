@@ -1,5 +1,4 @@
 import { Routes, Route, Outlet } from "react-router-dom"
-import ComingSoon from "./components/ComingSoon"
 import Footer from "./components/Footer"
 import NavBar from "./components/NavBar"
 import Admin from "./pages/Admin"
@@ -7,6 +6,8 @@ import Courses from "./pages/Courses"
 import Credential from "./pages/Credential"
 import Dao from "./pages/Dao"
 import DaoProposals from "./pages/DaoProposals"
+import Dashboard from "./pages/Dashboard"
+
 import Debug from "./pages/Debug"
 import Home from "./pages/Home"
 import Leaderboard from "./pages/Leaderboard"
@@ -31,10 +32,8 @@ function App() {
 				<Route path="/admin" element={<Admin />} />
 				<Route path="/treasury" element={<Treasury />} />
 				<Route path="/credentials/:nftId" element={<Credential />} />
-				<Route
-					path="/dashboard"
-					element={<ComingSoon title="My Dashboard" />}
-				/>
+				<Route path="/dashboard" element={<Dashboard />} />
+
 				<Route path="/debug" element={<Debug />} />
 				<Route path="/debug/:contractName" element={<Debug />} />
 				<Route path="*" element={<NotFound />} />

@@ -8,6 +8,7 @@ export default function NavBar() {
 	const { t } = useTranslation()
 
 	const navLinks = [
+		{ to: "/dashboard", label: t("nav.dashboard") },
 		{ to: "/courses", label: t("nav.learn") },
 		{ to: "/dao", label: t("nav.dao") },
 		{ to: "/treasury", label: t("nav.treasury") },

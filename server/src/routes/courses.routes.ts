@@ -11,9 +11,23 @@ export const coursesRouter = Router()
  * /api/courses:
  *   get:
  *     tags: [Courses]
- *     summary: List published courses
+ *     summary: List published courses (cursor-paginated)
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 20
+ *         description: Maximum number of courses to return
+ *       - in: query
+ *         name: cursor
+ *         schema:
+ *           type: string
+ *         description: Opaque base64 pagination token from previous response
  *     responses:
  *       200:
  *         description: Courses fetched successfully
@@ -26,12 +40,22 @@ export const coursesRouter = Router()
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Course'
+ *                 nextCursor:
+ *                   type: string
+ *                   nullable: true
+ *                   description: Cursor token for next page, null when no more pages
+ *       400:
+ *         $ref: '#/components/responses/BadRequestError'
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-coursesRouter.get("/courses", getCourses)
+coursesRouter.get(
+	"/courses",
+	validate({ query: schemas.coursesQuerySchema }),
+	getCourses,
+)
 
 /**
  * @openapi

@@ -1,0 +1,17 @@
+[
+  {
+    "name": "Main Next.js Chunk",
+    "path": ".next/static/chunks/main-*.js",
+    "limit": "150 kB"
+  },
+  {
+    "name": "Framework/Vendor Chunks",
+    "path": ".next/static/chunks/framework-*.js",
+    "limit": "100 kB"
+  },
+  {
+    "name": "CSS Assets",
+    "path": ".next/static/css/**/*.css",
+    "limit": "50 kB"
+  }
+]

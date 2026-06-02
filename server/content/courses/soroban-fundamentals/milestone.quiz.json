@@ -1,0 +1,51 @@
+{
+	"courseId": "soroban-fundamentals",
+	"passingScore": 80,
+	"questions": [
+		{
+			"id": 1,
+			"text": "Which Rust type is best for modeling “success or error”?",
+			"options": ["Option<T>", "Result<T, E>", "Vec<T>", "String"],
+			"correctIndex": 1
+		},
+		{
+			"id": 2,
+			"text": "What is the typical output of building a Soroban contract?",
+			"options": ["A .wasm artifact", "A PDF", "A JWT", "A PNG"],
+			"correctIndex": 0
+		},
+		{
+			"id": 3,
+			"text": "Where is Soroban contract state stored when persisted?",
+			"options": [
+				"In the Stellar ledger",
+				"In the wallet",
+				"In the browser",
+				"In DNS"
+			],
+			"correctIndex": 0
+		},
+		{
+			"id": 4,
+			"text": "Why are unbounded loops risky in contracts?",
+			"options": [
+				"They can exceed resource limits",
+				"They remove signatures",
+				"They mint XLM",
+				"They change the network passphrase"
+			],
+			"correctIndex": 0
+		},
+		{
+			"id": 5,
+			"text": "Which category should always be covered by tests?",
+			"options": [
+				"Authorization rules",
+				"Logo colors",
+				"Browser bookmarks",
+				"Chat messages"
+			],
+			"correctIndex": 0
+		}
+	]
+}

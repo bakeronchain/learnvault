@@ -1,0 +1,303 @@
+import React, { useState } from "react"
+import { useContractIds } from "../../hooks/useContractIds"
+import { useWallet } from "../../hooks/useWallet"
+import {
+	explorerTransactionUrl,
+	formatUsdcAmount,
+} from "../../util/scholarshipApplications"
+import {
+	SCHOLARSHIP_TREASURY_CONTRACT_ID,
+	createScholarshipTreasuryContract,
+} from "../../util/scholarshipTreasury"
+import { useToast } from "../Toast/ToastProvider"
+import { useAdminContracts } from "../../hooks/useAdminContracts"
+
+interface DepositMoreProps {
+	onDepositSuccess?: () => void
+}
+
+type CurrencyCode = "USDC" | "EURC" | "XLM"
+
+interface CurrencyOption {
+	code: CurrencyCode
+	label: string
+	envKey: string
+	description: string
+}
+
+const CURRENCIES: CurrencyOption[] = [
+	{
+		code: "USDC",
+		label: "USDC",
+		envKey: "VITE_USDC_CONTRACT_ID",
+		description: "USD Coin",
+	},
+	{
+		code: "EURC",
+		label: "EURC",
+		envKey: "VITE_EURC_CONTRACT_ID",
+		description: "Euro Coin",
+	},
+	{
+		code: "XLM",
+		label: "XLM",
+		envKey: "VITE_XLM_SAC_CONTRACT_ID",
+		description: "Native Stellar",
+	},
+]
+
+function getAssetContractId(currency: CurrencyCode): string | undefined {
+	const env = import.meta.env as Record<string, unknown>
+	const option = CURRENCIES.find((c) => c.code === currency)
+	if (!option) return undefined
+	const value = env[option.envKey]
+	return typeof value === "string" && value.trim() ? value.trim() : undefined
+}
+
+export const DepositMore: React.FC<DepositMoreProps> = ({
+	onDepositSuccess,
+}) => {
+	const [amount, setAmount] = useState("")
+	const [currency, setCurrency] = useState<CurrencyCode>("USDC")
+	const [isLoading, setIsLoading] = useState(false)
+	const [lastTxHash, setLastTxHash] = useState<string | null>(null)
+	const { scholarshipTreasury } = useContractIds()
+	const { address, signTransaction, updateBalances } = useWallet()
+	const { showSuccess, showError, showInfo } = useToast()
+	const { data: adminData, isLoading: adminLoading } = useAdminContracts()
+	const isPaused = adminData?.scholarshipTreasuryState?.paused ?? false
+
+	const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const value = e.target.value
+		if (value === "" || /^\d+(\.\d{0,2})?$/.test(value)) {
+			setAmount(value)
+		}
+	}
+
+	const handleQuickAmount = (value: number) => {
+		setAmount(value.toString())
+	}
+
+	const handleDeposit = async (e: React.FormEvent) => {
+		e.preventDefault()
+
+		if (!address) {
+			showError("Please connect your wallet")
+			return
+		}
+
+		if (!amount || parseFloat(amount) <= 0) {
+			showError("Please enter a valid amount")
+			return
+		}
+
+		if (!signTransaction) {
+			showError("Wallet does not support signing")
+			return
+		}
+
+		const contractId = scholarshipTreasury ?? SCHOLARSHIP_TREASURY_CONTRACT_ID
+		if (!contractId) {
+			showError("Scholarship treasury contract is not configured")
+			return
+		}
+
+		const assetContractId = getAssetContractId(currency)
+		if (!assetContractId) {
+			showError(
+				`${currency} contract address is not configured. Set VITE_${currency === "XLM" ? "XLM_SAC" : currency}_CONTRACT_ID in your environment.`,
+			)
+			return
+		}
+
+		setIsLoading(true)
+		setLastTxHash(null)
+
+		try {
+			showInfo("Waiting for wallet approval...")
+			const treasuryContract = createScholarshipTreasuryContract(
+				contractId,
+				address,
+			)
+			const txHash = await treasuryContract.deposit(
+				amount,
+				assetContractId,
+				signTransaction,
+			)
+			setLastTxHash(txHash)
+			await updateBalances()
+			showSuccess(
+				`Deposit of ${formatUsdcAmount(amount)} ${currency} submitted. Tx: ${txHash.slice(0, 8)}...`,
+			)
+			setAmount("")
+			onDepositSuccess?.()
+		} catch (error) {
+			const message =
+				error instanceof Error
+					? error.message
+					: "Failed to process deposit. Please try again."
+			showError(message)
+		} finally {
+			setIsLoading(false)
+		}
+	}
+
+	const govAmount = amount ? parseFloat(amount).toLocaleString() : "0.00"
+
+	return (
+		<section className="mb-20">
+			<div className="mb-12 flex items-center gap-4">
+				<h2 className="text-2xl font-black tracking-tight">Deposit More</h2>
+				{isPaused && (
+					<div className="mb-4 rounded-xl bg-red-500/20 border border-red-500/30 p-4 text-center text-red-400 font-black">
+						Emergency Pause Active – Deposits are disabled.
+					</div>
+				)}
+				<div className="h-px flex-1 bg-linear-to-r from-white/10 to-transparent" />
+			</div>
+
+			<form onSubmit={handleDeposit}>
+				<div className="glass-card max-w-2xl rounded-[3rem] border border-white/5 p-12">
+					{/* Currency selector */}
+					<div className="mb-8">
+						<p className="mb-4 text-xs font-black uppercase tracking-widest text-white/40">
+							Currency
+						</p>
+						<div className="grid grid-cols-3 gap-3">
+							{CURRENCIES.map((c) => (
+								<button
+									key={c.code}
+									type="button"
+									onClick={() => setCurrency(c.code)}
+									className={`rounded-xl px-4 py-3 text-sm font-black uppercase tracking-widest transition-all ${
+										currency === c.code
+											? "bg-brand-cyan text-black shadow-[0_0_20px_rgba(0,210,255,0.3)]"
+											: "border border-white/10 bg-white/5 text-white/40 hover:border-white/30 hover:text-white"
+									}`}
+								>
+									<span className="block">{c.label}</span>
+									<span className="block text-[10px] font-medium normal-case tracking-normal opacity-70">
+										{c.description}
+									</span>
+								</button>
+							))}
+						</div>
+					</div>
+
+					<div className="mb-8">
+						<label className="mb-4 block text-sm font-black uppercase tracking-widest text-white/40">
+							Deposit Amount
+						</label>
+						<div className="relative">
+							<span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-brand-cyan">
+								{currency === "USDC" || currency === "EURC" ? "$" : "✦"}
+							</span>
+							<input
+								type="text"
+								value={amount}
+								onChange={handleAmountChange}
+								placeholder="0.00"
+								disabled={isPaused}
+								className="w-full rounded-2xl border border-white/10 bg-white/5 px-12 py-4 text-2xl font-black text-white placeholder:text-white/20 transition-all focus:border-brand-cyan/50 focus:outline-none focus:ring-2 focus:ring-brand-cyan/20"
+							/>
+							<span className="absolute right-6 top-1/2 -translate-y-1/2 text-sm font-black uppercase tracking-widest text-white/40">
+								{currency}
+							</span>
+						</div>
+					</div>
+
+					<div className="mb-8">
+						<p className="mb-4 text-xs font-black uppercase tracking-widest text-white/40">
+							Quick Select
+						</p>
+						<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+							{[100, 500, 1000, 5000].map((value) => (
+								<button
+									key={value}
+									type="button"
+									disabled={isPaused}
+									onClick={() => handleQuickAmount(value)}
+									className={`rounded-xl px-4 py-3 text-sm font-black uppercase tracking-widest transition-all ${
+										amount === value.toString()
+											? "bg-brand-cyan text-black shadow-[0_0_20px_rgba(0,210,255,0.3)]"
+											: "border border-white/10 bg-white/5 text-white/40 hover:border-white/30 hover:text-white"
+									}`}
+								>
+									{currency === "XLM" ? value : `$${value}`}
+								</button>
+							))}
+						</div>
+					</div>
+
+					<div className="mb-8 h-px bg-white/5" />
+
+					<div className="mb-8 space-y-3">
+						<div className="flex items-center justify-between text-sm">
+							<span className="text-white/40">You will receive</span>
+							<span className="font-black text-brand-cyan">
+								{govAmount} GOV
+							</span>
+						</div>
+						<div className="flex items-center justify-between text-xs">
+							<span className="text-white/30">Exchange rate</span>
+							<span className="text-white/40">
+								1 {currency} = 1 GOV
+							</span>
+						</div>
+						{currency !== "USDC" && (
+							<div className="flex items-center justify-between text-xs">
+								<span className="text-white/30">Note</span>
+								<span className="text-white/40">
+									{currency} deposits fund the treasury directly
+								</span>
+							</div>
+						)}
+					</div>
+
+					<button
+						type="submit"
+						disabled={!address || !amount || isLoading || isPaused}
+						className={`w-full rounded-2xl px-6 py-4 font-black uppercase tracking-widest transition-all ${
+							!address || !amount || isLoading
+								? "cursor-not-allowed bg-white/5 text-white/40"
+								: "bg-brand-cyan text-black hover:scale-105 hover:shadow-[0_0_30px_rgba(0,210,255,0.4)] active:scale-95"
+						}`}
+					>
+						{isLoading
+							? "Processing..."
+							: address
+								? `Deposit ${amount ? `${currency === "XLM" ? "" : "$"}${parseFloat(amount || "0").toLocaleString()}` : ""} ${currency}`
+								: "Connect Wallet to Deposit"}
+					</button>
+
+					{lastTxHash ? (
+						<div className="mt-6 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-100">
+							<p className="text-[11px] font-black uppercase tracking-widest text-emerald-300">
+								Deposit Submitted
+							</p>
+							<p className="mt-2 break-all font-mono text-xs text-emerald-50">
+								Transaction: {lastTxHash}
+							</p>
+							<a
+								href={explorerTransactionUrl(lastTxHash)}
+								target="_blank"
+								rel="noreferrer"
+								className="mt-3 inline-flex text-xs font-black uppercase tracking-widest text-emerald-300 hover:text-emerald-200"
+							>
+								View on Stellar Explorer
+							</a>
+						</div>
+					) : null}
+
+					<p className="mt-6 text-center text-[10px] text-white/30">
+						Deposits are secured on the Stellar blockchain
+						<br />
+						You&apos;ll receive governance tokens immediately
+						<br />
+						Your funds support eligible scholar proposals
+					</p>
+				</div>
+			</form>
+		</section>
+	)
+}

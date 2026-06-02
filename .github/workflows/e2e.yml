@@ -1,0 +1,97 @@
+name: E2E (Playwright)
+
+on:
+  pull_request:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+
+      - name: Run Lighthouse CI
+        env:
+          STAGING_URL: ${{ vars.STAGING_URL }}
+        run: |
+          if [ -n "$STAGING_URL" ]; then
+            echo "Running Lighthouse against staging: $STAGING_URL"
+            npx @lhci/cli@0.15.x autorun --collect.url="$STAGING_URL"
+          else
+            echo "STAGING_URL repository variable is not set; running Lighthouse against local preview."
+            npm run build
+            npm run preview -- --host 127.0.0.1 --port 4173 --strictPort > /tmp/learnvault-preview.log 2>&1 &
+            PREVIEW_PID=$!
+            npx wait-on http://127.0.0.1:4173
+            npx @lhci/cli@0.15.x autorun --collect.url="http://127.0.0.1:4173"
+            kill "$PREVIEW_PID"
+          fi
+
+      - name: Upload Lighthouse report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report
+          path: .lighthouseci/
+
+      - name: Comment Lighthouse summary
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            const manifestPath = '.lighthouseci/manifest.json'
+            if (!fs.existsSync(manifestPath)) {
+              core.info('No Lighthouse manifest found; skipping PR comment.')
+              return
+            }
+
+            const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+            const rows = manifest.map((entry) => {
+              const summary = entry.summary || {}
+              const format = (value) => typeof value === 'number' ? Math.round(value * 100) : 'n/a'
+              return `| ${entry.url} | ${format(summary.performance)} | ${format(summary.accessibility)} | ${format(summary['best-practices'])} | ${format(summary.seo)} |`
+            })
+
+            const body = [
+              '## Lighthouse CI',
+              '',
+              '| URL | Performance | Accessibility | Best Practices | SEO |',
+              '| --- | ---: | ---: | ---: | ---: |',
+              ...rows,
+              '',
+              'Required minimums: Performance 80, Accessibility 90, Best Practices 90, SEO 80.',
+            ].join('\n')
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            })
+
+      - name: Upload test artifacts (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            test-results/
+            playwright-report/

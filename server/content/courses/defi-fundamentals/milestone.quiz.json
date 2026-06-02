@@ -1,0 +1,51 @@
+{
+	"courseId": "defi-fundamentals",
+	"passingScore": 80,
+	"questions": [
+		{
+			"id": 1,
+			"text": "Which is a core DeFi primitive?",
+			"options": ["Tokens", "Fax machines", "Airports", "Hard drives"],
+			"correctIndex": 0
+		},
+		{
+			"id": 2,
+			"text": "Slippage is primarily caused by…",
+			"options": [
+				"A trade changing the pool ratio / market depth",
+				"Wallet passwords",
+				"Memo fields",
+				"Sequence numbers"
+			],
+			"correctIndex": 0
+		},
+		{
+			"id": 3,
+			"text": "Which is a common DeFi yield source?",
+			"options": [
+				"Trading fees",
+				"Keyboard shortcuts",
+				"Phone wallpapers",
+				"Network passphrases"
+			],
+			"correctIndex": 0
+		},
+		{
+			"id": 4,
+			"text": "Which is a real DeFi risk category?",
+			"options": [
+				"Smart contract bugs",
+				"Guaranteed profit",
+				"No wallets needed",
+				"Infinite liquidity"
+			],
+			"correctIndex": 0
+		},
+		{
+			"id": 5,
+			"text": "On Stellar, users typically opt-in to hold issued assets by creating a…",
+			"options": ["Trustline", "Browser tab", "Mining rig", "Seed email"],
+			"correctIndex": 0
+		}
+	]
+}

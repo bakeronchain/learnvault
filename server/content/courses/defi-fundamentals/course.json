@@ -1,0 +1,45 @@
+{
+	"id": "defi-fundamentals",
+	"title": "DeFi Fundamentals",
+	"level": "beginner",
+	"published": true,
+	"description": "Understand DeFi primitives (tokens, AMMs, yield, risk) and how DeFi concepts map onto Stellar and Soroban.",
+	"lessons": [
+		{
+			"id": "defi-fundamentals-1",
+			"title": "What is DeFi?",
+			"kind": "theory",
+			"markdown": "lessons/01-what-is-defi.md",
+			"quiz": "lessons/01-what-is-defi.quiz.json",
+			"reviewedBy": null
+		},
+		{
+			"id": "defi-fundamentals-2",
+			"title": "Tokens and AMMs",
+			"kind": "theory",
+			"markdown": "lessons/02-tokens-and-amms.md",
+			"quiz": "lessons/02-tokens-and-amms.quiz.json",
+			"reviewedBy": null
+		},
+		{
+			"id": "defi-fundamentals-3",
+			"title": "Yield and risk",
+			"kind": "theory",
+			"markdown": "lessons/03-yield-and-risk.md",
+			"quiz": "lessons/03-yield-and-risk.quiz.json",
+			"reviewedBy": null
+		},
+		{
+			"id": "defi-fundamentals-4",
+			"title": "DeFi on Stellar (SDEX, liquidity pools)",
+			"kind": "theory",
+			"markdown": "lessons/04-defi-on-stellar.md",
+			"quiz": "lessons/04-defi-on-stellar.quiz.json",
+			"reviewedBy": null
+		}
+	],
+	"milestoneQuiz": {
+		"passingScore": 80,
+		"quiz": "milestone.quiz.json"
+	}
+}

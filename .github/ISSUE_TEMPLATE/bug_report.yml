@@ -38,7 +38,8 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: Include OS, browser, Node.js version, and wallet details if relevant.
+      description:
+        Include OS, browser, Node.js version, and wallet details if relevant.
       placeholder: macOS 14.4, Chrome 123, Node 22.2.0, Freighter
     validations:
       required: true

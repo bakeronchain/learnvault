@@ -1,0 +1,39 @@
+{
+	"lessonId": "stellar-basics-2",
+	"passingScore": 80,
+	"questions": [
+		{
+			"id": 1,
+			"text": "Which item should you never share with anyone (including “support”)?",
+			"options": [
+				"Your public address",
+				"Your recovery phrase / secret key",
+				"A transaction hash",
+				"The network passphrase"
+			],
+			"correctIndex": 1
+		},
+		{
+			"id": 2,
+			"text": "Why is a test network recommended for learning and experimenting?",
+			"options": [
+				"Transactions are slower and safer",
+				"It lets you practice without risking real funds",
+				"It removes the need for signatures",
+				"It guarantees profits"
+			],
+			"correctIndex": 1
+		},
+		{
+			"id": 3,
+			"text": "What does Friendbot typically do?",
+			"options": [
+				"Deploys Soroban contracts",
+				"Sends test XLM to a testnet account",
+				"Stores your seed phrase",
+				"Converts XLM to fiat automatically"
+			],
+			"correctIndex": 1
+		}
+	]
+}

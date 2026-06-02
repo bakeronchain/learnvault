@@ -1,325 +1,462 @@
 import React, { useEffect, useMemo, useState } from "react"
+import { Helmet } from "react-helmet"
+import { useSearchParams } from "react-router-dom"
+import CommentSection from "../components/CommentSection"
+import ConfirmDialog from "../components/ConfirmDialog"
+import Pagination from "../components/Pagination"
+import { NoProposalsEmptyState } from "../components/SkeletonLoader"
+import { EmptyState as StateEmpty } from "../components/states/emptyState"
+import { ErrorState } from "../components/states/errorState"
+import { useToast } from "../components/Toast/ToastProvider"
+import {
+	type ProposalRecord,
+	useProposal,
+	useProposalVotes,
+	useProposals,
+} from "../hooks/useProposals"
+import {
+	hasProposalDraft,
+	getDraftTimestamp,
+	clearProposalDraft,
+} from "../util/proposalDraft"
 
-type ProposalStatus = "Active" | "Passed" | "Rejected"
-type VoteType = "YES" | "NO" | null
-type FilterType = "Active" | "Passed" | "Rejected" | "All"
+type FilterType =
+	| "Voting Open"
+	| "Voting Closed"
+	| "Queued"
+	| "Passed"
+	| "Rejected"
+	| "All"
 
-type Milestone = {
-	title: string
-	description: string
-}
-
-type Proposal = {
-	id: string
-	title: string
-	description: string
-	author: string
-	status: ProposalStatus
-	votesFor: number
-	votesAgainst: number
-	endDate: string
-	usdcRequested: number
-	lrnScore: number
-	milestones: Milestone[]
-	quorumRequired: number
-	userVote: VoteType
-}
-
-const MOCK_PROPOSALS: Proposal[] = [
-	{
-		id: "1",
-		title: "Frontend Scholarship",
-		description:
-			"A scholarship proposal for learners focused on frontend development, React fundamentals, and project-based open-source contribution.",
-		author: "GA7B...4Y2K",
-		status: "Active",
-		votesFor: 320,
-		votesAgainst: 80,
-		endDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 2).toISOString(),
-		usdcRequested: 500,
-		lrnScore: 82,
-		milestones: [
-			{
-				title: "Milestone 1",
-				description:
-					"Complete HTML, CSS, JavaScript, and responsive design basics.",
-			},
-			{
-				title: "Milestone 2",
-				description:
-					"Build React projects and submit at least one open-source pull request.",
-			},
-		],
-		quorumRequired: 500,
-		userVote: null,
-	},
-	{
-		id: "2",
-		title: "Blockchain Scholarship",
-		description:
-			"A scholarship proposal for blockchain learners covering wallet basics, smart contracts, and Stellar ecosystem development.",
-		author: "GBSU...9R3T",
-		status: "Passed",
-		votesFor: 700,
-		votesAgainst: 100,
-		endDate: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-		usdcRequested: 900,
-		lrnScore: 91,
-		milestones: [
-			{
-				title: "Milestone 1",
-				description: "Learn wallets, transactions, and blockchain foundations.",
-			},
-			{
-				title: "Milestone 2",
-				description: "Build and test smart-contract-based mini projects.",
-			},
-		],
-		quorumRequired: 500,
-		userVote: "YES",
-	},
-	{
-		id: "3",
-		title: "AI Scholarship",
-		description:
-			"A scholarship proposal focused on AI fundamentals, model usage, and beginner machine learning workflows.",
-		author: "GC8X...7P1L",
-		status: "Rejected",
-		votesFor: 140,
-		votesAgainst: 260,
-		endDate: new Date(Date.now() - 1000 * 60 * 60 * 10).toISOString(),
-		usdcRequested: 650,
-		lrnScore: 76,
-		milestones: [
-			{
-				title: "Milestone 1",
-				description: "Complete Python and data fundamentals.",
-			},
-			{
-				title: "Milestone 2",
-				description: "Build a simple ML project and publish documentation.",
-			},
-		],
-		quorumRequired: 500,
-		userVote: "NO",
-	},
-]
-
-const governanceTokens = 128.45
-const isTokenHolder = true
+const ITEMS_PER_PAGE = 5
 
 const shortenAddress = (address: string) => {
+	if (!address) return ""
 	if (address.includes("...")) return address
 	if (address.length <= 10) return address
 	return `${address.slice(0, 6)}...${address.slice(-4)}`
 }
 
-const getTimeRemaining = (endDate: string) => {
-	const diff = new Date(endDate).getTime() - Date.now()
+const formatCountdown = (
+	deadline: string | null,
+	now: number,
+	{ queued = false }: { queued?: boolean } = {},
+) => {
+	if (!deadline) return "No deadline set"
 
-	if (diff <= 0) return "Ended"
+	const diff = new Date(deadline).getTime() - now
+	if (diff <= 0) return queued ? "Ready for execution" : "Voting closed"
 
-	const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-	const hours = Math.floor((diff / (1000 * 60 * 60)) % 24)
-	const minutes = Math.floor((diff / (1000 * 60)) % 60)
+	const minutes = Math.floor(diff / (1000 * 60))
+	const days = Math.floor(minutes / (60 * 24))
+	const hours = Math.floor((minutes % (60 * 24)) / 60)
+	const mins = minutes % 60
 
-	return `${days}d ${hours}h ${minutes}m`
+	const prefix = queued ? "Execution in " : ""
+	if (days > 0) return `${prefix}${days}d ${hours}h remaining`
+	if (hours > 0) return `${prefix}${hours}h ${mins}m remaining`
+	return `${prefix}${Math.max(mins, 1)}m remaining`
+}
+
+const formatTokenAmount = (value: bigint) => value.toString()
+
+const getFilterValue = (proposal: ProposalRecord): FilterType => {
+	if (proposal.displayStatus === "Voting Open") return "Voting Open"
+	if (proposal.displayStatus === "Voting Closed") return "Voting Closed"
+	if (proposal.displayStatus === "Queued") return "Queued"
+	if (proposal.displayStatus === "Passed") return "Passed"
+	return "Rejected"
 }
 
 const DaoProposals: React.FC = () => {
-	const [filter, setFilter] = useState<FilterType>("Active")
-	const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(
-		null,
-	)
-	const [isSubmittingVote, setIsSubmittingVote] = useState(false)
-	const [txMessage, setTxMessage] = useState("")
+	const [searchParams, setSearchParams] = useSearchParams()
+	const [filter, setFilter] = useState<FilterType>("Voting Open")
+	const [showLiveVotes, setShowLiveVotes] = useState(false)
+	const [now, setNow] = useState(() => Date.now())
+	const {
+		proposals,
+		votingPower,
+		castVote,
+		isVoting,
+		walletAddress,
+		isLoading,
+		error,
+		refetch,
+		cancelProposal,
+		isCancelling,
+	} = useProposals()
+	const { showSuccess } = useToast()
 
-	const filteredProposals = useMemo(() => {
-		if (filter === "All") return MOCK_PROPOSALS
-		return MOCK_PROPOSALS.filter((proposal) => proposal.status === filter)
-	}, [filter])
+	const [hasDraft, setHasDraft] = useState(false)
+	const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null)
 
 	useEffect(() => {
-		if (filteredProposals.length === 0) {
-			setSelectedProposal(null)
-			return
+		const existingDraft = hasProposalDraft()
+		setHasDraft(existingDraft)
+		if (existingDraft) {
+			setDraftTimestamp(getDraftTimestamp())
 		}
+	}, [])
 
-		const stillVisible = filteredProposals.find(
-			(proposal) => proposal.id === selectedProposal?.id,
+	const [showDeleteDraftConfirm, setShowDeleteDraftConfirm] = useState(false)
+
+	const handleDeleteDraft = () => {
+		clearProposalDraft()
+		setHasDraft(false)
+		setDraftTimestamp(null)
+		setShowDeleteDraftConfirm(false)
+		showSuccess("Draft deleted")
+	}
+
+	const formatDraftTime = (timestamp: number | null): string => {
+		if (!timestamp) return ""
+		const date = new Date(timestamp)
+		const now = new Date()
+		const diffMs = now.getTime() - date.getTime()
+		const diffMins = Math.floor(diffMs / 60000)
+
+		if (diffMins < 1) return "just now"
+		if (diffMins < 60) return `${diffMins}m ago`
+		if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`
+		return date.toLocaleDateString()
+	}
+
+	const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+
+	const handleCancelProposal = async () => {
+		if (!selectedProposal) return
+		try {
+			await cancelProposal(selectedProposal.id)
+			setShowCancelConfirm(false)
+		} catch (err) {
+			console.error("Cancel proposal failed", err)
+		}
+	}
+
+	const proposalParam = searchParams.get("proposal")
+	const pageParam = searchParams.get("page")
+	const parsedSelectedId = proposalParam
+		? Number.parseInt(proposalParam, 10)
+		: null
+	const parsedPage = pageParam ? Number.parseInt(pageParam, 10) : 1
+	const currentPage =
+		Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
+
+	const filteredProposals = useMemo(() => {
+		if (filter === "All") return proposals
+		return proposals.filter((proposal) => getFilterValue(proposal) === filter)
+	}, [filter, proposals])
+
+	const totalPages = Math.max(
+		1,
+		Math.ceil(filteredProposals.length / ITEMS_PER_PAGE),
+	)
+	const safePage = Math.min(currentPage, totalPages)
+	const currentProposals = filteredProposals.slice(
+		(safePage - 1) * ITEMS_PER_PAGE,
+		safePage * ITEMS_PER_PAGE,
+	)
+
+	const selectedFromList = useMemo(() => {
+		if (parsedSelectedId === null || Number.isNaN(parsedSelectedId)) return null
+		return (
+			proposals.find((proposal) => proposal.id === parsedSelectedId) ?? null
 		)
+	}, [parsedSelectedId, proposals])
 
-		if (!stillVisible) {
-			setSelectedProposal(filteredProposals[0])
+	const fallbackSelected = filteredProposals[0] ?? proposals[0] ?? null
+	const selectedProposalId =
+		selectedFromList?.id ?? fallbackSelected?.id ?? null
+	const selectedProposalQuery = useProposal(selectedProposalId)
+	const showVotesSection = Boolean(
+		selectedProposal &&
+			(!selectedProposal.isVotingOpen || showLiveVotes),
+	)
+	const votesQuery = useProposalVotes(selectedProposalId, showVotesSection)
+	const selectedProposal =
+		selectedProposalQuery.data ?? selectedFromList ?? fallbackSelected ?? null
+
+	useEffect(() => {
+		const interval = window.setInterval(() => setNow(Date.now()), 60000)
+		return () => window.clearInterval(interval)
+	}, [])
+
+	useEffect(() => {
+		if (currentPage !== safePage) {
+			const nextParams = new URLSearchParams(searchParams)
+			nextParams.set("page", safePage.toString())
+			setSearchParams(nextParams, { replace: true })
 		}
-	}, [filteredProposals, selectedProposal])
+	}, [currentPage, safePage, searchParams, setSearchParams])
+
+	useEffect(() => {
+		if (!selectedProposalId) return
+
+		const nextParams = new URLSearchParams(searchParams)
+		let changed = false
+
+		if (nextParams.get("proposal") !== String(selectedProposalId)) {
+			nextParams.set("proposal", String(selectedProposalId))
+			changed = true
+		}
+
+		if (!nextParams.get("page")) {
+			nextParams.set("page", "1")
+			changed = true
+		}
+
+		if (changed) {
+			setSearchParams(nextParams, { replace: true })
+		}
+	}, [searchParams, selectedProposalId, setSearchParams])
+
+	useEffect(() => {
+		if (!selectedFromList) return
+		const matchingFilter = getFilterValue(selectedFromList)
+		if (filter !== "All" && filter !== matchingFilter) {
+			setFilter(matchingFilter)
+		}
+	}, [filter, selectedFromList])
+
+	const handleSelectProposal = (proposalId: number) => {
+		const nextParams = new URLSearchParams(searchParams)
+		nextParams.set("proposal", String(proposalId))
+		setSearchParams(nextParams)
+	}
+
+	const handlePageChange = (page: number) => {
+		const nextParams = new URLSearchParams(searchParams)
+		nextParams.set("page", String(page))
+		setSearchParams(nextParams)
+		window.scrollTo({ top: 0, behavior: "smooth" })
+	}
+
+	const handleFilterChange = (nextFilter: FilterType) => {
+		setFilter(nextFilter)
+		const nextParams = new URLSearchParams(searchParams)
+		nextParams.set("page", "1")
+		setSearchParams(nextParams)
+	}
 
 	const totalVotes = selectedProposal
 		? selectedProposal.votesFor + selectedProposal.votesAgainst
-		: 0
-
+		: 0n
 	const yesPercent =
-		selectedProposal && totalVotes > 0
-			? (selectedProposal.votesFor / totalVotes) * 100
+		totalVotes > 0n
+			? Number((selectedProposal!.votesFor * 100n) / totalVotes)
 			: 0
-
 	const noPercent =
-		selectedProposal && totalVotes > 0
-			? (selectedProposal.votesAgainst / totalVotes) * 100
+		totalVotes > 0n
+			? Number((selectedProposal!.votesAgainst * 100n) / totalVotes)
 			: 0
-
-	const quorumReached = selectedProposal
-		? totalVotes >= selectedProposal.quorumRequired
-		: false
-
+	const userHasVoted =
+		selectedProposal?.userVoteSupport === true ||
+		selectedProposal?.userVoteSupport === false
+	const voteChoice = selectedProposal?.userVoteSupport ?? null
+	const isWalletConnected = Boolean(walletAddress)
+	const isTokenHolder = votingPower > 0n
 	const voteDisabled =
 		!selectedProposal ||
+		!selectedProposal.isVotingOpen ||
+		!isWalletConnected ||
 		!isTokenHolder ||
-		selectedProposal.userVote !== null ||
-		selectedProposal.status !== "Active"
+		userHasVoted
 
 	const getVoteDisabledMessage = () => {
 		if (!selectedProposal) return ""
-		if (!isTokenHolder) return "You must be a token holder to vote."
-		if (selectedProposal.userVote)
-			return "You have already voted on this proposal."
-		if (selectedProposal.status !== "Active")
+		if (!isWalletConnected) return "Connect your wallet to vote."
+		if (!isTokenHolder) return "You need governance tokens to vote."
+		if (userHasVoted) return "You have already cast your vote on this proposal."
+		if (!selectedProposal.isVotingOpen)
 			return "Voting is closed for this proposal."
 		return ""
 	}
 
-	const handleVote = async (vote: "YES" | "NO") => {
-		if (!selectedProposal || voteDisabled) return
+	const title = selectedProposal
+		? `${selectedProposal.title} | LearnVault DAO`
+		: "DAO Proposals | LearnVault"
 
-		setIsSubmittingVote(true)
-		setTxMessage("Transaction submitted...")
+	if (isLoading) {
+		return (
+			<div className="p-12 max-w-5xl mx-auto text-center h-[60vh] flex flex-col items-center justify-center">
+				<div className="w-12 h-12 border-4 border-brand-cyan/20 border-t-brand-cyan rounded-full animate-spin mb-4" />
+				<p className="text-white/60 font-medium">Loading proposals...</p>
+			</div>
+		)
+	}
 
-		try {
-			await new Promise((resolve) => setTimeout(resolve, 1500))
-			setTxMessage(`Transaction confirmed. Vote ${vote} recorded successfully.`)
-		} catch {
-			setTxMessage("Transaction failed. Please try again.")
-		} finally {
-			setIsSubmittingVote(false)
-		}
+	if (error) {
+		return (
+			<div className="p-12 max-w-5xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
+				<ErrorState
+					message={(error as Error).message || String(error)}
+					onRetry={() => void refetch()}
+				/>
+			</div>
+		)
+	}
+
+	if (proposals.length === 0) {
+		return (
+			<div className="p-12 max-w-5xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
+				<NoProposalsEmptyState />
+			</div>
+		)
 	}
 
 	return (
 		<div className="p-12 max-w-5xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
+			<Helmet>
+				<title>{title}</title>
+			</Helmet>
+
 			<header className="mb-16 text-center">
 				<h1 className="text-6xl font-black mb-4 tracking-tighter text-gradient">
 					DAO Proposals
 				</h1>
-				<p className="text-white/40 text-lg font-medium max-w-2xl mx-auto">
-					Governance token holders can review scholarship proposals and cast
-					votes.
+				<p className="text-white/70 text-lg font-medium max-w-2xl mx-auto">
+					Review live governance proposals, track vote totals, and follow the
+					discussion in real time.
 				</p>
 			</header>
 
-			<div className="flex flex-wrap gap-3 mb-8 justify-center">
-				{(["Active", "Passed", "Rejected", "All"] as FilterType[]).map(
-					(item) => (
+			{hasDraft && (
+				<div className="mb-12 glass-card p-6 rounded-[2rem] border border-brand-amber/30 bg-brand-amber/5 animate-in fade-in slide-in-from-top-4 duration-700 flex flex-col md:flex-row items-center justify-between gap-4">
+					<div className="flex items-center gap-4">
+						<div className="w-12 h-12 rounded-2xl bg-brand-amber/20 flex items-center justify-center text-2xl">
+							📝
+						</div>
+						<div>
+							<h3 className="font-black text-lg text-brand-amber">
+								Unfinished Proposal Draft
+							</h3>
+							<p className="text-white/50 text-sm">
+								You have a draft saved {formatDraftTime(draftTimestamp)}.
+							</p>
+						</div>
+					</div>
+					<div className="flex items-center gap-3">
 						<button
-							key={item}
-							onClick={() => {
-								setFilter(item)
-								setTxMessage("")
-							}}
-							className={`px-5 py-2.5 rounded-full border text-xs font-black uppercase tracking-widest transition-all ${
-								filter === item
-									? "bg-brand-cyan/10 border-brand-cyan/40 text-brand-cyan"
-									: "bg-white/5 border-white/10 text-white/60 hover:border-brand-cyan/30 hover:text-brand-cyan"
-							}`}
+							type="button"
+							onClick={() => setShowDeleteDraftConfirm(true)}
+							className="px-6 py-2 text-xs font-black uppercase tracking-widest text-white/40 hover:text-red-400 transition-colors"
 						>
-							{item}
+							Discard
 						</button>
-					),
-				)}
+						<a
+							href="/dao/propose"
+							className="px-8 py-2.5 bg-brand-amber/20 border border-brand-amber/40 text-brand-amber text-xs font-black uppercase tracking-widest rounded-full hover:bg-brand-amber/30 transition-all"
+						>
+							Continue Editing
+						</a>
+					</div>
+				</div>
+			)}
+
+			<div className="flex flex-wrap gap-3 mb-8 justify-center">
+				{(
+					[
+						"Voting Open",
+						"Voting Closed",
+						"Queued",
+						"Passed",
+						"Rejected",
+						"All",
+					] as FilterType[]
+				).map((item) => (
+					<button
+						key={item}
+						type="button"
+						onClick={() => handleFilterChange(item)}
+						className={`px-5 py-2.5 rounded-full border text-xs font-black uppercase tracking-widest transition-all ${filter === item
+								? "bg-brand-cyan/10 border-brand-cyan/40 text-brand-cyan"
+								: "bg-white/5 border-white/10 text-white/70 hover:border-brand-cyan/30"
+							}`}
+					>
+						{item}
+					</button>
+				))}
 			</div>
 
 			{selectedProposal && (
-				<div className="glass-card p-10 rounded-[2.5rem] border border-white/5 mb-10">
-					<div className="flex justify-between items-start gap-6 mb-6">
+				<section className="glass-card p-10 rounded-[2.5rem] border border-white/5 mb-10">
+					<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-8">
 						<div>
-							<h2 className="text-4xl font-black tracking-tight mb-3">
+							<h2
+								className="text-4xl font-black tracking-tight mb-3"
+								data-testid="proposal-detail-title"
+							>
 								{selectedProposal.title}
 							</h2>
 							<div className="flex flex-wrap items-center gap-3 text-xs font-black uppercase tracking-widest">
 								<span className="text-brand-cyan">
-									Applicant {shortenAddress(selectedProposal.author)}
+									Applicant {shortenAddress(selectedProposal.authorAddress)}
 								</span>
-								<span className="w-1.5 h-1.5 bg-white/10 rounded-full" />
-								<span className="text-white/40">
-									Time Remaining {getTimeRemaining(selectedProposal.endDate)}
+								<span className="w-1.5 h-1.5 bg-white/20 rounded-full" />
+								<span className="text-white/70">ID #{selectedProposal.id}</span>
+								<span className="w-1.5 h-1.5 bg-white/20 rounded-full" />
+								<span className="text-white/50">
+									{formatCountdown(
+										selectedProposal.executionReadyAt ??
+											selectedProposal.deadline,
+										now,
+										{ queued: selectedProposal.status === "queued" },
+									)}
 								</span>
 							</div>
 						</div>
-
-						<div className="px-5 py-2 bg-brand-cyan/10 border border-brand-cyan/30 rounded-full">
-							<span className="text-brand-cyan text-xs font-black uppercase tracking-widest">
-								{selectedProposal.status}
-							</span>
+						<div className="flex flex-col items-end gap-3">
+							<div className="px-5 py-2 bg-brand-cyan/10 border border-brand-cyan/30 rounded-full text-brand-cyan text-xs font-black uppercase">
+								{selectedProposal.displayStatus}
+							</div>
+							{selectedProposal.authorAddress === walletAddress &&
+								selectedProposal.displayStatus === "Voting Open" && (
+									<button
+										type="button"
+										onClick={() => setShowCancelConfirm(true)}
+										disabled={isCancelling}
+										className="text-[10px] font-black uppercase text-red-400/70 hover:text-red-400 transition-colors"
+									>
+										{isCancelling ? "Cancelling..." : "Cancel Proposal"}
+									</button>
+								)}
 						</div>
 					</div>
 
 					<div className="grid gap-8 md:grid-cols-2">
 						<div>
-							<div className="grid grid-cols-2 gap-4 mb-8">
-								<div className="rounded-[1.75rem] border border-white/5 bg-white/5 p-5">
-									<p className="text-[10px] text-white/30 uppercase font-black tracking-widest mb-2">
-										USDC Requested
-									</p>
-									<h3 className="text-2xl font-black">
-										{selectedProposal.usdcRequested}
-									</h3>
-								</div>
-
-								<div className="rounded-[1.75rem] border border-white/5 bg-white/5 p-5">
-									<p className="text-[10px] text-white/30 uppercase font-black tracking-widest mb-2">
-										LRN Score
-									</p>
-									<h3 className="text-2xl font-black">
-										{selectedProposal.lrnScore}
-									</h3>
-								</div>
-							</div>
-
-							<h3 className="text-xl font-black mb-3 tracking-tight">
-								Program Description
-							</h3>
-							<p className="text-white/60 leading-relaxed mb-8">
+							<h3 className="text-xl font-black mb-3">Description</h3>
+							<p className="text-white/70 leading-relaxed whitespace-pre-wrap mb-8">
 								{selectedProposal.description}
 							</p>
 
-							<h3 className="text-xl font-black mb-3 tracking-tight">
-								Milestone Breakdown
-							</h3>
-							<div className="space-y-4">
-								{selectedProposal.milestones.map((milestone, index) => (
-									<div
-										key={index}
-										className="rounded-[1.5rem] border border-white/5 bg-white/5 p-5"
-									>
-										<p className="font-black mb-1">{milestone.title}</p>
-										<p className="text-sm text-white/60 leading-relaxed">
-											{milestone.description}
-										</p>
-									</div>
-								))}
+							<div className="grid gap-4 sm:grid-cols-2">
+								<div className="rounded-[1.75rem] border border-white/5 bg-white/5 p-6">
+									<p className="text-[10px] text-white/70 uppercase font-black tracking-widest mb-2">
+										My Voting Power
+									</p>
+									<h3 className="text-2xl font-black">
+										{formatTokenAmount(votingPower)} GOV
+									</h3>
+								</div>
+								<div className="rounded-[1.75rem] border border-white/5 bg-white/5 p-6">
+									<p className="text-[10px] text-white/70 uppercase font-black tracking-widest mb-2">
+										Requested Amount
+									</p>
+									<h3 className="text-2xl font-black">
+										{selectedProposal.amount.toLocaleString()} USDC
+									</h3>
+								</div>
 							</div>
 						</div>
 
 						<div>
-							<h3 className="text-xl font-black mb-4 tracking-tight">
-								Voting Overview
-							</h3>
-
-							<div className="mb-5">
+							<h3 className="text-xl font-black mb-4">Voting Stats</h3>
+							<div className="mb-6">
 								<div className="flex justify-between text-xs font-black uppercase tracking-widest mb-2">
-									<span>YES {yesPercent.toFixed(1)}%</span>
-									<span>NO {noPercent.toFixed(1)}%</span>
+									<span>Yes {yesPercent}%</span>
+									<span>No {noPercent}%</span>
 								</div>
-
 								<div className="w-full h-3 rounded-full bg-white/5 overflow-hidden flex">
 									<div
 										className="h-full bg-brand-cyan"
@@ -332,161 +469,287 @@ const DaoProposals: React.FC = () => {
 								</div>
 							</div>
 
-							<div className="space-y-3 text-sm text-white/60 mb-6">
+							<div className="space-y-3 mb-8 text-sm text-white/60">
 								<p>
-									Current quorum: {totalVotes} /{" "}
-									{selectedProposal.quorumRequired}
+									<span data-testid="vote-yes-count">
+										Yes votes: {formatTokenAmount(selectedProposal.votesFor)}{" "}
+										GOV
+									</span>
 								</p>
 								<p>
-									Quorum status: {quorumReached ? "Reached" : "Not reached"}
+									<span data-testid="vote-no-count">
+										No votes: {formatTokenAmount(selectedProposal.votesAgainst)}{" "}
+										GOV
+									</span>
 								</p>
 								<p>
-									Your current vote:{" "}
-									{selectedProposal.userVote
-										? selectedProposal.userVote
-										: "Not voted"}
+									Total voting power cast: {formatTokenAmount(totalVotes)} GOV
 								</p>
 								<p>
-									Your vote = {governanceTokens.toFixed(2)} governance tokens
-								</p>
-								<p>
-									Countdown timer: {getTimeRemaining(selectedProposal.endDate)}
+									{formatCountdown(
+										selectedProposal.executionReadyAt ??
+											selectedProposal.deadline,
+										now,
+										{ queued: selectedProposal.status === "queued" },
+									)}
 								</p>
 							</div>
-
-							<div className="flex flex-wrap gap-3">
-								<button
-									onClick={() => handleVote("YES")}
-									disabled={voteDisabled || isSubmittingVote}
-									className="px-6 py-3 bg-brand-cyan/10 border border-brand-cyan/30 text-brand-cyan font-black uppercase tracking-widest rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
-								>
-									{isSubmittingVote ? "Submitting..." : "Vote YES"}
-								</button>
-
-								<button
-									onClick={() => handleVote("NO")}
-									disabled={voteDisabled || isSubmittingVote}
-									className="px-6 py-3 bg-brand-purple/10 border border-brand-purple/30 text-brand-purple font-black uppercase tracking-widest rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
-								>
-									{isSubmittingVote ? "Submitting..." : "Vote NO"}
-								</button>
+							<div className="mb-8 rounded-2xl border border-white/10 bg-white/5 p-4">
+								<div className="flex items-center justify-between gap-3 mb-4">
+									<h4 className="text-sm font-black uppercase tracking-widest text-white/70">
+										Vote transparency
+									</h4>
+									{selectedProposal?.isVotingOpen && (
+										<label className="text-xs text-white/60 flex items-center gap-2">
+											<input
+												type="checkbox"
+												checked={showLiveVotes}
+												onChange={(e) => setShowLiveVotes(e.target.checked)}
+											/>
+											Show before close
+										</label>
+									)}
+								</div>
+								{showVotesSection ? (
+									<>
+										<div className="flex items-center gap-4 mb-4">
+											<div
+												className="w-20 h-20 rounded-full border border-white/10"
+												style={{
+													background: `conic-gradient(#00d4ff 0 ${yesPercent}%, #a855f7 ${yesPercent}% 100%)`,
+												}}
+												aria-label="Vote breakdown pie chart"
+												title={`For ${yesPercent}%, Against ${noPercent}%`}
+											/>
+											<div className="text-xs text-white/60 space-y-1">
+												<p>For: {yesPercent}%</p>
+												<p>Against: {noPercent}%</p>
+											</div>
+										</div>
+										{votesQuery.data?.unavailable ? (
+											<p className="text-xs text-white/40">
+												Voter list endpoint is not available yet.
+											</p>
+										) : (
+											<ul className="space-y-2 max-h-56 overflow-auto pr-1">
+												{(votesQuery.data?.votes ?? []).map((vote, idx) => (
+													<li
+														key={`${vote.voterAddress}-${idx}`}
+														className="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2 text-xs"
+													>
+														<span title={vote.voterAddress} className="font-mono text-white/70">
+															{vote.voterAddress.slice(0, 6)}...
+															{vote.voterAddress.slice(-4)}
+														</span>
+														<span className={vote.support ? "text-brand-cyan" : "text-brand-purple"}>
+															{vote.support ? "For" : "Against"}
+														</span>
+														<span className="text-white/60">{vote.weight.toString()}</span>
+													</li>
+												))}
+												{(votesQuery.data?.votes?.length ?? 0) === 0 && (
+													<li className="text-xs text-white/40">
+														No vote records available.
+													</li>
+												)}
+											</ul>
+										)}
+									</>
+								) : (
+									<p className="text-xs text-white/40">
+										Voter list is shown after voting closes, or enable the opt-in toggle.
+									</p>
+								)}
+							</div>
+							<div className="mb-8 rounded-2xl border border-white/10 bg-white/5 p-4">
+								<div className="flex items-center justify-between gap-3 mb-4">
+									<h4 className="text-sm font-black uppercase tracking-widest text-white/70">
+										Vote transparency
+									</h4>
+									{selectedProposal?.isVotingOpen && (
+										<label className="text-xs text-white/60 flex items-center gap-2">
+											<input
+												type="checkbox"
+												checked={showLiveVotes}
+												onChange={(e) => setShowLiveVotes(e.target.checked)}
+											/>
+											Show before close
+										</label>
+									)}
+								</div>
+								{showVotesSection ? (
+									<>
+										<div className="flex items-center gap-4 mb-4">
+											<div
+												className="w-20 h-20 rounded-full border border-white/10"
+												style={{
+													background: `conic-gradient(#00d4ff 0 ${yesPercent}%, #a855f7 ${yesPercent}% 100%)`,
+												}}
+												aria-label="Vote breakdown pie chart"
+												title={`For ${yesPercent}%, Against ${noPercent}%`}
+											/>
+											<div className="text-xs text-white/60 space-y-1">
+												<p>For: {yesPercent}%</p>
+												<p>Against: {noPercent}%</p>
+											</div>
+										</div>
+										{votesQuery.data?.unavailable ? (
+											<p className="text-xs text-white/40">
+												Voter list endpoint is not available yet.
+											</p>
+										) : (
+											<ul className="space-y-2 max-h-56 overflow-auto pr-1">
+												{(votesQuery.data?.votes ?? []).map((vote, idx) => (
+													<li
+														key={`${vote.voterAddress}-${idx}`}
+														className="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2 text-xs"
+													>
+														<span title={vote.voterAddress} className="font-mono text-white/70">
+															{vote.voterAddress.slice(0, 6)}...
+															{vote.voterAddress.slice(-4)}
+														</span>
+														<span className={vote.support ? "text-brand-cyan" : "text-brand-purple"}>
+															{vote.support ? "For" : "Against"}
+														</span>
+														<span className="text-white/60">{vote.weight.toString()}</span>
+													</li>
+												))}
+												{(votesQuery.data?.votes?.length ?? 0) === 0 && (
+													<li className="text-xs text-white/40">
+														No vote records available.
+													</li>
+												)}
+											</ul>
+										)}
+									</>
+								) : (
+									<p className="text-xs text-white/40">
+										Voter list is shown after voting closes, or enable the opt-in toggle.
+									</p>
+								)}
 							</div>
 
-							{txMessage && (
-								<p className="mt-4 text-sm text-white/70">{txMessage}</p>
+							{userHasVoted ? (
+								<div className="inline-flex items-center px-4 py-2 rounded-full border border-brand-cyan/30 bg-brand-cyan/10 text-brand-cyan text-xs font-black uppercase tracking-widest">
+									You voted {voteChoice ? "Yes" : "No"}
+								</div>
+							) : (
+								<div className="flex gap-3">
+									<button
+										type="button"
+										data-testid="vote-yes"
+										onClick={() =>
+											void castVote({
+												proposalId: selectedProposal.id,
+												support: true,
+											})
+										}
+										disabled={voteDisabled || isVoting}
+										className="px-8 py-3 bg-brand-cyan/10 border border-brand-cyan/30 text-brand-cyan font-black uppercase tracking-widest rounded-full hover:bg-brand-cyan/20 disabled:opacity-30 transition-all"
+									>
+										{isVoting ? "Voting..." : "Vote Yes"}
+									</button>
+									<button
+										type="button"
+										data-testid="vote-no"
+										onClick={() =>
+											void castVote({
+												proposalId: selectedProposal.id,
+												support: false,
+											})
+										}
+										disabled={voteDisabled || isVoting}
+										className="px-8 py-3 bg-brand-purple/10 border border-brand-purple/30 text-brand-purple font-black uppercase tracking-widest rounded-full hover:bg-brand-purple/20 disabled:opacity-30 transition-all"
+									>
+										{isVoting ? "Voting..." : "Vote No"}
+									</button>
+								</div>
 							)}
 
 							{getVoteDisabledMessage() && (
-								<p className="mt-4 text-sm text-white/50">
+								<p className="mt-4 text-xs text-white/40 font-medium italic">
 									{getVoteDisabledMessage()}
 								</p>
 							)}
 						</div>
 					</div>
-				</div>
+
+					<CommentSection
+						proposalId={String(selectedProposal.id)}
+						proposalAuthor={selectedProposal.authorAddress}
+					/>
+				</section>
 			)}
 
-			{filteredProposals.length > 0 ? (
-				<div className="grid gap-6">
-					{filteredProposals.map((proposal) => (
-						<button
-							key={proposal.id}
-							onClick={() => {
-								setSelectedProposal(proposal)
-								setTxMessage("")
-							}}
-							className={`glass-card p-8 rounded-[2.5rem] border text-left transition-all duration-300 ${
-								selectedProposal?.id === proposal.id
-									? "border-brand-cyan/40"
-									: "border-white/5 hover:border-brand-cyan/30 hover:-translate-y-1"
+			<div className="grid gap-6">
+				{currentProposals.map((proposal) => (
+					<button
+						key={proposal.id}
+						type="button"
+						onClick={() => handleSelectProposal(proposal.id)}
+						className={`glass-card p-8 rounded-[2.5rem] border text-left transition-all ${selectedProposal?.id === proposal.id
+								? "border-brand-cyan/40"
+								: "border-white/5 hover:border-brand-cyan/20"
 							}`}
-						>
-							<div className="flex justify-between items-start gap-6 mb-5">
-								<div>
-									<h2 className="text-2xl font-black tracking-tight mb-2">
-										{proposal.title}
-									</h2>
-									<p className="text-sm text-white/40">
-										Applicant: {shortenAddress(proposal.author)}
-									</p>
-								</div>
-
-								<span className="px-4 py-1.5 bg-white/5 text-[10px] font-black uppercase tracking-widest rounded-full border border-white/10">
-									{proposal.status}
-								</span>
+					>
+						<div className="flex justify-between items-start gap-4 mb-4">
+							<div>
+								<h2
+									className="text-2xl font-black mb-1"
+									data-testid="proposal-title"
+								>
+									{proposal.title}
+								</h2>
+								<p className="text-[10px] text-white/40 uppercase font-black tracking-widest">
+									Applicant {shortenAddress(proposal.authorAddress)}
+								</p>
 							</div>
+							<span className="px-3 py-1 bg-white/5 text-[10px] uppercase font-black rounded-full border border-white/10">
+								{proposal.displayStatus}
+							</span>
+						</div>
+						<p className="text-sm text-white/60 mb-5 line-clamp-2">
+							{proposal.description}
+						</p>
+						<div className="flex flex-wrap items-center gap-6 text-[10px] font-black uppercase tracking-widest text-white/40">
+							<span>Yes: {formatTokenAmount(proposal.votesFor)}</span>
+							<span>No: {formatTokenAmount(proposal.votesAgainst)}</span>
+							<span>
+								{formatCountdown(
+									proposal.executionReadyAt ?? proposal.deadline,
+									now,
+									{ queued: proposal.status === "queued" },
+								)}
+							</span>
+							<span className="ml-auto text-brand-cyan">View details</span>
+						</div>
+					</button>
+				))}
+			</div>
 
-							<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
-								<div>
-									<p className="text-[10px] text-white/30 uppercase font-black tracking-widest mb-1">
-										USDC Requested
-									</p>
-									<p className="font-bold">{proposal.usdcRequested}</p>
-								</div>
-
-								<div>
-									<p className="text-[10px] text-white/30 uppercase font-black tracking-widest mb-1">
-										LRN Score
-									</p>
-									<p className="font-bold">{proposal.lrnScore}</p>
-								</div>
-
-								<div>
-									<p className="text-[10px] text-white/30 uppercase font-black tracking-widest mb-1">
-										Time Remaining
-									</p>
-									<p className="font-bold">
-										{getTimeRemaining(proposal.endDate)}
-									</p>
-								</div>
-
-								<div>
-									<p className="text-[10px] text-white/30 uppercase font-black tracking-widest mb-1">
-										Total Votes
-									</p>
-									<p className="font-bold">
-										{proposal.votesFor + proposal.votesAgainst}
-									</p>
-								</div>
-							</div>
-
-							<div className="flex items-center gap-4">
-								<div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
-									<div
-										className="h-full bg-brand-cyan"
-										style={{
-											width: `${
-												(proposal.votesFor /
-													(proposal.votesFor + proposal.votesAgainst)) *
-												100
-											}%`,
-										}}
-									/>
-								</div>
-								<div className="text-[10px] font-black uppercase tracking-widest text-white/40">
-									{Math.round(
-										(proposal.votesFor /
-											(proposal.votesFor + proposal.votesAgainst)) *
-											100,
-									)}
-									% YES
-								</div>
-							</div>
-						</button>
-					))}
-				</div>
-			) : (
-				<div className="glass-card p-12 rounded-[2.5rem] border border-white/5 text-center">
-					<h3 className="text-2xl font-black mb-3">
-						{filter === "Active"
-							? "No active proposals at the moment."
-							: "No proposals found for this filter."}
-					</h3>
-					<p className="text-white/40">
-						Check back later for new governance proposals.
-					</p>
+			{filteredProposals.length === 0 && (
+				<div className="py-20 text-center opacity-50">
+					<StateEmpty
+						icon="📑"
+						title="No proposals found"
+						description="Try a different filter or view all proposals."
+						ctaLabel="Show all proposals"
+						onCtaClick={() => handleFilterChange("All")}
+					/>
 				</div>
 			)}
+
+			{filteredProposals.length > 0 && (
+				<p className="text-center text-xs text-white/40 font-black uppercase tracking-widest mt-8 mb-2">
+					Page {safePage} of {totalPages}
+				</p>
+			)}
+
+			<Pagination
+				page={safePage}
+				totalPages={totalPages}
+				onPageChange={handlePageChange}
+			/>
 		</div>
 	)
 }

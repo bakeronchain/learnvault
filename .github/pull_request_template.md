@@ -1,30 +1,29 @@
-## Summary of changes
+## Summary
+<!-- What does this PR do? -->
 
--
+## Type of Change
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Smart contract change
+- [ ] Documentation
+- [ ] Breaking change
+- [ ] Other (please describe)
 
-## Related issue(s)
+## Checklist
+- [ ] Tests added or updated
+- [ ] No hardcoded secrets or private keys
+- [ ] If contract change: `cargo test` passes
+- [ ] If frontend change: `npm run typecheck` passes
+- [ ] If backend change: `npm test` passes
+- [ ] Related issues linked (Closes #...)
+- [ ] Self-review completed
+- [ ] Code follows project style guidelines
 
-Closes #NNN
+## Screenshots (if applicable)
+<!-- Add screenshots to help explain your changes -->
 
-## Type of change
+## Testing
+<!-- Describe the tests you ran and how to reproduce them -->
 
-- [ ] feat
-- [ ] fix
-- [ ] docs
-- [ ] refactor
-- [ ] test
-
-## Testing checklist
-
-- [ ] `npm run lint`
-- [ ] `npx tsc --noEmit`
-- [ ] `npm run build`
-- [ ] Added/updated tests where applicable
-
-## Screenshots (for UI changes)
-
-<!-- Add before/after screenshots or screen recordings. -->
-
-## Deployment notes (for contract changes)
-
-<!-- List migration steps, environment updates, or contract addresses. -->
+## Additional Notes
+<!-- Any additional information that reviewers should know -->

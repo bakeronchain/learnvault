@@ -1,0 +1,34 @@
+{
+	"lessonId": "stellar-basics-1",
+	"passingScore": 80,
+	"questions": [
+		{
+			"id": 1,
+			"text": "On Stellar, which item proves you control an account and can authorize transactions?",
+			"options": [
+				"A memo",
+				"A trustline",
+				"A secret key / seed phrase",
+				"A Horizon URL"
+			],
+			"correctIndex": 2
+		},
+		{
+			"id": 2,
+			"text": "What is the main reason you create a trustline?",
+			"options": [
+				"To increase your transaction fee",
+				"To hold a non-native asset issued on Stellar",
+				"To deploy a Soroban contract",
+				"To generate a new sequence number"
+			],
+			"correctIndex": 1
+		},
+		{
+			"id": 3,
+			"text": "Most applications query data and submit transactions through which Stellar component?",
+			"options": ["Horizon", "Stellar Core", "Freighter", "Soroban VM"],
+			"correctIndex": 0
+		}
+	]
+}

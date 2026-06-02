@@ -20,9 +20,10 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-
-      - name: Add wasm target
-        run: rustup target add wasm32v1-none
+        with:
+          toolchain: stable
+          components: clippy, rustfmt
+          targets: wasm32v1-none
 
       - name: Cache cargo and target
         uses: Swatinem/rust-cache@v2
@@ -34,6 +35,14 @@ jobs:
 
       - name: Run tests
         run: cargo test
+
+      - name: Run fuzz tests
+        run: cargo test -- --include-ignored fuzz
+
+      - name: Run milestone_escrow fuzz tests (60s)
+        run: |
+          timeout 60 cargo test -p milestone-escrow fuzz -- --include-ignored --nocapture || \
+            test $? -eq 124
 
       - name: Run clippy
         run: cargo clippy -- -D warnings

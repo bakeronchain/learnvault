@@ -1,9 +1,24 @@
 #![no_std]
+#![allow(clippy::too_many_arguments)]
 
 use soroban_sdk::{
-    Address, Env, String, Symbol, Vec, contract, contracterror, contractevent, contractimpl,
-    contracttype, panic_with_error, symbol_short,
+    Address, BytesN, Env, String, Symbol, Vec, contract, contracterror, contractevent,
+    contractimpl, contracttype, panic_with_error, symbol_short,
 };
+
+use learnvault_shared::upgrade;
+
+pub use upgrade::ContractUpgraded;
+
+// ---------------------------------------------------------------------------
+// Storage Constants (assuming ~6s ledger time)
+// ---------------------------------------------------------------------------
+
+const DAY_IN_LEDGERS: u32 = 17_280;
+const INSTANCE_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
+const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30; // 30 days
+const PERSISTENT_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
+const PERSISTENT_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365; // 1 year
 
 const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
 const GOV_KEY: Symbol = symbol_short!("GOV");
@@ -13,6 +28,17 @@ const NEXT_PROPOSAL_KEY: Symbol = symbol_short!("NEXTPROP");
 const DISBURSED_KEY: Symbol = symbol_short!("DISBURSED");
 const SCHOLARS_KEY: Symbol = symbol_short!("SCHOLARS");
 const DONORS_KEY: Symbol = symbol_short!("DONORS");
+const PAUSED_KEY: Symbol = symbol_short!("PAUSED");
+const TOTAL_GOV_KEY: Symbol = symbol_short!("TOTALGOV");
+const MIN_LRN_TO_PROPOSE_KEY: Symbol = symbol_short!("MINPROP");
+const SUPPORTED_ASSETS_KEY: Symbol = symbol_short!("ASSETS");
+const GOV_PER_USDC: i128 = 100;
+const PROPOSAL_DEADLINE_LEDGERS: u32 = 100_800;
+const QUORUM_KEY: Symbol = symbol_short!("QUORUM");
+const APPROVAL_BPS_KEY: Symbol = symbol_short!("APPBPS");
+const MILESTONE_COUNT_KEY: Symbol = symbol_short!("MSCNT");
+const TIMELOCK_LEDGER_KEY: Symbol = symbol_short!("TLOCK");
+const DEFAULT_TIMELOCK_LEDGERS: u32 = DAY_IN_LEDGERS * 2; // 48 hours
 
 #[derive(Clone)]
 #[contracttype]
@@ -21,6 +47,36 @@ pub enum DataKey {
     Proposal(u32),
     ApplicantProposals(Address),
     Scholar(Address),
+    VoteCast(u32, Address), // (proposal_id, voter) -> bool
+    FinalizedProposal(u32), // proposal_id -> ProposalStatus (set by finalize_proposal)
+    VetoCast(u32, Address), // (proposal_id, voter) -> bool
+    AssetDeposited(Address), // total deposited per asset (atomic units)
+}
+
+#[contractevent(topics = ["proposal_executed"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProposalExecuted {
+    #[topic]
+    pub proposal_id: u32,
+    pub passed: bool,
+    pub amount: i128,
+}
+
+#[contractevent(topics = ["proposal_cancelled"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProposalCancelled {
+    #[topic]
+    pub proposal_id: u32,
+    pub cancelled_by: Address,
+}
+
+#[contractevent(topics = ["proposal_queued"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProposalQueued {
+    #[topic]
+    pub proposal_id: u32,
+    pub queued_at: u32,
+    pub execution_ready_at: u32,
 }
 
 #[derive(Clone)]
@@ -36,6 +92,23 @@ pub struct Proposal {
     pub milestone_titles: Vec<String>,
     pub milestone_dates: Vec<String>,
     pub submitted_at: u64,
+    pub yes_votes: i128,
+    pub no_votes: i128,
+    pub deadline_ledger: u32,
+    pub executed: bool,
+    pub cancelled: bool,
+    pub queued_at: u32,
+    pub veto_votes: i128,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+pub enum ProposalStatus {
+    Pending,
+    Queued,
+    Approved,
+    Rejected,
+    Executed,
 }
 
 #[contracterror]
@@ -46,6 +119,33 @@ pub enum Error {
     NotInitialized = 2,
     InvalidAmount = 3,
     InsufficientFunds = 4,
+    ContractPaused = 5,
+    ProposalNotFound = 6,
+    AlreadyVoted = 7,
+    VotingClosed = 8,
+    /// Votes cast after the proposal's voting deadline.
+    VotingPeriodEnded = 9,
+    /// finalize_proposal called before the voting deadline has passed.
+    TooEarlyToFinalize = 10,
+    /// Proposal finalized but total votes cast did not reach MIN_QUORUM_BPS.
+    QuorumNotMet = 11,
+    InsufficientReputation = 12,
+    VotingNotClosed = 13,
+    ProposalAlreadyExecuted = 14,
+    ProposalRejected = 15,
+    ProposalCancelled = 16,
+    Unauthorized = 17,
+    ArithmeticOverflow = 18,
+    /// Milestone titles/dates count does not match the configured milestone count.
+    InvalidMilestoneCount = 19,
+    /// Timelock period has not elapsed yet.
+    TimelockNotExpired = 20,
+    /// Proposal is not in Queued status.
+    NotQueued = 21,
+    /// Supermajority veto threshold has not been reached.
+    VetoNotMet = 22,
+    /// Asset is not in the supported assets list.
+    UnsupportedAsset = 23,
 }
 
 #[contract]
@@ -57,6 +157,16 @@ pub struct DepositRecorded {
     #[topic]
     pub donor: Address,
     pub amount: i128,
+    pub asset: Address,
+}
+
+#[contractevent(topics = ["gov_issued"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GovIssued {
+    #[topic]
+    pub donor: Address,
+    pub usdc_amount: i128,
+    pub gov_amount: i128,
 }
 
 #[contractevent(topics = ["disburse"])]
@@ -77,32 +187,263 @@ pub struct ProposalSubmitted {
     pub amount: i128,
 }
 
+#[contractevent(topics = ["vote"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VoteCastEvent {
+    #[topic]
+    pub voter: Address,
+    #[topic]
+    pub proposal_id: u32,
+    pub support: bool,
+    pub weight: i128,
+}
+
 #[contractimpl]
+#[allow(clippy::too_many_arguments)]
 impl ScholarshipTreasury {
-    pub fn initialize(env: Env, admin: Address, usdc_token: Address, governance_contract: Address) {
+    pub fn initialize(
+        env: Env,
+        admin: Address,
+        usdc_token: Address,
+        governance_contract: Address,
+        quorum_threshold: i128,
+        approval_bps: u32,
+    ) {
         if env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(&env, Error::AlreadyInitialized);
         }
         admin.require_auth();
 
+        if quorum_threshold < 0 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
+        if approval_bps > 10_000 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
+
         env.storage().instance().set(&ADMIN_KEY, &admin);
+        upgrade::init(&env);
         env.storage().instance().set(&USDC_KEY, &usdc_token);
+
+        // Seed supported assets list with USDC as the primary asset
+        let mut initial_assets: Vec<Address> = Vec::new(&env);
+        initial_assets.push_back(usdc_token.clone());
+        env.storage()
+            .instance()
+            .set(&SUPPORTED_ASSETS_KEY, &initial_assets);
         env.storage().instance().set(&GOV_KEY, &governance_contract);
         env.storage().instance().set(&TOTAL_KEY, &0_i128);
         env.storage().instance().set(&NEXT_PROPOSAL_KEY, &1_u32);
         env.storage().instance().set(&DISBURSED_KEY, &0_i128);
         env.storage().instance().set(&SCHOLARS_KEY, &0_u32);
         env.storage().instance().set(&DONORS_KEY, &0_u32);
+        env.storage().instance().set(&PAUSED_KEY, &false);
+        env.storage()
+            .instance()
+            .set(&MIN_LRN_TO_PROPOSE_KEY, &0_i128);
+
+        env.storage().instance().set(&QUORUM_KEY, &quorum_threshold);
+        env.storage()
+            .instance()
+            .set(&APPROVAL_BPS_KEY, &approval_bps);
+        // Default to 3 milestones; use set_milestone_count to override.
+        env.storage()
+            .instance()
+            .set(&MILESTONE_COUNT_KEY, &3_u32);
+
+        Self::extend_instance(&env);
     }
 
-    pub fn deposit(env: Env, donor: Address, amount: i128) {
+    pub fn get_quorum(env: Env) -> i128 {
+        Self::extend_instance(&env);
+        env.storage()
+            .instance()
+            .get::<_, i128>(&QUORUM_KEY)
+            .unwrap_or(0)
+    }
+
+    pub fn get_approval_bps(env: Env) -> u32 {
+        Self::extend_instance(&env);
+        env.storage()
+            .instance()
+            .get::<_, u32>(&APPROVAL_BPS_KEY)
+            .unwrap_or(0)
+    }
+
+    pub fn set_quorum(env: Env, new_quorum: i128) {
+        let admin = Self::admin(&env);
+        admin.require_auth();
+        if new_quorum < 0 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
+        env.storage().instance().set(&QUORUM_KEY, &new_quorum);
+    }
+
+    pub fn set_approval_bps(env: Env, new_bps: u32) {
+        let admin = Self::admin(&env);
+        admin.require_auth();
+        if new_bps > 10_000 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
+        env.storage().instance().set(&APPROVAL_BPS_KEY, &new_bps);
+    }
+
+    /// Admin-only: set the timelock delay in ledgers.
+    pub fn set_timelock_delay(env: Env, admin: Address, ledgers: u32) {
+        admin.require_auth();
+        if admin != Self::admin(&env) {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
+        if ledgers == 0 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
+        env.storage().instance().set(&TIMELOCK_LEDGER_KEY, &ledgers);
+    }
+
+    /// Get the current timelock delay in ledgers.
+    pub fn get_timelock_delay(env: Env) -> u32 {
+        Self::extend_instance(&env);
+        env.storage()
+            .instance()
+            .get::<_, u32>(&TIMELOCK_LEDGER_KEY)
+            .unwrap_or(DEFAULT_TIMELOCK_LEDGERS)
+    }
+
+    /// Returns the configured number of milestones required per proposal.
+    pub fn get_milestone_count(env: Env) -> u32 {
+        Self::extend_instance(&env);
+        env.storage()
+            .instance()
+            .get::<_, u32>(&MILESTONE_COUNT_KEY)
+            .unwrap_or(3)
+    }
+
+    /// Admin-only: update the required milestone count for future proposals.
+    pub fn set_milestone_count(env: Env, count: u32) {
+        let admin = Self::admin(&env);
+        admin.require_auth();
+        if count == 0 {
+            panic_with_error!(&env, Error::InvalidMilestoneCount);
+        }
+        env.storage().instance().set(&MILESTONE_COUNT_KEY, &count);
+    }
+
+    // New constant for optional timelock vault integration
+    const TIMELOCK_VAULT_KEY: Symbol = symbol_short!("TIMELockVault");
+
+    // New PauseChanged event emitted on pause/unpause
+    #[contractevent(topics = ["pause_changed"])]
+    pub struct PauseChanged {
+        #[topic]
+        pub paused: bool,
+    }
+
+    /// Public getter for admin address
+    pub fn get_admin(env: Env) -> Address {
+        Self::admin(&env)
+    }
+
+    /// Set the timelock vault address (admin only)
+    pub fn set_timelock_vault(env: Env, vault: Address) {
+        let admin = Self::admin(&env);
+        admin.require_auth();
+        env.storage().instance().set(&TIMELOCK_VAULT_KEY, &vault);
+    }
+
+    /// Get the timelock vault address if configured
+    pub fn get_timelock_vault(env: Env) -> Option<Address> {
+        env.storage().instance().get(&TIMELOCK_VAULT_KEY)
+    }
+
+    pub fn pause(env: Env) {
+        let admin = Self::admin(&env);
+        admin.require_auth();
+        env.storage().instance().set(&PAUSED_KEY, &true);
+        // Emit pause event
+        PauseChanged { paused: true }.publish(&env);
+    }
+
+    pub fn unpause(env: Env) {
+        // Allow admin or timelock vault to unpause
+        let caller = env.invoker();
+        let admin = Self::admin(&env);
+        let authorized = if caller == admin {
+            true
+        } else {
+            match Self::get_timelock_vault(&env) {
+                Some(vault) => caller == vault,
+                None => false,
+            }
+        };
+        if !authorized {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
+        env.storage().instance().set(&PAUSED_KEY, &false);
+        // Emit unpause event
+        PauseChanged { paused: false }.publish(&env);
+    }
+
+    pub fn is_paused(env: Env) -> bool {
+        env.storage()
+            .instance()
+            .get::<_, bool>(&PAUSED_KEY)
+            .unwrap_or(false)
+    }
+
+    pub fn deposit(env: Env, donor: Address, amount: i128, asset: Address) {
+        Self::assert_not_paused(&env);
+
         if amount <= 0 {
             panic_with_error!(&env, Error::InvalidAmount);
         }
         donor.require_auth();
 
-        let usdc = token::client(&env);
-        usdc.transfer(&donor, &env.current_contract_address(), &amount);
+        // Validate asset is in the supported list
+        let supported: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&SUPPORTED_ASSETS_KEY)
+            .unwrap_or(Vec::new(&env));
+        if !supported.contains(&asset) {
+            panic_with_error!(&env, Error::UnsupportedAsset);
+        }
+
+        // Transfer the deposited asset to the contract
+        soroban_sdk::token::TokenClient::new(&env, &asset)
+            .transfer(&donor, &env.current_contract_address(), &amount);
+
+        let gov_contract = Self::governance_contract(&env);
+        let gov_client = governance::client(&env, &gov_contract);
+        let gov_amount = amount
+            .checked_mul(GOV_PER_USDC)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::InvalidAmount));
+        gov_client.mint(&donor, &gov_amount);
+        GovIssued {
+            donor: donor.clone(),
+            usdc_amount: amount,
+            gov_amount,
+        }
+        .publish(&env);
+
+        // Track total GOV issued for quorum calculations
+        let total_gov = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&TOTAL_GOV_KEY)
+            .unwrap_or(0);
+        let new_total_gov = Self::checked_add_i128(&env, total_gov, gov_amount);
+        env.storage().instance().set(&TOTAL_GOV_KEY, &new_total_gov);
+
+        // Track per-asset total deposited
+        let asset_key = DataKey::AssetDeposited(asset.clone());
+        let asset_current = env
+            .storage()
+            .persistent()
+            .get::<_, i128>(&asset_key)
+            .unwrap_or(0);
+        let new_asset_total = Self::checked_add_i128(&env, asset_current, amount);
+        env.storage().persistent().set(&asset_key, &new_asset_total);
+        Self::extend_persistent(&env, &asset_key);
 
         let donor_key = DataKey::Donor(donor.clone());
         let current = env
@@ -117,26 +458,37 @@ impl ScholarshipTreasury {
                 .instance()
                 .get::<_, u32>(&DONORS_KEY)
                 .unwrap_or(0);
-            env.storage()
-                .instance()
-                .set(&DONORS_KEY, &(donors_count + 1));
+            let new_donors_count = Self::checked_add_u32(&env, donors_count, 1);
+            env.storage().instance().set(&DONORS_KEY, &new_donors_count);
         }
 
-        env.storage()
-            .persistent()
-            .set(&donor_key, &(current + amount));
+        let new_donor_total = Self::checked_add_i128(&env, current, amount);
+        env.storage().persistent().set(&donor_key, &new_donor_total);
 
-        let total = env
+        Self::extend_persistent(&env, &donor_key);
+
+        // Only USDC deposits count toward the disbursable TOTAL_KEY balance
+        let usdc_address: Address = env
             .storage()
             .instance()
-            .get::<_, i128>(&TOTAL_KEY)
-            .unwrap_or(0);
-        env.storage().instance().set(&TOTAL_KEY, &(total + amount));
+            .get::<_, Address>(&USDC_KEY)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::NotInitialized));
+        if asset == usdc_address {
+            let total = env
+                .storage()
+                .instance()
+                .get::<_, i128>(&TOTAL_KEY)
+                .unwrap_or(0);
+            let new_total = Self::checked_add_i128(&env, total, amount);
+            env.storage().instance().set(&TOTAL_KEY, &new_total);
+        }
 
-        DepositRecorded { donor, amount }.publish(&env);
+        DepositRecorded { donor, amount, asset }.publish(&env);
     }
 
     pub fn disburse(env: Env, recipient: Address, amount: i128) {
+        Self::assert_not_paused(&env);
+
         if amount <= 0 {
             panic_with_error!(&env, Error::InvalidAmount);
         }
@@ -153,17 +505,16 @@ impl ScholarshipTreasury {
             panic_with_error!(&env, Error::InsufficientFunds);
         }
 
-        token::client(&env).transfer(&env.current_contract_address(), &recipient, &amount);
-        env.storage().instance().set(&TOTAL_KEY, &(total - amount));
+        let new_total = Self::checked_sub_i128(&env, total, amount);
+        env.storage().instance().set(&TOTAL_KEY, &new_total);
 
         let disbursed = env
             .storage()
             .instance()
             .get::<_, i128>(&DISBURSED_KEY)
             .unwrap_or(0);
-        env.storage()
-            .instance()
-            .set(&DISBURSED_KEY, &(disbursed + amount));
+        let new_disbursed = Self::checked_add_i128(&env, disbursed, amount);
+        env.storage().instance().set(&DISBURSED_KEY, &new_disbursed);
 
         let scholar_key = DataKey::Scholar(recipient.clone());
         if !env.storage().persistent().has(&scholar_key) {
@@ -172,13 +523,133 @@ impl ScholarshipTreasury {
                 .instance()
                 .get::<_, u32>(&SCHOLARS_KEY)
                 .unwrap_or(0);
+            let new_scholars_count = Self::checked_add_u32(&env, scholars_count, 1);
             env.storage()
                 .instance()
-                .set(&SCHOLARS_KEY, &(scholars_count + 1));
+                .set(&SCHOLARS_KEY, &new_scholars_count);
             env.storage().persistent().set(&scholar_key, &true);
+            Self::extend_persistent(&env, &scholar_key);
         }
 
+        token::client(&env).transfer(&env.current_contract_address(), &recipient, &amount);
+
         DisbursementRecorded { recipient, amount }.publish(&env);
+    }
+
+    pub fn execute_proposal(env: Env, proposal_id: u32) {
+        Self::assert_initialized(&env);
+        Self::assert_not_paused(&env);
+
+        let mut proposal = env
+            .storage()
+            .persistent()
+            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
+
+        if proposal.cancelled {
+            panic_with_error!(&env, Error::ProposalCancelled);
+        }
+
+        if proposal.executed {
+            panic_with_error!(&env, Error::ProposalAlreadyExecuted);
+        }
+
+        // Must be in queued state (or legacy Approved state)
+        let finalized_status = env
+            .storage()
+            .persistent()
+            .get::<_, ProposalStatus>(&DataKey::FinalizedProposal(proposal_id));
+        let is_queued = match finalized_status {
+            Some(ProposalStatus::Queued) => true,
+            Some(ProposalStatus::Approved) => !proposal.executed, // legacy pre-timelock
+            _ => false,
+        };
+        if !is_queued {
+            panic_with_error!(&env, Error::NotQueued);
+        }
+
+        let timelock_delay = Self::get_timelock_delay(env.clone());
+        let ready_at = Self::checked_add_u32(
+            &env,
+            proposal.queued_at,
+            timelock_delay,
+        );
+        if env.ledger().sequence() < ready_at {
+            panic_with_error!(&env, Error::TimelockNotExpired);
+        }
+
+        let total_votes = Self::checked_add_i128(&env, proposal.yes_votes, proposal.no_votes);
+        let quorum_threshold = Self::get_quorum(env.clone());
+        let approval_bps = Self::get_approval_bps(env.clone());
+
+        let passed = total_votes >= quorum_threshold
+            && total_votes > 0
+            && proposal
+                .yes_votes
+                .checked_mul(10_000)
+                .map(|v| (v / total_votes) as u32 > approval_bps)
+                .unwrap_or(false);
+
+        proposal.executed = true;
+        env.storage()
+            .persistent()
+            .set(&DataKey::Proposal(proposal_id), &proposal);
+        Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
+
+        // Update finalized status to Executed
+        env.storage()
+            .persistent()
+            .set(&DataKey::FinalizedProposal(proposal_id), &ProposalStatus::Executed);
+        Self::extend_persistent(&env, &DataKey::FinalizedProposal(proposal_id));
+
+        if passed {
+            Self::disburse_internal(&env, &proposal.applicant, proposal.amount);
+        }
+
+        ProposalExecuted {
+            proposal_id,
+            passed,
+            amount: if passed { proposal.amount } else { 0 },
+        }
+        .publish(&env);
+    }
+
+    pub fn cancel_proposal(env: Env, proposal_id: u32) {
+        Self::assert_initialized(&env);
+        let admin = Self::admin(&env);
+        admin.require_auth();
+
+        let mut proposal = env
+            .storage()
+            .persistent()
+            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
+
+        if proposal.executed {
+            panic_with_error!(&env, Error::ProposalAlreadyExecuted);
+        }
+
+        // Determine current public status
+        let status = Self::proposal_status(&env, &proposal);
+        if status == ProposalStatus::Rejected || status == ProposalStatus::Executed {
+            panic_with_error!(&env, Error::ProposalAlreadyExecuted);
+        }
+        // Allow cancellation during Pending (before deadline) or Queued (after finalize)
+        if status == ProposalStatus::Pending && env.ledger().sequence() > proposal.deadline_ledger {
+            panic_with_error!(&env, Error::VotingClosed);
+        }
+
+        proposal.cancelled = true;
+        env.storage()
+            .persistent()
+            .set(&DataKey::Proposal(proposal_id), &proposal);
+        Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
+
+        ProposalCancelled {
+            proposal_id,
+            cancelled_by: admin,
+        }
+        .publish(&env);
     }
 
     pub fn get_balance(env: Env) -> i128 {
@@ -193,6 +664,10 @@ impl ScholarshipTreasury {
             .instance()
             .get::<_, i128>(&DISBURSED_KEY)
             .unwrap_or(0)
+    }
+
+    pub fn get_exchange_rate(_env: Env) -> i128 {
+        GOV_PER_USDC
     }
 
     pub fn get_scholars_count(env: Env) -> u32 {
@@ -216,6 +691,64 @@ impl ScholarshipTreasury {
             .unwrap_or(0)
     }
 
+    /// Admin-only: add an asset to the supported assets list for deposits.
+    pub fn add_supported_asset(env: Env, asset: Address) {
+        let admin = Self::admin(&env);
+        admin.require_auth();
+
+        let mut assets: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&SUPPORTED_ASSETS_KEY)
+            .unwrap_or(Vec::new(&env));
+
+        if !assets.contains(&asset) {
+            assets.push_back(asset);
+            env.storage().instance().set(&SUPPORTED_ASSETS_KEY, &assets);
+        }
+        Self::extend_instance(&env);
+    }
+
+    /// Returns the list of token addresses accepted for deposits.
+    pub fn get_supported_assets(env: Env) -> Vec<Address> {
+        Self::extend_instance(&env);
+        env.storage()
+            .instance()
+            .get::<_, Vec<Address>>(&SUPPORTED_ASSETS_KEY)
+            .unwrap_or(Vec::new(&env))
+    }
+
+    /// Returns the cumulative amount deposited for a given asset (in atomic units).
+    pub fn get_asset_deposited(env: Env, asset: Address) -> i128 {
+        env.storage()
+            .persistent()
+            .get::<_, i128>(&DataKey::AssetDeposited(asset))
+            .unwrap_or(0)
+    }
+
+    pub fn set_min_lrn_to_propose(env: Env, admin: Address, min_lrn: i128) {
+        Self::assert_initialized(&env);
+
+        admin.require_auth();
+        if admin != Self::admin(&env) {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
+        if min_lrn < 0 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
+
+        env.storage()
+            .instance()
+            .set(&MIN_LRN_TO_PROPOSE_KEY, &min_lrn);
+    }
+
+    pub fn get_min_lrn_to_propose(env: Env) -> i128 {
+        env.storage()
+            .instance()
+            .get::<_, i128>(&MIN_LRN_TO_PROPOSE_KEY)
+            .unwrap_or(0)
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn submit_proposal(
         env: Env,
@@ -229,12 +762,31 @@ impl ScholarshipTreasury {
         milestone_dates: Vec<String>,
     ) -> u32 {
         Self::assert_initialized(&env);
+        Self::assert_not_paused(&env);
 
-        if amount <= 0 || milestone_titles.len() != 3 || milestone_dates.len() != 3 {
+        if amount <= 0 {
             panic_with_error!(&env, Error::InvalidAmount);
         }
 
+        let required_milestones = env
+            .storage()
+            .instance()
+            .get::<_, u32>(&MILESTONE_COUNT_KEY)
+            .unwrap_or(3);
+        if milestone_titles.len() != required_milestones
+            || milestone_dates.len() != required_milestones
+        {
+            panic_with_error!(&env, Error::InvalidMilestoneCount);
+        }
+
         applicant.require_auth();
+
+        let gov_contract = Self::governance_contract(&env);
+        let gov_client = governance::client(&env, &gov_contract);
+        let min_lrn_to_propose = Self::get_min_lrn_to_propose(env.clone());
+        if gov_client.balance(&applicant) < min_lrn_to_propose {
+            panic_with_error!(&env, Error::InsufficientReputation);
+        }
 
         let proposal_id = env
             .storage()
@@ -253,11 +805,26 @@ impl ScholarshipTreasury {
             milestone_titles,
             milestone_dates,
             submitted_at: env.ledger().timestamp(),
+            yes_votes: 0,
+            no_votes: 0,
+            deadline_ledger: Self::checked_add_u32(
+                &env,
+                env.ledger().sequence(),
+                PROPOSAL_DEADLINE_LEDGERS,
+            ),
+            executed: false,
+            cancelled: false,
+            queued_at: 0,
+            veto_votes: 0,
         };
 
         env.storage()
             .persistent()
             .set(&DataKey::Proposal(proposal_id), &proposal);
+        
+        Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
+
+        Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
 
         let applicant_key = DataKey::ApplicantProposals(applicant.clone());
         let mut proposal_ids = env
@@ -269,9 +836,12 @@ impl ScholarshipTreasury {
         env.storage()
             .persistent()
             .set(&applicant_key, &proposal_ids);
+
+        Self::extend_persistent(&env, &applicant_key);
+        let next_proposal_id = Self::checked_add_u32(&env, proposal_id, 1);
         env.storage()
             .instance()
-            .set(&NEXT_PROPOSAL_KEY, &(proposal_id + 1));
+            .set(&NEXT_PROPOSAL_KEY, &next_proposal_id);
 
         ProposalSubmitted {
             applicant,
@@ -284,9 +854,14 @@ impl ScholarshipTreasury {
     }
 
     pub fn get_proposal(env: Env, proposal_id: u32) -> Option<Proposal> {
-        env.storage()
-            .persistent()
-            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+        Self::extend_instance(&env);
+        let key = DataKey::Proposal(proposal_id);
+        if let Some(prop) = env.storage().persistent().get::<_, Proposal>(&key) {
+            Self::extend_persistent(&env, &key);
+            Some(prop)
+        } else {
+            None
+        }
     }
 
     pub fn get_proposals_by_applicant(env: Env, applicant: Address) -> Vec<u32> {
@@ -294,6 +869,33 @@ impl ScholarshipTreasury {
             .persistent()
             .get::<_, Vec<u32>>(&DataKey::ApplicantProposals(applicant))
             .unwrap_or(Vec::new(&env))
+    }
+
+    pub fn get_proposals_by_status(env: Env, status: ProposalStatus) -> Vec<Proposal> {
+        let proposal_count = Self::get_proposal_count(env.clone());
+        let mut proposal_id = 1_u32;
+        let mut proposals = Vec::new(&env);
+
+        while proposal_id <= proposal_count {
+            if let Some(proposal) = env
+                .storage()
+                .persistent()
+                .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+                .filter(|p| Self::proposal_status(&env, p) == status)
+            {
+                proposals.push_back(proposal);
+            }
+            if proposal_id == proposal_count {
+                break;
+            }
+            proposal_id = Self::checked_add_u32(&env, proposal_id, 1);
+        }
+
+        proposals
+    }
+
+    pub fn get_active_proposals(env: Env) -> Vec<Proposal> {
+        Self::get_proposals_by_status(env, ProposalStatus::Pending)
     }
 
     pub fn get_proposal_count(env: Env) -> u32 {
@@ -304,17 +906,291 @@ impl ScholarshipTreasury {
             .saturating_sub(1)
     }
 
+    pub fn vote(env: Env, voter: Address, proposal_id: u32, support: bool) {
+        Self::assert_initialized(&env);
+        Self::assert_not_paused(&env);
+
+        // 1. Require auth
+        voter.require_auth();
+
+        // 2. Load proposal — panic ProposalNotFound if missing
+        let mut proposal = env
+            .storage()
+            .persistent()
+            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
+
+        if proposal.cancelled {
+            panic_with_error!(&env, Error::ProposalCancelled);
+        }
+
+        if proposal.executed {
+            panic_with_error!(&env, Error::ProposalAlreadyExecuted);
+        }
+
+        // 3. Panic VotingClosed if past deadline
+        if env.ledger().sequence() > proposal.deadline_ledger {
+            panic_with_error!(&env, Error::VotingClosed);
+        }
+
+        // 4. Panic AlreadyVoted if VoteCast(proposal_id, voter) exists
+        let vote_key = DataKey::VoteCast(proposal_id, voter.clone());
+        if env
+            .storage()
+            .persistent()
+            .get::<_, bool>(&vote_key)
+            .unwrap_or(false)
+        {
+            panic_with_error!(&env, Error::AlreadyVoted);
+        }
+
+        // 5. Get voter's GOV token balance as weight
+        let gov_contract = Self::governance_contract(&env);
+        let gov_client = governance::client(&env, &gov_contract);
+        let weight = gov_client.get_voting_power(&voter);
+        if weight < 0 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
+        // Weight of 0 is permitted; vote is recorded but has no numerical effect on outcome
+
+        // 6. Add weight to yes_votes or no_votes
+        if support {
+            proposal.yes_votes = Self::checked_add_i128(&env, proposal.yes_votes, weight);
+        } else {
+            proposal.no_votes = Self::checked_add_i128(&env, proposal.no_votes, weight);
+        }
+
+        // 7. Mark VoteCast = true
+        env.storage().persistent().set(&vote_key, &true);
+
+        // 8. Update stored proposal
+        env.storage()
+            .persistent()
+            .set(&DataKey::Proposal(proposal_id), &proposal);
+
+        Self::extend_persistent(&env, &vote_key);
+        Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
+
+        // 9. Emit event
+        VoteCastEvent {
+            voter,
+            proposal_id,
+            support,
+            weight,
+        }
+        .publish(&env);
+    }
+
+    /// Finalize a proposal once its voting deadline has passed.
+    ///
+    /// Only the admin may call this. The outcome is:
+    /// - **Rejected** if total votes cast < MIN_QUORUM_BPS of total GOV supply.
+    /// - **Approved** if quorum is met and `yes_votes > no_votes`.
+    /// - **Rejected** otherwise (tie or majority against).
+    ///
+    /// The result is stored under `DataKey::FinalizedProposal(proposal_id)` so
+    /// it can be read back without re-running the tally.
+    pub fn finalize_proposal(env: Env, admin: Address, proposal_id: u32) -> ProposalStatus {
+        admin.require_auth();
+        let stored_admin = Self::admin(&env);
+        if admin != stored_admin {
+            panic_with_error!(&env, Error::Unauthorized);
+        }
+
+        let proposal = env
+            .storage()
+            .persistent()
+            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
+
+        // Must be called after the voting deadline
+        if env.ledger().sequence() <= proposal.deadline_ledger {
+            panic_with_error!(&env, Error::VotingNotClosed);
+        }
+
+        let total_votes = Self::checked_add_i128(&env, proposal.yes_votes, proposal.no_votes);
+        let quorum_threshold = Self::get_quorum(env.clone());
+        let approval_bps = Self::get_approval_bps(env.clone());
+
+        let passed = total_votes >= quorum_threshold
+            && total_votes > 0
+            && proposal
+                .yes_votes
+                .checked_mul(10_000)
+                .map(|v| (v / total_votes) as u32 > approval_bps)
+                .unwrap_or(false);
+
+        let mut proposal = env
+            .storage()
+            .persistent()
+            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
+
+        let status = if passed {
+            let current_ledger = env.ledger().sequence();
+            proposal.queued_at = current_ledger;
+            env.storage()
+                .persistent()
+                .set(&DataKey::Proposal(proposal_id), &proposal);
+            Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
+
+            let timelock_delay = Self::get_timelock_delay(env.clone());
+            let execution_ready_at = Self::checked_add_u32(&env, current_ledger, timelock_delay);
+
+            ProposalQueued {
+                proposal_id,
+                queued_at: current_ledger,
+                execution_ready_at,
+            }
+            .publish(&env);
+
+            ProposalStatus::Queued
+        } else {
+            ProposalStatus::Rejected
+        };
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::FinalizedProposal(proposal_id), &status.clone());
+        
+        Self::extend_persistent(&env, &DataKey::FinalizedProposal(proposal_id));
+
+        Self::extend_persistent(&env, &DataKey::FinalizedProposal(proposal_id));
+
+        status
+    }
+
+    /// Returns the finalized status for a proposal if `finalize_proposal` has
+    /// been called, or `None` if it hasn't been finalized yet.
+    pub fn get_finalized_status(env: Env, proposal_id: u32) -> Option<ProposalStatus> {
+        env.storage()
+            .persistent()
+            .get::<_, ProposalStatus>(&DataKey::FinalizedProposal(proposal_id))
+    }
+
+    /// Register an objection to a queued proposal.
+    ///
+    /// Voters can object during the timelock period. Objections accumulate
+    /// in `proposal.veto_votes`. If veto votes reach a 2/3 supermajority of
+    /// total GOV supply, anyone can call `veto_proposal` to reject it.
+    pub fn object_to_proposal(env: Env, voter: Address, proposal_id: u32) {
+        Self::assert_initialized(&env);
+        Self::assert_not_paused(&env);
+
+        voter.require_auth();
+
+        let mut proposal = env
+            .storage()
+            .persistent()
+            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
+
+        if proposal.cancelled {
+            panic_with_error!(&env, Error::ProposalCancelled);
+        }
+
+        if proposal.executed {
+            panic_with_error!(&env, Error::ProposalAlreadyExecuted);
+        }
+
+        let finalized_status = env
+            .storage()
+            .persistent()
+            .get::<_, ProposalStatus>(&DataKey::FinalizedProposal(proposal_id));
+        if finalized_status != Some(ProposalStatus::Queued) {
+            panic_with_error!(&env, Error::NotQueued);
+        }
+
+        let veto_key = DataKey::VetoCast(proposal_id, voter.clone());
+        if env
+            .storage()
+            .persistent()
+            .get::<_, bool>(&veto_key)
+            .unwrap_or(false)
+        {
+            panic_with_error!(&env, Error::AlreadyVoted);
+        }
+
+        let gov_contract = Self::governance_contract(&env);
+        let gov_client = governance::client(&env, &gov_contract);
+        let weight = gov_client.get_voting_power(&voter);
+        if weight < 0 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
+
+        proposal.veto_votes = Self::checked_add_i128(&env, proposal.veto_votes, weight);
+        env.storage().persistent().set(&veto_key, &true);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Proposal(proposal_id), &proposal);
+
+        Self::extend_persistent(&env, &veto_key);
+        Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
+    }
+
+    /// Veto a queued proposal.
+    ///
+    /// Either the admin may veto directly, or any caller may veto if the
+    /// accumulated `veto_votes` represent a 2/3 supermajority of the total GOV
+    /// token supply.
+    pub fn veto_proposal(env: Env, caller: Address, proposal_id: u32) {
+        caller.require_auth();
+
+        let mut proposal = env
+            .storage()
+            .persistent()
+            .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
+
+        if proposal.cancelled || proposal.executed {
+            panic_with_error!(&env, Error::ProposalAlreadyExecuted);
+        }
+
+        let finalized_status = env
+            .storage()
+            .persistent()
+            .get::<_, ProposalStatus>(&DataKey::FinalizedProposal(proposal_id));
+        if finalized_status != Some(ProposalStatus::Queued) {
+            panic_with_error!(&env, Error::NotQueued);
+        }
+
+        let admin = Self::admin(&env);
+        let is_admin = caller == admin;
+        let total_gov = Self::get_total_gov_issued(env.clone());
+        // 2/3 supermajority threshold (multiply by 2, divide by 3)
+        let supermajority_met = total_gov > 0
+            && proposal.veto_votes >= (total_gov * 2) / 3;
+
+        if !is_admin && !supermajority_met {
+            panic_with_error!(&env, Error::VetoNotMet);
+        }
+
+        env.storage()
+            .persistent()
+            .set(
+                &DataKey::FinalizedProposal(proposal_id),
+                &ProposalStatus::Rejected,
+            );
+        Self::extend_persistent(&env, &DataKey::FinalizedProposal(proposal_id));
+
+        ProposalCancelled {
+            proposal_id,
+            cancelled_by: caller,
+        }
+        .publish(&env);
+    }
+
+    /// Returns the total GOV tokens issued so far (used for quorum calculation).
+    pub fn get_total_gov_issued(env: Env) -> i128 {
+        env.storage()
+            .instance()
+            .get::<_, i128>(&TOTAL_GOV_KEY)
+            .unwrap_or(0)
+    }
+
     fn governance_contract(env: &Env) -> Address {
         if let Some(governance) = env.storage().instance().get::<_, Address>(&GOV_KEY) {
             governance
-        } else {
-            panic_with_error!(env, Error::NotInitialized);
-        }
-    }
-
-    fn token_contract(env: &Env) -> Address {
-        if let Some(token) = env.storage().instance().get::<_, Address>(&USDC_KEY) {
-            token
         } else {
             panic_with_error!(env, Error::NotInitialized);
         }
@@ -325,25 +1201,207 @@ impl ScholarshipTreasury {
             panic_with_error!(env, Error::NotInitialized);
         }
     }
+
+    fn assert_not_paused(env: &Env) {
+        let paused: bool = env.storage().instance().get(&PAUSED_KEY).unwrap_or(false);
+        if paused {
+            panic_with_error!(env, Error::ContractPaused);
+        }
+    }
+
+    fn proposal_status(env: &Env, proposal: &Proposal) -> ProposalStatus {
+        if proposal.cancelled {
+            return ProposalStatus::Rejected;
+        }
+
+        // If finalize_proposal has already been called, return its stored result
+        // authoritatively — this is the single source of truth.
+        if let Some(status) = env
+            .storage()
+            .persistent()
+            .get::<_, ProposalStatus>(&DataKey::FinalizedProposal(proposal.id))
+        {
+            return match status {
+                // Legacy pre-timelock: Approved proposals become Queued or Executed
+                ProposalStatus::Approved => {
+                    if proposal.executed {
+                        ProposalStatus::Executed
+                    } else {
+                        ProposalStatus::Queued
+                    }
+                }
+                s => s,
+            };
+        }
+
+        if env.ledger().sequence() <= proposal.deadline_ledger {
+            ProposalStatus::Pending
+        } else {
+            // Apply the same quorum + approval_bps formula used in finalize_proposal
+            // and execute_proposal so all code paths are consistent.
+            let total_votes = proposal
+                .yes_votes
+                .checked_add(proposal.no_votes)
+                .unwrap_or(i128::MAX);
+            let quorum_threshold = env
+                .storage()
+                .instance()
+                .get::<_, i128>(&QUORUM_KEY)
+                .unwrap_or(0);
+            let approval_bps = env
+                .storage()
+                .instance()
+                .get::<_, u32>(&APPROVAL_BPS_KEY)
+                .unwrap_or(0);
+
+            let passed = total_votes >= quorum_threshold
+                && total_votes > 0
+                && proposal
+                    .yes_votes
+                    .checked_mul(10_000)
+                    .map(|v| (v / total_votes) as u32 > approval_bps)
+                    .unwrap_or(false);
+
+            if passed {
+                ProposalStatus::Queued
+            } else {
+                ProposalStatus::Rejected
+            }
+        }
+    }
+
+    fn disburse_internal(env: &Env, recipient: &Address, amount: i128) {
+        if amount <= 0 {
+            panic_with_error!(env, Error::InvalidAmount);
+        }
+
+        let total = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&TOTAL_KEY)
+            .unwrap_or(0);
+        if amount > total {
+            panic_with_error!(env, Error::InsufficientFunds);
+        }
+
+        let new_total = Self::checked_sub_i128(env, total, amount);
+        env.storage().instance().set(&TOTAL_KEY, &new_total);
+
+        let disbursed = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&DISBURSED_KEY)
+            .unwrap_or(0);
+        let new_disbursed = Self::checked_add_i128(env, disbursed, amount);
+        env.storage().instance().set(&DISBURSED_KEY, &new_disbursed);
+
+        let scholar_key = DataKey::Scholar(recipient.clone());
+        if !env.storage().persistent().has(&scholar_key) {
+            let scholars_count = env
+                .storage()
+                .instance()
+                .get::<_, u32>(&SCHOLARS_KEY)
+                .unwrap_or(0);
+            let new_scholars_count = Self::checked_add_u32(env, scholars_count, 1);
+            env.storage()
+                .instance()
+                .set(&SCHOLARS_KEY, &new_scholars_count);
+            env.storage().persistent().set(&scholar_key, &true);
+            Self::extend_persistent(env, &scholar_key);
+        }
+
+        token::client(env).transfer(&env.current_contract_address(), recipient, &amount);
+
+        DisbursementRecorded {
+            recipient: recipient.clone(),
+            amount,
+        }
+        .publish(env);
+    }
+
+    fn admin(env: &Env) -> Address {
+        env.storage()
+            .instance()
+            .get(&ADMIN_KEY)
+            .unwrap_or_else(|| panic_with_error!(env, Error::NotInitialized))
+    }
+
+    /// Replace the current contract WASM with a new uploaded hash. Admin only.
+    pub fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
+        Self::assert_initialized(&env);
+        Self::extend_instance(&env);
+        let admin = Self::admin(&env);
+        admin.require_auth();
+        upgrade::apply(&env, &admin, &new_wasm_hash);
+    }
+
+    pub fn get_version(env: Env) -> String {
+        String::from_str(&env, "1.0.0")
+    }
+
+    fn extend_instance(env: &Env) {
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_EXTEND_TO);
+    }
+
+    fn extend_persistent(env: &Env, key: &DataKey) {
+        env.storage()
+            .persistent()
+            .extend_ttl(key, PERSISTENT_BUMP_THRESHOLD, PERSISTENT_EXTEND_TO);
+    }
+
+    fn checked_add_i128(env: &Env, left: i128, right: i128) -> i128 {
+        left.checked_add(right)
+            .unwrap_or_else(|| panic_with_error!(env, Error::ArithmeticOverflow))
+    }
+
+    fn checked_sub_i128(env: &Env, left: i128, right: i128) -> i128 {
+        left.checked_sub(right)
+            .unwrap_or_else(|| panic_with_error!(env, Error::ArithmeticOverflow))
+    }
+
+    fn checked_add_u32(env: &Env, left: u32, right: u32) -> u32 {
+        left.checked_add(right)
+            .unwrap_or_else(|| panic_with_error!(env, Error::ArithmeticOverflow))
+    }
 }
+
+mod governance {
+    use soroban_sdk::{Address, Env};
+
+    pub fn client<'a>(env: &Env, contract_id: &Address) -> GovernanceTokenClient<'a> {
+        GovernanceTokenClient::new(env, contract_id)
+    }
+
+    #[soroban_sdk::contractclient(name = "GovernanceTokenClient")]
+    #[allow(dead_code)]
+    pub trait GovernanceTokenInterface {
+        fn mint(env: Env, to: Address, amount: i128);
+        fn balance(env: Env, account: Address) -> i128;
+        fn get_voting_power(env: Env, address: Address) -> i128;
+    }
+}
+
+pub use governance::GovernanceTokenClient;
 
 mod token {
     #[cfg(test)]
     mod test_token {
-        use soroban_sdk::{Address, Env, Symbol, symbol_short};
+        use soroban_sdk::{Address, Env};
 
-        const TOKEN_KEY: Symbol = symbol_short!("TOK");
+        use super::super::USDC_KEY;
 
         pub fn contract_id(env: &Env) -> Address {
             env.storage()
                 .instance()
-                .get::<_, Address>(&TOKEN_KEY)
+                .get::<_, Address>(&USDC_KEY)
                 .expect("token contract not initialized")
         }
 
         pub fn register(env: &Env, admin: &Address) {
             let sac = env.register_stellar_asset_contract_v2(admin.clone());
-            env.storage().instance().set(&TOKEN_KEY, &sac.address());
+            env.storage().instance().set(&USDC_KEY, &sac.address());
         }
 
         pub fn client<'a>(env: &Env) -> soroban_sdk::token::TokenClient<'a> {
@@ -353,7 +1411,12 @@ mod token {
 
     #[cfg(not(test))]
     pub fn client<'a>(env: &soroban_sdk::Env) -> soroban_sdk::token::TokenClient<'a> {
-        soroban_sdk::token::TokenClient::new(env, &super::ScholarshipTreasury::token_contract(env))
+        let token_address = env
+            .storage()
+            .instance()
+            .get::<_, soroban_sdk::Address>(&crate::USDC_KEY)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(env, crate::Error::NotInitialized));
+        soroban_sdk::token::TokenClient::new(env, &token_address)
     }
 
     #[cfg(test)]
@@ -362,3 +1425,6 @@ mod token {
 
 #[cfg(test)]
 mod test;
+
+#[cfg(test)]
+mod tests;

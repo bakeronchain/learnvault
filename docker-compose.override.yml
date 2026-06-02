@@ -1,0 +1,15 @@
+services:
+  api:
+    volumes:
+      - .:/workspace
+      - api-node-modules:/workspace/server/node_modules
+      - root-node-modules:/workspace/node_modules
+
+  frontend:
+    volumes:
+      - .:/workspace
+      - root-node-modules:/workspace/node_modules
+
+volumes:
+  api-node-modules:
+  root-node-modules:

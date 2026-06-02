@@ -1,29 +1,31 @@
+import { CONTRACT_IDS } from "../constants/contracts"
+
 const normalizeContractId = (value: string | undefined): string | undefined => {
-  const trimmed = value?.trim()
-  return trimmed || undefined
+	const trimmed = value?.trim()
+	return trimmed || undefined
 }
 
 export function useContractIds() {
-  const learnToken = normalizeContractId(import.meta.env.VITE_LEARN_TOKEN_CONTRACT_ID as string | undefined)
-  const governanceToken = normalizeContractId(
-    import.meta.env.VITE_GOVERNANCE_TOKEN_CONTRACT_ID as string | undefined,
-  )
-  const scholarNft = normalizeContractId(import.meta.env.VITE_SCHOLAR_NFT_CONTRACT_ID as string | undefined)
-  const courseMilestone = normalizeContractId(import.meta.env.VITE_COURSE_MILESTONE_CONTRACT_ID as string | undefined)
-  const scholarshipTreasury = normalizeContractId(
-    import.meta.env.VITE_SCHOLARSHIP_TREASURY_CONTRACT_ID as string | undefined,
-  )
-  const milestoneEscrow = normalizeContractId(import.meta.env.VITE_MILESTONE_ESCROW_CONTRACT_ID as string | undefined)
-  const usdc = normalizeContractId(import.meta.env.VITE_USDC_CONTRACT_ID as string | undefined)
+	const learnToken = normalizeContractId(CONTRACT_IDS.learnToken)
+	const governanceToken = normalizeContractId(CONTRACT_IDS.governanceToken)
+	const scholarNft = normalizeContractId(CONTRACT_IDS.scholarNft)
+	const courseMilestone = normalizeContractId(CONTRACT_IDS.courseMilestone)
+	const scholarshipTreasury = normalizeContractId(
+		CONTRACT_IDS.scholarshipTreasury,
+	)
+	const milestoneEscrow = normalizeContractId(CONTRACT_IDS.milestoneEscrow)
+	const usdc =
+		normalizeContractId(import.meta.env.PUBLIC_USDC_CONTRACT_ID as string) ??
+		normalizeContractId(import.meta.env.VITE_USDC_CONTRACT_ID as string)
 
-  return {
-    learnToken,
-    governanceToken,
-    scholarNft,
-    courseMilestone,
-    scholarshipTreasury,
-    milestoneEscrow,
-    usdc,
-    isDeployed: (id: string | undefined): id is string => Boolean(id),
-  }
+	return {
+		learnToken,
+		governanceToken,
+		scholarNft,
+		courseMilestone,
+		scholarshipTreasury,
+		milestoneEscrow,
+		usdc,
+		isDeployed: (id: string | undefined): id is string => Boolean(id),
+	}
 }

@@ -15,3 +15,5 @@ export function shortenContractId(
 	const end = id.slice(-suffixLength)
 	return `${start}…${end}`
 }
+
+export const shortenAddress = shortenContractId

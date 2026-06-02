@@ -1,0 +1,15 @@
+DROP TRIGGER IF EXISTS trg_quiz_questions_updated_at ON quiz_questions;
+DROP TRIGGER IF EXISTS trg_quizzes_updated_at ON quizzes;
+DROP TRIGGER IF EXISTS trg_milestones_updated_at ON milestones;
+DROP TRIGGER IF EXISTS trg_lessons_updated_at ON lessons;
+DROP TRIGGER IF EXISTS trg_courses_updated_at ON courses;
+DROP FUNCTION IF EXISTS set_updated_at();
+DROP INDEX IF EXISTS idx_quiz_questions_quiz_id;
+DROP INDEX IF EXISTS idx_milestones_lesson_id;
+DROP INDEX IF EXISTS idx_milestones_course_id;
+DROP INDEX IF EXISTS idx_lessons_course_id;
+DROP TABLE IF EXISTS quiz_questions;
+DROP TABLE IF EXISTS quizzes;
+DROP TABLE IF EXISTS milestones;
+DROP TABLE IF EXISTS lessons;
+DROP TABLE IF EXISTS courses;

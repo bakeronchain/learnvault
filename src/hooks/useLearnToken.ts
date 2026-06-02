@@ -1,8 +1,12 @@
-import { useCallback } from "react"
+import { type Api } from "@stellar/stellar-sdk/rpc"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import type { Api } from "@stellar/stellar-sdk/rpc"
+import { useCallback } from "react"
+import { useToast } from "../components/Toast/ToastProvider"
+import { type LearnTokenInfo } from "../types/contracts"
+import { ErrorCode, createAppError } from "../types/errors"
+import { parseError, isUserRejection } from "../utils/errors"
+import { logger } from "../utils/logger"
 import { useContractIds } from "./useContractIds"
-import { useNotification } from "./useNotification"
 import { useSubscription } from "./useSubscription"
 import { useWallet } from "./useWallet"
 
@@ -12,27 +16,50 @@ import { useWallet } from "./useWallet"
 
 type ContractRecord = Record<string, unknown>
 
+const generatedContractModules = import.meta.glob("../contracts/*.ts")
+
 /**
  * Dynamically loads the generated LearnToken contract client (or its shim).
  * Returns null if the module cannot be found at all.
  */
 const loadLearnTokenClient = async (): Promise<ContractRecord | null> => {
-  try {
-    const mod = (await import("../contracts/learn_token")) as ContractRecord
-    return (mod.default as ContractRecord) ?? mod
-  } catch {
-    return null
-  }
+	const moduleLoader = generatedContractModules["../contracts/learn_token.ts"]
+	if (!moduleLoader) {
+		logger.warn(
+			createAppError(
+				ErrorCode.CONTRACT_NOT_DEPLOYED,
+				"LearnToken contract module not found",
+				{ contractName: "learn_token" },
+			),
+		)
+		return null
+	}
+
+	try {
+		const mod = (await moduleLoader()) as ContractRecord
+
+		return (mod.default as ContractRecord) ?? mod
+	} catch (err) {
+		logger.warn(
+			createAppError(
+				ErrorCode.CONTRACT_NOT_DEPLOYED,
+				"Failed to load LearnToken contract",
+				{ contractName: "learn_token" },
+				err,
+			),
+		)
+		return null
+	}
 }
 
 const toMethod = (
-  client: ContractRecord,
-  name: string,
+	client: ContractRecord,
+	name: string,
 ): ((...args: unknown[]) => Promise<unknown>) | null => {
-  const fn = client[name]
-  return typeof fn === "function"
-    ? (fn as (...args: unknown[]) => Promise<unknown>)
-    : null
+	const fn = client[name]
+	return typeof fn === "function"
+		? (fn as (...args: unknown[]) => Promise<unknown>)
+		: null
 }
 
 /**
@@ -40,25 +67,25 @@ const toMethod = (
  * responses. Falls back to the raw value when `.result` is absent.
  */
 const unwrapResult = (raw: unknown): unknown => {
-  if (raw !== null && typeof raw === "object") {
-    const obj = raw as ContractRecord
-    if ("result" in obj) return obj.result
-  }
-  return raw
+	if (raw !== null && typeof raw === "object") {
+		const obj = raw as ContractRecord
+		if ("result" in obj) return obj.result
+	}
+	return raw
 }
 
 const toBigInt = (value: unknown): bigint => {
-  if (typeof value === "bigint") return value
-  if (typeof value === "number" && Number.isFinite(value))
-    return BigInt(Math.trunc(value))
-  if (typeof value === "string") {
-    try {
-      return BigInt(value)
-    } catch {
-      /* fall through */
-    }
-  }
-  return 0n
+	if (typeof value === "bigint") return value
+	if (typeof value === "number" && Number.isFinite(value))
+		return BigInt(Math.trunc(value))
+	if (typeof value === "string") {
+		try {
+			return BigInt(value)
+		} catch {
+			/* fall through */
+		}
+	}
+	return 0n
 }
 
 // ---------------------------------------------------------------------------
@@ -68,7 +95,10 @@ const toBigInt = (value: unknown): bigint => {
 // Prefix used to invalidate all balance entries at once (e.g. after any mint).
 const BALANCE_QUERY_KEY_PREFIX = ["learnToken", "balance"] as const
 
-const BALANCE_STALE_TIME = 5 * 60 * 1000 // 5 minutes
+const BALANCE_STALE_TIME = 30 * 1000 // 30 seconds
+
+// The expected contract version this client was generated against.
+const EXPECTED_CONTRACT_VERSION = "1.0.0"
 
 // The LearnToken contract emits a MilestoneCompleted event. Soroban encodes
 // the first topic as a Symbol from the #[contractevent] struct name. The SDK
@@ -82,15 +112,15 @@ const MINT_EVENT_TOPIC = "mint"
 // ---------------------------------------------------------------------------
 
 export interface UseLearnTokenResult {
-  /** Learner's LRN balance. `undefined` when no wallet is connected. */
-  balance: bigint | undefined
-  isLoading: boolean
-  /**
-   * Mint LRN tokens to `to`. Admin-only on the contract side.
-   * `courseId` is required by the on-chain `mint(to, amount, course_id)` call.
-   */
-  mint: (to: string, amount: bigint, courseId: string) => Promise<void>
-  isMinting: boolean
+	/** Learner's LRN balance. `undefined` when no wallet is connected. */
+	balance: bigint | undefined
+	isLoading: boolean
+	/**
+	 * Mint LRN tokens to `to`. Admin-only on the contract side.
+	 * `courseId` is required by the on-chain `mint(to, amount, course_id)` call.
+	 */
+	mint: (to: string, amount: bigint, courseId: string) => Promise<void>
+	isMinting: boolean
 }
 
 /**
@@ -100,137 +130,178 @@ export interface UseLearnTokenResult {
  *                  the connected wallet address.
  */
 export function useLearnToken(address?: string): UseLearnTokenResult {
-  const { address: walletAddress, signTransaction } = useWallet()
-  const { learnToken: contractId, isDeployed } = useContractIds()
-  const { addNotification } = useNotification()
-  const queryClient = useQueryClient()
+	const { address: walletAddress, signTransaction } = useWallet()
+	const { learnToken: contractId, isDeployed } = useContractIds()
+	const { showSuccess, showError, showInfo } = useToast()
+	const queryClient = useQueryClient()
 
-  const targetAddress = address ?? walletAddress
-  const contractReady = isDeployed(contractId)
+	const targetAddress = address ?? walletAddress
+	const contractReady = isDeployed(contractId)
 
-  // ---------------------------------------------------------------------------
-  // Balance query
-  // ---------------------------------------------------------------------------
+	// ---------------------------------------------------------------------------
+	// Version check — warn if deployed contract version doesn't match expected
+	// ---------------------------------------------------------------------------
 
-  const balanceQueryKey = [...BALANCE_QUERY_KEY_PREFIX, targetAddress] as const
+	useQuery({
+		queryKey: ["learnToken", "version", contractId],
+		queryFn: async (): Promise<string | null> => {
+			const client = await loadLearnTokenClient()
+			if (!client || !contractReady) return null
 
-  const { data: balance, isLoading } = useQuery({
-    queryKey: balanceQueryKey,
-    queryFn: async (): Promise<bigint> => {
-      const client = await loadLearnTokenClient()
-      if (!client || !contractReady) return 0n
+			const fn = toMethod(client, "get_version")
+			if (!fn) return null
 
-      const fn = toMethod(client, "balance")
-      if (!fn) return 0n
+			try {
+				const raw = await fn({})
+				const version = String(unwrapResult(raw) ?? "")
+				if (version && version !== EXPECTED_CONTRACT_VERSION) {
+					logger.warn(
+						`[LearnToken] Version mismatch: expected ${EXPECTED_CONTRACT_VERSION}, got ${version}. ` +
+							"Client bindings may be out of date.",
+					)
+				}
+				return version
+			} catch {
+				return null
+			}
+		},
+		enabled: contractReady,
+		staleTime: Infinity,
+	})
 
-      const raw = await fn({ account: targetAddress, id: targetAddress })
+	// ---------------------------------------------------------------------------
+	// Balance query
+	// ---------------------------------------------------------------------------
 
-      // The shim's errResult signals that the generated client is not yet
-      // available; degrade gracefully to zero rather than surfacing an error.
-      const resolved = unwrapResult(raw)
-      if (
-        resolved !== null &&
-        typeof resolved === "object" &&
-        typeof (resolved as ContractRecord).isErr === "function" &&
-        ((resolved as ContractRecord).isErr as () => boolean)()
-      ) {
-        return 0n
-      }
+	const balanceQueryKey = [...BALANCE_QUERY_KEY_PREFIX, targetAddress] as const
 
-      return toBigInt(resolved)
-    },
-    // Only fetch when there is an address to look up.
-    enabled: targetAddress !== undefined,
-    staleTime: BALANCE_STALE_TIME,
-  })
+	const { data: balance, isLoading } = useQuery({
+		queryKey: balanceQueryKey,
+		queryFn: async (): Promise<bigint> => {
+			const client = await loadLearnTokenClient()
+			if (!client || !contractReady) return 0n
 
-  // ---------------------------------------------------------------------------
-  // Real-time refresh via mint events
-  // ---------------------------------------------------------------------------
+			const fn = toMethod(client, "balance")
+			if (!fn) return 0n
 
-  const onMintEvent = useCallback(
-    (_event: Api.EventResponse): void => {
-      // Invalidate all balance entries so the leaderboard, profile, etc.
-      // all pick up the new balance without waiting for the stale timer.
-      void queryClient.invalidateQueries({ queryKey: BALANCE_QUERY_KEY_PREFIX })
-    },
-    [queryClient],
-  )
+			const raw = await fn({ account: targetAddress, id: targetAddress })
 
-  // contractId falls back to "" (no-op) when the contract is not yet deployed.
-  useSubscription(contractId ?? "", MINT_EVENT_TOPIC, onMintEvent)
+			// The shim's errResult signals that the generated client is not yet
+			// available; degrade gracefully to zero rather than surfacing an error.
+			const resolved = unwrapResult(raw)
+			if (
+				resolved !== null &&
+				typeof resolved === "object" &&
+				typeof (resolved as ContractRecord).isErr === "function" &&
+				((resolved as ContractRecord).isErr as () => boolean)()
+			) {
+				return 0n
+			}
 
-  // ---------------------------------------------------------------------------
-  // Mint mutation (admin only)
-  // ---------------------------------------------------------------------------
+			return toBigInt(resolved)
+		},
+		// Only fetch when there is an address to look up.
+		enabled: targetAddress !== undefined,
+		staleTime: BALANCE_STALE_TIME,
+	})
 
-  const { mutateAsync, isPending: isMinting } = useMutation({
-    mutationFn: async ({
-      to,
-      amount,
-      courseId,
-    }: {
-      to: string
-      amount: bigint
-      courseId: string
-    }): Promise<void> => {
-      const client = await loadLearnTokenClient()
-      if (!client || !contractReady) {
-        throw new Error("LearnToken contract is not deployed")
-      }
+	// ---------------------------------------------------------------------------
+	// Real-time refresh via mint events
+	// ---------------------------------------------------------------------------
 
-      const fn = toMethod(client, "mint")
-      if (!fn) throw new Error("mint method not found on LearnToken client")
+	const onMintEvent = useCallback(
+		(_event: Api.EventResponse): void => {
+			// Invalidate all balance entries so the leaderboard, profile, etc.
+			// all pick up the new balance without waiting for the stale timer.
+			void queryClient.invalidateQueries({ queryKey: BALANCE_QUERY_KEY_PREFIX })
+		},
+		[queryClient],
+	)
 
-      // The generated Soroban client returns a transaction builder object;
-      // the shim returns the same shape with signAndSend always throwing.
-      const rawTx = await fn(
-        { to, amount, course_id: courseId },
-        { publicKey: walletAddress ?? "" },
-      )
+	// contractId falls back to "" (no-op) when the contract is not yet deployed.
+	useSubscription(contractId ?? "", MINT_EVENT_TOPIC, onMintEvent)
 
-      if (
-        rawTx !== null &&
-        typeof rawTx === "object" &&
-        typeof (rawTx as ContractRecord).signAndSend === "function"
-      ) {
-        await (
-          (rawTx as ContractRecord).signAndSend as (opts: {
-            signTransaction: typeof signTransaction
-          }) => Promise<unknown>
-        )({ signTransaction })
-      }
-    },
+	// ---------------------------------------------------------------------------
+	// Mint mutation (admin only)
+	// ---------------------------------------------------------------------------
 
-    onSuccess: () => {
-      // Eagerly invalidate so callers see the updated balance immediately.
-      void queryClient.invalidateQueries({ queryKey: BALANCE_QUERY_KEY_PREFIX })
-      addNotification("LearnTokens minted successfully", "success")
-    },
+	const { mutateAsync, isPending: isMinting } = useMutation({
+		mutationFn: async ({
+			to,
+			amount,
+			courseId,
+		}: {
+			to: string
+			amount: bigint
+			courseId: string
+		}): Promise<void> => {
+			const client = await loadLearnTokenClient()
+			if (!client || !contractReady) {
+				throw new Error("LearnToken contract is not deployed")
+			}
 
-    onError: (error: unknown) => {
-      const message = error instanceof Error ? error.message : "Mint failed"
-      addNotification(message, "error")
-    },
-  })
+			const fn = toMethod(client, "mint")
+			if (!fn) throw new Error("mint method not found on LearnToken client")
 
-  const mint = useCallback(
-    async (to: string, amount: bigint, courseId: string): Promise<void> => {
-      await mutateAsync({ to, amount, courseId })
-    },
-    [mutateAsync],
-  )
+			// The generated Soroban client returns a transaction builder object;
+			// the shim returns the same shape with signAndSend always throwing.
+			const rawTx = await fn(
+				{ to, amount, course_id: courseId },
+				{ publicKey: walletAddress ?? "" },
+			)
 
-  // ---------------------------------------------------------------------------
-  // Return value
-  // ---------------------------------------------------------------------------
+			if (
+				rawTx !== null &&
+				typeof rawTx === "object" &&
+				typeof (rawTx as ContractRecord).signAndSend === "function"
+			) {
+				await (
+					(rawTx as ContractRecord).signAndSend as (opts: {
+						signTransaction: typeof signTransaction
+					}) => Promise<unknown>
+				)({ signTransaction })
+			}
+		},
 
-  return {
-    // Explicitly return undefined (not 0n) when there is no wallet, so callers
-    // can distinguish "not connected" from "connected but zero balance".
-    balance: targetAddress === undefined ? undefined : balance,
-    isLoading,
-    mint,
-    isMinting,
-  }
+		onSuccess: () => {
+			// Eagerly invalidate so callers see the updated balance immediately.
+			void queryClient.invalidateQueries({ queryKey: BALANCE_QUERY_KEY_PREFIX })
+			showSuccess("LearnTokens minted successfully")
+		},
+
+		onError: (error: unknown) => {
+			if (isUserRejection(error)) {
+				showInfo("Mint cancelled")
+				return
+			}
+			const appError = parseError(error)
+			const message =
+				appError.code === ErrorCode.CONTRACT_NOT_DEPLOYED
+					? "LearnToken contract is not available on this network"
+					: appError.code === ErrorCode.WALLET_NOT_CONNECTED
+						? "Please connect your wallet to mint tokens"
+						: "Mint failed. Please try again."
+			showError(message)
+		},
+	})
+
+	const mint = useCallback(
+		async (to: string, amount: bigint, courseId: string): Promise<void> => {
+			await mutateAsync({ to, amount, courseId })
+		},
+		[mutateAsync],
+	)
+
+	// ---------------------------------------------------------------------------
+	// Return value
+	// ---------------------------------------------------------------------------
+
+	return {
+		// Explicitly return undefined (not 0n) when there is no wallet, so callers
+		// can distinguish "not connected" from "connected but zero balance".
+		balance: targetAddress === undefined ? undefined : balance,
+		isLoading,
+		mint,
+		isMinting,
+	}
 }

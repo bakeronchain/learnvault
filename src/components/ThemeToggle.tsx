@@ -61,6 +61,7 @@ export const ThemeToggle = () => {
 			onClick={toggleTheme}
 			aria-label={`Switch to ${nextTheme} theme`}
 			title={`Switch to ${nextTheme} theme`}
+			className="!px-2"
 		>
 			{activeTheme === "dark" ? <Icon.Sun /> : <Icon.Moon01 />}
 		</Button>

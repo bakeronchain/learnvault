@@ -1,34 +1,213 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCallback } from "react"
+import { useToast } from "../components/Toast/ToastProvider"
+import { ErrorCode, createAppError } from "../types/errors"
+import { type RawContractProposal, type Proposal } from "../types/governance"
+import { isUserRejection, parseError } from "../utils/errors"
+import { logger } from "../utils/logger"
+import { useContractIds } from "./useContractIds"
 import { useWallet } from "./useWallet"
 
-export interface Proposal {
-	id: number
-	title: string
-	description: string
-	author: string
-	status: "Active" | "Passed" | "Rejected"
-	votesFor: bigint
-	votesAgainst: bigint
-	endDate: number // timestamp
-}
+// expose the canonical Proposal type for consumers of this module
+export type { Proposal }
 
-const readEnv = (key: string): string | undefined => {
-	const value = (import.meta.env as Record<string, unknown>)[key]
-	return typeof value === "string" && value.length ? value : undefined
-}
+type ContractRecord = Record<string, unknown>
 
-const SCHOLARSHIP_TREASURY_CONTRACT = readEnv(
-	"PUBLIC_SCHOLARSHIP_TREASURY_CONTRACT",
-)
-const GOVERNANCE_TOKEN_CONTRACT = readEnv("PUBLIC_GOVERNANCE_TOKEN_CONTRACT")
+// The expected contract version this client was generated against.
+const EXPECTED_CONTRACT_VERSION = "1.0.0"
 
 /**
  * Hook to manage governance interactions: reading proposals, voting power, and casting votes.
  */
 export function useGovernance() {
 	const { address, signTransaction } = useWallet()
+	const { scholarshipTreasury, governanceToken } = useContractIds()
 	const queryClient = useQueryClient()
+	const { showSuccess, showError, showInfo } = useToast()
+
+	const asMethod = useCallback(
+		(
+			client: ContractRecord | null,
+			...names: string[]
+		): ((...args: unknown[]) => Promise<unknown>) | null => {
+			if (!client) return null
+			for (const name of names) {
+				const maybeMethod = client[name]
+				if (typeof maybeMethod === "function") {
+					return maybeMethod as (...args: unknown[]) => Promise<unknown>
+				}
+			}
+			return null
+		},
+		[],
+	)
+
+	const unwrapResult = useCallback((value: unknown): unknown => {
+		if (!value || typeof value !== "object") return value
+		const result = (value as ContractRecord).result
+		return result ?? value
+	}, [])
+
+	const isErrResult = useCallback((value: unknown): boolean => {
+		if (!value || typeof value !== "object") return false
+		const maybe = value as ContractRecord
+		return typeof maybe.isErr === "function" && maybe.isErr()
+	}, [])
+
+	const toBigIntSafe = useCallback(
+		(value: unknown): bigint => {
+			const resolved = unwrapResult(value)
+			if (isErrResult(resolved)) return 0n
+			if (typeof resolved === "bigint") return resolved
+			if (typeof resolved === "number" && Number.isFinite(resolved)) {
+				return BigInt(Math.trunc(resolved))
+			}
+			if (typeof resolved === "string") {
+				try {
+					return BigInt(resolved)
+				} catch {
+					return 0n
+				}
+			}
+			return 0n
+		},
+		[isErrResult, unwrapResult],
+	)
+
+	const toProposalStatus = useCallback(
+		(status: unknown): Proposal["status"] => {
+			const normalized = String(status ?? "pending").toLowerCase()
+			if (normalized === "queued") return "Queued"
+			if (normalized === "approved" || normalized === "passed") return "Passed"
+			if (normalized === "rejected") return "Rejected"
+			if (normalized === "executed") return "Executed"
+			return "Active"
+		},
+		[],
+	)
+
+	const mapProposal = useCallback(
+		(
+			rawProposal: RawContractProposal,
+			fallbackStatus: Proposal["status"],
+		): Proposal => ({
+			id: Number(rawProposal.id ?? 0),
+			title: String(rawProposal.title ?? rawProposal.program_name ?? ""),
+			description: String(
+				rawProposal.program_description ?? rawProposal.description ?? "",
+			),
+			author: String(
+				rawProposal.applicant ??
+					rawProposal.author ??
+					rawProposal.author_address ??
+					"",
+			),
+			status: toProposalStatus(rawProposal.status ?? fallbackStatus),
+			votesFor: toBigIntSafe(
+				rawProposal.yes_votes ??
+					rawProposal.votes_for ??
+					rawProposal.votesFor ??
+					0,
+			),
+			votesAgainst: toBigIntSafe(
+				rawProposal.no_votes ??
+					rawProposal.votes_against ??
+					rawProposal.votesAgainst ??
+					0,
+			),
+			endDate: Number(
+				rawProposal.endDate ??
+					rawProposal.end_date ??
+					rawProposal.deadline_ledger ??
+					0,
+			),
+		}),
+		[toBigIntSafe, toProposalStatus],
+	)
+
+	const readContractArray = useCallback(
+		async (
+			client: ContractRecord | null,
+			methodNames: string[],
+			argumentVariants: unknown[][],
+		): Promise<unknown[]> => {
+			for (const methodName of methodNames) {
+				const method = asMethod(client, methodName)
+				if (!method) continue
+				for (const args of argumentVariants) {
+					try {
+						const raw = await method(...args)
+						const resolved = unwrapResult(raw)
+						if (Array.isArray(resolved)) return resolved
+					} catch {
+						continue
+					}
+				}
+			}
+			return []
+		},
+		[asMethod, unwrapResult],
+	)
+
+	const sendTxIfNeeded = useCallback(
+		async (value: unknown): Promise<unknown> => {
+			if (!value || typeof value !== "object") return value
+			const maybeTx = value as ContractRecord
+			if (typeof maybeTx.signAndSend !== "function") return value
+			return maybeTx.signAndSend({ signTransaction })
+		},
+		[signTransaction],
+	)
+
+	const unwrapSendResult = useCallback(
+		(value: unknown): unknown => {
+			const resolved = unwrapResult(value)
+			if (isErrResult(resolved)) {
+				const maybeUnwrapErr = (resolved as ContractRecord).unwrapErr
+				const errorValue =
+					typeof maybeUnwrapErr === "function"
+						? (maybeUnwrapErr as () => unknown)()
+						: new Error("Transaction failed")
+				throw errorValue instanceof Error
+					? errorValue
+					: new Error(String(errorValue))
+			}
+			if (
+				resolved &&
+				typeof resolved === "object" &&
+				typeof (resolved as ContractRecord).unwrap === "function"
+			) {
+				const maybeUnwrap = (resolved as ContractRecord).unwrap as
+					| (() => unknown)
+					| undefined
+				return maybeUnwrap ? maybeUnwrap() : resolved
+			}
+			return resolved
+		},
+		[isErrResult, unwrapResult],
+	)
+
+	const toBooleanSafe = useCallback(
+		(value: unknown): boolean => {
+			const resolved = unwrapResult(value)
+			if (typeof resolved === "boolean") return resolved
+			if (typeof resolved === "number") return resolved !== 0
+			if (typeof resolved === "string") {
+				const normalized = resolved.trim().toLowerCase()
+				return (
+					normalized === "true" || normalized === "yes" || normalized === "for"
+				)
+			}
+			if (resolved && typeof resolved === "object") {
+				const maybe = resolved as ContractRecord
+				if (typeof maybe.support === "boolean") return maybe.support
+				if (typeof maybe.vote === "boolean") return maybe.vote
+				if (typeof maybe.value === "boolean") return maybe.value
+			}
+			return false
+		},
+		[unwrapResult],
+	)
 
 	// Helper to load contract clients
 	const loadClient = useCallback(async (path: string) => {
@@ -38,69 +217,200 @@ export function useGovernance() {
 				unknown
 			>
 			return (mod.default as Record<string, unknown>) ?? mod
-		} catch {
+		} catch (err) {
+			logger.warn(
+				createAppError(
+					ErrorCode.CONTRACT_NOT_DEPLOYED,
+					"Contract not available",
+					{ contractPath: path },
+					err,
+				),
+			)
 			return null
 		}
 	}, [])
+
+	// Version checks — warn if deployed contract versions don't match expected
+	useQuery({
+		queryKey: ["governance", "version", "governance_token"],
+		queryFn: async (): Promise<string | null> => {
+			if (!governanceToken) return null
+			const client = await loadClient("../contracts/governance_token")
+			if (!client) return null
+			const fn = asMethod(client, "get_version")
+			if (!fn) return null
+			try {
+				const raw = await fn({})
+				const version = String(
+					(raw !== null &&
+					typeof raw === "object" &&
+					"result" in (raw as ContractRecord)
+						? (raw as ContractRecord).result
+						: raw) ?? "",
+				)
+				if (version && version !== EXPECTED_CONTRACT_VERSION) {
+					logger.warn(
+						`[GovernanceToken] Version mismatch: expected ${EXPECTED_CONTRACT_VERSION}, got ${version}. ` +
+							"Client bindings may be out of date.",
+					)
+				}
+				return version
+			} catch {
+				return null
+			}
+		},
+		staleTime: Infinity,
+	})
+
+	useQuery({
+		queryKey: ["governance", "version", "scholarship_treasury"],
+		queryFn: async (): Promise<string | null> => {
+			if (!scholarshipTreasury) return null
+			const client = await loadClient("../contracts/scholarship_treasury")
+			if (!client) return null
+			const fn = asMethod(client, "get_version")
+			if (!fn) return null
+			try {
+				const raw = await fn({})
+				const version = String(
+					(raw !== null &&
+					typeof raw === "object" &&
+					"result" in (raw as ContractRecord)
+						? (raw as ContractRecord).result
+						: raw) ?? "",
+				)
+				if (version && version !== EXPECTED_CONTRACT_VERSION) {
+					logger.warn(
+						`[ScholarshipTreasury] Version mismatch: expected ${EXPECTED_CONTRACT_VERSION}, got ${version}. ` +
+							"Client bindings may be out of date.",
+					)
+				}
+				return version
+			} catch {
+				return null
+			}
+		},
+		staleTime: Infinity,
+	})
 
 	// Fetch voting power (GOV token balance)
 	const { data: votingPower = 0n } = useQuery({
 		queryKey: ["governance", "votingPower", address],
 		queryFn: async () => {
-			if (!address || !GOVERNANCE_TOKEN_CONTRACT) return 0n
+			if (!address || !governanceToken) return 0n
 			const client = await loadClient("../contracts/governance_token")
 			if (!client) return 0n
 
-			// Standard Soroban token 'balance' call
-			const balanceFn =
-				(client.balance as Function) || (client.get_balance as Function)
-			if (typeof balanceFn !== "function") return 0n
+			const balanceFn = asMethod(client, "balance", "get_balance", "getBalance")
+			if (!balanceFn) return 0n
 
-			const res = await balanceFn({ id: address, user: address })
-			return typeof res === "bigint" ? res : BigInt(res)
+			for (const args of [
+				[{ account: address }],
+				[{ user: address }],
+				[{ id: address }],
+				[{ account: address, user: address, id: address }],
+				[address],
+			]) {
+				try {
+					const result = await balanceFn(...args)
+					return toBigIntSafe(result)
+				} catch {
+					continue
+				}
+			}
+
+			return 0n
 		},
 		enabled: !!address,
+		staleTime: 60 * 1000,
 	})
 
 	// Fetch all proposals
-	const { data: proposals = [] } = useQuery<Proposal[]>({
+	const { data: proposals = [], isLoading: isLoadingProposals } = useQuery<
+		Proposal[]
+	>({
 		queryKey: ["governance", "proposals"],
 		queryFn: async () => {
-			if (!SCHOLARSHIP_TREASURY_CONTRACT) return []
+			if (!scholarshipTreasury) return []
 			const client = await loadClient("../contracts/scholarship_treasury")
 			if (!client) return []
 
-			const getProposalsFn =
-				(client.get_proposals as Function) || (client.getProposals as Function)
-			if (typeof getProposalsFn !== "function") return []
+			const pending = await readContractArray(
+				client,
+				["get_active_proposals", "getActiveProposals"],
+				[[]],
+			)
+			const queued = await readContractArray(
+				client,
+				["get_proposals_by_status", "getProposalsByStatus"],
+				[["Queued"], [{ status: "Queued" }], [{ tag: "Queued" }]],
+			)
+			const approved = await readContractArray(
+				client,
+				["get_proposals_by_status", "getProposalsByStatus"],
+				[["Approved"], [{ status: "Approved" }], [{ tag: "Approved" }]],
+			)
+			const rejected = await readContractArray(
+				client,
+				["get_proposals_by_status", "getProposalsByStatus"],
+				[["Rejected"], [{ status: "Rejected" }], [{ tag: "Rejected" }]],
+			)
 
-			const raw = await getProposalsFn()
-			// Transform contract response to Proposal interface
-			return (Array.isArray(raw) ? raw : []).map((p: any) => ({
-				id: Number(p.id ?? 0),
-				title: String(p.title ?? ""),
-				description: String(p.description ?? ""),
-				author: String(p.author ?? p.author_address ?? ""),
-				status: (p.status ?? "Active") as Proposal["status"],
-				votesFor: BigInt(p.votes_for ?? p.votesFor ?? 0),
-				votesAgainst: BigInt(p.votes_against ?? p.votesAgainst ?? 0),
-				endDate: Number(p.end_date ?? p.endDate ?? 0),
-			}))
+			const grouped = [
+				...pending.map((proposal: unknown) =>
+					mapProposal(proposal as RawContractProposal, "Active"),
+				),
+				...queued.map((proposal: unknown) =>
+					mapProposal(proposal as RawContractProposal, "Queued"),
+				),
+				...approved.map((proposal: unknown) =>
+					mapProposal(proposal as RawContractProposal, "Passed"),
+				),
+				...rejected.map((proposal: unknown) =>
+					mapProposal(proposal as RawContractProposal, "Rejected"),
+				),
+			]
+
+			if (grouped.length > 0) return grouped
+
+			const fallback = await readContractArray(
+				client,
+				["get_proposals", "getProposals"],
+				[[]],
+			)
+			return fallback.map((proposal: unknown) =>
+				mapProposal(proposal as RawContractProposal, "Active"),
+			)
 		},
+		staleTime: 60 * 1000,
 	})
 
 	// Check if voter has already voted on a specific proposal
 	const hasVoted = useCallback(
-		(proposalId: number) => {
-			// This could also be a query, but for the requested API we can check cache or fetch.
-			// Let's assume we fetch this info or it's part of the proposal list.
-			// Implementing as a query-backed check.
+		(proposalId: number, voterAddress?: string) => {
+			const resolvedAddress = voterAddress ?? address
+			if (!resolvedAddress) return false
 			return !!queryClient.getQueryData([
 				"governance",
 				"voted",
 				proposalId,
-				address,
+				resolvedAddress,
 			])
+		},
+		[address, queryClient],
+	)
+
+	const getVoteChoice = useCallback(
+		(proposalId: number, voterAddress?: string): boolean | null => {
+			const resolvedAddress = voterAddress ?? address
+			if (!resolvedAddress) return null
+			const cached = queryClient.getQueryData([
+				"governance",
+				"voteChoice",
+				proposalId,
+				resolvedAddress,
+			])
+			return typeof cached === "boolean" ? cached : null
 		},
 		[address, queryClient],
 	)
@@ -109,30 +419,52 @@ export function useGovernance() {
 	useQuery({
 		queryKey: ["governance", "voted", address],
 		queryFn: async () => {
-			if (!address || !SCHOLARSHIP_TREASURY_CONTRACT || proposals.length === 0)
-				return {}
+			if (!address || !scholarshipTreasury || proposals.length === 0) return {}
 			const client = await loadClient("../contracts/scholarship_treasury")
 			if (!client) return {}
 
-			const hasVotedFn =
-				(client.has_voted as Function) || (client.hasVoted as Function)
-			if (typeof hasVotedFn !== "function") return {}
+			const hasVotedFn = asMethod(client, "has_voted", "hasVoted")
+			const voteChoiceFn = asMethod(
+				client,
+				"get_vote",
+				"getVote",
+				"vote_of",
+				"voteOf",
+			)
+			if (!hasVotedFn) return {}
 
 			const results: Record<number, boolean> = {}
 			await Promise.all(
-				proposals.map(async (p) => {
+				proposals.map(async (p: Proposal) => {
 					try {
 						const voted = await hasVotedFn({
 							voter: address,
 							proposal_id: p.id,
-							proposalId: p.id,
 						})
-						results[p.id] = !!voted
+						results[p.id] = Boolean(unwrapResult(voted))
 						// Also update the individual cache
 						queryClient.setQueryData(
 							["governance", "voted", p.id, address],
-							!!voted,
+							results[p.id],
 						)
+						if (results[p.id] && voteChoiceFn) {
+							for (const args of [
+								[{ voter: address, proposal_id: p.id }],
+								[{ address, proposal_id: p.id }],
+								[p.id, address],
+							]) {
+								try {
+									const choice = await voteChoiceFn(...args)
+									queryClient.setQueryData(
+										["governance", "voteChoice", p.id, address],
+										toBooleanSafe(choice),
+									)
+									break
+								} catch {
+									continue
+								}
+							}
+						}
 					} catch {
 						results[p.id] = false
 					}
@@ -141,10 +473,11 @@ export function useGovernance() {
 			return results
 		},
 		enabled: !!address && proposals.length > 0,
+		staleTime: 60 * 1000,
 	})
 
 	// Mutation for casting a vote
-	const { mutateAsync: vote, isPending: isVoting } = useMutation({
+	const { mutateAsync: castVote, isPending: isVoting } = useMutation({
 		mutationFn: async ({
 			proposalId,
 			support,
@@ -153,50 +486,75 @@ export function useGovernance() {
 			support: boolean
 		}) => {
 			if (!address) throw new Error("Wallet not connected")
-			if (!SCHOLARSHIP_TREASURY_CONTRACT)
-				throw new Error("Contract not configured")
+			if (!scholarshipTreasury) throw new Error("Contract not configured")
 
 			const client = await loadClient("../contracts/scholarship_treasury")
 			if (!client) throw new Error("Contract client not found")
 
-			const voteFn = (client.vote as Function) || (client.cast_vote as Function)
-			if (typeof voteFn !== "function") throw new Error("Vote method not found")
+			const voteFn = asMethod(client, "vote", "cast_vote")
+			if (!voteFn) throw new Error("Vote method not found")
 
 			const tx = await voteFn(
 				{
 					proposal_id: proposalId,
-					proposalId: proposalId,
 					voter: address,
 					support,
 				},
 				{ publicKey: address },
 			)
 
-			// signAndSend is expected on the tx object from generated clients
-			if (tx && typeof tx.signAndSend === "function") {
-				await tx.signAndSend({ signTransaction })
-			}
+			showInfo("Waiting for wallet approval…")
+			const sendResult = await sendTxIfNeeded(tx)
+			unwrapSendResult(sendResult)
 		},
-		onSuccess: (_, { proposalId }) => {
+		onSuccess: (
+			_: void,
+			{ proposalId, support }: { proposalId: number; support: boolean },
+		) => {
+			showSuccess("Vote submitted successfully!")
 			// Invalidate queries to refresh UI
 			void queryClient.invalidateQueries({
 				queryKey: ["governance", "proposals"],
 			})
-			void queryClient.invalidateQueries({ queryKey: ["governance", "voted"] })
+			void queryClient.invalidateQueries({
+				queryKey: ["governance", "voted"],
+			})
 			// Optimistically update the specific voted status
 			queryClient.setQueryData(
 				["governance", "voted", proposalId, address],
 				true,
 			)
+			queryClient.setQueryData(
+				["governance", "voteChoice", proposalId, address],
+				support,
+			)
+		},
+
+		onError: (error: unknown) => {
+			if (isUserRejection(error)) {
+				showInfo("Vote cancelled")
+				return
+			}
+			const appError = parseError(error)
+			const message =
+				appError.code === ErrorCode.WALLET_NOT_CONNECTED
+					? "Please connect your wallet to vote"
+					: appError.code === ErrorCode.CONTRACT_NOT_DEPLOYED
+						? "Voting is not available on this network"
+						: "Vote failed. Already voted or voting closed."
+			showError(message)
 		},
 	})
 
 	return {
 		votingPower,
 		proposals,
-		vote: (proposalId: number, support: boolean) =>
-			vote({ proposalId, support }),
+		isLoadingProposals,
+		castVote: (proposalId: number, support: boolean) =>
+			castVote({ proposalId, support }),
 		isVoting,
 		hasVoted,
+		getVoteChoice,
+		walletAddress: address,
 	}
 }

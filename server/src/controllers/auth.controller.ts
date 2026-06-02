@@ -1,71 +1,151 @@
-import type { Request, Response } from "express";
+import { type Request, type Response } from "express"
 
-import type { AuthService } from "../services/auth.service";
+import { type AuthService } from "../services/auth.service"
 
 export function createAuthControllers(authService: AuthService) {
-  return {
-    async getNonce(req: Request, res: Response): Promise<void> {
-      const address =
-        typeof req.query.address === "string" ? req.query.address.trim() : "";
+	return {
+		async getChallenge(req: Request, res: Response): Promise<void> {
+			const address =
+				typeof req.query.address === "string" ? req.query.address.trim() : ""
 
-      if (!address) {
-        res.status(400).json({ error: "Missing query parameter: address" });
-        return;
-      }
+			if (!address) {
+				res.status(400).json({ error: "Missing query parameter: address" })
+				return
+			}
 
-      try {
-        const { nonce } = await authService.getOrCreateNonce(address);
-        res.status(200).json({ nonce });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Bad request";
-        if (message === "Invalid Stellar public key") {
-          res.status(400).json({ error: message });
-          return;
-        }
-        res.status(400).json({ error: message });
-      }
-    },
+			try {
+				const challenge = await authService.createChallenge(address)
+				res.status(200).json(challenge)
+			} catch (err) {
+				const message = err instanceof Error ? err.message : "Bad request"
+				res.status(400).json({ error: message })
+			}
+		},
 
-    async postVerify(req: Request, res: Response): Promise<void> {
-      const body = req.body as { address?: unknown; signature?: unknown };
-      const address =
-        typeof body.address === "string" ? body.address.trim() : "";
-      const signature =
-        typeof body.signature === "string" ? body.signature.trim() : "";
+		async postChallengeVerify(req: Request, res: Response): Promise<void> {
+			const body = req.body as { signed_transaction?: unknown }
+			const signedTransaction =
+				typeof body.signed_transaction === "string"
+					? body.signed_transaction.trim()
+					: ""
 
-      if (!address || !signature) {
-        res
-          .status(400)
-          .json({ error: "Missing required fields: address, signature" });
-        return;
-      }
+			if (!signedTransaction) {
+				res
+					.status(400)
+					.json({ error: "Missing required field: signed_transaction" })
+				return
+			}
 
-      try {
-        const token = await authService.verifyAndIssueToken(address, signature);
-        res.status(200).json({
-          token,
-          tokenType: "Bearer",
-          expiresIn: "24h"
-        });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Unauthorized";
-        if (
-          message === "Invalid Stellar public key" ||
-          message === "Invalid signature encoding"
-        ) {
-          res.status(400).json({ error: message });
-          return;
-        }
-        if (message === "Invalid signature") {
-          res.status(401).json({ error: message });
-          return;
-        }
-        if (message.startsWith("Nonce expired")) {
-          res.status(401).json({ error: message });
-          return;
-        }
-        res.status(401).json({ error: message });
-      }
-    }
-  };
+			try {
+				const { accessToken, refreshToken } =
+					await authService.verifySignedTransaction(signedTransaction)
+				res.status(200).json({
+					token: accessToken,
+					refreshToken,
+					tokenType: "Bearer",
+					expiresIn: "24h",
+				})
+			} catch (err) {
+				const message = err instanceof Error ? err.message : "Unauthorized"
+				if (message.includes("Invalid") || message.includes("Missing")) {
+					res.status(400).json({ error: message })
+					return
+				}
+				if (message.includes("expired")) {
+					res.status(401).json({ error: message })
+					return
+				}
+				res.status(401).json({ error: message })
+			}
+		},
+
+		async getNonce(req: Request, res: Response): Promise<void> {
+			const address =
+				typeof req.query.address === "string" ? req.query.address.trim() : ""
+
+			if (!address) {
+				res.status(400).json({ error: "Missing query parameter: address" })
+				return
+			}
+
+			try {
+				const { nonce } = await authService.getOrCreateNonce(address)
+				res.status(200).json({ nonce })
+			} catch (err) {
+				const message = err instanceof Error ? err.message : "Bad request"
+				if (message === "Invalid Stellar public key") {
+					res.status(400).json({ error: message })
+					return
+				}
+				res.status(400).json({ error: message })
+			}
+		},
+
+		async postVerify(req: Request, res: Response): Promise<void> {
+			const body = req.body as { address?: unknown; signature?: unknown }
+			const address =
+				typeof body.address === "string" ? body.address.trim() : ""
+			const signature =
+				typeof body.signature === "string" ? body.signature.trim() : ""
+
+			if (!address || !signature) {
+				res
+					.status(400)
+					.json({ error: "Missing required fields: address, signature" })
+				return
+			}
+
+			try {
+				const { accessToken, refreshToken } =
+					await authService.verifyAndIssueToken(address, signature)
+				res.status(200).json({
+					token: accessToken,
+					refreshToken,
+					tokenType: "Bearer",
+					expiresIn: "24h",
+				})
+			} catch (err) {
+				const message = err instanceof Error ? err.message : "Unauthorized"
+				if (
+					message === "Invalid Stellar public key" ||
+					message === "Invalid signature encoding"
+				) {
+					res.status(400).json({ error: message })
+					return
+				}
+				if (message === "Invalid signature") {
+					res.status(401).json({ error: message })
+					return
+				}
+				if (message.startsWith("Nonce expired")) {
+					res.status(401).json({ error: message })
+					return
+				}
+				res.status(401).json({ error: message })
+			}
+		},
+
+		async postRefresh(req: Request, res: Response): Promise<void> {
+			const body = req.body as { refreshToken?: unknown }
+			const refreshToken =
+				typeof body.refreshToken === "string" ? body.refreshToken.trim() : ""
+
+			if (!refreshToken) {
+				res.status(400).json({ error: "Missing required field: refreshToken" })
+				return
+			}
+
+			try {
+				const rotated = await authService.refreshSession(refreshToken)
+				res.status(200).json({
+					token: rotated.accessToken,
+					refreshToken: rotated.refreshToken,
+					tokenType: "Bearer",
+					expiresIn: "24h",
+				})
+			} catch {
+				res.status(401).json({ error: "Invalid or expired refresh token" })
+			}
+		},
+	}
 }

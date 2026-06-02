@@ -1,16 +1,34 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useToast } from "../components/Toast/ToastProvider"
 import { rpcUrl } from "../contracts/util"
+import { ErrorCode, createAppError } from "../types/errors"
+import { parseError, isUserRejection } from "../utils/errors"
+import { logger } from "../utils/logger"
 import { useNotification } from "./useNotification"
 import { useWallet } from "./useWallet"
 
 export interface Course {
 	id: string
 	title?: string
+	totalMilestones?: number
 }
 
 export interface MilestoneProgress {
 	courseId: string
 	completedMilestoneIds: number[]
+	totalMilestones?: number
+}
+
+export interface EscrowTimeoutStatus {
+	proposalId: number
+	scholarAddress: string
+	courseId: string | null
+	daysRemaining: number
+	inactivityWindowDays: number
+	lastActivityAt: string
+	deadlineAt: string
+	reminderSentAt: string | null
+	status: "active" | "reclaimed"
 }
 
 type AnyRecord = Record<string, unknown>
@@ -77,7 +95,15 @@ const loadCourseClient = async (): Promise<AnyRecord | null> => {
 		const path = "../contracts/course_milestone"
 		const mod = (await import(/* @vite-ignore */ path)) as AnyRecord
 		return (mod.default as AnyRecord) ?? mod
-	} catch {
+	} catch (err) {
+		logger.warn(
+			createAppError(
+				ErrorCode.CONTRACT_NOT_DEPLOYED,
+				"CourseMilestone contract not available",
+				{ contractName: "course_milestone" },
+				err,
+			),
+		)
 		return null
 	}
 }
@@ -92,11 +118,46 @@ const callFirst = async (
 		if (!fn) continue
 		try {
 			return await Promise.resolve(fn(...args))
-		} catch {
+		} catch (err) {
+			logger.debug(`Method ${name} failed, trying next method:`, err)
 			continue
 		}
 	}
-	throw new Error(`No compatible method found: ${methodNames.join(", ")}`)
+	throw createAppError(
+		ErrorCode.CONTRACT_NOT_DEPLOYED,
+		"No compatible method found",
+		{ methodName: methodNames.join(", ") },
+	)
+}
+
+/**
+ * Fetch the total milestone count for a course from the contract.
+ * Falls back to undefined if the contract / method is unavailable.
+ */
+const fetchTotalMilestones = async (
+	client: AnyRecord,
+	courseId: string,
+	address: string,
+): Promise<number | undefined> => {
+	try {
+		const raw = await callFirst(
+			client,
+			[
+				"get_course_milestone_count",
+				"getCourseMilestoneCount",
+				"milestone_count",
+				"milestoneCount",
+				"total_milestones",
+				"totalMilestones",
+			],
+			[{ course_id: courseId, courseId, learner: address }],
+		)
+		const value = resolveResultValue(raw)
+		const num = Number(value)
+		return Number.isFinite(num) && num > 0 ? num : undefined
+	} catch {
+		return undefined
+	}
 }
 
 const waitForMintEvent = async (
@@ -145,8 +206,8 @@ const waitForMintEvent = async (
 					return lastEarned
 				}
 			}
-		} catch {
-			// ignore polling errors; continue until timeout
+		} catch (err) {
+			logger.debug("Polling for mint event failed, continuing:", err)
 		}
 		await new Promise((resolve) => setTimeout(resolve, 1000))
 	}
@@ -154,14 +215,50 @@ const waitForMintEvent = async (
 }
 
 export function useCourse() {
-	const { address, signTransaction } = useWallet()
+	const { address, signTransaction, updateBalances } = useWallet()
 	const { addNotification } = useNotification()
+	const { showWarning, showError, showInfo, showSuccess } = useToast()
 
 	const [enrolledCourses, setEnrolledCourses] = useState<Course[]>([])
 	const [progressMap, setProgressMap] = useState<
 		Record<string, MilestoneProgress>
 	>({})
+	const [submissionStatusMap, setSubmissionStatusMap] = useState<
+		Record<string, "pending" | "verified" | "rejected" | "none">
+	>({})
+	const [escrowTimeoutMap, setEscrowTimeoutMap] = useState<
+		Record<string, EscrowTimeoutStatus>
+	>({})
 	const [isCompletingMilestone, setIsCompletingMilestone] = useState(false)
+
+	const refreshEscrowTimeouts = useCallback(async () => {
+		if (!address) {
+			setEscrowTimeoutMap({})
+			return
+		}
+
+		try {
+			const response = await fetch(
+				`/api/scholars/${encodeURIComponent(address)}/escrow-timeouts`,
+			)
+			if (!response.ok) {
+				return
+			}
+
+			const payload = (await response.json()) as {
+				escrows?: EscrowTimeoutStatus[]
+			}
+
+			const next = Object.fromEntries(
+				(payload.escrows ?? [])
+					.filter((item) => item.courseId && item.status === "active")
+					.map((item) => [item.courseId as string, item]),
+			)
+			setEscrowTimeoutMap(next)
+		} catch (err) {
+			logger.debug("Failed to load escrow timeout status:", err)
+		}
+	}, [address])
 
 	const refreshCourses = useCallback(async () => {
 		if (!address) {
@@ -200,56 +297,79 @@ export function useCourse() {
 			)
 			const value = resolveResultValue(raw)
 			const ids = toArray(value).map((v) => String(v))
-			const courses = ids.map((id) => ({ id }))
+
+			// Fetch progress + total milestone count for each course in parallel
+			const entries = await Promise.all(
+				ids.map(async (id) => {
+					const [completedMilestoneIds, totalMilestones] = await Promise.all([
+						(async (): Promise<number[]> => {
+							try {
+								const rawProgress = await callFirst(
+									client,
+									[
+										"get_course_progress",
+										"getCourseProgress",
+										"course_progress_for",
+										"courseProgressFor",
+									],
+									[{ learner: address, course_id: id, courseId: id }],
+								)
+								return toNumberArray(resolveResultValue(rawProgress))
+							} catch {
+								return []
+							}
+						})(),
+						fetchTotalMilestones(client, id, address),
+					])
+
+					return { id, completedMilestoneIds, totalMilestones }
+				}),
+			)
+
+			const courses: Course[] = entries.map(({ id, totalMilestones }) => ({
+				id,
+				totalMilestones,
+			}))
 			setEnrolledCourses(courses)
 
-			const entries = await Promise.all(
-				ids.map(async (id) => ({
-					id,
-					progress: await (async () => {
-						try {
-							const rawProgress = await callFirst(
-								client,
-								[
-									"get_course_progress",
-									"getCourseProgress",
-									"course_progress_for",
-									"courseProgressFor",
-								],
-								[{ learner: address, course_id: id, courseId: id }],
-							)
-							return toNumberArray(resolveResultValue(rawProgress))
-						} catch {
-							return []
-						}
-					})(),
-				})),
-			)
 			setProgressMap(
 				Object.fromEntries(
-					entries.map(({ id, progress }) => [
+					entries.map(({ id, completedMilestoneIds, totalMilestones }) => [
 						id,
-						{ courseId: id, completedMilestoneIds: progress },
+						{ courseId: id, completedMilestoneIds, totalMilestones },
 					]),
 				),
 			)
-		} catch {
-			addNotification(
-				"Unable to load enrolled courses from CourseMilestone",
-				"warning",
-			)
+		} catch (err) {
+			const appError = parseError(err)
+			if (appError.code === ErrorCode.CONTRACT_NOT_DEPLOYED) {
+				showWarning("CourseMilestone contract not available on this network")
+			} else {
+				showError("Unable to load enrolled courses. Please try again.")
+			}
 		}
-	}, [address, addNotification])
+	}, [address, showWarning, showError])
 
 	useEffect(() => {
 		void refreshCourses()
 	}, [refreshCourses])
+
+	useEffect(() => {
+		void refreshEscrowTimeouts()
+	}, [refreshEscrowTimeouts])
 
 	const getCourseProgress = useCallback(
 		(courseId: string): MilestoneProgress => {
 			return progressMap[courseId] ?? { courseId, completedMilestoneIds: [] }
 		},
 		[progressMap],
+	)
+
+	const getEscrowTimeout = useCallback(
+		(courseId: string): EscrowTimeoutStatus | null => {
+			return escrowTimeoutMap[courseId] ?? null
+		},
+		[escrowTimeoutMap],
 	)
 
 	const enroll = useCallback(
@@ -286,11 +406,23 @@ export function useCourse() {
 				)
 				addNotification("Enrollment successful", "success")
 				await refreshCourses()
-			} catch {
-				addNotification("Enrollment failed", "error")
+			} catch (err) {
+				if (isUserRejection(err)) {
+					showInfo("Enrollment cancelled")
+				} else {
+					showError("Enrollment failed. Please try again.")
+				}
 			}
 		},
-		[address, addNotification, refreshCourses, signTransaction],
+		[
+			address,
+			addNotification,
+			refreshCourses,
+			signTransaction,
+			showError,
+			showInfo,
+			showSuccess,
+		],
 	)
 
 	const completeMilestone = useCallback(
@@ -300,14 +432,14 @@ export function useCourse() {
 					"Connect wallet before completing milestones",
 					"warning",
 				)
-				return
+				return false
 			}
 
 			const already =
 				getCourseProgress(courseId).completedMilestoneIds.includes(milestoneId)
 			if (already) {
 				addNotification("Milestone already completed", "secondary")
-				return
+				return false
 			}
 
 			setIsCompletingMilestone(true)
@@ -323,6 +455,7 @@ export function useCourse() {
 					setProgressMap((prev) => ({
 						...prev,
 						[courseId]: {
+							...prev[courseId],
 							courseId,
 							completedMilestoneIds: updatedProgress,
 						},
@@ -331,7 +464,8 @@ export function useCourse() {
 						"Milestone completed (local fallback mode)",
 						"success",
 					)
-					return
+					await updateBalances()
+					return true
 				}
 
 				const rawTx = await callFirst(
@@ -353,21 +487,48 @@ export function useCourse() {
 						{ publicKey: address },
 					],
 				)
+				showInfo("Waiting for wallet approval…")
 				await sendTxIfNeeded(
 					rawTx,
 					signTransaction as (...args: unknown[]) => unknown,
 				)
 
+				setProgressMap((prev) => {
+					const existing = prev[courseId] ?? {
+						courseId,
+						completedMilestoneIds: [],
+					}
+					if (existing.completedMilestoneIds.includes(milestoneId)) {
+						return prev
+					}
+					return {
+						...prev,
+						[courseId]: {
+							...existing,
+							completedMilestoneIds: [
+								...existing.completedMilestoneIds,
+								milestoneId,
+							],
+						},
+					}
+				})
+
 				const earned = await waitForMintEvent(address)
-				addNotification(
+				showSuccess(
 					earned != null
 						? `Milestone complete. Earned ${earned} LRN`
 						: "Milestone complete. LRN mint event confirmed",
-					"success",
 				)
+				await updateBalances()
 				await refreshCourses()
-			} catch {
-				addNotification("Failed to complete milestone", "error")
+				return true
+			} catch (err) {
+				if (isUserRejection(err)) {
+					showInfo("Milestone completion cancelled")
+				} else {
+					showError("Failed to complete milestone. Please try again.")
+				}
+				return false
 			} finally {
 				setIsCompletingMilestone(false)
 			}
@@ -378,6 +539,135 @@ export function useCourse() {
 			getCourseProgress,
 			refreshCourses,
 			signTransaction,
+			updateBalances,
+			showError,
+			showInfo,
+			showSuccess,
+		],
+	)
+
+	const submitMilestone = useCallback(
+		async (
+			courseId: string,
+			milestoneId: number,
+			evidence: { github?: string; description?: string },
+		) => {
+			if (!address) {
+				addNotification(
+					"Connect wallet before submitting milestones",
+					"warning",
+				)
+				return
+			}
+
+			const key = `${courseId}-${milestoneId}`
+			if (submissionStatusMap[key] === "pending") {
+				addNotification(
+					"Milestone already submitted and pending review",
+					"secondary",
+				)
+				return
+			}
+
+			setIsCompletingMilestone(true)
+			try {
+				// 1. Prepare API call
+				const apiPromise = fetch("/api/milestones", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						courseId,
+						milestoneId: String(milestoneId),
+						evidenceGithub: evidence.github || "",
+						evidenceDescription: evidence.description || "",
+						evidenceIpfsCid: "",
+						acceptedTerms: true,
+					}),
+				})
+
+				// 2. Prepare Contract call
+				const client = await loadCourseClient()
+				let contractPromise: Promise<unknown> = Promise.resolve()
+
+				if (client && COURSE_MILESTONE_CONTRACT) {
+					const rawTx = await callFirst(
+						client,
+						[
+							"complete_milestone",
+							"completeMilestone",
+							"complete_course_milestone",
+							"completeCourseMilestone",
+						],
+						[
+							{
+								course_id: courseId,
+								courseId,
+								milestone_id: BigInt(milestoneId),
+								milestoneId: BigInt(milestoneId),
+								learner: address,
+							},
+							{ publicKey: address },
+						],
+					)
+					showInfo("Waiting for wallet approval…")
+					contractPromise = sendTxIfNeeded(
+						rawTx,
+						signTransaction as (...args: unknown[]) => unknown,
+					)
+				} else {
+					// Fallback for mock/local
+					mockEnrollments.add(courseId)
+					const updatedProgress = [
+						...(mockProgressStore[courseId] ?? []),
+						milestoneId,
+					]
+					mockProgressStore[courseId] = updatedProgress
+					setProgressMap((prev) => ({
+						...prev,
+						[courseId]: {
+							...prev[courseId],
+							courseId,
+							completedMilestoneIds: updatedProgress,
+						},
+					}))
+				}
+
+				// 3. Run in parallel as requested
+				await Promise.all([apiPromise, contractPromise])
+
+				setSubmissionStatusMap((prev) => ({
+					...prev,
+					[key]: "pending",
+				}))
+
+				showSuccess("Milestone submitted — awaiting admin review")
+				await updateBalances()
+				await refreshCourses()
+				await refreshEscrowTimeouts()
+			} catch (err) {
+				if (isUserRejection(err)) {
+					showInfo("Submission cancelled")
+				} else {
+					showError(
+						err instanceof Error
+							? err.message
+							: "Failed to submit milestone. Please try again.",
+					)
+				}
+			} finally {
+				setIsCompletingMilestone(false)
+			}
+		},
+		[
+			address,
+			addNotification,
+			submissionStatusMap,
+			signTransaction,
+			updateBalances,
+			refreshCourses,
+			refreshEscrowTimeouts,
+			showError,
+			showInfo,
 		],
 	)
 
@@ -387,6 +677,9 @@ export function useCourse() {
 			getCourseProgress,
 			enroll,
 			completeMilestone,
+			submitMilestone,
+			submissionStatusMap,
+			getEscrowTimeout,
 			isCompletingMilestone,
 		}),
 		[
@@ -394,6 +687,9 @@ export function useCourse() {
 			getCourseProgress,
 			enroll,
 			completeMilestone,
+			submitMilestone,
+			submissionStatusMap,
+			getEscrowTimeout,
 			isCompletingMilestone,
 		],
 	)

@@ -1,7 +1,7 @@
 import { Router } from "express"
 import { validateMilestone } from "../controllers/validator.controller"
 import * as schemas from "../lib/zod-schemas"
-import { validate } from "../middleware/validation.middleware"
+import { validate } from "../middleware/validate"
 
 export const validatorRouter = Router()
 

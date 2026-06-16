@@ -27,6 +27,15 @@ export interface IndexedEvent {
 	event_index?: number
 }
 
+export interface WebhookHorizonEvent {
+	id: string
+	type: string
+	contract: string
+	topic: string
+	ledger: string | number
+	value?: Record<string, unknown>
+}
+
 /**
  * Extract transaction hash from event ID or data
  * Event ID format: "<ledger_sequence>-<tx_hash>-<event_index>"
@@ -123,6 +132,90 @@ async function invalidateCacheForEvent(
 }
 
 /**
+ * Persist a single indexed event and return whether a new row was inserted.
+ */
+async function persistIndexedEvent(
+	contractId: string,
+	topic: string,
+	ev: {
+		id: string
+		type: string
+		ledger: string | number
+		topic?: unknown
+		value?: unknown
+	},
+): Promise<boolean> {
+	const ledger = Number(ev.ledger)
+	const txHash = extractTxHash(ev.id)
+	const eventIndex = extractEventIndex(ev.id)
+
+	const data = {
+		id: ev.id,
+		type: ev.type,
+		ledger: String(ev.ledger),
+		topic: ev.topic ?? topic,
+		value: ev.value,
+	}
+
+	const result = await pool.query(
+		`INSERT INTO events (contract, event_type, data, ledger_sequence, tx_hash, event_index)
+		 VALUES ($1, $2, $3, $4, $5, $6)
+		 ON CONFLICT (ledger_sequence, tx_hash, event_index) DO NOTHING
+		 RETURNING id`,
+		[contractId, topic, data, ledger, txHash, eventIndex],
+	)
+
+	await invalidateCacheForEvent(topic, data)
+
+	if ((result.rowCount ?? 0) > 0) {
+		if (topic === "LearnToken_Mint" || topic === "ScholarNFT::minted") {
+			leaderboardEmitter.emitUpdate()
+		}
+		return true
+	}
+
+	return false
+}
+
+/**
+ * Process events pushed via the Horizon webhook relay.
+ */
+export async function processWebhookEvents(
+	events: WebhookHorizonEvent[],
+): Promise<{ inserted: number; skipped: number }> {
+	let inserted = 0
+	let skipped = 0
+	const contractMaxLedger = new Map<string, number>()
+
+	for (const ev of events) {
+		try {
+			const ledger = Number(ev.ledger)
+			const wasInserted = await persistIndexedEvent(ev.contract, ev.topic, ev)
+			if (wasInserted) {
+				inserted++
+			} else {
+				skipped++
+			}
+
+			const currentMax = contractMaxLedger.get(ev.contract) ?? 0
+			if (ledger > currentMax) {
+				contractMaxLedger.set(ev.contract, ledger)
+			}
+		} catch (err) {
+			log.error({ err, eventId: ev.id, contract: ev.contract }, "Webhook event error")
+			skipped++
+		}
+	}
+
+	for (const [contract, lastLedger] of contractMaxLedger) {
+		await updateIndexerState(contract, lastLedger)
+	}
+
+	log.info({ inserted, skipped, count: events.length }, "Webhook events processed")
+	return { inserted, skipped }
+}
+
+/**
  * Poll and index new events from target contracts
  * @param startLedger - Starting ledger (config or last indexed)
  * @param endLedger - Latest ledger to check
@@ -165,61 +258,9 @@ export async function indexEventsBatch(
 						maxLedgerForContract = ledger
 					}
 
-					// Extract tx_hash and event_index from event ID
-					const txHash = extractTxHash(ev.id)
-					const eventIndex = extractEventIndex(ev.id)
-
-					const data = {
-						id: ev.id,
-						type: ev.type,
-						ledger: ev.ledger,
-						topic: ev.topic,
-						value: ev.value,
-					}
-
-					// Use UPSERT for idempotency
-					// If the event already exists (same ledger, tx_hash, event_index), do nothing
-					const result = await pool.query(
-						`INSERT INTO events (contract, event_type, data, ledger_sequence, tx_hash, event_index)
-						 VALUES ($1, $2, $3, $4, $5, $6)
-						 ON CONFLICT (ledger_sequence, tx_hash, event_index) DO NOTHING
-						 RETURNING id`,
-						[contractId, topic, data, ledger, txHash, eventIndex],
-					)
-					inserted++
-					await invalidateCacheForEvent(topic, data)
-
-					if ((result.rowCount ?? 0) > 0) {
+					const wasInserted = await persistIndexedEvent(contractId, topic, ev)
+					if (wasInserted) {
 						inserted++
-
-						// Notify leaderboard of potential balance changes
-						if (topic === "LearnToken_Mint" || topic === "ScholarNFT::minted") {
-							leaderboardEmitter.emitUpdate()
-						}
-
-						// Tranche disbursement notification
-						if (topic.toLowerCase().includes("disburse") || topic.toLowerCase().includes("fundsdisbursed")) {
-							try {
-								const { scValToNative } = await import("@stellar/stellar-sdk")
-								const eventData = scValToNative(ev.value) as any
-								const scholarAddress = eventData.scholar || eventData.beneficiary
-								const amountStr = eventData.amount?.toString() || "0"
-								const amount = Number(amountStr) / 10000000 // Convert stroops to USDC
-								const proposalId = eventData.proposal_id || eventData.proposalId || "unknown"
-								
-								if (scholarAddress) {
-									void createNotification({
-										recipient_address: scholarAddress,
-										type: "disbursement",
-										message: \`A tranche of \${amount} USDC has been disbursed for proposal "\${proposalId}".\`,
-										href: \`/dao/proposals/\${proposalId}\`,
-										data: { amount: amountStr, proposalId }
-									})
-								}
-							} catch (e) {
-								log.error({ err: e }, "Failed to parse disbursement event for notification")
-							}
-						}
 					} else {
 						skipped++
 					}

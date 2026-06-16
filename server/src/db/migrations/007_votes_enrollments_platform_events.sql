@@ -21,8 +21,8 @@ CREATE INDEX IF NOT EXISTS idx_votes_voter_address  ON votes (voter_address);
 CREATE TABLE IF NOT EXISTS enrollments (
     id               SERIAL PRIMARY KEY,
     learner_address  TEXT NOT NULL,
-    course_id        TEXT NOT NULL,
-    tx_hash          TEXT NOT NULL,
+    course_id        TEXT NOT NULL REFERENCES courses(slug),
+    tx_hash          TEXT,
     enrolled_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(learner_address, course_id)
 );

@@ -215,8 +215,8 @@ Course registration history.
 *   **Columns**:
     *   `id` (SERIAL, PRIMARY KEY).
     *   `learner_address` (TEXT, NOT NULL).
-    *   `course_id` (TEXT, NOT NULL).
-    *   `tx_hash` (TEXT, NOT NULL).
+    *   `course_id` (TEXT, FOREIGN KEY REFERENCES `courses(slug)`, NOT NULL).
+    *   `tx_hash` (TEXT): Nullable transaction hash.
     *   `enrolled_at` (TIMESTAMP WITH TIME ZONE, DEFAULT CURRENT_TIMESTAMP).
 *   **Constraints**: `UNIQUE(learner_address, course_id)`.
 *   **Indexes**:

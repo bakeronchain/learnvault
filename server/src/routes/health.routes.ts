@@ -4,17 +4,9 @@ import path from "node:path"
 import { Router } from "express"
 import Redis from "ioredis"
 
-import { getHealth } from "../controllers/health.controller"
-import {
-	getPoolMetrics,
-	resetPoolAlerts,
-} from "../controllers/metrics.controller"
-import { pool } from "../db"
-import { logger } from "../lib/logger"
 
 import { getPgStatStatementsSnapshot, pool } from "../db/index"
 import { getRpcCacheStats, resetRpcCacheStats } from "../lib/rpc-cache"
-const log = logger.child({ module: "health" })
 
 export const healthRouter = Router()
 
@@ -150,7 +142,7 @@ const checkRedis = async (): Promise<CheckResult> => {
 	const client = new Redis(redisUrl, {
 		maxRetriesPerRequest: 1,
 		enableOfflineQueue: false,
-		connectTimeout: 2000,
+		connectTimeout: 1500,
 	})
 	const startedAt = Date.now()
 
@@ -186,7 +178,8 @@ const checkHorizon = async (): Promise<CheckResult> => {
 	try {
 		const response = await fetch(horizonUrl, {
 			headers: { Accept: "application/json" },
-			signal: AbortSignal.timeout(5000),
+			// Keep the probe well under the endpoint's 2s response budget.
+			signal: AbortSignal.timeout(1500),
 		})
 
 		if (!response.ok) {
@@ -249,35 +242,42 @@ const deriveOverallStatus = (
  *             schema:
  *               $ref: '#/components/schemas/HealthResponse'
  */
-healthRouter.get("/health", async (req, res) => {
+healthRouter.get("/health", async (_req, res) => {
 	const [database, redis, stellarHorizon] = await Promise.all([
 		checkDatabase(),
 		checkRedis(),
 		checkHorizon(),
 	])
 
-	const overallStatus = deriveOverallStatus(
+	const status = deriveOverallStatus(
 		database.status,
 		redis.status,
 		stellarHorizon.status,
 	)
+	const dbConnectionState: DbConnectionState =
+		database.status === "healthy" ? "connected" : "disconnected"
 
-	const statusCode = overallStatus === "unhealthy" ? 503 : 200
-
-	res.status(statusCode).json({
-		status: overallStatus,
+	const payload = {
+		status,
+		db: dbConnectionState,
+		uptime_s: Math.floor(process.uptime()),
+		timestamp: new Date().toISOString(),
 		version: appVersion,
 		commitHash: resolveGitCommitHash(),
-		timestamp: new Date().toISOString(),
-		db: database.status === "healthy" ? "connected" : "disconnected",
 		dbPool: getDbPoolStats(),
 		checks: {
 			database,
 			redis,
 			stellarHorizon,
 		},
-		stellarRpc: stellarRpcCircuitBreaker.getStatus(),
-	})
+	}
+
+	if (status === "unhealthy") {
+		res.status(503).json(payload)
+		return
+	}
+
+	res.status(200).json(payload)
 })
 
 healthRouter.get("/health/db/performance", async (_req, res) => {

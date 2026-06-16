@@ -424,6 +424,43 @@ two-step build process:
 3. Fill in deployed contract IDs, Pinata credentials, and any server secrets you
    need for your local workflow.
 
+## Quick Start with Docker
+
+Use Docker Compose when you want the frontend, API, PostgreSQL, Redis, and a
+local Stellar Quickstart node to come up together.
+
+1. Copy the environment templates:
+
+   ```bash
+   cp .env.example .env
+   cp server/.env.example server/.env
+   ```
+
+2. Start the full local stack:
+
+   ```bash
+   npm run dev:docker
+   ```
+
+3. Open the services:
+   - Frontend: `http://localhost:5173`
+   - API health: `http://localhost:3001/api/health`
+   - Postgres: `localhost:5432`
+   - Stellar Quickstart / Horizon: `http://localhost:8000`
+   - Soroban RPC: `http://localhost:8000/rpc`
+
+4. Tear everything down and remove local volumes when you want a clean reset:
+
+   ```bash
+   npm run dev:docker:clean
+   ```
+
+Notes:
+- The frontend service is defined behind the `frontend` Compose profile so
+  contributors can skip it and run Vite natively with `docker compose up api postgres redis stellar-quickstart`.
+- Host ports are configurable through the `DEV_DOCKER_*` values in
+  `.env.example`.
+
 ---
 
 ## Running Tests
@@ -505,6 +542,7 @@ expect all participants to uphold these standards.
 
 - [Glossary](docs/glossary.md) — Key terms, tokens, and contracts explained in
   plain English
+ - [Contract events](docs/contract-events.md) — Documented on-chain event names, payloads, and example payloads for the indexer
 
 ---
 

@@ -1,13 +1,6 @@
 // Event configuration and helpers
+// Import types for reuse
 import {
-	CONTRACT_IDS,
-	EVENTS_TO_INDEX,
-	EVENT_TOPICS,
-	type ContractName,
-} from "../types/events"
-
-// Re-export types/constants for reuse by consumers
-export {
 	type ContractName,
 	type EventTopic,
 	type EventTopicValue,
@@ -17,6 +10,17 @@ export {
 	EVENT_DATA_SCHEMAS,
 	DB_EVENT_SCHEMA,
 } from "../types/events"
+
+export {
+	type ContractName,
+	type EventTopic,
+	type EventTopicValue,
+	type ApiEvent,
+	CONTRACT_IDS,
+	EVENTS_TO_INDEX,
+	EVENT_DATA_SCHEMAS,
+	DB_EVENT_SCHEMA,
+}
 
 // Soroban RPC endpoints
 export const SOROBAN_RPC_URL =

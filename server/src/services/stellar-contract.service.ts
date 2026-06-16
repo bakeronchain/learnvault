@@ -135,16 +135,15 @@ async function withRetry<T>(
 				break
 			}
 			const delayMs = 500 * 2 ** (attempt - 1) // 500 ms, 1 s, 2 s, …
-			log.warn(
-				{ err },
+			console.warn(
 				`[stellar] ${label} failed (attempt ${attempt}/${maxAttempts}), retrying in ${delayMs}ms…`,
+				err instanceof Error ? err.message : String(err),
 			)
 			await new Promise<void>((resolve) => setTimeout(resolve, delayMs))
 		}
 	}
 	// Re-throw with retry context attached
-	const base =
-		lastError instanceof Error ? lastError : new Error(String(lastError))
+	const base = lastError instanceof Error ? lastError : new Error(String(lastError))
 	const wrapped = new Error(
 		`${base.message} (failed after ${maxAttempts} attempt${maxAttempts === 1 ? "" : "s"})`,
 	) as Error & { retriesExhausted: boolean; attempts: number }
@@ -153,166 +152,6 @@ async function withRetry<T>(
 	throw wrapped
 }
 
-// ---------------------------------------------------------------------------
-// Circuit Breaker
-// ---------------------------------------------------------------------------
-
-/**
- * Circuit breaker states:
- *   CLOSED    – calls pass through normally (healthy)
- *   OPEN      – calls are rejected immediately (endpoint assumed failed)
- *   HALF_OPEN – a single probe call is allowed to test recovery
- */
-export type CircuitState = "CLOSED" | "OPEN" | "HALF_OPEN"
-
-interface CircuitBreakerOptions {
-	/** Number of consecutive failures before the circuit opens. Default: 5 */
-	failureThreshold?: number
-	/** Milliseconds to wait before moving from OPEN → HALF_OPEN. Default: 30 000 */
-	resetTimeoutMs?: number
-	/** Label used in log messages. Default: "stellar-rpc" */
-	label?: string
-}
-
-export class CircuitBreaker {
-	private state: CircuitState = "CLOSED"
-	private consecutiveFailures = 0
-	private openedAt: number | null = null
-
-	private readonly failureThreshold: number
-	private readonly resetTimeoutMs: number
-	private readonly label: string
-
-	constructor(options: CircuitBreakerOptions = {}) {
-		this.failureThreshold = options.failureThreshold ?? 5
-		this.resetTimeoutMs = options.resetTimeoutMs ?? 30_000
-		this.label = options.label ?? "stellar-rpc"
-	}
-
-	/** Returns a snapshot of the current circuit state for health checks. */
-	getStatus(): {
-		state: CircuitState
-		consecutiveFailures: number
-		openedAt: string | null
-	} {
-		return {
-			state: this.state,
-			consecutiveFailures: this.consecutiveFailures,
-			openedAt: this.openedAt ? new Date(this.openedAt).toISOString() : null,
-		}
-	}
-
-	/**
-	 * Wrap an async operation with circuit-breaker protection.
-	 * Throws `CircuitOpenError` when the circuit is OPEN and the probe window
-	 * has not yet elapsed.
-	 */
-	async call<T>(operation: () => Promise<T>): Promise<T> {
-		this.maybeTransitionToHalfOpen()
-
-		if (this.state === "OPEN") {
-			throw new CircuitOpenError(
-				`[circuit:${this.label}] Circuit is OPEN – Stellar RPC calls are suspended`,
-			)
-		}
-
-		try {
-			const result = await operation()
-			this.onSuccess()
-			return result
-		} catch (err) {
-			this.onFailure(err)
-			throw err
-		}
-	}
-
-	// -------------------------------------------------------------------------
-	// Private helpers
-	// -------------------------------------------------------------------------
-
-	private maybeTransitionToHalfOpen(): void {
-		if (
-			this.state === "OPEN" &&
-			this.openedAt !== null &&
-			Date.now() - this.openedAt >= this.resetTimeoutMs
-		) {
-			this.transition("HALF_OPEN")
-		}
-	}
-
-	private onSuccess(): void {
-		if (this.state === "HALF_OPEN") {
-			this.transition("CLOSED")
-		}
-		this.consecutiveFailures = 0
-	}
-
-	private onFailure(err: unknown): void {
-		this.consecutiveFailures++
-
-		if (this.state === "HALF_OPEN") {
-			// Probe failed – reopen immediately
-			this.transition("OPEN")
-			return
-		}
-
-		if (
-			this.state === "CLOSED" &&
-			this.consecutiveFailures >= this.failureThreshold
-		) {
-			this.transition("OPEN")
-		} else {
-			const msg = err instanceof Error ? err.message : String(err)
-			console.warn(
-				`[circuit:${this.label}] Failure recorded (${this.consecutiveFailures}/${this.failureThreshold}): ${msg}`,
-			)
-		}
-	}
-
-	private transition(next: CircuitState): void {
-		const prev = this.state
-		this.state = next
-
-		if (next === "OPEN") {
-			this.openedAt = Date.now()
-		} else if (next === "CLOSED") {
-			this.openedAt = null
-			this.consecutiveFailures = 0
-		}
-
-		console.warn(
-			`[circuit:${this.label}] State transition: ${prev} → ${next}` +
-				(next === "OPEN"
-					? ` (will probe after ${this.resetTimeoutMs}ms)`
-					: ""),
-		)
-	}
-}
-
-/** Error thrown when a call is rejected because the circuit is open. */
-export class CircuitOpenError extends Error {
-	readonly isCircuitOpen = true
-
-	constructor(message: string) {
-		super(message)
-		this.name = "CircuitOpenError"
-	}
-}
-
-/**
- * Shared circuit breaker instance for all Stellar RPC calls.
- *
- * Configuration via environment variables:
- *   STELLAR_CB_FAILURE_THRESHOLD  – consecutive failures before opening (default 5)
- *   STELLAR_CB_RESET_TIMEOUT_MS   – ms before probing recovery (default 30 000)
- */
-export const stellarRpcCircuitBreaker = new CircuitBreaker({
-	failureThreshold: Number(process.env.STELLAR_CB_FAILURE_THRESHOLD ?? 5),
-	resetTimeoutMs: Number(process.env.STELLAR_CB_RESET_TIMEOUT_MS ?? 30_000),
-	label: "stellar-rpc",
-})
-
-// ---------------------------------------------------------------------------
 
 async function ensureAdminRole(): Promise<void> {
 	if (!STELLAR_SECRET_KEY) {
@@ -403,7 +242,7 @@ async function callVerifyMilestone(
 		)
 	}
 
-	return stellarRpcCircuitBreaker.call(() => withRetry(async () => {
+	return withRetry(async () => {
 		try {
 			// Enforce access control before doing anything
 			await ensureAdminRole()
@@ -441,51 +280,27 @@ async function callVerifyMilestone(
 						xdr.ScVal.scvU32(milestoneId),
 					),
 				)
+				.setTimeout(30)
+				.build()
 
-				const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
-				const account = await server.getAccount(keypair.publicKey())
-				const contract = new Contract(COURSE_MILESTONE_CONTRACT_ID)
+			const prepared = await server.prepareTransaction(tx)
+			prepared.sign(keypair)
 
-				const tx = new TransactionBuilder(account, {
-					fee: BASE_FEE,
-					networkPassphrase:
-						STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-				})
-					.addOperation(
-						contract.call(
-							"verify_milestone",
-							xdr.ScVal.scvString(scholarAddress),
-							xdr.ScVal.scvString(courseId),
-							xdr.ScVal.scvU32(milestoneId),
-						),
-					)
-					.setTimeout(30)
-					.build()
-
-				const prepared = await server.prepareTransaction(tx)
-				prepared.sign(keypair)
-
-				const result = await server.sendTransaction(prepared)
-				return { txHash: result.hash, simulated: false }
-			} catch (err) {
-				const msg = err instanceof Error ? err.message : String(err)
-				// Bubble up our specific admin error without wrapping it
-				if (msg.includes("is not the contract admin")) {
-					throw err
-				}
-				log.error({ err }, "Contract call failed")
-				throw new Error(
-					"Contract call failed: " +
-						(err instanceof Error ? err.message : String(err)),
-				)
+			const result = await server.sendTransaction(prepared)
+			return { txHash: result.hash, simulated: false }
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err)
+			// Bubble up our specific admin error without wrapping it
+			if (msg.includes("is not the contract admin")) {
+				throw err
 			}
-			log.error({ err }, "Contract call failed")
+			console.error("[stellar] Contract call failed:", err)
 			throw new Error(
 				"Contract call failed: " +
 					(err instanceof Error ? err.message : String(err)),
 			)
 		}
-	}, 3, "callVerifyMilestone"))
+	}, 3, "callVerifyMilestone")
 }
 
 async function emitRejectionEvent(
@@ -506,7 +321,7 @@ async function emitRejectionEvent(
 		)
 	}
 
-	return stellarRpcCircuitBreaker.call(() => withRetry(async () => {
+	return withRetry(async () => {
 		try {
 			// Enforce access control before doing anything
 			await ensureAdminRole()
@@ -544,52 +359,27 @@ async function emitRejectionEvent(
 						xdr.ScVal.scvString(reason),
 					),
 				)
+				.setTimeout(30)
+				.build()
 
-				const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
-				const account = await server.getAccount(keypair.publicKey())
-				const contract = new Contract(COURSE_MILESTONE_CONTRACT_ID)
+			const prepared = await server.prepareTransaction(tx)
+			prepared.sign(keypair)
 
-				const tx = new TransactionBuilder(account, {
-					fee: BASE_FEE,
-					networkPassphrase:
-						STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
-				})
-					.addOperation(
-						contract.call(
-							"reject_milestone",
-							xdr.ScVal.scvString(scholarAddress),
-							xdr.ScVal.scvString(courseId),
-							xdr.ScVal.scvU32(milestoneId),
-							xdr.ScVal.scvString(reason),
-						),
-					)
-					.setTimeout(30)
-					.build()
-
-				const prepared = await server.prepareTransaction(tx)
-				prepared.sign(keypair)
-
-				const result = await server.sendTransaction(prepared)
-				return { txHash: result.hash, simulated: false }
-			} catch (err) {
-				const msg = err instanceof Error ? err.message : String(err)
-				// Bubble up our specific admin error without wrapping it
-				if (msg.includes("is not the contract admin")) {
-					throw err
-				}
-				log.error({ err }, "Rejection event failed")
-				throw new Error(
-					"Rejection event failed: " +
-						(err instanceof Error ? err.message : String(err)),
-				)
+			const result = await server.sendTransaction(prepared)
+			return { txHash: result.hash, simulated: false }
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err)
+			// Bubble up our specific admin error without wrapping it
+			if (msg.includes("is not the contract admin")) {
+				throw err
 			}
-			log.error({ err }, "Rejection event failed")
+			console.error("[stellar] Rejection event failed:", err)
 			throw new Error(
 				"Rejection event failed: " +
 					(err instanceof Error ? err.message : String(err)),
 			)
 		}
-	}, 3, "emitRejectionEvent"))
+	}, 3, "emitRejectionEvent")
 }
 
 async function callMintScholarNFT(
@@ -607,7 +397,7 @@ async function callMintScholarNFT(
 		)
 	}
 
-	return stellarRpcCircuitBreaker.call(() => withRetry(async () => {
+	return withRetry(async () => {
 		try {
 			const {
 				Keypair,
@@ -641,19 +431,22 @@ async function callMintScholarNFT(
 						xdr.ScVal.scvString(metadataUri),
 					),
 				)
+				.setTimeout(30)
+				.build()
 
 			const prepared = await server.prepareTransaction(tx)
 			prepared.sign(keypair)
 
 			const result = await server.sendTransaction(prepared)
-			return { txHash: result.hash, simulated: false, tokenId }
+			return { txHash: result.hash, simulated: false }
 		} catch (err) {
-			log.error({ err }, "ScholarNFT mint failed")
+			console.error("[stellar] ScholarNFT mint failed:", err)
 			throw new Error(
-				`ScholarNFT mint failed: ${err instanceof Error ? err.message : String(err)}`,
+				"ScholarNFT mint failed: " +
+					(err instanceof Error ? err.message : String(err)),
 			)
 		}
-	}, 3, "callMintScholarNFT"))
+	}, 3, "callMintScholarNFT")
 }
 
 /**
@@ -760,7 +553,7 @@ async function submitScholarshipProposal(
 		)
 	}
 
-	return stellarRpcCircuitBreaker.call(() => withRetry(async () => {
+	return withRetry(async () => {
 		try {
 			const {
 				Keypair,
@@ -800,16 +593,23 @@ async function submitScholarshipProposal(
 						nativeToScVal(params.milestoneDates),
 					),
 				)
+				.setTimeout(30)
+				.build()
+
+			const prepared = await server.prepareTransaction(tx)
+			prepared.sign(keypair)
+
+			const result = await server.sendTransaction(prepared)
 
 			return { txHash: result.hash, proposalId: null, simulated: false }
 		} catch (err) {
-			log.error({ err }, "Scholarship proposal submission failed")
+			console.error("[stellar] Scholarship proposal submission failed:", err)
 			throw new Error(
 				"Scholarship proposal submission failed: " +
 					(err instanceof Error ? err.message : String(err)),
 			)
 		}
-	}, 3, "submitScholarshipProposal"))
+	}, 3, "submitScholarshipProposal")
 }
 
 async function castVote(

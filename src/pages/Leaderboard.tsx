@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight, Trophy } from "lucide-react"
 import React, { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import AddressDisplay from "../components/AddressDisplay"
+import { LeaderboardRowSkeleton } from "../components/SkeletonLoader"
 import { EmptyState } from "../components/states/emptyState"
 import { ErrorState } from "../components/states/errorState"
 import { useLeaderboard } from "../hooks/useLeaderboard"
@@ -74,7 +75,7 @@ const Leaderboard: React.FC = () => {
 	}
 
 	return (
-		<div className="p-6 md:p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
+		<div aria-busy={isLoading} className="p-6 md:p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
 			<header className="mb-12 text-center">
 				<h1 className="text-5xl md:text-6xl font-black mb-4 tracking-tighter text-gradient">
 					{t("pages.leaderboard.title")}
@@ -85,14 +86,7 @@ const Leaderboard: React.FC = () => {
 			</header>
 
 			{isLoading ? (
-				<div className="space-y-4">
-					{[...Array(3)].map((_, i) => (
-						<div
-							key={i}
-							className="h-24 rounded-[2.5rem] bg-white/5 animate-pulse"
-						/>
-					))}
-				</div>
+				<LeaderboardRowSkeleton />
 			) : error ? (
 				<ErrorState
 					message={error instanceof Error ? error.message : String(error)}
@@ -101,8 +95,10 @@ const Leaderboard: React.FC = () => {
 			) : leaderboardRows.length === 0 ? (
 				<EmptyState
 					icon={Trophy}
-					title="No scholars yet"
-					description="No scholars have earned LRN tokens yet. Be the first to complete a course!"
+					title="No learners ranked yet"
+					description="Complete a course to earn LRN tokens and claim your spot on the leaderboard!"
+					ctaLabel="Browse Courses"
+					ctaTo="/courses"
 				/>
 			) : (
 				<div className="glass-card overflow-hidden rounded-[2.5rem] border border-white/5 shadow-2xl">

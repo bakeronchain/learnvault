@@ -9,35 +9,730 @@ servers:
 tags:
   - name: Health
     description: Server status endpoints
+  - name: Auth
+    description: Wallet authentication endpoints
   - name: Courses
     description: Course catalog endpoints
+  - name: Enrollments
+    description: Course enrollment endpoints
+  - name: Governance
+    description: Governance proposal endpoints
+  - name: Scholarships
+    description: Scholarship application endpoints
+  - name: Scholars
+    description: Scholar leaderboard endpoints
   - name: Validator
     description: Milestone validation endpoints
+  - name: Admin
+    description: Admin milestone management endpoints
+  - name: Credentials
+    description: Scholar credential endpoints
   - name: Events
     description: Event stream endpoints
+  - name: Leaderboard
+    description: Learner ranking endpoints
+  - name: Comments
+    description: Proposal comment endpoints
+  - name: Treasury
+    description: Treasury statistics and activity endpoints
+  - name: Upload
+    description: IPFS file upload endpoints
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - status
+        - timestamp
+    Course:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        level:
+          type: string
+        published:
+          type: boolean
+      required:
+        - id
+        - title
+        - level
+        - published
+    Event:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        entityId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - id
+        - type
+        - entityId
+        - timestamp
+    ValidatorRequest:
+      type: object
+      properties:
+        courseId:
+          type: string
+        learnerAddress:
+          type: string
+        milestoneId:
+          type: integer
+          minimum: 0
+      required:
+        - courseId
+        - learnerAddress
+        - milestoneId
+    ValidatorResult:
+      allOf:
+        - $ref: "#/components/schemas/ValidatorRequest"
+        - type: object
+          properties:
+            approved:
+              type: boolean
+            validator:
+              type: string
+          required:
+            - approved
+            - validator
+    Proposal:
+      type: object
+      properties:
+        id:
+          type: integer
+        author_address:
+          type: string
+          example: GABCD123456789...
+        title:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+        votes_for:
+          type: integer
+        votes_against:
+          type: integer
+        status:
+          type: string
+          enum:
+            - pending
+            - approved
+            - rejected
+        cancelled:
+          type: boolean
+        deadline:
+          type: string
+          format: date-time
+      required:
+        - id
+        - author_address
+        - title
+        - status
+    ScholarRanking:
+      type: object
+      properties:
+        rank:
+          type: integer
+        address:
+          type: string
+        lrn_balance:
+          type: number
+        courses_completed:
+          type: integer
+      required:
+        - rank
+        - address
+        - lrn_balance
+        - courses_completed
+    ScholarshipApplication:
+      type: object
+      properties:
+        applicant_address:
+          type: string
+          minLength: 50
+          maxLength: 56
+        full_name:
+          type: string
+          minLength: 2
+        course_id:
+          type: string
+          minLength: 2
+        motivation:
+          type: string
+          minLength: 10
+        evidence_url:
+          type: string
+          format: uri
+        amount:
+          type: number
+          description: "Requested USDC amount (default: 1000)"
+      required:
+        - applicant_address
+        - full_name
+        - course_id
+        - motivation
+        - evidence_url
+    CourseDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        coverImage:
+          type: string
+          nullable: true
+        track:
+          type: string
+        difficulty:
+          type: string
+          enum:
+            - beginner
+            - intermediate
+            - advanced
+        published:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - slug
+        - title
+        - track
+        - difficulty
+        - published
+    Lesson:
+      type: object
+      properties:
+        id:
+          type: integer
+        courseId:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        order:
+          type: integer
+        quiz:
+          type: array
+          items:
+            type: object
+            properties:
+              question:
+                type: string
+              options:
+                type: array
+                items:
+                  type: string
+              correctIndex:
+                type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - courseId
+        - title
+        - content
+        - order
+    GovernanceProposalInput:
+      type: object
+      properties:
+        author_address:
+          type: string
+          minLength: 50
+          maxLength: 56
+          example: GABCD123456789...
+        title:
+          type: string
+          minLength: 5
+          maxLength: 200
+        description:
+          type: string
+          minLength: 10
+        requested_amount:
+          type: string
+          pattern: ^\d+(\.\d+)?$
+          description: Numeric string representing requested USDC amount
+        evidence_url:
+          type: string
+          format: uri
+      required:
+        - author_address
+        - title
+        - description
+        - requested_amount
+        - evidence_url
+    GovernanceProposalCreated:
+      type: object
+      properties:
+        proposal_id:
+          type: integer
+        tx_hash:
+          type: string
+      required:
+        - proposal_id
+        - tx_hash
+    VotingPower:
+      type: object
+      properties:
+        address:
+          type: string
+          example: GABCD123456789...
+        gov_balance:
+          type: string
+          description: Raw governance token balance
+        formatted:
+          type: string
+          description: Human-readable balance
+          example: "100.50"
+        can_vote:
+          type: boolean
+      required:
+        - address
+        - gov_balance
+        - formatted
+        - can_vote
+    ScholarProfile:
+      type: object
+      properties:
+        address:
+          type: string
+        lrn_balance:
+          type: string
+          description: Raw LRN token balance
+        enrolled_courses:
+          type: array
+          items:
+            type: string
+        completed_milestones:
+          type: integer
+        pending_milestones:
+          type: integer
+        credentials:
+          type: array
+          items:
+            $ref: "#/components/schemas/Credential"
+        joined_at:
+          type: string
+          format: date-time
+      required:
+        - address
+        - lrn_balance
+        - enrolled_courses
+        - completed_milestones
+        - pending_milestones
+        - credentials
+        - joined_at
+    ScholarMilestone:
+      type: object
+      properties:
+        id:
+          type: string
+        course_id:
+          type: string
+        milestone_id:
+          type: integer
+        status:
+          type: string
+          enum:
+            - pending
+            - verified
+            - rejected
+        evidence_url:
+          type: string
+          nullable: true
+        submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+        verified_at:
+          type: string
+          format: date-time
+          nullable: true
+        tx_hash:
+          type: string
+          nullable: true
+      required:
+        - id
+        - course_id
+        - milestone_id
+        - status
+    Credential:
+      type: object
+      properties:
+        token_id:
+          type: integer
+        course_id:
+          type: string
+        course_title:
+          type: string
+        issued_at:
+          type: string
+          format: date-time
+        metadata_uri:
+          type: string
+        revoked:
+          type: boolean
+      required:
+        - token_id
+        - course_id
+        - course_title
+        - issued_at
+        - metadata_uri
+        - revoked
+    CourseImportRow:
+      type: object
+      properties:
+        title:
+          type: string
+        slug:
+          type: string
+        track:
+          type: string
+        difficulty:
+          type: string
+        description:
+          type: string
+          nullable: true
+        coverImage:
+          type: string
+          nullable: true
+        published:
+          type: boolean
+      required:
+        - title
+        - slug
+        - track
+        - difficulty
+    UserProfile:
+      type: object
+      properties:
+        address:
+          type: string
+        display_name:
+          type: string
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        avatar_url:
+          type: string
+          nullable: true
+        twitter:
+          type: string
+          nullable: true
+        github:
+          type: string
+          nullable: true
+        website:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - address
+    ProfileStats:
+      type: object
+      properties:
+        lrn_balance:
+          type: string
+        enrolled_courses:
+          type: array
+          items:
+            type: string
+        completed_milestones:
+          type: integer
+        pending_milestones:
+          type: integer
+  responses:
+    BadRequestError:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    UnauthorizedError:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ForbiddenError:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
 paths:
-  /api/health:
+  /api/admin/milestones/pending:
     get:
-      tags: [Health]
-      summary: Check server health status
-      responses:
-        "200":
-          description: Server is healthy
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HealthResponse"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
-  /api/courses:
-    get:
-      tags: [Courses]
-      summary: List published courses
+      tags:
+        - Admin
+      summary: List all unverified milestone reports
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: Courses fetched successfully
+          description: List of pending milestone reports
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+  /api/admin/milestones/{id}:
+    get:
+      tags:
+        - Admin
+      summary: Get milestone report details and evidence
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Milestone report with audit log
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+  /api/admin/milestones/{id}/approve:
+    post:
+      tags:
+        - Admin
+      summary: Approve a milestone report and trigger contract call
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Milestone approved
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: Report already processed
+  /api/admin/milestones/{id}/reject:
+    post:
+      tags:
+        - Admin
+      summary: Reject a milestone report with a reason
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Milestone rejected
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: Report already processed
+  /api/milestones/submit:
+    post:
+      tags:
+        - Milestones
+      summary: Scholar submits a milestone report
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - scholarAddress
+                - course_id
+                - milestone_id
+              properties:
+                scholarAddress:
+                  type: string
+                course_id:
+                  type: string
+                milestone_id:
+                  type: integer
+                evidenceGitHub:
+                  type: string
+                evidenceIpfsCid:
+                  type: string
+                evidenceDescription:
+                  type: string
+      responses:
+        "201":
+          description: Report submitted
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "409":
+          description: Report already submitted for this milestone
+        "429":
+          description: Rate limit exceeded
+  /api/admin/courses/bulk-import:
+    post:
+      summary: Bulk import courses for admin users
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  properties:
+                    courses:
+                      type: array
+                      items:
+                        $ref: "#/components/schemas/CourseImportRow"
+                    preview:
+                      type: boolean
+                - type: object
+                  properties:
+                    csv:
+                      type: string
+                      description: CSV payload with headers
+                    preview:
+                      type: boolean
+          text/csv:
+            schema:
+              type: string
+            example: >
+              title,slug,track,difficulty,description,coverImage,published
+
+              Stellar Basics,stellar-basics,Beginner,Beginner,"A starter
+              course",,true
+      responses:
+        "200":
+          description: Bulk import preview or confirmation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  imported:
+                    type: integer
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        row:
+                          type: integer
+                        slug:
+                          type: string
+                        success:
+                          type: boolean
+                        errors:
+                          type: array
+                          items:
+                            type: string
+                        course:
+                          type: object
+                          nullable: true
+  /api/me/bookmarks:
+    get:
+      tags:
+        - Bookmarks
+      summary: List the authenticated learner's bookmarked courses
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Bookmarks fetched successfully
           content:
             application/json:
               schema:
@@ -46,15 +741,48 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Course"
+                      type: object
+                      properties:
+                        bookmark_id:
+                          type: integer
+                        course_id:
+                          type: string
+                        created_at:
+                          type: string
+                          format: date-time
         "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
-  /api/courses/{courseId}:
-    get:
-      tags: [Courses]
-      summary: Get a course by id
+          description: Unauthorized
+    post:
+      tags:
+        - Bookmarks
+      summary: Bookmark a course
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - course_id
+              properties:
+                course_id:
+                  type: string
+      responses:
+        "200":
+          description: Bookmark already existed (idempotent)
+        "201":
+          description: Bookmark created
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+  /api/me/bookmarks/{courseId}:
+    delete:
+      tags:
+        - Bookmarks
+      summary: Remove a bookmark (idempotent)
       security:
         - bearerAuth: []
       parameters:
@@ -63,26 +791,1339 @@ paths:
           required: true
           schema:
             type: string
-          description: Unique course identifier
+      responses:
+        "204":
+          description: Bookmark removed (or did not exist)
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+  /api/proposals/{proposalId}/comments:
+    get:
+      summary: Fetch comments for a proposal
+      tags:
+        - Comments
+      parameters:
+        - in: path
+          name: proposalId
+          required: true
+          schema:
+            type: string
       responses:
         "200":
-          description: Course fetched successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    $ref: "#/components/schemas/Course"
+          description: List of comments
+  /api/comments:
+    post:
+      summary: Post a new comment
+      tags:
+        - Comments
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Comment created
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "429":
+          description: Rate limited
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/comments/{id}:
+    delete:
+      summary: Delete own comment (soft delete)
+      tags:
+        - Comments
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Comment deleted
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "404":
           $ref: "#/components/responses/NotFoundError"
         "500":
           $ref: "#/components/responses/InternalServerError"
+  /api/comments/{id}/vote:
+    put:
+      summary: Upvote or downvote a comment
+      tags:
+        - Comments
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+              properties:
+                type:
+                  type: string
+                  enum:
+                    - upvote
+                    - downvote
+      responses:
+        "200":
+          description: Vote recorded
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/comments/{id}/pin:
+    put:
+      summary: Pin a comment (proposal author only)
+      tags:
+        - Comments
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - pinned
+              properties:
+                pinned:
+                  type: boolean
+      responses:
+        "200":
+          description: Pin updated
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/credentials/{address}:
+    get:
+      tags:
+        - Credentials
+      summary: List credentials for a learner address
+      description: Returns all ScholarNFT credentials minted for the provided Stellar
+        address, including revoked items.
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            type: string
+          description: Scholar's Stellar wallet address
+      responses:
+        "200":
+          description: Credentials fetched successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        token_id:
+                          type: integer
+                          example: 1
+                        course_id:
+                          type: string
+                          example: stellar-basics
+                        metadata_uri:
+                          type: string
+                          nullable: true
+                          example: ipfs://bafkrei...
+                        minted_at:
+                          type: string
+                          format: date-time
+                          example: 2026-03-26T10:30:00Z
+                        revoked:
+                          type: boolean
+                          example: false
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/credentials/metadata:
+    post:
+      tags:
+        - Credentials
+      summary: Generate and upload NFT metadata for a course completion credential
+      description: |
+        Creates ERC-721/ERC-1155 compliant metadata for a ScholarNFT credential,
+        uploads it to IPFS via Pinata, and returns the ipfs:// URI for use in
+        scholar_nft.mint().
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - course_id
+                - learner_address
+                - completed_at
+              properties:
+                course_id:
+                  type: string
+                  description: Course identifier (e.g., "stellar-basics")
+                  example: stellar-basics
+                learner_address:
+                  type: string
+                  description: Stellar address of the learner
+                  example: GABC123...XYZ789
+                completed_at:
+                  type: string
+                  format: date-time
+                  description: ISO 8601 timestamp of course completion
+                  example: 2026-03-26T10:30:00Z
+      responses:
+        "201":
+          description: Metadata created and uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      metadata_uri:
+                        type: string
+                        description: IPFS URI for use in scholar_nft.mint()
+                        example: ipfs://bafkreiabcdef1234567890ghijklmnopqrstuvwxyz
+                      gateway_url:
+                        type: string
+                        description: HTTP gateway URL for viewing metadata
+                        example: https://gateway.pinata.cloud/ipfs/bafkreiabcdef1234567890ghijklmnopqrstuvwxyz
+                      metadata:
+                        type: object
+                        description: The generated metadata object
+                        properties:
+                          name:
+                            type: string
+                            example: Introduction to Stellar & Soroban — Course Completion
+                          description:
+                            type: string
+                            example: Issued to learners who complete all milestones in Introduction to
+                              Stellar & Soroban
+                          image:
+                            type: string
+                            example: ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+                          attributes:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                trait_type:
+                                  type: string
+                                value:
+                                  type: string
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          description: Course not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Course not found
+                  message:
+                    type: string
+                    example: "No course found with id: invalid-course"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          description: IPFS pinning service not configured
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Service unavailable
+                  message:
+                    type: string
+                    example: IPFS pinning service is not configured. Please contact the
+                      administrator.
+  /api/donors/{address}/impact:
+    get:
+      tags:
+        - Donors
+      summary: Get donor impact statistics
+      description: Returns impact metrics for a specific donor including total
+        donated, scholars funded, milestones completed by funded scholars, and
+        average completion rate
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            type: string
+          description: Donor's Stellar wallet address
+      responses:
+        "200":
+          description: Donor impact statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_donated_usdc:
+                    type: string
+                    description: Total USDC donated by this donor (in stroops)
+                    example: "500000000"
+                  scholars_funded:
+                    type: integer
+                    description: Number of unique scholars funded by this donor
+                    example: 5
+                  milestones_completed:
+                    type: integer
+                    description: Total milestones completed by scholars funded by this donor
+                    example: 12
+                  average_completion_rate:
+                    type: number
+                    format: float
+                    description: Average milestone completion rate for scholars funded by this donor
+                      (0-1)
+                    example: 0.85
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          description: Treasury contract not configured
+  /api/enrollments:
+    post:
+      tags:
+        - Enrollments
+      summary: Create a new course enrollment
+      description: |
+        Records a course enrollment in the database after validating
+        the on-chain enrollment via the CourseMilestone contract.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - learner_address
+                - course_id
+                - tx_hash
+              properties:
+                learner_address:
+                  type: string
+                  description: The learner's Stellar wallet address
+                course_id:
+                  type: string
+                  description: The course identifier (e.g., "stellar-basics")
+                tx_hash:
+                  type: string
+                  description: The transaction hash of the on-chain enrollment
+            example:
+              learner_address: GABCD123456789...
+              course_id: stellar-basics
+              tx_hash: abc123def456
+      responses:
+        "201":
+          description: Enrollment created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enrollment_id:
+                    type: integer
+                  enrolled_at:
+                    type: string
+                    format: date-time
+        "400":
+          description: Validation error or not enrolled on-chain
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Already enrolled in this course
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    get:
+      tags:
+        - Enrollments
+      summary: Get enrollments for a learner
+      description: Returns all courses a learner is enrolled in
+      parameters:
+        - in: query
+          name: learner_address
+          required: true
+          schema:
+            type: string
+          description: The learner's Stellar wallet address
+      responses:
+        "200":
+          description: Enrollments fetched successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        enrollment_id:
+                          type: integer
+                        course_id:
+                          type: string
+                        tx_hash:
+                          type: string
+                        enrolled_at:
+                          type: string
+                          format: date-time
+        "400":
+          description: Missing learner_address parameter
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/events:
+    get:
+      tags:
+        - Events
+      summary: List indexed on-chain events
+      parameters:
+        - in: query
+          name: contract
+          schema:
+            type: string
+          description: Contract ID filter
+        - in: query
+          name: type
+          schema:
+            type: string
+          description: Event topic (LearnToken::Mint etc)
+        - in: query
+          name: address
+          schema:
+            type: string
+          description: Address in event data
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        contract:
+                          type: string
+                        event_type:
+                          type: string
+                        data:
+                          type: object
+                        ledger_sequence:
+                          type: string
+                        created_at:
+                          type: string
+                          format: date-time
+        "500":
+          description: Internal error
+  /api/governance/proposals:
+    get:
+      tags:
+        - Governance
+      summary: List governance proposals
+      description: Returns a paginated list of governance proposals, optionally
+        filtered by status.
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum:
+              - pending
+              - approved
+              - rejected
+          description: Filter proposals by status
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Number of proposals per page
+      responses:
+        "200":
+          description: Paginated list of proposals
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  proposals:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Proposal"
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      tags:
+        - Governance
+      summary: Create a governance proposal
+      description: >
+        Submits a new governance proposal on-chain via the ScholarshipTreasury
+        contract
+
+        and records it in the database. Generates a 3-milestone program
+        automatically.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GovernanceProposalInput"
+            example:
+              author_address: GABCD123456789...
+              title: Fund blockchain education program
+              description: A comprehensive program to teach blockchain development
+                fundamentals.
+              requested_amount: "1000"
+              evidence_url: https://github.com/example/proposal
+      responses:
+        "201":
+          description: Proposal created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GovernanceProposalCreated"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/governance/voting-power/{address}:
+    get:
+      tags:
+        - Governance
+      summary: Get voting power for an address
+      description: Returns the governance token balance and voting eligibility for the
+        given Stellar address.
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            type: string
+            minLength: 50
+          description: Stellar wallet address
+      responses:
+        "200":
+          description: Voting power details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VotingPower"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/proposals/{id}/status:
+    get:
+      tags:
+        - Governance
+      summary: Get the current public state of a proposal
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Proposal state details
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+  /api/proposals/{id}:
+    delete:
+      tags:
+        - Governance
+      summary: Cancel an open proposal
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Proposal cancelled
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: Proposal already closed or cancelled
+  /api/health:
+    get:
+      tags:
+        - Health
+      summary: Check service health details
+      responses:
+        "200":
+          description: Core services are reachable (or degraded)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Critical service is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /api/leaderboard:
+    get:
+      tags:
+        - Leaderboard
+      summary: List top learners
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+          description: Max number of learners to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Pagination offset
+      responses:
+        "200":
+          description: Leaderboard fetched successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        rank:
+                          type: integer
+                        address:
+                          type: string
+                        fullAddress:
+                          type: string
+                        balance:
+                          type: string
+                        completedCourses:
+                          type: integer
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/admin/moderation:
+    get:
+      tags:
+        - Admin
+      summary: List flagged content
+      description: Returns flagged content queue for moderation. Admins only.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum:
+              - pending
+              - reviewed
+              - dismissed
+          description: Filter by status
+      responses:
+        "200":
+          description: Flagged content list
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+  /api/admin/moderation/{flagId}:
+    get:
+      tags:
+        - Admin
+      summary: Get flag details with content and audit log
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: flagId
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Flag details
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+  /api/admin/moderation/{flagId}/action:
+    post:
+      tags:
+        - Admin
+      summary: Take action on flagged content
+      description: Delete, dismiss, or warn for flagged content
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: flagId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - action
+              properties:
+                action:
+                  type: string
+                  enum:
+                    - delete
+                    - dismiss
+                    - warn
+                adminNotes:
+                  type: string
+      responses:
+        "200":
+          description: Action taken
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+  /api/admin/moderation/stats:
+    get:
+      tags:
+        - Admin
+      summary: Get moderation statistics
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Moderation stats
+  /api/profiles/{address}:
+    get:
+      tags:
+        - Profiles
+      summary: Get user profile
+      description: Returns the public profile for a specific wallet address.
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            type: string
+          description: Wallet address
+      responses:
+        "200":
+          description: User profile
+        "404":
+          description: Profile not found
+        "500":
+          description: Internal server error
+  /api/profiles/me:
+    put:
+      tags:
+        - Profiles
+      summary: Update or create user profile
+      description: Upserts the profile for the authenticated user.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name:
+                  type: string
+                bio:
+                  type: string
+                avatar_url:
+                  type: string
+                twitter:
+                  type: string
+                github:
+                  type: string
+                website:
+                  type: string
+      responses:
+        "200":
+          description: Updated profile
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+        "409":
+          description: Display name already taken
+        "500":
+          description: Internal server error
+  /api/scholars/leaderboard:
+    get:
+      tags:
+        - Scholars
+      summary: Get scholars leaderboard
+      description: Returns a paginated ranking of scholars by LRN balance, with
+        optional search.
+      responses:
+        "200":
+          description: Leaderboard fetched successfully
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/scholars/{address}:
+    get:
+      tags:
+        - Scholars
+      summary: Get scholar profile
+      description: Returns a scholar's on-chain balances, enrolled courses, milestone
+        stats, credentials, and join date.
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Scholar profile
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/scholars/{address}/milestones:
+    get:
+      tags:
+        - Scholars
+      summary: Get milestones for a scholar
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Scholar milestones
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/scholars/{address}/credentials:
+    get:
+      tags:
+        - Scholars
+      summary: Get credentials for a scholar
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Scholar credentials
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/scholars/{address}/follow:
+    post:
+      tags:
+        - Scholars
+      summary: Follow a scholar
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Followed successfully
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      tags:
+        - Scholars
+      summary: Unfollow a scholar
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Unfollowed successfully
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    get:
+      tags:
+        - Scholars
+      summary: Get follow status and counts
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Follow status
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/scholarships/apply:
+    post:
+      tags:
+        - Scholarships
+      summary: Submit a scholarship application
+      description: >
+        Creates a scholarship proposal on-chain via the ScholarshipTreasury
+        contract
+
+        and records it in the database. Generates a 3-milestone program
+        automatically.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScholarshipApplication"
+            example:
+              applicant_address: GABCD123456789...
+              full_name: Jane Doe
+              course_id: stellar-basics
+              motivation: I want to learn blockchain development to build solutions for my
+                community.
+              evidence_url: https://github.com/janedoe/portfolio
+              amount: 1000
+      responses:
+        "201":
+          description: Scholarship application submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  proposal_id:
+                    type: integer
+                    description: Database ID of the created proposal
+                  tx_hash:
+                    type: string
+                    description: On-chain transaction hash
+                  simulated:
+                    type: boolean
+                    description: Whether the transaction was simulated (no secret key configured)
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  details:
+                    type: object
+                    description: Field-level validation errors
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/treasury/stats:
+    get:
+      tags:
+        - Treasury
+      summary: Get treasury statistics
+      description: Returns aggregated statistics including total deposits,
+        disbursements, scholars funded, active proposals, and donor count
+      responses:
+        "200":
+          description: Treasury statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_deposited_usdc:
+                    type: string
+                    description: Total USDC deposited (in stroops)
+                    example: "125400000000"
+                  total_disbursed_usdc:
+                    type: string
+                    description: Total USDC disbursed (in stroops)
+                    example: "98200000000"
+                  scholars_funded:
+                    type: integer
+                    description: Number of unique scholars funded
+                    example: 128
+                  active_proposals:
+                    type: integer
+                    description: Number of active scholarship proposals
+                    example: 12
+                  donors_count:
+                    type: integer
+                    description: Number of unique donors
+                    example: 47
+        "500":
+          description: Internal server error
+        "503":
+          description: Treasury contract not configured
+  /api/treasury/activity:
+    get:
+      tags:
+        - Treasury
+      summary: Get treasury activity feed
+      description: Returns recent treasury events including deposits and disbursements
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Maximum number of events to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description: Number of events to skip for pagination
+      responses:
+        "200":
+          description: Treasury activity events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          enum:
+                            - deposit
+                            - disburse
+                          example: deposit
+                        amount:
+                          type: string
+                          description: Amount in stroops
+                          example: "500000000"
+                        address:
+                          type: string
+                          description: Donor address (for deposits)
+                          example: GABC...
+                        scholar:
+                          type: string
+                          description: Scholar address (for disbursements)
+                          example: GDEF...
+                        tx_hash:
+                          type: string
+                          description: Transaction hash
+                          example: 018d4d55354a1d4f6726932712954d0f5b6797a0d58478a5e89f6a9d3451d3d8
+                        created_at:
+                          type: string
+                          format: date-time
+                          description: Event timestamp
+        "500":
+          description: Internal server error
+        "503":
+          description: Treasury contract not configured
+  /api/upload:
+    post:
+      tags:
+        - Upload
+      summary: Pin a file to IPFS via Pinata
+      description: >
+        Accepts a single file (PDF, PNG, JPEG, MP4 — max 10 MB), pins it to IPFS
+        via Pinata, and returns the CID and a Pinata gateway URL. Use this
+        endpoint to upload proposal attachments, course cover images, and
+        ScholarNFT images before referencing their CIDs elsewhere.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: File pinned successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cid:
+                    type: string
+                    example: bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+                  gatewayUrl:
+                    type: string
+                    example: https://gateway.pinata.cloud/ipfs/bafybei...
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+  /api/upload/nft-metadata:
+    post:
+      tags:
+        - Upload
+      summary: Pin NFT metadata to IPFS
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Metadata pinned successfully
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+  /api/profile/{address}:
+    get:
+      tags:
+        - Profile
+      summary: Get user profile
+      description: Returns a user's rich profile including bio, avatar, social links,
+        and stats.
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            type: string
+          description: User's Stellar wallet address
+      responses:
+        "200":
+          description: User profile with stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile:
+                    $ref: "#/components/schemas/UserProfile"
+                  stats:
+                    $ref: "#/components/schemas/ProfileStats"
+                  milestones:
+                    type: object
+                    properties:
+                      completed:
+                        type: integer
+                      pending:
+                        type: integer
+                  credentials:
+                    type: array
+                    items:
+                      type: object
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/profile:
+    put:
+      tags:
+        - Profile
+      summary: Update user profile
+      description: Updates or creates the authenticated user's profile. Requires
+        authentication.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName:
+                  type: string
+                  maxLength: 100
+                  nullable: true
+                bio:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+                avatarUrl:
+                  type: string
+                  maxLength: 500
+                  nullable: true
+                avatarCid:
+                  type: string
+                  maxLength: 100
+                  nullable: true
+                socialLinks:
+                  type: object
+                  properties:
+                    twitter:
+                      type: string
+                      maxLength: 200
+                    github:
+                      type: string
+                      maxLength: 200
+                    linkedin:
+                      type: string
+                      maxLength: 200
+                    website:
+                      type: string
+                      maxLength: 200
+                    discord:
+                      type: string
+                      maxLength: 200
+      responses:
+        "200":
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile:
+                    $ref: "#/components/schemas/UserProfile"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      tags:
+        - Profile
+      summary: Delete user profile
+      description: Deletes the authenticated user's profile. Requires authentication.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Profile deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   /api/validator/validate:
     post:
-      tags: [Validator]
+      tags:
+        - Validator
       summary: Validate a learner milestone
       security:
         - bearerAuth: []
@@ -108,133 +2149,3 @@ paths:
           $ref: "#/components/responses/UnauthorizedError"
         "500":
           $ref: "#/components/responses/InternalServerError"
-  /api/events:
-    get:
-      tags: [Events]
-      summary: List platform events
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: query
-          name: type
-          schema:
-            type: string
-          description: Optional event type filter
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 20
-          description: Max number of events to return
-      responses:
-        "200":
-          description: Events fetched successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Event"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
-components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-  schemas:
-    ErrorResponse:
-      type: object
-      properties:
-        error:
-          type: string
-      required: [error]
-    HealthResponse:
-      type: object
-      properties:
-        status:
-          type: string
-          example: ok
-        timestamp:
-          type: string
-          format: date-time
-      required: [status, timestamp]
-    Course:
-      type: object
-      properties:
-        id:
-          type: string
-        title:
-          type: string
-        level:
-          type: string
-        published:
-          type: boolean
-      required: [id, title, level, published]
-    Event:
-      type: object
-      properties:
-        id:
-          type: string
-        type:
-          type: string
-        entityId:
-          type: string
-        timestamp:
-          type: string
-          format: date-time
-      required: [id, type, entityId, timestamp]
-    ValidatorRequest:
-      type: object
-      properties:
-        courseId:
-          type: string
-        learnerAddress:
-          type: string
-        milestoneId:
-          type: integer
-          minimum: 0
-      required: [courseId, learnerAddress, milestoneId]
-    ValidatorResult:
-      allOf:
-        - $ref: "#/components/schemas/ValidatorRequest"
-        - type: object
-          properties:
-            approved:
-              type: boolean
-            validator:
-              type: string
-          required: [approved, validator]
-  responses:
-    BadRequestError:
-      description: Bad request
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/ErrorResponse"
-    UnauthorizedError:
-      description: Unauthorized
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/ErrorResponse"
-    NotFoundError:
-      description: Resource not found
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/ErrorResponse"
-    InternalServerError:
-      description: Internal server error
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/ErrorResponse"

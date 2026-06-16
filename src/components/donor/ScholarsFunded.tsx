@@ -1,4 +1,5 @@
 import React from "react"
+import { EmptyState as StateEmpty } from "../states/emptyState"
 import { type Scholar } from "../../hooks/useDonor"
 
 interface ScholarsFundedProps {
@@ -99,16 +100,13 @@ export const ScholarsFunded: React.FC<ScholarsFundedProps> = ({ scholars }) => {
 					))}
 				</div>
 			) : (
-				<div className="glass-card p-12 rounded-[3rem] border border-white/5 text-center">
-					<div className="text-5xl mb-4">🎓</div>
-					<p className="text-white/40 font-medium mb-4">
-						No scholars funded yet.
-					</p>
-					<p className="text-xs text-white/30">
-						Make a contribution above to enable approved scholarship proposals
-						and directly impact scholars' lives.
-					</p>
-				</div>
+				<StateEmpty
+					icon="🎓"
+					title="No scholars funded yet"
+					description="Make a contribution to enable scholarship proposals and impact scholars' lives."
+					ctaLabel="Donate to treasury"
+					ctaHref="/treasury"
+				/>
 			)}
 		</section>
 	)

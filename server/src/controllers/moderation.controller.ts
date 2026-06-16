@@ -64,7 +64,7 @@ export async function getFlagDetails(
 export async function actionOnFlag(req: Request, res: Response): Promise<void> {
 	const { flagId } = req.params
 	const body = req.body as ModerationActionRequest
-	const adminAddress = (req as any).user?.address
+	const adminAddress = (req as any).user?.address || (req as any).adminAddress
 
 	const { action, adminNotes } = body
 
@@ -90,6 +90,9 @@ export async function actionOnFlag(req: Request, res: Response): Promise<void> {
 				)
 			}
 			// For proposals, we might want to archive them instead
+		} else if (action === "dismiss") {
+			// Dismiss/unhide the content
+			await flaggedContentStore.dismissContent(flag.content_type, flag.content_id)
 		}
 
 		// Update flag status

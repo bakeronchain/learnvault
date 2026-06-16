@@ -359,7 +359,7 @@ fn mint_emits_event() {
     let env = Env::default();
     let (_, _admin, client) = setup(&env);
     let scholar = Address::generate(&env);
-    let token_id = 1u64;
+    let uri = cid(&env, "ipfs://mint-event");
 
     env.mock_all_auths();
     let token_id = client.mint(&scholar, &uri);

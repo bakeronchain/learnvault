@@ -1,11 +1,12 @@
 import { Button } from "@stellar/design-system"
 import React, { useEffect, useMemo, useState } from "react"
-import { useParams } from "react-router-dom"
+import { Link, useParams } from "react-router-dom"
 import { CourseForum } from "../components/forum/CourseForum"
 import LessonContent from "../components/LessonContent"
+import CourseReviewsPanel from "../components/CourseReviewsPanel"
 import LessonSidebar from "../components/LessonSidebar"
 import MilestoneSubmitPanel from "../components/MilestoneSubmitPanel"
-import SponsorLogosForTrack from "../components/SponsorLogosForTrack"
+
 import { LessonListSkeleton } from "../components/skeletons/LessonListSkeleton"
 import { useCourse } from "../hooks/useCourse"
 import { useCourseDetail } from "../hooks/useCourses"
@@ -38,8 +39,13 @@ const LessonView: React.FC = () => {
 	const lessonId = parseInt(lessonIdParam || "0", 10)
 
 	const { address } = useWallet()
-	const { getCourseProgress, completeMilestone, isCompletingMilestone } =
-		useCourse()
+	const {
+		getCourseProgress,
+		completeMilestone,
+		isCompletingMilestone,
+		enrolledCourses,
+		enroll,
+	} = useCourse()
 	const {
 		course,
 		isLoading: isLoadingCourse,
@@ -77,6 +83,24 @@ const LessonView: React.FC = () => {
 		[course, lessonId],
 	)
 	const allLessons = useMemo(() => course?.lessons ?? [], [course])
+	const isEnrolledInCourse = useMemo(
+		() => (course ? enrolledCourses.some((c) => c.id === course.slug) : false),
+		[course, enrolledCourses],
+	)
+	const prerequisites = course?.prerequisites ?? []
+	const hasPrerequisiteData = prerequisites.length > 0
+	const prerequisiteStatuses = useMemo(() => {
+		return prerequisites.map((prereq) => {
+			const progress = getCourseProgress(prereq.slug)
+			const total = progress.totalMilestones
+			const completed =
+				typeof total === "number" && total > 0
+					? progress.completedMilestoneIds.length >= total
+					: false
+			return { prereq, completed }
+		})
+	}, [getCourseProgress, prerequisites])
+	const hasUnmetPrerequisites = prerequisiteStatuses.some((p) => !p.completed)
 
 	useEffect(() => {
 		// Simulate a short content load delay
@@ -217,6 +241,8 @@ const LessonView: React.FC = () => {
 
 	const handleMarkComplete = async () => {
 		if (!courseId || !course || !lesson) return
+		if (hasPrerequisiteData && hasUnmetPrerequisites) return
+		if (!isEnrolledInCourse) return
 
 		const completedOnChain = await completeMilestone(courseId, lessonId)
 		if (completedOnChain) {
@@ -238,21 +264,17 @@ const LessonView: React.FC = () => {
 					</span>
 					<span className="text-white/40 text-sm">{course.title}</span>
 				</div>
-				{course.hasUpdatedContent && (
-					<div className="mb-4 rounded-2xl border border-amber-300/30 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
-						Updated content is available. You are currently on version{" "}
-						<strong>{course.enrollmentContentVersion ?? 1}</strong>, while the
-						latest is <strong>{course.latestContentVersion ?? 1}</strong>.
-					</div>
-				)}
+				<h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
+					{lesson.title}
+				</h1>
+			</header>
+
 				<div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
 					<h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
 						{currentTab === "forum" ? "Community Forum" : lesson.title}
 					</h1>
 				</div>
-				<SponsorLogosForTrack track={course.track} />
 			</header>
-
 			{/* Course progress bar */}
 			{allLessons.length > 0 &&
 				(() => {
@@ -388,24 +410,36 @@ const LessonView: React.FC = () => {
 				</div>
 
 				<div>
+					<LessonContent
+						lesson={lesson ?? loadingLesson}
+						isLoading={isLoadingCourse || isLoadingContent}
+						isCompleted={isCompleted}
+						isCompleting={isCompletingMilestone}
+						timeSpentLabel={timeSpentLabel}
+						onMarkComplete={handleMarkComplete}
+						prevLessonId={prevLessonId}
+						nextLessonId={nextLessonId}
+						isNextLocked={isNextLocked}
+					/>
+
 					{currentTab === "forum" ? (
 						<div className="animate-in fade-in">
 							<CourseForum courseId={course.slug} />
 						</div>
 					) : (
-						<LessonContent
-							lesson={lesson ?? loadingLesson}
-							isLoading={isLoadingCourse || isLoadingContent}
-							isCompleted={isCompleted}
-							isCompleting={isCompletingMilestone}
-							timeSpentLabel={timeSpentLabel}
-							onMarkComplete={handleMarkComplete}
-							onScrolledToBottom={() => markLessonRead(lessonId)}
-							prevLessonId={prevLessonId}
-							nextLessonId={nextLessonId}
-							isNextLocked={isNextLocked}
-						/>
-					)}
+						<>
+							<LessonContent
+								lesson={lesson ?? loadingLesson}
+								isLoading={isLoadingCourse || isLoadingContent}
+								isCompleted={isCompleted}
+								isCompleting={isCompletingMilestone}
+								timeSpentLabel={timeSpentLabel}
+								onMarkComplete={handleMarkComplete}
+								onScrolledToBottom={() => markLessonRead(lessonId)}
+								prevLessonId={prevLessonId}
+								nextLessonId={nextLessonId}
+								isNextLocked={isNextLocked}
+							/>
 
 					{lesson?.isMilestone && !isLoadingCourse && !isLoadingContent && (
 						<div className="mt-12 animate-in fade-in slide-in-from-top-4 duration-1000">
@@ -414,6 +448,12 @@ const LessonView: React.FC = () => {
 								milestoneId={lesson.id}
 							/>
 						</div>
+					)}
+					{course && currentTab !== "forum" && (
+						<CourseReviewsPanel
+							courseId={course.slug}
+							canReview={Boolean(nextLessonId === null && isCompleted)}
+						/>
 					)}
 				</div>
 			</div>

@@ -8,7 +8,7 @@
 //!
 //! - Only the admin (treasury contract) can mint.
 //! - Fully transferable — unlike LearnToken (LRN).
-//! - No burning in V1.
+//! - Governance proposals enforce a mandatory execution timelock after passing.
 //!
 //! ## Relevant issue
 //! Implements: https://github.com/bakeronchain/learnvault/issues/11
@@ -32,17 +32,10 @@ const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30; // 30 days
 const PERSISTENT_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
 const PERSISTENT_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365; // 1 year
 
-// ---------------------------------------------------------------------------
-// Storage Constants (assuming ~6s ledger time)
-// ---------------------------------------------------------------------------
+/// Default timelock before a passed proposal may be executed (48 hours).
+pub const TIMELOCK_PERIOD: u64 = 172_800;
 
-const DAY_IN_LEDGERS: u32 = 17_280;
-const INSTANCE_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
-const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30; // 30 days
-const PERSISTENT_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
-const PERSISTENT_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365; // 1 year
-const TEMP_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
-const TEMP_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365; // 1 year
+const TIMELOCK_KEY: Symbol = symbol_short!("TLOCK");
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -70,6 +63,16 @@ pub enum GOVError {
     InvalidAmount = 8,
     /// Arithmetic overflow or underflow was detected.
     ArithmeticOverflow = 9,
+    /// Proposal execution attempted before the timelock expires.
+    TimelockActive = 10,
+    /// Proposal does not exist.
+    ProposalNotFound = 11,
+    /// Proposal has not passed and cannot be executed.
+    ProposalNotPassed = 12,
+    /// Proposal has already been executed.
+    ProposalAlreadyExecuted = 13,
+    /// Proposal with this id already exists.
+    ProposalAlreadyExists = 14,
 }
 
 // ---------------------------------------------------------------------------
@@ -89,6 +92,15 @@ pub enum DataKey {
     TotalSupply,
     Delegate(Address),
     DelegatedAmount(Address),
+    Proposal(u32),
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GovernanceProposal {
+    pub passed: bool,
+    pub executed: bool,
+    pub execution_not_before: u64,
 }
 
 #[contractevent]
@@ -144,7 +156,8 @@ impl GovernanceToken {
     /// Initialise the contract. Can only be called once.
     ///
     /// Sets name = "LearnVault Governance", symbol = "GOV", decimals = 7.
-    pub fn initialize(env: Env, admin: Address) {
+    /// `timelock_period` defaults to [`TIMELOCK_PERIOD`] when zero.
+    pub fn initialize(env: Env, admin: Address, timelock_period: u64) {
         if env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(&env, GOVError::Unauthorized);
         }
@@ -158,6 +171,12 @@ impl GovernanceToken {
             .instance()
             .set(&SYMBOL_KEY, &symbol_short!("GOV"));
         env.storage().instance().set(&DECIMALS_KEY, &7_u32);
+        let period = if timelock_period == 0 {
+            TIMELOCK_PERIOD
+        } else {
+            timelock_period
+        };
+        env.storage().instance().set(&TIMELOCK_KEY, &period);
 
         Self::extend_instance(&env);
     }
@@ -254,52 +273,6 @@ impl GovernanceToken {
         env.storage()
             .instance()
             .set(&DataKey::TotalSupply, &new_supply);
-        GOVBurned { from, amount }.publish(&env);
-    }
-
-    /// Burn `amount` from the caller's own balance.
-    pub fn burn(env: Env, from: Address, amount: i128) {
-        Self::extend_instance(&env);
-        from.require_auth();
-        if amount <= 0 {
-            panic_with_error!(&env, GOVError::ZeroAmount);
-        }
-        Self::_debit(&env, &from, amount);
-        // reduce total supply
-        let supply: i128 = env
-            .storage()
-            .instance()
-            .get(&DataKey::TotalSupply)
-            .unwrap_or(0);
-        env.storage()
-            .instance()
-            .set(&DataKey::TotalSupply, &(supply - amount));
-        GOVBurned { from, amount }.publish(&env);
-    }
-
-    /// Administrative burn for slashing.
-    pub fn admin_burn_from(env: Env, from: Address, amount: i128) {
-        Self::extend_instance(&env);
-        let admin: Address = env
-            .storage()
-            .instance()
-            .get(&ADMIN_KEY)
-            .unwrap_or_else(|| panic_with_error!(&env, GOVError::NotInitialized));
-        admin.require_auth();
-
-        if amount <= 0 {
-            panic_with_error!(&env, GOVError::ZeroAmount);
-        }
-        Self::_debit(&env, &from, amount);
-
-        let supply: i128 = env
-            .storage()
-            .instance()
-            .get(&DataKey::TotalSupply)
-            .unwrap_or(0);
-        env.storage()
-            .instance()
-            .set(&DataKey::TotalSupply, &(supply - amount));
         GOVBurned { from, amount }.publish(&env);
     }
 
@@ -592,6 +565,104 @@ impl GovernanceToken {
     }
 
     // -----------------------------------------------------------------------
+    // Governance proposal timelock
+    // -----------------------------------------------------------------------
+
+    pub fn get_timelock_period(env: Env) -> u64 {
+        env.storage()
+            .instance()
+            .get(&TIMELOCK_KEY)
+            .unwrap_or(TIMELOCK_PERIOD)
+    }
+
+    pub fn create_proposal(env: Env, admin: Address, proposal_id: u32) {
+        Self::extend_instance(&env);
+        let stored_admin: Address = env
+            .storage()
+            .instance()
+            .get(&ADMIN_KEY)
+            .unwrap_or_else(|| panic_with_error!(&env, GOVError::NotInitialized));
+        if admin != stored_admin {
+            panic_with_error!(&env, GOVError::Unauthorized);
+        }
+        admin.require_auth();
+
+        let key = DataKey::Proposal(proposal_id);
+        if env.storage().persistent().has(&key) {
+            panic_with_error!(&env, GOVError::ProposalAlreadyExists);
+        }
+
+        let proposal = GovernanceProposal {
+            passed: false,
+            executed: false,
+            execution_not_before: 0,
+        };
+        env.storage().persistent().set(&key, &proposal);
+        Self::extend_persistent(&env, &key);
+    }
+
+    pub fn mark_proposal_passed(env: Env, admin: Address, proposal_id: u32) {
+        Self::extend_instance(&env);
+        let stored_admin: Address = env
+            .storage()
+            .instance()
+            .get(&ADMIN_KEY)
+            .unwrap_or_else(|| panic_with_error!(&env, GOVError::NotInitialized));
+        if admin != stored_admin {
+            panic_with_error!(&env, GOVError::Unauthorized);
+        }
+        admin.require_auth();
+
+        let key = DataKey::Proposal(proposal_id);
+        let mut proposal: GovernanceProposal = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or_else(|| panic_with_error!(&env, GOVError::ProposalNotFound));
+
+        let timelock = Self::get_timelock_period(env.clone());
+        proposal.passed = true;
+        proposal.execution_not_before = env
+            .ledger()
+            .timestamp()
+            .checked_add(timelock)
+            .unwrap_or_else(|| panic_with_error!(&env, GOVError::ArithmeticOverflow));
+
+        env.storage().persistent().set(&key, &proposal);
+        Self::extend_persistent(&env, &key);
+    }
+
+    pub fn execute_proposal(env: Env, proposal_id: u32) {
+        Self::extend_instance(&env);
+        let key = DataKey::Proposal(proposal_id);
+        let mut proposal: GovernanceProposal = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or_else(|| panic_with_error!(&env, GOVError::ProposalNotFound));
+
+        if !proposal.passed {
+            panic_with_error!(&env, GOVError::ProposalNotPassed);
+        }
+        if proposal.executed {
+            panic_with_error!(&env, GOVError::ProposalAlreadyExecuted);
+        }
+        if env.ledger().timestamp() < proposal.execution_not_before {
+            panic_with_error!(&env, GOVError::TimelockActive);
+        }
+
+        proposal.executed = true;
+        env.storage().persistent().set(&key, &proposal);
+        Self::extend_persistent(&env, &key);
+    }
+
+    pub fn get_proposal(env: Env, proposal_id: u32) -> Option<GovernanceProposal> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Proposal(proposal_id))
+    }
+
+    // -----------------------------------------------------------------------
     // Internal helpers
     // -----------------------------------------------------------------------
 
@@ -667,6 +738,10 @@ impl GovernanceToken {
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
+#[path = "test.rs"]
+mod dedicated_test_suite;
+
+#[cfg(test)]
 mod test {
     extern crate std;
 
@@ -682,7 +757,7 @@ mod test {
         let id = e.register(GovernanceToken, ());
         e.mock_all_auths();
         let client = GovernanceTokenClient::new(e, &id);
-        client.initialize(&admin);
+        client.initialize(&admin, &0);
         (id, admin, client)
     }
 
@@ -743,13 +818,13 @@ mod test {
             invoke: &MockAuthInvoke {
                 contract: &id,
                 fn_name: "initialize",
-                args: (admin.clone(),).into_val(&e),
+                args: (admin.clone(), 0_u64).into_val(&e),
                 sub_invokes: &[],
             },
         }]);
 
         let client = GovernanceTokenClient::new(&e, &id);
-        client.initialize(&admin);
+        client.initialize(&admin, &0);
 
         let wasm_hash = crate::upgrade::testutils::upload_upgrade_target(&e);
         authorize_upgrade(&e, &id, &attacker, &wasm_hash);
@@ -793,7 +868,7 @@ mod test {
         let e = Env::default();
         let (_, admin, client) = setup(&e);
         let _ = admin; // already initialized via setup
-        let result = client.try_initialize(&Address::generate(&e));
+        let result = client.try_initialize(&Address::generate(&e), &0);
         assert_eq!(
             result.err(),
             Some(Ok(soroban_sdk::Error::from_contract_error(
@@ -850,12 +925,12 @@ mod test {
             invoke: &soroban_sdk::testutils::MockAuthInvoke {
                 contract: &id,
                 fn_name: "initialize",
-                args: (admin.clone(),).into_val(&e),
+                args: (admin.clone(), 0_u64).into_val(&e),
                 sub_invokes: &[],
             },
         }]);
         let client = GovernanceTokenClient::new(&e, &id);
-        client.initialize(&admin);
+        client.initialize(&admin, &0);
         let donor = Address::generate(&e);
         let result = client.try_mint(&donor, &100);
         assert!(result.is_err());
@@ -1436,7 +1511,7 @@ mod test {
         let id = e.register(GovernanceToken, ());
         let fresh_client = GovernanceTokenClient::new(&e, &id);
         e.cost_estimate().budget().reset_unlimited();
-        fresh_client.initialize(&fresh_admin);
+        fresh_client.initialize(&fresh_admin, &0);
         let init_instr = e.cost_estimate().budget().cpu_instruction_cost();
         let init_mem = e.cost_estimate().budget().memory_bytes_cost();
 

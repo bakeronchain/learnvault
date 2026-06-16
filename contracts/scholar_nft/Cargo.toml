@@ -17,3 +17,6 @@ soroban-sdk = { workspace = true }
 [dev-dependencies]
 learnvault-shared = { workspace = true, features = ["testutils"] }
 soroban-sdk = { workspace = true, features = ["testutils"] }
+# Real CourseMilestone contract, deployed alongside ScholarNFT in the
+# mint-on-completion integration test (contracts/scholar_nft/src/tests/).
+course_milestone = { path = "../course_milestone" }

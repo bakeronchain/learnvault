@@ -146,8 +146,8 @@ fn deposits_are_tracked_per_donor() {
     let (client, _governance, donor, _recipient, token_id, gov_client) = setup(&env);
 
     env.mock_all_auths();
-    client.deposit(&donor, &150);
-    client.deposit(&donor, &50);
+    client.deposit(&donor, &150, &token_id);
+    client.deposit(&donor, &50, &token_id);
 
     assert_eq!(client.get_donor_total(&donor), 200);
     assert_eq!(client.get_balance(), 200);
@@ -162,7 +162,7 @@ fn unauthorized_disburse_is_rejected() {
     let env = Env::default();
     let (client, governance, donor, recipient, token_id, _gov_client) = setup(&env);
     env.mock_all_auths();
-    client.deposit(&donor, &250);
+    client.deposit(&donor, &250, &token_id);
     env.set_auths(&[]);
 
     let attacker = Address::generate(&env);
@@ -181,9 +181,9 @@ fn unauthorized_disburse_is_rejected() {
 #[test]
 fn disburse_more_than_balance_fails() {
     let env = Env::default();
-    let (client, governance, donor, recipient, _token_id, _gov_client) = setup(&env);
+    let (client, governance, donor, recipient, token_id, _gov_client) = setup(&env);
     env.mock_all_auths();
-    client.deposit(&donor, &10);
+    client.deposit(&donor, &10, &token_id);
     env.set_auths(&[]);
 
     set_caller(&client, "disburse", &governance, (&recipient, 20_i128));
@@ -260,19 +260,19 @@ fn get_proposals_by_status_returns_pending_proposals() {
 
     let pending = client.get_proposals_by_status(&ProposalStatus::Pending);
     let active = client.get_active_proposals();
-    let approved = client.get_proposals_by_status(&ProposalStatus::Approved);
+    let queued = client.get_proposals_by_status(&ProposalStatus::Queued);
     let rejected = client.get_proposals_by_status(&ProposalStatus::Rejected);
 
     assert_eq!(pending.len(), 1);
     assert_eq!(active.len(), 1);
     assert_eq!(pending.get(0).unwrap().id, proposal_id);
     assert_eq!(active.get(0).unwrap().id, proposal_id);
-    assert_eq!(approved.len(), 0);
+    assert_eq!(queued.len(), 0);
     assert_eq!(rejected.len(), 0);
 }
 
 #[test]
-fn get_proposals_by_status_returns_approved_proposals_after_deadline() {
+fn get_proposals_by_status_returns_queued_proposals_after_deadline() {
     let env = Env::default();
     let (client, _governance, donor, _recipient, _token_id, gov_client) = setup(&env);
     let voter = Address::generate(&env);
@@ -286,12 +286,12 @@ fn get_proposals_by_status_returns_approved_proposals_after_deadline() {
     env.ledger()
         .set_sequence_number(proposal.deadline_ledger + 1);
 
-    let approved = client.get_proposals_by_status(&ProposalStatus::Approved);
+    let queued = client.get_proposals_by_status(&ProposalStatus::Queued);
     let rejected = client.get_proposals_by_status(&ProposalStatus::Rejected);
     let pending = client.get_proposals_by_status(&ProposalStatus::Pending);
 
-    assert_eq!(approved.len(), 1);
-    assert_eq!(approved.get(0).unwrap().id, proposal_id);
+    assert_eq!(queued.len(), 1);
+    assert_eq!(queued.get(0).unwrap().id, proposal_id);
     assert_eq!(rejected.len(), 0);
     assert_eq!(pending.len(), 0);
 }
@@ -312,11 +312,11 @@ fn get_proposals_by_status_returns_rejected_proposals_after_deadline() {
         .set_sequence_number(proposal.deadline_ledger + 1);
 
     let rejected = client.get_proposals_by_status(&ProposalStatus::Rejected);
-    let approved = client.get_proposals_by_status(&ProposalStatus::Approved);
+    let queued = client.get_proposals_by_status(&ProposalStatus::Queued);
 
     assert_eq!(rejected.len(), 1);
     assert_eq!(rejected.get(0).unwrap().id, proposal_id);
-    assert_eq!(approved.len(), 0);
+    assert_eq!(queued.len(), 0);
 }
 
 #[test]
@@ -327,10 +327,10 @@ fn get_proposals_by_status_returns_empty_vec_when_no_match() {
     env.mock_all_auths();
     let _proposal_id = submit_sample_proposal(&env, &client, &donor, 500);
 
-    let approved = client.get_proposals_by_status(&ProposalStatus::Approved);
+    let queued = client.get_proposals_by_status(&ProposalStatus::Queued);
     let rejected = client.get_proposals_by_status(&ProposalStatus::Rejected);
 
-    assert_eq!(approved.len(), 0);
+    assert_eq!(queued.len(), 0);
     assert_eq!(rejected.len(), 0);
 }
 
@@ -645,7 +645,7 @@ fn deposit_happy_path() {
     let (client, _, donor, _, token_id, gov_client) = setup(&env);
 
     env.mock_all_auths();
-    client.deposit(&donor, &100);
+    client.deposit(&donor, &100, &token_id);
 
     assert_eq!(client.get_donor_total(&donor), 100);
     assert_eq!(client.get_balance(), 100);
@@ -657,11 +657,11 @@ fn deposit_happy_path() {
 #[test]
 fn deposit_mints_gov_at_exchange_rate() {
     let env = Env::default();
-    let (client, _, donor, _, _, gov_client) = setup(&env);
+    let (client, _, donor, _, token_id, gov_client) = setup(&env);
 
     env.mock_all_auths();
     let rate = client.get_exchange_rate();
-    client.deposit(&donor, &500);
+    client.deposit(&donor, &500, &token_id);
 
     assert_eq!(gov_client.balance(&donor), 500_i128 * rate);
 }
@@ -669,10 +669,10 @@ fn deposit_mints_gov_at_exchange_rate() {
 #[test]
 fn deposit_zero_amount_fails() {
     let env = Env::default();
-    let (client, _, donor, _, _, _) = setup(&env);
+    let (client, _, donor, _, token_id, _) = setup(&env);
 
     env.mock_all_auths();
-    let result = client.try_deposit(&donor, &0);
+    let result = client.try_deposit(&donor, &0, &token_id);
 
     assert_eq!(
         result.err(),
@@ -685,10 +685,10 @@ fn deposit_zero_amount_fails() {
 #[test]
 fn deposit_negative_amount_fails() {
     let env = Env::default();
-    let (client, _, donor, _, _, _) = setup(&env);
+    let (client, _, donor, _, token_id, _) = setup(&env);
 
     env.mock_all_auths();
-    let result = client.try_deposit(&donor, &-50);
+    let result = client.try_deposit(&donor, &-50, &token_id);
 
     assert_eq!(
         result.err(),
@@ -701,11 +701,11 @@ fn deposit_negative_amount_fails() {
 #[test]
 fn deposit_when_paused_fails() {
     let env = Env::default();
-    let (client, _, donor, _, _, _) = setup(&env);
+    let (client, _, donor, _, token_id, _) = setup(&env);
 
     env.mock_all_auths();
     client.pause();
-    let result = client.try_deposit(&donor, &100);
+    let result = client.try_deposit(&donor, &100, &token_id);
 
     assert_eq!(
         result.err(),
@@ -718,24 +718,23 @@ fn deposit_when_paused_fails() {
 #[test]
 fn deposit_increments_donor_count() {
     let env = Env::default();
-    let (client, _, donor, _, _, _) = setup(&env);
+    let (client, _, donor, _, token_id, _) = setup(&env);
 
     env.mock_all_auths();
     assert_eq!(client.get_donors_count(), 0);
 
-    client.deposit(&donor, &100);
+    client.deposit(&donor, &100, &token_id);
     assert_eq!(client.get_donors_count(), 1);
 
     // Second deposit from same donor doesn't increment
-    client.deposit(&donor, &50);
+    client.deposit(&donor, &50, &token_id);
     assert_eq!(client.get_donors_count(), 1);
 
     // New donor increments
     let donor2 = Address::generate(&env);
-    let token_id = env.as_contract(&client.address, || token::contract_id(&env));
     let sac = StellarAssetClient::new(&env, &token_id);
     sac.mint(&donor2, &1_000);
-    client.deposit(&donor2, &100);
+    client.deposit(&donor2, &100, &token_id);
     assert_eq!(client.get_donors_count(), 2);
 }
 
@@ -749,7 +748,7 @@ fn disburse_happy_path() {
     let (client, governance, donor, recipient, token_id, _) = setup(&env);
 
     env.mock_all_auths();
-    client.deposit(&donor, &500);
+    client.deposit(&donor, &500, &token_id);
     env.set_auths(&[]);
 
     set_caller(&client, "disburse", &governance, (&recipient, 200_i128));
@@ -762,10 +761,10 @@ fn disburse_happy_path() {
 #[test]
 fn disburse_zero_amount_fails() {
     let env = Env::default();
-    let (client, governance, donor, recipient, _, _) = setup(&env);
+    let (client, governance, donor, recipient, token_id, _) = setup(&env);
 
     env.mock_all_auths();
-    client.deposit(&donor, &500);
+    client.deposit(&donor, &500, &token_id);
     env.set_auths(&[]);
 
     set_caller(&client, "disburse", &governance, (&recipient, 0_i128));
@@ -782,10 +781,10 @@ fn disburse_zero_amount_fails() {
 #[test]
 fn disburse_negative_amount_fails() {
     let env = Env::default();
-    let (client, governance, donor, recipient, _, _) = setup(&env);
+    let (client, governance, donor, recipient, token_id, _) = setup(&env);
 
     env.mock_all_auths();
-    client.deposit(&donor, &500);
+    client.deposit(&donor, &500, &token_id);
     env.set_auths(&[]);
 
     set_caller(&client, "disburse", &governance, (&recipient, -100_i128));
@@ -802,10 +801,10 @@ fn disburse_negative_amount_fails() {
 #[test]
 fn disburse_insufficient_balance_fails() {
     let env = Env::default();
-    let (client, governance, donor, recipient, _, _) = setup(&env);
+    let (client, governance, donor, recipient, token_id, _) = setup(&env);
 
     env.mock_all_auths();
-    client.deposit(&donor, &100);
+    client.deposit(&donor, &100, &token_id);
     env.set_auths(&[]);
 
     set_caller(&client, "disburse", &governance, (&recipient, 200_i128));
@@ -822,10 +821,10 @@ fn disburse_insufficient_balance_fails() {
 #[test]
 fn disburse_when_paused_fails() {
     let env = Env::default();
-    let (client, governance, donor, recipient, _, _) = setup(&env);
+    let (client, governance, donor, recipient, token_id, _) = setup(&env);
 
     env.mock_all_auths();
-    client.deposit(&donor, &500);
+    client.deposit(&donor, &500, &token_id);
     client.pause();
     env.set_auths(&[]);
 
@@ -843,10 +842,10 @@ fn disburse_when_paused_fails() {
 #[test]
 fn disburse_increments_scholar_count() {
     let env = Env::default();
-    let (client, governance, donor, recipient, _, _) = setup(&env);
+    let (client, governance, donor, recipient, token_id, _) = setup(&env);
 
     env.mock_all_auths();
-    client.deposit(&donor, &500);
+    client.deposit(&donor, &500, &token_id);
     assert_eq!(client.get_scholars_count(), 0);
     env.set_auths(&[]);
 
@@ -863,10 +862,10 @@ fn disburse_increments_scholar_count() {
 #[test]
 fn disburse_tracks_total_disbursed() {
     let env = Env::default();
-    let (client, governance, donor, recipient, _, _) = setup(&env);
+    let (client, governance, donor, recipient, token_id, _) = setup(&env);
 
     env.mock_all_auths();
-    client.deposit(&donor, &500);
+    client.deposit(&donor, &500, &token_id);
     assert_eq!(client.get_total_disbursed(), 0);
     env.set_auths(&[]);
 
@@ -1232,13 +1231,13 @@ fn pause_only_admin_can_call() {
 #[test]
 fn pause_prevents_deposits() {
     let env = Env::default();
-    let (client, _, donor, _, _, _) = setup(&env);
+    let (client, _, donor, _, token_id, _) = setup(&env);
 
     env.mock_all_auths();
     client.pause();
     assert!(client.is_paused());
 
-    let result = client.try_deposit(&donor, &100);
+    let result = client.try_deposit(&donor, &100, &token_id);
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
@@ -1250,10 +1249,10 @@ fn pause_prevents_deposits() {
 #[test]
 fn pause_prevents_disbursements() {
     let env = Env::default();
-    let (client, governance, donor, recipient, _, _) = setup(&env);
+    let (client, governance, donor, recipient, token_id, _) = setup(&env);
 
     env.mock_all_auths();
-    client.deposit(&donor, &500);
+    client.deposit(&donor, &500, &token_id);
     client.pause();
     env.set_auths(&[]);
 
@@ -1270,7 +1269,7 @@ fn pause_prevents_disbursements() {
 #[test]
 fn unpause_restores_functionality() {
     let env = Env::default();
-    let (client, _, donor, _, _, _) = setup(&env);
+    let (client, _, donor, _, token_id, _) = setup(&env);
 
     env.mock_all_auths();
     client.pause();
@@ -1279,7 +1278,7 @@ fn unpause_restores_functionality() {
     client.unpause();
     assert!(!client.is_paused());
 
-    client.deposit(&donor, &100);
+    client.deposit(&donor, &100, &token_id);
     assert_eq!(client.get_balance(), 100);
 }
 
@@ -1296,7 +1295,7 @@ fn full_flow_deposit_propose_vote_disburse() {
     // Step 1: Donor deposits USDC
     env.mock_all_auths();
     let rate = client.get_exchange_rate();
-    client.deposit(&donor, &1000);
+    client.deposit(&donor, &1000, &token_id);
     assert_eq!(client.get_balance(), 1000);
     assert_eq!(gov_client.balance(&donor), 1000_i128 * rate);
 
@@ -1334,14 +1333,14 @@ fn full_flow_deposit_propose_vote_disburse() {
 #[test]
 fn full_flow_multiple_donors_and_proposals() {
     let env = Env::default();
-    let (client, governance, donor1, recipient, _, _) = setup(&env);
+    let (client, governance, donor1, recipient, token_id, _) = setup(&env);
     let (milestone_titles, milestone_dates) = sample_milestones(&env);
 
     env.mock_all_auths();
     let rate = client.get_exchange_rate();
 
     // Both donors deposit (using same donor for simplicity in test)
-    client.deposit(&donor1, &1000);
+    client.deposit(&donor1, &1000, &token_id);
     assert_eq!(client.get_balance(), 1000);
     assert_eq!(client.get_donors_count(), 1);
 
@@ -1398,13 +1397,13 @@ fn full_flow_multiple_donors_and_proposals() {
 #[test]
 fn full_flow_with_pause_and_unpause() {
     let env = Env::default();
-    let (client, governance, donor, recipient, _, _) = setup(&env);
+    let (client, governance, donor, recipient, token_id, _) = setup(&env);
     let (milestone_titles, milestone_dates) = sample_milestones(&env);
 
     env.mock_all_auths();
 
     // Initial deposit
-    client.deposit(&donor, &500);
+    client.deposit(&donor, &500, &token_id);
     assert_eq!(client.get_balance(), 500);
 
     // Pause contract
@@ -1412,7 +1411,7 @@ fn full_flow_with_pause_and_unpause() {
     assert!(client.is_paused());
 
     // Verify operations fail
-    let result = client.try_deposit(&donor, &100);
+    let result = client.try_deposit(&donor, &100, &token_id);
     assert!(result.is_err());
 
     // Unpause
@@ -1456,13 +1455,13 @@ fn full_flow_with_pause_and_unpause() {
 #[test]
 fn full_flow_edge_case_exact_balance_disburse() {
     let env = Env::default();
-    let (client, governance, donor, recipient, _, _) = setup(&env);
+    let (client, governance, donor, recipient, token_id, _) = setup(&env);
     let (milestone_titles, milestone_dates) = sample_milestones(&env);
 
     env.mock_all_auths();
 
     // Deposit exact amount
-    client.deposit(&donor, &500);
+    client.deposit(&donor, &500, &token_id);
 
     // Submit proposal
     let applicant = Address::generate(&env);
@@ -1489,6 +1488,69 @@ fn full_flow_edge_case_exact_balance_disburse() {
     assert_eq!(client.get_total_disbursed(), 500);
 }
 
+// ============================================================================
+// MULTI-CURRENCY DEPOSIT TESTS
+// ============================================================================
+
+#[test]
+fn deposit_with_unsupported_asset_fails() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, _gov_client) = setup(&env);
+
+    let fake_asset = Address::generate(&env);
+    env.mock_all_auths();
+    let result = client.try_deposit(&donor, &100, &fake_asset);
+
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::UnsupportedAsset as u32
+        )))
+    );
+}
+
+#[test]
+fn add_and_deposit_eurc_asset() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, token_id, _gov_client, admin) =
+        setup_with_admin(&env);
+
+    // Register a second SAC for EURC
+    let eurc_admin = Address::generate(&env);
+    env.mock_all_auths();
+    let eurc_sac = env.register_stellar_asset_contract_v2(eurc_admin.clone());
+    let eurc_id = eurc_sac.address();
+    let eurc_client = StellarAssetClient::new(&env, &eurc_id);
+    eurc_client.mint(&donor, &1_000);
+
+    // Admin adds EURC to supported assets
+    client.add_supported_asset(&eurc_id);
+
+    let supported = client.get_supported_assets();
+    assert_eq!(supported.len(), 2);
+
+    // Donor deposits EURC
+    client.deposit(&donor, &200, &eurc_id);
+
+    // per-asset tracking works; USDC balance (TOTAL_KEY) is unaffected
+    assert_eq!(client.get_asset_deposited(&eurc_id), 200);
+    assert_eq!(client.get_asset_deposited(&token_id), 0);
+    assert_eq!(client.get_balance(), 0); // no USDC deposited
+    assert_eq!(client.get_donors_count(), 1);
+}
+
+#[test]
+fn usdc_deposit_updates_balance_and_asset_tracking() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, token_id, _gov_client) = setup(&env);
+
+    env.mock_all_auths();
+    client.deposit(&donor, &300, &token_id);
+
+    assert_eq!(client.get_balance(), 300); // TOTAL_KEY updated
+    assert_eq!(client.get_asset_deposited(&token_id), 300); // per-asset tracking
+}
+
 // --- fuzz tests ---
 
 use proptest::prelude::*;
@@ -1505,10 +1567,10 @@ proptest! {
         env.mock_all_auths();
         sac.mint(&donor, &(amount1 + amount2));
 
-        client.deposit(&donor, &amount1);
+        client.deposit(&donor, &amount1, &token_id);
         let gov_bal1 = gov_client.balance(&donor);
 
-        client.deposit(&donor, &amount2);
+        client.deposit(&donor, &amount2, &token_id);
         let gov_bal2 = gov_client.balance(&donor);
 
         // Each deposited USDC mints GOV_PER_USDC (100) governance tokens
@@ -1568,7 +1630,7 @@ mod fuzz_tests {
             // Ensure donor has sufficient balance for the randomized deposit.
             StellarAssetClient::new(&env, &token_id).mint(&donor, &amount);
 
-            client.deposit(&donor, &amount);
+            client.deposit(&donor, &amount, &token_id);
 
             assert_eq!(client.get_donor_total(&donor), amount);
             assert_eq!(client.get_balance(), amount);
@@ -1671,7 +1733,7 @@ fn finalize_proposal_before_deadline_panics() {
 }
 
 #[test]
-fn finalize_proposal_approved_when_quorum_met_and_yes_wins() {
+fn finalize_proposal_queues_when_quorum_met_and_yes_wins() {
     let env = Env::default();
     let (client, _governance, donor, _recipient, _token_id, gov_client, admin) =
         setup_with_admin(&env);
@@ -1704,11 +1766,14 @@ fn finalize_proposal_approved_when_quorum_met_and_yes_wins() {
 
     let status = client.finalize_proposal(&admin, &proposal_id);
 
-    assert_eq!(status, crate::ProposalStatus::Approved);
+    assert_eq!(status, crate::ProposalStatus::Queued);
     assert_eq!(
         client.get_finalized_status(&proposal_id),
-        Some(crate::ProposalStatus::Approved)
+        Some(crate::ProposalStatus::Queued)
     );
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    assert!(proposal.queued_at > 0);
 }
 
 #[test]
@@ -1787,16 +1852,16 @@ fn finalize_proposal_rejected_when_no_votes_win() {
 #[test]
 fn get_total_gov_issued_tracks_deposits() {
     let env = Env::default();
-    let (client, _governance, donor, _recipient, _token_id, _gov_client, _admin) =
+    let (client, _governance, donor, _recipient, token_id, _gov_client, _admin) =
         setup_with_admin(&env);
 
     env.mock_all_auths();
     assert_eq!(client.get_total_gov_issued(), 0);
 
-    client.deposit(&donor, &100);
+    client.deposit(&donor, &100, &token_id);
     assert_eq!(client.get_total_gov_issued(), 100 * 100); // GOV_PER_USDC = 100
 
-    client.deposit(&donor, &400);
+    client.deposit(&donor, &400, &token_id);
     assert_eq!(client.get_total_gov_issued(), 500 * 100);
 }
 
@@ -1817,11 +1882,12 @@ fn execute_proposal_before_deadline_panics() {
     gov_client.mint(&donor, &100);
     client.vote(&donor, &proposal_id, &true);
 
+    // Before deadline the proposal is Pending, so execute fails with NotQueued
     let result = client.try_execute_proposal(&proposal_id);
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::VotingNotClosed as u32
+            Error::NotQueued as u32
         )))
     );
 }
@@ -1829,11 +1895,12 @@ fn execute_proposal_before_deadline_panics() {
 #[test]
 fn execute_proposal_passed_disburses_and_emits_event() {
     let env = Env::default();
-    let (client, _governance, donor, _recipient, token_id, gov_client) = setup(&env);
+    let (client, _governance, donor, _recipient, token_id, gov_client, admin) =
+        setup_with_admin(&env);
     let applicant = Address::generate(&env);
 
     env.mock_all_auths();
-    client.deposit(&donor, &500);
+    client.deposit(&donor, &500, &token_id);
     client.set_quorum(&1);
     client.set_approval_bps(&5_000);
 
@@ -1846,6 +1913,14 @@ fn execute_proposal_passed_disburses_and_emits_event() {
     env.ledger()
         .set_sequence_number(proposal.deadline_ledger + 1);
 
+    // Finalize moves it to Queued
+    client.finalize_proposal(&admin, &proposal_id);
+
+    // Advance past timelock
+    let timelock = client.get_timelock_delay();
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1 + timelock);
+
     let before = token_client(&env, &token_id).balance(&applicant);
     client.execute_proposal(&proposal_id);
     let after = token_client(&env, &token_id).balance(&applicant);
@@ -1853,16 +1928,21 @@ fn execute_proposal_passed_disburses_and_emits_event() {
 
     let stored = client.get_proposal(&proposal_id).unwrap();
     assert!(stored.executed);
+    assert_eq!(
+        client.get_finalized_status(&proposal_id),
+        Some(crate::ProposalStatus::Executed)
+    );
 }
 
 #[test]
-fn execute_proposal_rejected_emits_event_and_no_disbursement() {
+fn execute_proposal_rejected_fails_with_not_queued() {
     let env = Env::default();
-    let (client, _governance, donor, _recipient, token_id, gov_client) = setup(&env);
+    let (client, _governance, donor, _recipient, _token_id, gov_client, admin) =
+        setup_with_admin(&env);
     let applicant = Address::generate(&env);
 
     env.mock_all_auths();
-    client.deposit(&donor, &500);
+    client.deposit(&donor, &500, &token_id);
     client.set_quorum(&1_000);
     client.set_approval_bps(&10_000);
 
@@ -1875,23 +1955,28 @@ fn execute_proposal_rejected_emits_event_and_no_disbursement() {
     env.ledger()
         .set_sequence_number(proposal.deadline_ledger + 1);
 
-    let before = token_client(&env, &token_id).balance(&applicant);
-    client.execute_proposal(&proposal_id);
-    let after = token_client(&env, &token_id).balance(&applicant);
-    assert_eq!(after, before);
+    // Finalize rejects the proposal (quorum not met)
+    client.finalize_proposal(&admin, &proposal_id);
 
-    let stored = client.get_proposal(&proposal_id).unwrap();
-    assert!(stored.executed);
+    // Execution fails because proposal is Rejected, not Queued
+    let result = client.try_execute_proposal(&proposal_id);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::NotQueued as u32
+        )))
+    );
 }
 
 #[test]
 fn execute_proposal_double_execute_panics() {
     let env = Env::default();
-    let (client, _governance, donor, _recipient, _token_id, gov_client) = setup(&env);
+    let (client, _governance, donor, _recipient, token_id, gov_client, admin) =
+        setup_with_admin(&env);
     let applicant = Address::generate(&env);
 
     env.mock_all_auths();
-    client.deposit(&donor, &500);
+    client.deposit(&donor, &500, &token_id);
     client.set_quorum(&1);
     client.set_approval_bps(&5_000);
     let proposal_id = submit_sample_proposal(&env, &client, &applicant, 100);
@@ -1901,6 +1986,12 @@ fn execute_proposal_double_execute_panics() {
     let proposal = client.get_proposal(&proposal_id).unwrap();
     env.ledger()
         .set_sequence_number(proposal.deadline_ledger + 1);
+
+    client.finalize_proposal(&admin, &proposal_id);
+
+    let timelock = client.get_timelock_delay();
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1 + timelock);
 
     client.execute_proposal(&proposal_id);
     let result = client.try_execute_proposal(&proposal_id);
@@ -1942,6 +2033,224 @@ fn cancel_proposal_prevents_vote_and_execute() {
         )))
     );
 }
+
+// =========================================================================
+// TIMELOCK + VETO TESTS
+// =========================================================================
+
+#[test]
+fn execute_proposal_fails_before_timelock_expires() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client, admin) =
+        setup_with_admin(&env);
+    let applicant = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.deposit(&donor, &500);
+    client.set_quorum(&1);
+    client.set_approval_bps(&5_000);
+    let proposal_id = submit_sample_proposal(&env, &client, &applicant, 100);
+
+    gov_client.mint(&donor, &100);
+    client.vote(&donor, &proposal_id, &true);
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1);
+
+    client.finalize_proposal(&admin, &proposal_id);
+
+    // Try to execute immediately after finalize (before timelock expires)
+    let result = client.try_execute_proposal(&proposal_id);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::TimelockNotExpired as u32
+        )))
+    );
+}
+
+#[test]
+fn cancel_proposal_during_queue_period() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client, admin) =
+        setup_with_admin(&env);
+
+    env.mock_all_auths();
+    let proposal_id = submit_sample_proposal(&env, &client, &donor, 100);
+    gov_client.mint(&donor, &100);
+    client.vote(&donor, &proposal_id, &true);
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1);
+
+    // Finalize to queue
+    client.finalize_proposal(&admin, &proposal_id);
+    assert_eq!(
+        client.get_finalized_status(&proposal_id),
+        Some(crate::ProposalStatus::Queued)
+    );
+
+    // Admin can cancel during queue period
+    client.cancel_proposal(&proposal_id);
+    let stored = client.get_proposal(&proposal_id).unwrap();
+    assert!(stored.cancelled);
+}
+
+#[test]
+fn veto_proposal_by_admin() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client, admin) =
+        setup_with_admin(&env);
+
+    env.mock_all_auths();
+    let proposal_id = submit_sample_proposal(&env, &client, &donor, 100);
+    gov_client.mint(&donor, &100);
+    client.vote(&donor, &proposal_id, &true);
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1);
+
+    client.finalize_proposal(&admin, &proposal_id);
+    assert_eq!(
+        client.get_finalized_status(&proposal_id),
+        Some(crate::ProposalStatus::Queued)
+    );
+
+    // Admin vetoes the queued proposal
+    client.veto_proposal(&admin, &proposal_id);
+    assert_eq!(
+        client.get_finalized_status(&proposal_id),
+        Some(crate::ProposalStatus::Rejected)
+    );
+}
+
+#[test]
+fn veto_proposal_by_supermajority() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client, admin) =
+        setup_with_admin(&env);
+    let objector = Address::generate(&env);
+
+    env.mock_all_auths();
+    // Deposit 300 USDC -> total GOV issued = 30_000
+    client.deposit(&donor, &300);
+    client.set_quorum(&1);
+    client.set_approval_bps(&5_000);
+    let proposal_id = submit_sample_proposal(&env, &client, &donor, 100);
+
+    // Donor votes yes (has 30_000 GOV)
+    client.vote(&donor, &proposal_id, &true);
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1);
+
+    client.finalize_proposal(&admin, &proposal_id);
+
+    // Objector with 20_000 GOV (2/3 of 30_000) objects
+    gov_client.mint(&objector, &20_000);
+    client.object_to_proposal(&objector, &proposal_id);
+
+    // Non-admin caller can now veto because supermajority threshold is met
+    let caller = Address::generate(&env);
+    env.mock_all_auths();
+    client.veto_proposal(&caller, &proposal_id);
+    assert_eq!(
+        client.get_finalized_status(&proposal_id),
+        Some(crate::ProposalStatus::Rejected)
+    );
+}
+
+#[test]
+fn veto_proposal_fails_without_supermajority() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client, admin) =
+        setup_with_admin(&env);
+    let objector = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.deposit(&donor, &300);
+    client.set_quorum(&1);
+    client.set_approval_bps(&5_000);
+    let proposal_id = submit_sample_proposal(&env, &client, &donor, 100);
+
+    client.vote(&donor, &proposal_id, &true);
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1);
+
+    client.finalize_proposal(&admin, &proposal_id);
+
+    // Objector with only 10_000 GOV (less than 2/3 of 30_000) objects
+    gov_client.mint(&objector, &10_000);
+    client.object_to_proposal(&objector, &proposal_id);
+
+    // Non-admin caller cannot veto because threshold not met
+    let caller = Address::generate(&env);
+    env.mock_all_auths();
+    let result = client.try_veto_proposal(&caller, &proposal_id);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::VetoNotMet as u32
+        )))
+    );
+}
+
+#[test]
+fn object_to_proposal_prevents_double_objection() {
+    let env = Env::default();
+    let (client, _governance, donor, _recipient, _token_id, gov_client, admin) =
+        setup_with_admin(&env);
+    let objector = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.deposit(&donor, &300);
+    client.set_quorum(&1);
+    client.set_approval_bps(&5_000);
+    let proposal_id = submit_sample_proposal(&env, &client, &donor, 100);
+
+    client.vote(&donor, &proposal_id, &true);
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1);
+
+    client.finalize_proposal(&admin, &proposal_id);
+
+    gov_client.mint(&objector, &5_000);
+    client.object_to_proposal(&objector, &proposal_id);
+
+    // Double objection should fail
+    let result = client.try_object_to_proposal(&objector, &proposal_id);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::AlreadyVoted as u32
+        )))
+    );
+}
+
+#[test]
+fn set_timelock_delay_and_get_timelock_delay() {
+    let env = Env::default();
+    let (client, _governance, _donor, _recipient, _token_id, _gov_client, admin) =
+        setup_with_admin(&env);
+
+    env.mock_all_auths();
+    assert_eq!(client.get_timelock_delay(), 34_560); // DAY_IN_LEDGERS * 2
+
+    client.set_timelock_delay(&admin, &10_000);
+    assert_eq!(client.get_timelock_delay(), 10_000);
+}
+
+// =========================================================================
+// UPGRADE TESTS
+// =========================================================================
 
 #[test]
 fn upgrade_requires_admin_auth() {
@@ -1985,12 +2294,12 @@ fn state_persists_after_upgrade() {
 #[test]
 fn benchmark_costs() {
     let env = Env::default();
-    let (client, _governance, donor, _recipient, _token_id, _gov_client) = setup(&env);
+    let (client, _governance, donor, _recipient, token_id, _gov_client) = setup(&env);
 
     // 1. Benchmark deposit
     env.cost_estimate().budget().reset_unlimited();
     env.mock_all_auths();
-    client.deposit(&donor, &100);
+    client.deposit(&donor, &100, &token_id);
     let dep_instr = env.cost_estimate().budget().cpu_instruction_cost();
     let dep_mem = env.cost_estimate().budget().memory_bytes_cost();
 

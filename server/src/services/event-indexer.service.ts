@@ -7,7 +7,10 @@ import {
 } from "../lib/event-config"
 import { getRpcCache, CacheKey } from "../lib/rpc-cache"
 import { leaderboardEmitter } from "../lib/leaderboard-emitter"
+import { invalidateApiResponseCacheType } from "../lib/api-response-cache"
 import { logger } from "../lib/logger"
+import { createNotification } from "../db/notifications-store"
+import { deliverNotificationChannels } from "./notification-delivery.service"
 
 const log = logger.child({ module: "indexer" })
 
@@ -58,6 +61,26 @@ function extractEventIndex(eventId: string): number | undefined {
 		}
 	}
 	return undefined
+}
+
+function affectsLeaderboard(topic: string): boolean {
+	const t = topic.toLowerCase()
+	return (
+		(t.includes("learntoken") && t.includes("mint")) ||
+		(t.includes("coursemilestone") && t.includes("milestonecomplete")) ||
+		(t.includes("scholarnft") && t.includes("minted"))
+	)
+}
+
+function affectsTreasuryStats(topic: string): boolean {
+	const t = topic.toLowerCase()
+	return (
+		(t.includes("scholarshiptreasury") &&
+			(t.includes("deposit") ||
+				t.includes("proposalcreated") ||
+				t.includes("votecastevent"))) ||
+		(t.includes("milestoneescrow") && t.includes("fundsdisbursed"))
+	)
 }
 
 /**

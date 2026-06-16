@@ -48,6 +48,10 @@ jobs:
         working-directory: server
         run: npm run migrate
 
+      - name: Validate OpenAPI spec (generate + lint + drift check)
+        working-directory: server
+        run: npm run openapi:check
+
       - name: Run tests
         working-directory: server
         run: npm test

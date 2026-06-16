@@ -22,6 +22,9 @@ const baseReturn = {
 	hasVoted: mockHasVoted,
 	getVoteChoice: vi.fn().mockReturnValue(null),
 	walletAddress: "GADDR",
+	quorum: 0n,
+	approvalBps: 0,
+	votingPeriod: 0,
 }
 
 beforeEach(() => {

@@ -1,6 +1,9 @@
 import { type Response } from "express"
 import sanitizeHtml from "sanitize-html"
-import { getPeerReviewQueue, submitPeerReview } from "../db/peer-review-store"
+import {
+	getPeerReviewQueue,
+	submitPeerReview,
+} from "../db/peer-review-store"
 import { type AuthRequest } from "../middleware/auth.middleware"
 
 export async function getPeerReviewQueueHandler(
@@ -41,10 +44,8 @@ export async function submitPeerReviewHandler(
 	const rawComment = req.body?.comment
 	const comment =
 		typeof rawComment === "string"
-			? sanitizeHtml(rawComment, {
-					allowedTags: [],
-					allowedAttributes: {},
-				}).trim() || null
+			? sanitizeHtml(rawComment, { allowedTags: [], allowedAttributes: {} })
+					.trim() || null
 			: null
 
 	const verdict = req.body?.verdict as "approve" | "reject"
@@ -72,8 +73,7 @@ export async function submitPeerReviewHandler(
 				SELF_REVIEW: "You cannot peer-review your own milestone submission",
 				SAME_COURSE:
 					"You cannot peer-review milestones for a course you are enrolled in",
-				ALREADY_REVIEWED:
-					"You have already submitted a peer review for this report",
+				ALREADY_REVIEWED: "You have already submitted a peer review for this report",
 				INSUFFICIENT_REPUTATION:
 					"Peer review requires a higher LRN balance (reputation) threshold",
 			}

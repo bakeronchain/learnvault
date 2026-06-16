@@ -9,14 +9,14 @@
 //!
 //! - Only the admin (CourseMilestone contract) can mint.
 //! - Non-transferable by design.
-//! - No burning in V1.
+//! - Holders may burn their own LRN via `burn()` to remove tokens from circulation.
 //!
 //! ## Relevant issue
 //! Implements: https://github.com/bakeronchain/learnvault/issues/5
 
 use soroban_sdk::{
-    Address, BytesN, Env, String, Symbol, contract, contracterror, contractimpl, contracttype,
-    panic_with_error, symbol_short,
+    Address, BytesN, Env, String, Symbol, contract, contracterror, contractevent, contractimpl,
+    contracttype, panic_with_error, symbol_short,
 };
 
 use learnvault_shared::upgrade;
@@ -33,15 +33,6 @@ const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30; // 30 days
 const PERSISTENT_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
 const PERSISTENT_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365; // 1 year
 
-// ---------------------------------------------------------------------------
-// Storage Constants (assuming ~6s ledger time)
-// ---------------------------------------------------------------------------
-
-const DAY_IN_LEDGERS: u32 = 17_280;
-const INSTANCE_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
-const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30; // 30 days
-const PERSISTENT_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
-const PERSISTENT_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365; // 1 year
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -61,6 +52,15 @@ pub enum LRNError {
     Soulbound = 4,
     /// Arithmetic overflow or underflow was detected.
     ArithmeticOverflow = 5,
+    /// Account balance is too low for the requested burn amount.
+    InsufficientBalance = 6,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LRNBurned {
+    pub from: Address,
+    pub amount: i128,
 }
 
 // ---------------------------------------------------------------------------
@@ -188,6 +188,54 @@ impl LearnToken {
         upgrade::apply(&env, &admin, &new_wasm_hash);
     }
 
+    /// Burn `amount` LRN from `from`, removing tokens from circulation.
+    ///
+    /// Requires authorization from `from`. Decrements both the holder balance and
+    /// total supply.
+    pub fn burn(env: Env, from: Address, amount: i128) {
+        Self::extend_instance(&env);
+        from.require_auth();
+
+        if amount <= 0 {
+            panic_with_error!(&env, LRNError::ZeroAmount);
+        }
+
+        let bal_key = DataKey::Balance(from.clone());
+        let bal: i128 = env.storage().persistent().get(&bal_key).unwrap_or(0);
+        if bal < amount {
+            panic_with_error!(&env, LRNError::InsufficientBalance);
+        }
+
+        let new_balance = Self::checked_sub_amount(&env, bal, amount);
+        env.storage().persistent().set(&bal_key, &new_balance);
+        env.storage().persistent().extend_ttl(
+            &bal_key,
+            PERSISTENT_BUMP_THRESHOLD,
+            PERSISTENT_EXTEND_TO,
+        );
+
+        let supply: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::TotalSupply)
+            .unwrap_or(0);
+        let new_supply = Self::checked_sub_amount(&env, supply, amount);
+        env.storage()
+            .persistent()
+            .set(&DataKey::TotalSupply, &new_supply);
+        env.storage().persistent().extend_ttl(
+            &DataKey::TotalSupply,
+            PERSISTENT_BUMP_THRESHOLD,
+            PERSISTENT_EXTEND_TO,
+        );
+
+        LRNBurned {
+            from: from.clone(),
+            amount,
+        }
+        .publish(&env);
+    }
+
     /// Transfer is not allowed — LRN is soulbound.
     pub fn transfer(_env: Env, _from: Address, _to: Address, _amount: i128) {
         panic_with_error!(&_env, LRNError::Soulbound);
@@ -289,6 +337,11 @@ impl LearnToken {
 
     fn checked_add_amount(env: &Env, left: i128, right: i128) -> i128 {
         left.checked_add(right)
+            .unwrap_or_else(|| panic_with_error!(env, LRNError::ArithmeticOverflow))
+    }
+
+    fn checked_sub_amount(env: &Env, left: i128, right: i128) -> i128 {
+        left.checked_sub(right)
             .unwrap_or_else(|| panic_with_error!(env, LRNError::ArithmeticOverflow))
     }
 }

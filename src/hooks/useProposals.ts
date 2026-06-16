@@ -3,7 +3,11 @@ import { useWallet } from "./useWallet"
 
 const API_BASE = import.meta.env.VITE_SERVER_URL ?? "http://localhost:4000"
 
-export type BackendProposalStatus = "pending" | "approved" | "rejected"
+export type BackendProposalStatus =
+	| "pending"
+	| "approved"
+	| "queued"
+	| "rejected"
 
 export interface ProposalRecord {
 	id: number
@@ -15,10 +19,29 @@ export interface ProposalRecord {
 	votesAgainst: bigint
 	status: BackendProposalStatus
 	deadline: string | null
+	queuedAt: string | null
+	executionReadyAt: string | null
 	createdAt: string | null
 	userVoteSupport: boolean | null
 	isVotingOpen: boolean
-	displayStatus: "Voting Open" | "Voting Closed" | "Passed" | "Rejected"
+	displayStatus:
+		| "Voting Open"
+		| "Voting Closed"
+		| "Queued"
+		| "Passed"
+		| "Rejected"
+}
+
+export interface ProposalVoteRecord {
+	voterAddress: string
+	support: boolean
+	weight: bigint
+}
+
+export interface ProposalVoteRecord {
+	voterAddress: string
+	support: boolean
+	weight: bigint
 }
 
 export interface CreateProposalInput {
@@ -45,6 +68,8 @@ interface ProposalApiRow {
 	votes_against: number | string
 	status: BackendProposalStatus
 	deadline: string | null
+	queued_at: string | null
+	execution_ready_at: string | null
 	created_at: string | null
 	user_vote_support: boolean | null
 }
@@ -70,6 +95,7 @@ export const getProposalDisplayStatus = (proposal: {
 	status: BackendProposalStatus
 	deadline: string | null
 }) => {
+	if (proposal.status === "queued") return "Queued" as const
 	if (proposal.status === "approved") return "Passed" as const
 	if (proposal.status === "rejected") return "Rejected" as const
 	return isVotingOpen(proposal.status, proposal.deadline)
@@ -92,6 +118,8 @@ export const mapProposal = (row: ProposalApiRow): ProposalRecord => {
 		votesAgainst: parseBigInt(row.votes_against),
 		status: row.status,
 		deadline,
+		queuedAt: row.queued_at ?? null,
+		executionReadyAt: row.execution_ready_at ?? null,
 		createdAt: row.created_at ?? null,
 		userVoteSupport:
 			typeof row.user_vote_support === "boolean" ? row.user_vote_support : null,
@@ -160,6 +188,40 @@ async function fetchVotingPower(address?: string): Promise<bigint> {
 	)
 	const data = await readJson<{ gov_balance: string }>(response)
 	return parseBigInt(data.gov_balance)
+}
+
+async function fetchProposalVotes(
+	proposalId: number,
+): Promise<{ votes: ProposalVoteRecord[]; unavailable: boolean }> {
+	const response = await fetch(`${API_BASE}/api/proposals/${proposalId}/votes`)
+	if (response.status === 404) {
+		return { votes: [], unavailable: true }
+	}
+	const data = await readJson<
+		| Array<{
+				voter_address?: string
+				support?: boolean
+				weight?: string | number
+		  }>
+		| {
+				votes?: Array<{
+					voter_address?: string
+					support?: boolean
+					weight?: string | number
+				}>
+		  }
+	>(response)
+	const rows = Array.isArray(data) ? data : (data.votes ?? [])
+	return {
+		votes: rows
+			.map((row) => ({
+				voterAddress: String(row.voter_address ?? ""),
+				support: Boolean(row.support),
+				weight: parseBigInt(row.weight),
+			}))
+			.filter((row) => row.voterAddress.length > 0),
+		unavailable: false,
+	}
 }
 
 export function useProposals() {
@@ -302,6 +364,15 @@ export function useProposal(proposalId: number | null) {
 		queryKey: ["proposal", proposalId, address],
 		queryFn: () => fetchProposal(proposalId as number, address),
 		enabled: proposalId !== null,
+		staleTime: 60 * 1000,
+	})
+}
+
+export function useProposalVotes(proposalId: number | null, enabled = true) {
+	return useQuery({
+		queryKey: ["proposal", proposalId, "votes"],
+		queryFn: () => fetchProposalVotes(proposalId as number),
+		enabled: proposalId !== null && enabled,
 		staleTime: 60 * 1000,
 	})
 }

@@ -1,3 +1,4 @@
+/// <reference path="./types.d.ts" />
 import path from "node:path"
 
 import swaggerJSDoc from "swagger-jsdoc"
@@ -17,7 +18,7 @@ export const buildOpenApiSpec = () => {
 			},
 			servers: [
 				{
-					url: "http://localhost:4000",
+					url: "http://localhost:4000/api/v1",
 					description: "Local development server",
 				},
 			],
@@ -62,13 +63,104 @@ export const buildOpenApiSpec = () => {
 						},
 						required: ["error"],
 					},
+					ZodIssue: {
+						type: "object",
+						required: ["code", "path", "message"],
+						properties: {
+							code: { type: "string", example: "invalid_type" },
+							path: {
+								type: "array",
+								items: { oneOf: [{ type: "string" }, { type: "integer" }] },
+								example: ["walletAddress"],
+							},
+							message: { type: "string", example: "Required" },
+						},
+					},
+					ValidationErrorResponse: {
+						type: "object",
+						required: ["errors"],
+						properties: {
+							errors: {
+								type: "array",
+								items: { $ref: "#/components/schemas/ZodIssue" },
+							},
+						},
+					},
 					HealthResponse: {
 						type: "object",
 						properties: {
-							status: { type: "string", example: "ok" },
+							status: {
+								type: "string",
+								enum: ["healthy", "degraded", "unhealthy"],
+								example: "healthy",
+							},
+							db: {
+								type: "string",
+								enum: ["connected", "disconnected"],
+							},
+							uptime: { type: "number", format: "float" },
 							timestamp: { type: "string", format: "date-time" },
+							version: { type: "string" },
+							commitHash: { type: "string" },
+							dbPool: {
+								type: "object",
+								properties: {
+									totalConnections: { type: "integer", nullable: true },
+									idleConnections: { type: "integer", nullable: true },
+									waitingClients: { type: "integer", nullable: true },
+								},
+								required: [
+									"totalConnections",
+									"idleConnections",
+									"waitingClients",
+								],
+							},
+							checks: {
+								type: "object",
+								properties: {
+									database: {
+										type: "object",
+										properties: {
+											status: { type: "string" },
+											responseTimeMs: { type: "integer", nullable: true },
+											error: { type: "string" },
+										},
+										required: ["status", "responseTimeMs"],
+									},
+									redis: {
+										type: "object",
+										properties: {
+											status: { type: "string" },
+											responseTimeMs: { type: "integer", nullable: true },
+											error: { type: "string" },
+											details: { type: "string" },
+										},
+										required: ["status", "responseTimeMs"],
+									},
+									stellarHorizon: {
+										type: "object",
+										properties: {
+											status: { type: "string" },
+											responseTimeMs: { type: "integer", nullable: true },
+											url: { type: "string" },
+											error: { type: "string" },
+										},
+										required: ["status", "responseTimeMs", "url"],
+									},
+								},
+								required: ["database", "redis", "stellarHorizon"],
+							},
 						},
-						required: ["status", "timestamp"],
+						required: [
+							"status",
+							"db",
+							"uptime",
+							"timestamp",
+							"version",
+							"commitHash",
+							"dbPool",
+							"checks",
+						],
 					},
 					Course: {
 						type: "object",
@@ -124,7 +216,7 @@ export const buildOpenApiSpec = () => {
 							votes_against: { type: "integer" },
 							status: {
 								type: "string",
-								enum: ["pending", "approved", "rejected"],
+								enum: ["pending", "approved", "queued", "rejected"],
 							},
 							cancelled: { type: "boolean" },
 							deadline: { type: "string", format: "date-time" },
@@ -347,14 +439,51 @@ export const buildOpenApiSpec = () => {
 							"revoked",
 						],
 					},
+					CourseImportRow: {
+						type: "object",
+						properties: {
+							title: { type: "string" },
+							slug: { type: "string" },
+							track: { type: "string" },
+							difficulty: { type: "string" },
+							description: { type: "string", nullable: true },
+							coverImage: { type: "string", nullable: true },
+							published: { type: "boolean" },
+						},
+						required: ["title", "slug", "track", "difficulty"],
+					},
+					UserProfile: {
+						type: "object",
+						properties: {
+							address: { type: "string" },
+							display_name: { type: "string", nullable: true },
+							bio: { type: "string", nullable: true },
+							avatar_url: { type: "string", nullable: true },
+							twitter: { type: "string", nullable: true },
+							github: { type: "string", nullable: true },
+							website: { type: "string", nullable: true },
+							created_at: { type: "string", format: "date-time" },
+							updated_at: { type: "string", format: "date-time" },
+						},
+						required: ["address"],
+					},
+					ProfileStats: {
+						type: "object",
+						properties: {
+							lrn_balance: { type: "string" },
+							enrolled_courses: { type: "array", items: { type: "string" } },
+							completed_milestones: { type: "integer" },
+							pending_milestones: { type: "integer" },
+						},
+					},
 				},
 				responses: {
 					BadRequestError: {
-						description: "Bad request",
+						description: "Bad request — validation failed",
 						content: {
 							"application/json": {
 								schema: {
-									$ref: "#/components/schemas/ErrorResponse",
+									$ref: "#/components/schemas/ValidationErrorResponse",
 								},
 							},
 						},

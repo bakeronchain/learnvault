@@ -1,6 +1,7 @@
 import { type Request, type Response } from "express"
 import sanitizeHtml from "sanitize-html"
 import { pool } from "../db"
+import { invalidateApiResponseCacheType } from "../lib/api-response-cache"
 
 type CourseRow = {
 	id: number
@@ -14,6 +15,9 @@ type CourseRow = {
 	created_at: string
 	updated_at: string
 	students_count: number
+	prerequisites?: number[]
+	avg_rating: string | null
+	review_count: number
 }
 
 type LessonRow = {
@@ -48,6 +52,12 @@ const toCourse = (row: CourseRow) => ({
 	createdAt: row.created_at,
 	updatedAt: row.updated_at,
 	studentsCount: Number(row.students_count ?? 0),
+	prerequisites: row.prerequisites ?? [],
+	avgRating:
+		row.avg_rating !== null && row.avg_rating !== undefined
+			? Number(row.avg_rating)
+			: null,
+	reviewCount: Number(row.review_count ?? 0),
 })
 
 const toLesson = (row: LessonRow) => ({
@@ -173,10 +183,7 @@ export const getCourses = async (
 			if (!difficultyValues.has(difficulty)) {
 				res.status(200).json({
 					data: [],
-					page,
-					limit,
-					total: 0,
-					totalPages: 0,
+					pagination: { page, limit, total: 0 },
 				})
 				return
 			}
@@ -187,9 +194,11 @@ export const getCourses = async (
 		const whereClause =
 			conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
 
+		// Snapshot filter params so COUNT is not affected when LIMIT/OFFSET are appended.
+		const countParams = [...params]
 		const totalResult = (await pool.query(
 			`SELECT COUNT(*) AS count FROM courses c ${whereClause}`,
-			params,
+			countParams,
 		)) as { rows: Array<{ count: string }> }
 		const total = Number.parseInt(totalResult.rows[0]?.count ?? "0", 10)
 		const totalPages = total === 0 ? 0 : Math.ceil(total / limit)
@@ -208,11 +217,15 @@ export const getCourses = async (
 				c.published_at,
 				c.created_at,
 				c.updated_at,
-				COUNT(DISTINCT e.learner_address)::int AS students_count
+				c.prerequisites,
+				COUNT(DISTINCT e.learner_address)::int AS students_count,
+				ROUND(AVG(cr.rating), 1) AS avg_rating,
+				COUNT(DISTINCT cr.id)::int AS review_count
 			 FROM courses c
 			 LEFT JOIN enrollments e ON e.course_id = c.slug
+			 LEFT JOIN course_reviews cr ON cr.course_id = c.id
 			 ${whereClause}
-			 GROUP BY c.id, c.slug, c.title, c.description, c.cover_image_url, c.track, c.difficulty, c.published_at, c.created_at, c.updated_at
+			 GROUP BY c.id, c.slug, c.title, c.description, c.cover_image_url, c.track, c.difficulty, c.published_at, c.created_at, c.updated_at, c.prerequisites
 			 ORDER BY c.created_at DESC
 			 LIMIT $${params.length - 1} OFFSET $${params.length}`,
 			params,
@@ -220,10 +233,7 @@ export const getCourses = async (
 
 		res.status(200).json({
 			data: rowsResult.rows.map(toCourse),
-			page,
-			limit,
-			total,
-			totalPages,
+			pagination: { page, limit, total },
 		})
 	} catch {
 		res.status(500).json({ error: "Internal server error" })
@@ -236,13 +246,23 @@ export const getCourse = async (req: Request, res: Response): Promise<void> => {
 		const isNumericId = /^\d+$/.test(idOrSlug)
 
 		const query = isNumericId
-			? `SELECT id, slug, title, description, cover_image_url, track, difficulty, published_at, created_at, updated_at
-			   FROM courses
-			   WHERE id = $1 AND published_at IS NOT NULL
+			? `SELECT c.id, c.slug, c.title, c.description, c.cover_image_url, c.track, c.difficulty, c.published_at, c.created_at, c.updated_at,
+			          c.prerequisites, 0 AS students_count,
+			          ROUND(AVG(cr.rating), 1) AS avg_rating,
+			          COUNT(cr.id)::int AS review_count
+			   FROM courses c
+			   LEFT JOIN course_reviews cr ON cr.course_id = c.id
+			   WHERE c.id = $1 AND c.published_at IS NOT NULL
+			   GROUP BY c.id
 			   LIMIT 1`
-			: `SELECT id, slug, title, description, cover_image_url, track, difficulty, published_at, created_at, updated_at
-			   FROM courses
-			   WHERE slug = $1 AND published_at IS NOT NULL
+			: `SELECT c.id, c.slug, c.title, c.description, c.cover_image_url, c.track, c.difficulty, c.published_at, c.created_at, c.updated_at,
+			          c.prerequisites, 0 AS students_count,
+			          ROUND(AVG(cr.rating), 1) AS avg_rating,
+			          COUNT(cr.id)::int AS review_count
+			   FROM courses c
+			   LEFT JOIN course_reviews cr ON cr.course_id = c.id
+			   WHERE c.slug = $1 AND c.published_at IS NOT NULL
+			   GROUP BY c.id
 			   LIMIT 1`
 
 		const courseResult = (await pool.query(query, [
@@ -405,6 +425,8 @@ export const getCourseLessonById = async (
 			return
 		}
 
+		// Invalidate cached /api/courses responses after content changes.
+		void invalidateApiResponseCacheType("courses")
 		res.status(200).json(toLesson(lesson))
 	} catch {
 		res.status(500).json({ error: "Internal server error" })
@@ -789,6 +811,7 @@ export const createCourse = async (
 			coverImage?: unknown
 			track?: unknown
 			difficulty?: unknown
+			prerequisites?: unknown
 		}
 
 		for (const field of ["title", "slug", "track", "difficulty"] as const) {
@@ -833,10 +856,32 @@ export const createCourse = async (
 			return
 		}
 
+		let prerequisites: number[] = []
+		if ("prerequisites" in body) {
+			const reqPrereqs = body.prerequisites
+			if (!Array.isArray(reqPrereqs)) {
+				res.status(400).json({ error: "prerequisites must be an array of course IDs", field: "prerequisites" })
+				return
+			}
+			if (reqPrereqs.some((item) => typeof item !== "number" || !Number.isInteger(item))) {
+				res.status(400).json({ error: "prerequisites must be an array of integers", field: "prerequisites" })
+				return
+			}
+			if (reqPrereqs.length > 0) {
+				const uniqueIds = Array.from(new Set(reqPrereqs))
+				const check = await pool.query("SELECT id FROM courses WHERE id = ANY($1::integer[])", [uniqueIds])
+				if (check.rows.length !== uniqueIds.length) {
+					res.status(400).json({ error: "One or more prerequisite course IDs do not exist", field: "prerequisites" })
+					return
+				}
+				prerequisites = reqPrereqs
+			}
+		}
+
 		const insert = (await pool.query(
-			`INSERT INTO courses (title, slug, description, cover_image_url, track, difficulty, published_at)
-			 VALUES ($1, $2, $3, $4, $5, $6, NULL)
-			 RETURNING id, slug, title, description, cover_image_url, track, difficulty, published_at, created_at, updated_at`,
+			`INSERT INTO courses (title, slug, description, cover_image_url, track, difficulty, published_at, prerequisites)
+			 VALUES ($1, $2, $3, $4, $5, $6, NULL, $7)
+			 RETURNING id, slug, title, description, cover_image_url, track, difficulty, published_at, created_at, updated_at, prerequisites`,
 			[
 				title,
 				String(body.slug).trim(),
@@ -844,9 +889,12 @@ export const createCourse = async (
 				typeof body.coverImage === "string" ? body.coverImage : null,
 				String(body.track).trim(),
 				difficulty,
+				prerequisites,
 			],
 		)) as { rows: CourseRow[] }
 
+		// Invalidate cached /api/courses responses after content changes.
+		void invalidateApiResponseCacheType("courses")
 		res.status(201).json(toCourse(insert.rows[0]))
 	} catch (error) {
 		if (typeof error === "object" && error && "code" in error) {
@@ -942,6 +990,30 @@ export const updateCourse = async (
 				setClauses.push(`published_at = NULL`)
 			}
 		}
+		if ("prerequisites" in body) {
+			const reqPrereqs = body.prerequisites
+			if (!Array.isArray(reqPrereqs)) {
+				res.status(400).json({ error: "prerequisites must be an array of course IDs", field: "prerequisites" })
+				return
+			}
+			if (reqPrereqs.some((item) => typeof item !== "number" || !Number.isInteger(item))) {
+				res.status(400).json({ error: "prerequisites must be an array of integers", field: "prerequisites" })
+				return
+			}
+			if (reqPrereqs.includes(id)) {
+				res.status(400).json({ error: "A course cannot be a prerequisite of itself", field: "prerequisites" })
+				return
+			}
+			if (reqPrereqs.length > 0) {
+				const uniqueIds = Array.from(new Set(reqPrereqs))
+				const check = await pool.query("SELECT id FROM courses WHERE id = ANY($1::integer[])", [uniqueIds])
+				if (check.rows.length !== uniqueIds.length) {
+					res.status(400).json({ error: "One or more prerequisite course IDs do not exist", field: "prerequisites" })
+					return
+				}
+			}
+			addField("prerequisites", reqPrereqs)
+		}
 
 		if (setClauses.length === 0) {
 			res.status(400).json({ error: "No valid fields provided" })
@@ -953,10 +1025,12 @@ export const updateCourse = async (
 			`UPDATE courses
 			 SET ${setClauses.join(", ")}
 			 WHERE id = $${values.length}
-			 RETURNING id, slug, title, description, cover_image_url, track, difficulty, published_at, created_at, updated_at`,
+			 RETURNING id, slug, title, description, cover_image_url, track, difficulty, published_at, created_at, updated_at, prerequisites`,
 			values,
 		)) as { rows: CourseRow[] }
 
+		// Invalidate cached /api/courses responses after content changes.
+		void invalidateApiResponseCacheType("courses")
 		res.status(200).json(toCourse(result.rows[0]))
 	} catch (error) {
 		if (typeof error === "object" && error && "code" in error) {

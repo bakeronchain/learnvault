@@ -9,6 +9,8 @@ import {
 	useForumThreadDetail,
 } from "../../hooks/useForum"
 import { WalletAddressPill } from "../WalletAddressPill"
+import { EmptyState as StateEmpty } from "../states/emptyState"
+import { connectWallet } from "../../util/wallet"
 
 interface ThreadDetailProps {
 	courseId: string
@@ -29,6 +31,7 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 		courseId,
 		threadId,
 	)
+
 	const queryClient = useQueryClient()
 	const [replyContent, setReplyContent] = useState("")
 	const [isSubmitting, setIsSubmitting] = useState(false)
@@ -40,12 +43,15 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 		try {
 			setIsSubmitting(true)
 			await replyToThread(courseId, threadId, replyContent)
+
 			await queryClient.invalidateQueries({
 				queryKey: ["forum", "thread", courseId, threadId],
 			})
+
 			await queryClient.invalidateQueries({
 				queryKey: ["forum", "threads", courseId],
 			})
+
 			setReplyContent("")
 		} catch (err) {
 			console.error("Failed to post reply", err)
@@ -56,11 +62,14 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 
 	const handleDeleteThread = async () => {
 		if (!confirm("Are you sure you want to delete this thread?")) return
+
 		try {
 			await deleteThread(courseId, threadId)
+
 			await queryClient.invalidateQueries({
 				queryKey: ["forum", "threads", courseId],
 			})
+
 			onBack()
 		} catch (err) {
 			console.error("Failed to delete thread", err)
@@ -69,8 +78,10 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 
 	const handleDeleteReply = async (replyId: number) => {
 		if (!confirm("Are you sure you want to delete this reply?")) return
+
 		try {
 			await deleteReply(courseId, replyId)
+
 			await queryClient.invalidateQueries({
 				queryKey: ["forum", "thread", courseId, threadId],
 			})
@@ -80,7 +91,11 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 	}
 
 	if (isLoading) {
-		return <div className="text-white/60 animate-pulse">Loading discussion...</div>
+		return (
+			<div className="text-white/60 animate-pulse">
+				Loading discussion...
+			</div>
+		)
 	}
 
 	if (error || !thread) {
@@ -89,6 +104,7 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 				<Button variant="secondary" size="sm" onClick={onBack}>
 					← Back to Discussions
 				</Button>
+
 				<div className="text-red-400 bg-red-400/10 p-4 rounded-xl border border-red-400/20">
 					Thread not found or failed to load.
 				</div>
@@ -108,7 +124,9 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 				</button>
 
 				<div className="flex justify-between items-start gap-4 mb-6">
-					<h2 className="text-3xl font-bold text-white">{thread.title}</h2>
+					<h2 className="text-3xl font-bold text-white">
+						{thread.title}
+					</h2>
 
 					{(isAdmin || currentAddress === thread.author_address) && (
 						<button
@@ -138,9 +156,24 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 				</h3>
 
 				{thread.replies?.length === 0 ? (
-					<div className="text-white/40 text-center py-6 glass-card rounded-2xl">
-						No replies yet.
-					</div>
+					<StateEmpty
+						icon="💬"
+						title="No replies yet"
+						description="Be the first to reply to this discussion."
+						ctaLabel={currentAddress ? "Add a reply" : "Connect Wallet"}
+						onCtaClick={async () => {
+							if (currentAddress) {
+								const el =
+									document.querySelector<HTMLTextAreaElement>(
+										"textarea[placeholder*='Type your response']",
+									)
+
+								el?.focus()
+							} else {
+								await connectWallet()
+							}
+						}}
+					/>
 				) : (
 					<div className="space-y-4">
 						{thread.replies.map((reply) => (
@@ -150,18 +183,26 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 							>
 								<div className="flex justify-between items-start">
 									<div className="flex items-center gap-3 text-xs text-white/50">
-										<WalletAddressPill address={reply.author_address} />
+										<WalletAddressPill
+											address={reply.author_address}
+										/>
 										<span>•</span>
 										<span>
-											{new Date(reply.created_at).toLocaleString()}
+											{new Date(
+												reply.created_at,
+											).toLocaleString()}
 										</span>
 									</div>
 
-									{(isAdmin || currentAddress === reply.author_address) && (
+									{(isAdmin ||
+										currentAddress ===
+											reply.author_address) && (
 										<button
 											type="button"
 											className="text-white/30 hover:text-red-400 transition-colors px-2 py-1"
-											onClick={() => handleDeleteReply(reply.id)}
+											onClick={() =>
+												handleDeleteReply(reply.id)
+											}
 											title="Delete reply"
 											aria-label="Delete reply"
 										>
@@ -171,7 +212,9 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 								</div>
 
 								<div className="prose prose-sm prose-invert max-w-none text-white/70">
-									<ReactMarkdown>{reply.content}</ReactMarkdown>
+									<ReactMarkdown>
+										{reply.content}
+									</ReactMarkdown>
 								</div>
 							</div>
 						))}
@@ -187,7 +230,9 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 						<textarea
 							placeholder="Type your response here (Markdown supported)..."
 							value={replyContent}
-							onChange={(e) => setReplyContent(e.target.value)}
+							onChange={(e) =>
+								setReplyContent(e.target.value)
+							}
 							rows={4}
 							className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:outline-hidden focus:border-brand-cyan transition-colors font-mono text-sm"
 						/>
@@ -197,7 +242,9 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 								variant="primary"
 								size="sm"
 								onClick={handleReply}
-								disabled={isSubmitting || !replyContent.trim()}
+								disabled={
+									isSubmitting || !replyContent.trim()
+								}
 							>
 								{isSubmitting ? "Posting..." : "Post Reply"}
 							</Button>
@@ -213,4 +260,5 @@ export const ThreadDetail: React.FC<ThreadDetailProps> = ({
 			)}
 		</div>
 	)
+}
 }

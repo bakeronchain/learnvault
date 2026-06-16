@@ -17,10 +17,16 @@ import {
 	requireCourseAdmin,
 	requireCourseAdminIfRequested,
 } from "../middleware/course-admin.middleware"
+import { apiResponseCache } from "../middleware/api-response-cache.middleware"
 
 export const coursesRouter = Router()
 
-coursesRouter.get("/courses", requireCourseAdminIfRequested, getCourses)
+coursesRouter.get(
+	"/courses",
+	requireCourseAdminIfRequested,
+	apiResponseCache("courses"),
+	getCourses,
+)
 coursesRouter.get("/courses/:idOrSlug", getCourse)
 coursesRouter.get("/courses/:idOrSlug/lessons/:id", getCourseLessonById)
 

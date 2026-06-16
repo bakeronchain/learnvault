@@ -29,6 +29,7 @@ export interface ScholarshipTreasuryContract {
 	) => Promise<string>
 	deposit: (
 		amount: string,
+		assetContractId: string,
 		signTransaction: WalletSignTransaction,
 	) => Promise<string>
 	getGovernanceTokenBalance: (address: string) => Promise<number>
@@ -150,6 +151,7 @@ export class ScholarshipTreasury implements ScholarshipTreasuryContract {
 
 	async deposit(
 		amount: string,
+		assetContractId: string,
 		signTransaction: WalletSignTransaction,
 	): Promise<string> {
 		if (!this.address) {
@@ -160,6 +162,10 @@ export class ScholarshipTreasury implements ScholarshipTreasuryContract {
 			throw new Error(
 				"Scholarship treasury contract is not configured for this environment",
 			)
+		}
+
+		if (!assetContractId) {
+			throw new Error("Asset contract address is required")
 		}
 
 		if (typeof signTransaction !== "function") {
@@ -179,6 +185,7 @@ export class ScholarshipTreasury implements ScholarshipTreasuryContract {
 				"deposit",
 				nativeToScVal(this.address, { type: "address" }),
 				nativeToScVal(atomicAmount, { type: "i128" }),
+				nativeToScVal(assetContractId, { type: "address" }),
 			)
 
 			const transaction = new TransactionBuilder(sourceAccount, {

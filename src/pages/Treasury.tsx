@@ -209,7 +209,7 @@ const Treasury: React.FC = () => {
 	return (
 		<div
 			aria-busy={isLoading}
-			className="p-12 max-w-7xl mx-auto min-h-screen text-white animate-in fade-in duration-1000"
+			className="p-6 md:p-12 max-w-7xl mx-auto min-h-screen text-white animate-in fade-in duration-1000"
 		>
 			<Helmet>
 				<title>{title}</title>

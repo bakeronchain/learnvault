@@ -6,7 +6,7 @@ interface EmptyStateProps {
 
 export const EmptyState: React.FC<EmptyStateProps> = ({ onBecomeDonor }) => {
 	return (
-		<div className="min-h-screen flex items-center justify-center p-12">
+		<div className="min-h-screen flex items-center justify-center p-6 md:p-12">
 			<div className="text-center max-w-2xl">
 				<div className="mb-12">
 					<div className="inline-block mb-8">

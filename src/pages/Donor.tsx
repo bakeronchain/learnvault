@@ -11,7 +11,8 @@ import { useWallet } from "../hooks/useWallet"
 
 const Donor: React.FC = () => {
 	const { address } = useWallet()
-	const { stats, impact, contributions, votes, scholars, isLoading, error } = useDonor()
+	const { stats, impact, contributions, votes, scholars, isLoading, error } =
+		useDonor()
 	const { balance: usdcBalance, isLoading: usdcLoading } = useUSDC(address)
 	const [showDepositForm, setShowDepositForm] = useState(false)
 	const hasActivity =
@@ -25,7 +26,7 @@ const Donor: React.FC = () => {
 		return (
 			<div className="p-8 md:p-12 max-w-6xl mx-auto text-white animate-in fade-in duration-700">
 				<header className="text-center mb-16">
-					<h1 className="text-6xl font-black mb-4 tracking-tighter text-gradient">
+					<h1 className="text-4xl sm:text-6xl font-black mb-4 tracking-tighter text-gradient">
 						Donor Dashboard
 					</h1>
 					<p className="text-white/40 text-lg font-medium max-w-2xl mx-auto">
@@ -113,12 +114,12 @@ const Donor: React.FC = () => {
 	}
 
 	return (
-		<div className="p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
+		<div className="p-6 md:p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
 			{/* Header */}
 			<header className="mb-20 relative">
 				<div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-brand-cyan/20 blur-[100px] rounded-full -z-10" />
 				<div className="mb-8">
-					<h1 className="text-6xl font-black mb-4 tracking-tighter text-gradient">
+					<h1 className="text-4xl sm:text-6xl font-black mb-4 tracking-tighter text-gradient">
 						Donor Dashboard
 					</h1>
 					<p className="text-white/40 text-lg max-w-2xl font-medium">
@@ -165,7 +166,9 @@ const Donor: React.FC = () => {
 			{/* Impact Statistics Section */}
 			{impact && (
 				<section className="mb-20">
-					<h2 className="text-3xl font-black mb-8 text-gradient">Your Impact</h2>
+					<h2 className="text-3xl font-black mb-8 text-gradient">
+						Your Impact
+					</h2>
 					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
 						<ImpactCard
 							title="Total Donated"
@@ -242,7 +245,12 @@ interface ImpactCardProps {
 	description: string
 }
 
-const ImpactCard: React.FC<ImpactCardProps> = ({ title, value, icon, description }) => {
+const ImpactCard: React.FC<ImpactCardProps> = ({
+	title,
+	value,
+	icon,
+	description,
+}) => {
 	return (
 		<div className="glass-card p-6 rounded-2xl border border-white/5 group hover:border-white/20 transition-all">
 			<div className="flex items-start justify-between mb-4">

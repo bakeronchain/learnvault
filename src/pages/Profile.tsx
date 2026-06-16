@@ -246,7 +246,7 @@ const Profile: React.FC = () => {
 
 	if (isProfileLoading || isLoading) {
 		return (
-			<div className="p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
+			<div className="p-6 md:p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
 				<ProfileSkeleton />
 			</div>
 		)
@@ -254,7 +254,7 @@ const Profile: React.FC = () => {
 
 	if (profileError || error) {
 		return (
-			<div className="p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
+			<div className="p-6 md:p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
 				<ErrorState
 					message={(profileError as any)?.message || error}
 					onRetry={fetchCredentials}
@@ -264,7 +264,7 @@ const Profile: React.FC = () => {
 	}
 
 	return (
-		<div className="p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
+		<div className="p-6 md:p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
 			<Helmet>
 				<title>{title}</title>
 				<meta property="og:title" content={title} />
@@ -277,7 +277,7 @@ const Profile: React.FC = () => {
 				<meta name="twitter:card" content="summary_large_image" />
 			</Helmet>
 
-			<header className="glass-card mb-20 p-12 rounded-[3.5rem] flex flex-col md:flex-row items-center gap-12 relative overflow-hidden group">
+			<header className="glass-card mb-12 md:mb-20 p-6 sm:p-8 md:p-12 rounded-[3.5rem] flex flex-col md:flex-row items-center gap-8 md:gap-12 relative overflow-hidden group">
 				<div className="absolute top-0 right-0 w-64 h-64 bg-brand-cyan/10 blur-[100px] rounded-full -z-10 group-hover:bg-brand-purple/10 transition-colors duration-1000"></div>
 				<div className="iridescent-border p-1 rounded-full shadow-2xl shadow-brand-cyan/20">
 					{userProfile?.avatarUrl ? (

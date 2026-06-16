@@ -172,7 +172,7 @@ export default function NavBar() {
 					<button
 						type="button"
 						onClick={() => setMenuOpen((current) => !current)}
-						className="md:hidden w-10 h-10 glass flex items-center justify-center rounded-xl text-slate-700 dark:text-white/70 hover:text-black dark:hover:text-white transition-colors border border-white/10"
+						className="md:hidden touch-target w-11 h-11 glass flex items-center justify-center rounded-xl text-slate-700 dark:text-white/70 hover:text-black dark:hover:text-white transition-colors border border-white/10"
 						aria-controls={mobileMenuId}
 						aria-expanded={menuOpen}
 						aria-label={
@@ -220,7 +220,7 @@ export default function NavBar() {
 						<button
 							type="button"
 							onClick={closeMenu}
-							className="w-9 h-9 rounded-xl border border-white/10 text-slate-700 dark:text-white/70 hover:text-black dark:hover:text-white hover:border-white/20"
+							className="touch-target w-11 h-11 rounded-xl border border-white/10 text-slate-700 dark:text-white/70 hover:text-black dark:hover:text-white hover:border-white/20"
 							aria-label="Close mobile navigation menu"
 						>
 							×

@@ -87,7 +87,7 @@ const Home: React.FC = () => {
 				<div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-brand-purple/10 blur-[160px] rounded-full" />
 			</div>
 
-			<div className="w-full max-w-6xl mx-auto px-6 sm:px-8 flex flex-col gap-24 pb-32">
+			<div className="w-full max-w-6xl mx-auto px-4 sm:px-8 flex flex-col gap-16 sm:gap-24 pb-24 sm:pb-32">
 				{/* ── HERO ─────────────────────────────────────────────────────── */}
 				<section className="text-center pt-12 pb-4 flex flex-col items-center gap-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
 					{/* Logo mark */}
@@ -129,10 +129,13 @@ const Home: React.FC = () => {
 				</section>
 
 				{/* ── STATS BAR ────────────────────────────────────────────────── */}
-				<div className="glass-card rounded-2xl border border-white/8 px-8 py-6 animate-in fade-in duration-700 delay-200">
-					<div className="flex flex-wrap justify-around gap-6 text-center divide-x divide-white/10">
+				<div className="glass-card rounded-2xl border border-white/8 px-4 sm:px-8 py-6 animate-in fade-in duration-700 delay-200">
+					<div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
 						{STATS.map(({ label, value }) => (
-							<div key={label} className="flex-1 min-w-[100px] px-4">
+							<div
+								key={label}
+								className="px-2 sm:px-4 sm:border-r sm:border-white/10 last:sm:border-r-0"
+							>
 								<p className="text-3xl font-black text-brand-cyan">{value}</p>
 								<p className="text-xs text-white/40 uppercase tracking-widest mt-1">
 									{label}

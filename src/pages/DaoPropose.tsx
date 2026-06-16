@@ -616,7 +616,7 @@ const DaoPropose: React.FC = () => {
 					isDestructive
 				/>
 			)}
-			<div className="p-12 max-w-4xl mx-auto">
+			<div className="p-6 md:p-12 max-w-4xl mx-auto">
 				<header className="mb-12">
 					<div className="flex items-center gap-4 mb-4">
 						<h1 className="text-6xl font-black tracking-tighter text-gradient">

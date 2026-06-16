@@ -74,7 +74,7 @@ export default function Dao() {
 	return (
 		<div className="p-8 md:p-12 max-w-5xl mx-auto text-white animate-in fade-in duration-700">
 			<header className="text-center mb-16">
-				<h1 className="text-6xl font-black mb-4 tracking-tighter text-gradient">
+				<h1 className="text-4xl sm:text-6xl font-black mb-4 tracking-tighter text-gradient">
 					DAO Governance
 				</h1>
 				<p className="text-white/40 text-lg font-medium max-w-2xl mx-auto">

@@ -53,6 +53,7 @@ import { createMilestoneAppealRouter } from "./routes/milestone-appeal.routes"
 import { healthRouter } from "./routes/health.routes"
 import { impactRouter } from "./routes/impact.routes"
 import { leaderboardRouter } from "./routes/leaderboard.routes"
+import { lrnRouter } from "./routes/lrn.routes"
 import { createMeRouter } from "./routes/me.routes"
 import { mentorshipRouter } from "./routes/mentorship.routes"
 import { moderationRouter } from "./routes/moderation.routes"
@@ -208,6 +209,7 @@ app.use("/api", createCommentsRouter(jwtService))
 app.use("/api", createPeerReviewRouter(jwtService))
 app.use("/api", leaderboardRouter)
 app.use("/api", governanceRouter)
+app.use("/api", lrnRouter)
 app.use("/api", treasuryRouter)
 app.use("/api", wikiRouter)
 app.use("/api", adminRouter)

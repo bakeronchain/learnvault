@@ -1,43 +1,20 @@
-import { Pool } from "pg"
+import { Pool, type PoolConfig } from "pg"
 
 import { logger } from "../lib/logger"
 import { poolMonitor } from "../services/pool-monitor.service"
+import { resolvePoolEnvConfig } from "./pool-config"
 
 const log = logger.child({ module: "db" })
 
-// Environment-specific pool configuration
-const getPoolConfig = () => {
+export const getPoolConfig = (): PoolConfig => {
 	const isProduction = process.env.NODE_ENV === "production"
 	const isDevelopment = process.env.NODE_ENV === "development"
-
-	// Recommended pool sizes per environment
-	const poolSizes = {
-		production: {
-			max: 20,
-			min: 4,
-			idleTimeoutMillis: 30000,
-			connectionTimeoutMillis: 5000,
-		},
-		staging: {
-			max: 15,
-			min: 2,
-			idleTimeoutMillis: 30000,
-			connectionTimeoutMillis: 5000,
-		},
-		development: {
-			max: 5,
-			min: 1,
-			idleTimeoutMillis: 30000,
-			connectionTimeoutMillis: 5000,
-		},
-	}
-
 	const env = isProduction
 		? "production"
 		: isDevelopment
 			? "development"
 			: "staging"
-	const config = poolSizes[env as keyof typeof poolSizes]
+	const config = resolvePoolEnvConfig()
 
 	return {
 		connectionString: process.env.DATABASE_URL,
@@ -77,8 +54,10 @@ try {
 		"Pool configured",
 	)
 
-	// Initialize pool monitoring
 	if (activePool instanceof Pool) {
+		activePool.on("error", (err) => {
+			log.error({ err }, "Unexpected error on idle database pool client")
+		})
 		poolMonitor.initializeMonitor(activePool)
 	}
 } catch (err) {

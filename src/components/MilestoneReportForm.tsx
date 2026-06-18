@@ -81,17 +81,17 @@ export default function MilestoneReportForm({
 	}
 
 	return (
-		<div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-xl">
+		<div className="rounded-[2rem] border border-white/10 bg-white/5 p-4 sm:p-6 shadow-xl backdrop-blur-xl">
 			<Card>
-				<form className="space-y-6" onSubmit={handleSubmit}>
+				<form className="space-y-5 sm:space-y-6" onSubmit={handleSubmit}>
 					<div className="space-y-2">
-						<p className="text-xs font-black uppercase tracking-[0.3em] text-brand-cyan/70">
+						<p className="text-[10px] sm:text-xs font-black uppercase tracking-[0.3em] text-brand-cyan/70">
 							Scholar milestone reporting
 						</p>
-						<h2 className="text-2xl font-black tracking-tight text-white">
+						<h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
 							Submit a milestone completion report
 						</h2>
-						<p className="text-sm text-white/65">
+						<p className="text-xs sm:text-sm text-white/65 leading-relaxed">
 							Send the validator committee the course, milestone, and evidence
 							for the work you completed.
 						</p>
@@ -107,7 +107,7 @@ export default function MilestoneReportForm({
 					) : null}
 
 					<div className="grid gap-4 md:grid-cols-2">
-						<label className="space-y-2 text-sm text-white/80">
+						<label className="space-y-2 text-xs sm:text-sm text-white/80">
 							<span className="font-semibold text-white">Course ID</span>
 							<input
 								value={values.courseId}
@@ -115,11 +115,11 @@ export default function MilestoneReportForm({
 									updateValue("courseId", event.target.value)
 								}
 								placeholder="stellar-basics"
-								className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none transition focus:border-brand-cyan/50"
+								className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 min-h-[48px] text-white outline-none transition focus:border-brand-cyan/50"
 							/>
 						</label>
 
-						<label className="space-y-2 text-sm text-white/80">
+						<label className="space-y-2 text-xs sm:text-sm text-white/80">
 							<span className="font-semibold text-white">Milestone number</span>
 							<input
 								value={values.milestoneId}
@@ -128,26 +128,26 @@ export default function MilestoneReportForm({
 								}
 								inputMode="numeric"
 								placeholder="1"
-								className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none transition focus:border-brand-cyan/50"
+								className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 min-h-[48px] text-white outline-none transition focus:border-brand-cyan/50"
 							/>
 						</label>
 					</div>
 
-					<label className="block space-y-2 text-sm text-white/80">
+					<label className="block space-y-2 text-xs sm:text-sm text-white/80">
 						<span className="font-semibold text-white">Milestone notes</span>
 						<textarea
 							value={values.evidenceDescription}
 							onChange={(event) =>
 								updateValue("evidenceDescription", event.target.value)
 							}
-							rows={5}
+							rows={4}
 							placeholder="Describe what you built, tested, or shipped for this milestone."
 							className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none transition focus:border-brand-cyan/50"
 						/>
 					</label>
 
 					<div className="grid gap-4 md:grid-cols-2">
-						<label className="space-y-2 text-sm text-white/80">
+						<label className="space-y-2 text-xs sm:text-sm text-white/80">
 							<span className="font-semibold text-white">
 								GitHub evidence link
 							</span>
@@ -158,11 +158,11 @@ export default function MilestoneReportForm({
 								}
 								type="url"
 								placeholder="https://github.com/..."
-								className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none transition focus:border-brand-cyan/50"
+								className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 min-h-[48px] text-white outline-none transition focus:border-brand-cyan/50"
 							/>
 						</label>
 
-						<label className="space-y-2 text-sm text-white/80">
+						<label className="space-y-2 text-xs sm:text-sm text-white/80">
 							<span className="font-semibold text-white">IPFS CID</span>
 							<input
 								value={values.evidenceIpfsCid}
@@ -170,19 +170,19 @@ export default function MilestoneReportForm({
 									updateValue("evidenceIpfsCid", event.target.value)
 								}
 								placeholder="bafy..."
-								className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none transition focus:border-brand-cyan/50"
+								className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 min-h-[48px] text-white outline-none transition focus:border-brand-cyan/50"
 							/>
 						</label>
 					</div>
 
-					<label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/10 px-4 py-4 text-sm text-white/75">
+					<label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/10 px-3 sm:px-4 py-4 text-xs sm:text-sm text-white/75">
 						<input
 							type="checkbox"
 							checked={values.acceptedTerms}
 							onChange={(event) =>
 								updateValue("acceptedTerms", event.target.checked)
 							}
-							className="mt-1"
+							className="mt-1 shrink-0"
 						/>
 						<span>
 							I certify that this submission accurately represents my completed
@@ -195,6 +195,7 @@ export default function MilestoneReportForm({
 							type="submit"
 							variant="primary"
 							size="md"
+							isFullWidth
 							disabled={isSubmitting}
 						>
 							{isSubmitting ? "Submitting..." : "Submit report"}

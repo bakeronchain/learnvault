@@ -7,6 +7,8 @@ import {
 	useState,
 	useTransition,
 } from "react"
+import { MobileSigningModal } from "../components/MobileSigningModal"
+import { useIsMobile } from "../hooks/useIsMobile"
 import { logoutSession } from "../lib/auth"
 import storage from "../util/storage"
 import { type MappedBalances } from "../util/wallet"
@@ -74,6 +76,9 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 	const [isReconnecting, setIsReconnecting] = useState(true)
 	const [isPending, startTransition] = useTransition()
 	const popupLock = useRef(false)
+	const isMobile = useIsMobile()
+	const [mobileSigningXdr, setMobileSigningXdr] = useState<string | null>(null)
+	const mobileSigningResolver = useRef<((value: { signedTxXdr: string; signerAddress?: string }) => void) | null>(null)
 
 	const nullify = (shouldLogout = false) => {
 		const hadWalletSession = Boolean(
@@ -210,6 +215,39 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 		}
 	}, []) // eslint-disable-line react-hooks/exhaustive-deps -- it SHOULD only run once per component mount
 
+	const handleMobileOpenWallet = useCallback(() => {
+		const xdr = mobileSigningXdr
+		if (!xdr) return
+		const walletUrl = `freighter://sign?xdr=${encodeURIComponent(xdr)}`
+		window.open(walletUrl, "_blank")
+	}, [mobileSigningXdr])
+
+	const handleMobileCopyXdr = useCallback(() => {
+		const xdr = mobileSigningXdr
+		if (!xdr) return
+		navigator.clipboard.writeText(xdr).catch(() => {})
+	}, [mobileSigningXdr])
+
+	const handleMobileSigningClose = useCallback(() => {
+		setMobileSigningXdr(null)
+		mobileSigningResolver.current?.({ signedTxXdr: "" })
+		mobileSigningResolver.current = null
+	}, [])
+
+	const signTransactionMobile: WalletSignTransaction = useCallback(
+		async (xdr, opts) => {
+			return new Promise<{ signedTxXdr: string; signerAddress?: string }>(
+				(resolve) => {
+					mobileSigningResolver.current = resolve
+					setMobileSigningXdr(xdr)
+				},
+			)
+		},
+		[],
+	)
+
+	const activeSignTransaction = isMobile ? signTransactionMobile : signTransaction
+
 	const contextValue = useMemo(
 		() => ({
 			address,
@@ -219,7 +257,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 			updateBalances,
 			isPending,
 			isReconnecting,
-			signTransaction,
+			signTransaction: activeSignTransaction,
 		}),
 		[
 			address,
@@ -229,8 +267,19 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 			updateBalances,
 			isPending,
 			isReconnecting,
+			activeSignTransaction,
 		],
 	)
 
-	return <WalletContext value={contextValue}>{children}</WalletContext>
+	return (
+		<>
+			<WalletContext value={contextValue}>{children}</WalletContext>
+			<MobileSigningModal
+				isOpen={mobileSigningXdr !== null}
+				onClose={handleMobileSigningClose}
+				onOpenWallet={handleMobileOpenWallet}
+				onCopyXdr={handleMobileCopyXdr}
+			/>
+		</>
+	)
 }

@@ -5,6 +5,14 @@ import dotenv from "dotenv"
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") })
 
 // Initialize Sentry FIRST before any other imports that might throw
+import express from "express"
+import helmet from "helmet"
+import morgan from "morgan"
+import swaggerUi from "swagger-ui-express"
+import YAML from "yaml"
+import { z } from "zod"
+import { allowedOrigins } from "./config/cors-config"
+import { initDb } from "./db/index"
 import { initSentry, sentryRequestHandler } from "./lib/sentry"
 
 initSentry({
@@ -16,14 +24,7 @@ initSentry({
 })
 
 import cors from "cors"
-import express from "express"
-import helmet from "helmet"
-import morgan from "morgan"
-import swaggerUi from "swagger-ui-express"
-import YAML from "yaml"
-import { z } from "zod"
 
-import { initDb } from "./db/index"
 import { createNonceStore } from "./db/nonce-store"
 import { createTokenStore } from "./db/token-store"
 import { setupConsoleRequestTracing } from "./lib/request-context"
@@ -45,9 +46,9 @@ import { governanceRouter } from "./routes/governance.routes"
 import { healthRouter } from "./routes/health.routes"
 import { leaderboardRouter } from "./routes/leaderboard.routes"
 import { createMeRouter } from "./routes/me.routes"
-import { createPeerReviewRouter } from "./routes/peer-review.routes"
 import { moderationRouter } from "./routes/moderation.routes"
 import { notificationsRouter } from "./routes/notifications.routes"
+import { createPeerReviewRouter } from "./routes/peer-review.routes"
 import { scholarsRouter } from "./routes/scholars.routes"
 import { scholarshipsRouter } from "./routes/scholarships.routes"
 import { treasuryRouter } from "./routes/treasury.routes"
@@ -73,15 +74,16 @@ const envSchema = z.object({
 	REDIS_URL: z.string().optional(),
 	JWT_PRIVATE_KEY: z.string().optional(),
 	JWT_PUBLIC_KEY: z.string().optional(),
+	// When "true" the CSP is sent as Content-Security-Policy-Report-Only so
+	// violations are logged but not blocked. Enabled automatically in staging
+	// (NODE_ENV=staging) and can be forced with CSP_REPORT_ONLY=true.
+	CSP_REPORT_ONLY: z.string().optional(),
 })
 
 const env = envSchema.parse(process.env)
 setupConsoleRequestTracing()
 
 const isProduction = env.NODE_ENV === "production"
-
-import { allowedOrigins } from "./config/cors-config"
-
 
 let jwtPrivateKey = env.JWT_PRIVATE_KEY
 let jwtPublicKey = env.JWT_PUBLIC_KEY
@@ -121,22 +123,88 @@ const openApiYaml = YAML.stringify(openApiSpec)
 app.set("trust proxy", 1)
 app.use(requestLogger)
 app.use(sentryRequestHandler)
+// ---------------------------------------------------------------------------
+// Content Security Policy
+// ---------------------------------------------------------------------------
+// Directives are intentionally explicit (no wildcard *) to maintain a strong
+// XSS posture while allowing the Freighter wallet extension, Stellar/Soroban
+// RPC endpoints, Sentry error reporting, Google Fonts, and IPFS gateways.
+//
+// Freighter injects its API via window.freighterApi from a chrome-extension://
+// content script — no additional script-src origin is required for that.
+// The extension communicates with the host page through window postMessage and
+// does NOT load remote scripts from our origin, so script-src stays tight.
+//
+// Sentry (@sentry/react / @sentry/node) sends events to ingest.sentry.io via
+// fetch() — that origin must appear in connect-src.
+// ---------------------------------------------------------------------------
+
+const CSP_SENTRY_INGEST = "https://o0.ingest.sentry.io"
+// Covers all Sentry ingest sub-accounts (o<id>.ingest.sentry.io).
+// Tighten to your exact DSN hostname in production if desired.
+const CSP_SENTRY_INGEST_WILDCARD = "https://*.ingest.sentry.io"
+const CSP_SENTRY_CDN = "https://browser.sentry-cdn.com"
+
+const isStaging = env.NODE_ENV === "staging"
+
 app.use(
 	helmet({
 		contentSecurityPolicy: {
 			directives: {
 				defaultSrc: ["'self'"],
-				scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+				// Freighter injects via content script — no extra origin needed here.
+				// cdn.jsdelivr.net is used by swagger-ui in non-production.
+				scriptSrc: [
+					"'self'",
+					"'unsafe-inline'",
+					"https://cdn.jsdelivr.net",
+					CSP_SENTRY_CDN,
+				],
+				// Allowed fetch / XHR / WebSocket destinations:
+				//   - self (our own API)
+				//   - Stellar Horizon (mainnet + testnet)
+				//   - Soroban RPC (testnet + mainnet public)
+				//   - IPFS gateways
+				//   - Sentry ingest (error reporting)
+				//   - Google Fonts metadata (CSS @font-face src)
 				connectSrc: [
 					"'self'",
+					// Stellar Horizon
 					"https://horizon-testnet.stellar.org",
 					"https://horizon.stellar.org",
-					"https://ipfs.io",
+					// Soroban RPC
+					"https://soroban-testnet.stellar.org",
+					"https://rpc-mainnet.stellar.org",
+					// Broader *.stellar.org catch-all kept for SDK discovery
 					"https://*.stellar.org",
+					// IPFS
+					"https://ipfs.io",
+					"https://gateway.pinata.cloud",
+					"https://*.mypinata.cloud",
+					// Sentry error reporting
+					CSP_SENTRY_INGEST,
+					CSP_SENTRY_INGEST_WILDCARD,
+					// Google Fonts (font-face descriptors loaded as JSON by some browsers)
+					"https://fonts.googleapis.com",
 				],
-				imgSrc: ["'self'", "data:", "https://ipfs.io"],
+				imgSrc: [
+					"'self'",
+					"data:",
+					"https://ipfs.io",
+					"https://gateway.pinata.cloud",
+					"https://*.mypinata.cloud",
+				],
+				// Google Fonts stylesheet
+				styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+				// Google Fonts binary font files
+				fontSrc: ["'self'", "https://fonts.gstatic.com"],
+				// Disallow framing entirely (clickjacking prevention)
+				frameAncestors: ["'none'"],
 				upgradeInsecureRequests: [],
 			},
+			// In staging: use Report-Only so violations are logged before the
+			// stricter policy ships to production. CSP_REPORT_ONLY=true enables this.
+			reportOnly: isStaging || process.env.CSP_REPORT_ONLY === "true",
 		},
 		xContentTypeOptions: true,
 		hsts: true,

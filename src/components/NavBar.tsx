@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query"
-import { useEffect, useId, useState, useCallback } from "react"
+import { useCallback, useEffect, useId, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { NavLink } from "react-router-dom"
 import { fetchCourses } from "../hooks/useCourses"
@@ -11,7 +11,10 @@ import {
 } from "../hooks/useTreasury"
 import { useWallet } from "../hooks/useWallet"
 import { fetchHistory } from "../pages/History"
+import { getAuthToken } from "../util/auth"
 import GlobalSearch from "./GlobalSearch"
+import { LanguageSelector } from "./LanguageSelector"
+import NetworkIndicator from "./NetworkIndicator"
 import { NotificationBell } from "./NotificationBell"
 import { ReputationBadge } from "./ReputationBadge"
 import { ThemeToggle } from "./ThemeToggle"
@@ -21,8 +24,6 @@ export default function NavBar() {
 	const [menuOpen, setMenuOpen] = useState(false)
 	const mobileMenuId = useId()
 	const { t } = useTranslation()
-	const token = localStorage.getItem("auth_token") ?? undefined
-
 	useEffect(() => {
 		if (typeof document === "undefined") return
 		const previousOverflow = document.body.style.overflow
@@ -33,14 +34,18 @@ export default function NavBar() {
 	}, [menuOpen])
 
 	const navLinks = [
+		{ to: "/dashboard", label: t("nav.dashboard") },
 		{ to: "/courses", label: t("nav.learn") },
+		{ to: "/tracks", label: "Tracks" },
 		{ to: "/peer-review", label: "Peer review" },
 		{ to: "/dao", label: t("nav.dao") },
 		{ to: "/community", label: "Community" },
 		{ to: "/leaderboard", label: t("nav.leaderboard") },
+		{ to: "/impact", label: "Impact" },
 		{ to: "/history", label: "Activity" },
 		{ to: "/wiki", label: t("nav.docs") },
 		{ to: "/donor", label: "Donor" },
+		{ to: "/sponsor", label: "Sponsor" },
 		{ to: "/treasury", label: t("nav.treasury") },
 	]
 
@@ -61,6 +66,7 @@ export default function NavBar() {
 
 	const queryClient = useQueryClient()
 	const { address } = useWallet()
+	const token = getAuthToken()
 
 	const handlePrefetch = useCallback(
 		(to: string) => {
@@ -78,8 +84,8 @@ export default function NavBar() {
 				})
 			} else if (to === "/leaderboard") {
 				void queryClient.prefetchQuery({
-					queryKey: ["leaderboard", address],
-					queryFn: () => fetchLeaderboard(address),
+					queryKey: ["leaderboard", address, 1, 10],
+					queryFn: () => fetchLeaderboard(address, 1, 10),
 					staleTime: 300 * 1000,
 				})
 			} else if (to === "/history" && address) {
@@ -128,6 +134,7 @@ export default function NavBar() {
 						<NavLink
 							key={to}
 							to={to}
+							id={to === "/courses" ? "courses-nav-link" : undefined}
 							onMouseEnter={() => handlePrefetch(to)}
 							className={({ isActive }) =>
 								`px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
@@ -146,7 +153,13 @@ export default function NavBar() {
 					<div className="hidden lg:block">
 						<GlobalSearch />
 					</div>
+					<div className="hidden md:flex items-center">
+						<LanguageSelector />
+					</div>
 					<ThemeToggle />
+					<div className="hidden xl:block">
+						<NetworkIndicator />
+					</div>
 
 					<ReputationBadge
 						className="hidden lg:inline-flex shrink-0"
@@ -154,13 +167,32 @@ export default function NavBar() {
 						showBalance
 					/>
 					<NotificationBell token={token} />
+					<NavLink
+						to="/settings/notifications"
+						aria-label="Notification settings"
+						className="hidden sm:inline-flex min-h-10 min-w-10 items-center justify-center rounded-xl border border-white/10 text-white/70 hover:text-white transition-colors"
+					>
+						<svg
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="2"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+							className="h-4 w-4"
+							aria-hidden="true"
+						>
+							<circle cx="12" cy="12" r="3" />
+							<path d="M19.4 15a1.7 1.7 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-.4-1.1 1.7 1.7 0 0 0-1-.6 1.7 1.7 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H2.8a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.1-.4 1.7 1.7 0 0 0 .6-1 1.7 1.7 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V2.8a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 .4 1.1 1.7 1.7 0 0 0 1 .6 1.7 1.7 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.27.31.49.67.6 1.1h.1a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-.6 1z" />
+						</svg>
+					</NavLink>
 					<div className="hidden md:block scale-90 [&_button]:dark:text-black [&_button]:dark:bg-white">
 						<WalletButton />
 					</div>
 					<button
 						type="button"
 						onClick={() => setMenuOpen((current) => !current)}
-						className="md:hidden w-10 h-10 glass flex items-center justify-center rounded-xl text-slate-700 dark:text-white/70 hover:text-black dark:hover:text-white transition-colors border border-white/10"
+						className="md:hidden touch-target w-11 h-11 glass flex items-center justify-center rounded-xl text-slate-700 dark:text-white/70 hover:text-black dark:hover:text-white transition-colors border border-white/10"
 						aria-controls={mobileMenuId}
 						aria-expanded={menuOpen}
 						aria-label={
@@ -208,7 +240,7 @@ export default function NavBar() {
 						<button
 							type="button"
 							onClick={closeMenu}
-							className="w-9 h-9 rounded-xl border border-white/10 text-slate-700 dark:text-white/70 hover:text-black dark:hover:text-white hover:border-white/20"
+							className="touch-target w-11 h-11 rounded-xl border border-white/10 text-slate-700 dark:text-white/70 hover:text-black dark:hover:text-white hover:border-white/20"
 							aria-label="Close mobile navigation menu"
 						>
 							×
@@ -218,6 +250,18 @@ export default function NavBar() {
 					<ReputationBadge className="w-full" size="sm" showBalance />
 					<div className="w-full [&_button]:dark:text-black [&_button]:dark:bg-white">
 						<WalletButton />
+					</div>
+					<div className="w-full flex justify-center py-2">
+						<NetworkIndicator showLabel />
+					</div>
+
+					<div className="h-px bg-slate-200 dark:bg-white/10 my-1" />
+
+					<div className="flex items-center justify-between">
+						<span className="text-xs font-black uppercase tracking-[0.25em] text-slate-500 dark:text-white/40">
+							Language
+						</span>
+						<LanguageSelector />
 					</div>
 
 					<div className="h-px bg-slate-200 dark:bg-white/10 my-1" />

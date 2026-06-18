@@ -49,18 +49,14 @@ jobs:
         run: npm run migrate
         working-directory: server
 
+      - name: Validate OpenAPI spec (generate + lint + drift check)
+        run: npm run openapi:check
+        working-directory: server
+
       - name: Verify migrations (apply, idempotency, rollback)
         run: npm run migrate:verify
         working-directory: server
 
-      - name: Run tests with coverage
+      - name: Run tests
         run: npm run test:coverage
         working-directory: server
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./server/coverage/lcov.info
-          flags: backend
-          fail_ci_if_error: true

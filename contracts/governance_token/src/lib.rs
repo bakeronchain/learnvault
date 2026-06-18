@@ -8,7 +8,7 @@
 //!
 //! - Only the admin (treasury contract) can mint.
 //! - Fully transferable — unlike LearnToken (LRN).
-//! - No burning in V1.
+//! - Governance proposals enforce a mandatory execution timelock after passing.
 //!
 //! ## Relevant issue
 //! Implements: https://github.com/bakeronchain/learnvault/issues/11
@@ -32,6 +32,11 @@ const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30; // 30 days
 const PERSISTENT_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
 const PERSISTENT_EXTEND_TO: u32 = DAY_IN_LEDGERS * 365; // 1 year
 
+/// Default timelock before a passed proposal may be executed (48 hours).
+pub const TIMELOCK_PERIOD: u64 = 172_800;
+
+const TIMELOCK_KEY: Symbol = symbol_short!("TLOCK");
+
 // ---------------------------------------------------------------------------
 // Errors
 // ---------------------------------------------------------------------------
@@ -54,6 +59,20 @@ pub enum GOVError {
     AllowanceExpired = 6,
     /// Contract is paused; all state-mutating calls are blocked.
     ContractPaused = 7,
+    /// Amount is outside the supported range for this operation.
+    InvalidAmount = 8,
+    /// Arithmetic overflow or underflow was detected.
+    ArithmeticOverflow = 9,
+    /// Proposal execution attempted before the timelock expires.
+    TimelockActive = 10,
+    /// Proposal does not exist.
+    ProposalNotFound = 11,
+    /// Proposal has not passed and cannot be executed.
+    ProposalNotPassed = 12,
+    /// Proposal has already been executed.
+    ProposalAlreadyExecuted = 13,
+    /// Proposal with this id already exists.
+    ProposalAlreadyExists = 14,
 }
 
 // ---------------------------------------------------------------------------
@@ -73,6 +92,15 @@ pub enum DataKey {
     TotalSupply,
     Delegate(Address),
     DelegatedAmount(Address),
+    Proposal(u32),
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GovernanceProposal {
+    pub passed: bool,
+    pub executed: bool,
+    pub execution_not_before: u64,
 }
 
 #[contractevent]
@@ -116,21 +144,6 @@ pub struct GOVApproved {
     pub amount: i128,
 }
 
-/// Emitted when a token holder changes their delegation to a new address.
-#[contractevent]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DelegateChanged {
-    pub delegator: Address,
-    pub delegatee: Address,
-}
-
-/// Emitted when a token holder removes their delegation entirely.
-#[contractevent]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DelegateRemoved {
-    pub delegator: Address,
-}
-
 // ---------------------------------------------------------------------------
 // Contract
 // ---------------------------------------------------------------------------
@@ -143,10 +156,12 @@ impl GovernanceToken {
     /// Initialise the contract. Can only be called once.
     ///
     /// Sets name = "LearnVault Governance", symbol = "GOV", decimals = 7.
-    pub fn initialize(env: Env, admin: Address) {
+    /// `timelock_period` defaults to [`TIMELOCK_PERIOD`] when zero.
+    pub fn initialize(env: Env, admin: Address, timelock_period: u64) {
         if env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(&env, GOVError::Unauthorized);
         }
+        admin.require_auth();
         env.storage().instance().set(&ADMIN_KEY, &admin);
         upgrade::init(&env);
         env.storage()
@@ -154,8 +169,14 @@ impl GovernanceToken {
             .set(&NAME_KEY, &String::from_str(&env, "LearnVault Governance"));
         env.storage()
             .instance()
-            .set(&SYMBOL_KEY, &String::from_str(&env, "GOV"));
+            .set(&SYMBOL_KEY, &symbol_short!("GOV"));
         env.storage().instance().set(&DECIMALS_KEY, &7_u32);
+        let period = if timelock_period == 0 {
+            TIMELOCK_PERIOD
+        } else {
+            timelock_period
+        };
+        env.storage().instance().set(&TIMELOCK_KEY, &period);
 
         Self::extend_instance(&env);
     }
@@ -181,16 +202,16 @@ impl GovernanceToken {
 
         let key = DataKey::Balance(to.clone());
         let bal: i128 = env.storage().persistent().get(&key).unwrap_or(0);
-        env.storage().persistent().set(&key, &(bal + amount));
+        let new_balance = Self::checked_add_amount(&env, bal, amount);
+        env.storage().persistent().set(&key, &new_balance);
         Self::extend_persistent(&env, &key);
 
         // Update delegated amount for 'to's delegate
         if let Some(delegate) = Self::get_delegate(env.clone(), to.clone()) {
             let del_key = DataKey::DelegatedAmount(delegate.clone());
             let del_bal: i128 = env.storage().persistent().get(&del_key).unwrap_or(0);
-            env.storage()
-                .persistent()
-                .set(&del_key, &(del_bal + amount));
+            let new_delegated = Self::checked_add_amount(&env, del_bal, amount);
+            env.storage().persistent().set(&del_key, &new_delegated);
         }
 
         let supply: i128 = env
@@ -198,9 +219,10 @@ impl GovernanceToken {
             .instance()
             .get(&DataKey::TotalSupply)
             .unwrap_or(0);
+        let new_supply = Self::checked_add_amount(&env, supply, amount);
         env.storage()
             .instance()
-            .set(&DataKey::TotalSupply, &(supply + amount));
+            .set(&DataKey::TotalSupply, &new_supply);
 
         GOVMinted { to, amount }.publish(&env);
     }
@@ -220,9 +242,10 @@ impl GovernanceToken {
             .instance()
             .get(&DataKey::TotalSupply)
             .unwrap_or(0);
+        let new_supply = Self::checked_sub_amount(&env, supply, amount);
         env.storage()
             .instance()
-            .set(&DataKey::TotalSupply, &(supply - amount));
+            .set(&DataKey::TotalSupply, &new_supply);
         GOVBurned { from, amount }.publish(&env);
     }
 
@@ -246,9 +269,10 @@ impl GovernanceToken {
             .instance()
             .get(&DataKey::TotalSupply)
             .unwrap_or(0);
+        let new_supply = Self::checked_sub_amount(&env, supply, amount);
         env.storage()
             .instance()
-            .set(&DataKey::TotalSupply, &(supply - amount));
+            .set(&DataKey::TotalSupply, &new_supply);
         GOVBurned { from, amount }.publish(&env);
     }
 
@@ -347,6 +371,9 @@ impl GovernanceToken {
     ) {
         Self::assert_not_paused(&env);
         owner.require_auth();
+        if amount < 0 {
+            panic_with_error!(&env, GOVError::InvalidAmount);
+        }
         let current_ledger = env.ledger().sequence();
         if expiration_ledger < current_ledger {
             panic_with_error!(&env, GOVError::InvalidExpiration);
@@ -368,6 +395,8 @@ impl GovernanceToken {
 
     /// Transfer `amount` from `from` to `to` using `spender`'s allowance.
     pub fn transfer_from(env: Env, spender: Address, from: Address, to: Address, amount: i128) {
+        Self::assert_not_paused(&env);
+        Self::extend_instance(&env);
         spender.require_auth();
         if amount <= 0 {
             panic_with_error!(&env, GOVError::ZeroAmount);
@@ -386,7 +415,7 @@ impl GovernanceToken {
             panic_with_error!(&env, GOVError::InsufficientFunds);
         }
 
-        let remaining = allowance - amount;
+        let remaining = Self::checked_sub_amount(&env, allowance, amount);
         if remaining == 0 {
             env.storage().persistent().remove(&allow_key);
         } else {
@@ -407,6 +436,7 @@ impl GovernanceToken {
     // -----------------------------------------------------------------------
 
     pub fn delegate(env: Env, delegator: Address, delegatee: Address) {
+        Self::assert_not_paused(&env);
         delegator.require_auth();
 
         let old_delegate = Self::get_delegate(env.clone(), delegator.clone());
@@ -420,32 +450,29 @@ impl GovernanceToken {
         if let Some(old) = old_delegate {
             let key = DataKey::DelegatedAmount(old);
             let current: i128 = env.storage().persistent().get(&key).unwrap_or(0);
-            env.storage().persistent().set(&key, &(current - bal));
+            let new_amount = Self::checked_sub_amount(&env, current, bal);
+            env.storage().persistent().set(&key, &new_amount);
         }
 
         // Add to new delegate
         if delegator != delegatee {
             let key = DataKey::DelegatedAmount(delegatee.clone());
             let current: i128 = env.storage().persistent().get(&key).unwrap_or(0);
-            env.storage().persistent().set(&key, &(current + bal));
+            let new_amount = Self::checked_add_amount(&env, current, bal);
+            env.storage().persistent().set(&key, &new_amount);
             env.storage()
                 .persistent()
-                .set(&DataKey::Delegate(delegator.clone()), &delegatee.clone());
-            DelegateChanged {
-                delegator,
-                delegatee,
-            }
-            .publish(&env);
+                .set(&DataKey::Delegate(delegator), &delegatee);
         } else {
             // Delegating to self is same as undelegating
             env.storage()
                 .persistent()
-                .remove(&DataKey::Delegate(delegator.clone()));
-            DelegateRemoved { delegator }.publish(&env);
+                .remove(&DataKey::Delegate(delegator));
         }
     }
 
     pub fn undelegate(env: Env, delegator: Address) {
+        Self::assert_not_paused(&env);
         delegator.require_auth();
 
         let old_delegate = Self::get_delegate(env.clone(), delegator.clone());
@@ -453,12 +480,12 @@ impl GovernanceToken {
             let bal = Self::balance(env.clone(), delegator.clone());
             let key = DataKey::DelegatedAmount(old);
             let current: i128 = env.storage().persistent().get(&key).unwrap_or(0);
-            env.storage().persistent().set(&key, &(current - bal));
+            let new_amount = Self::checked_sub_amount(&env, current, bal);
+            env.storage().persistent().set(&key, &new_amount);
 
             env.storage()
                 .persistent()
-                .remove(&DataKey::Delegate(delegator.clone()));
-            DelegateRemoved { delegator }.publish(&env);
+                .remove(&DataKey::Delegate(delegator));
         }
     }
 
@@ -482,7 +509,7 @@ impl GovernanceToken {
             .persistent()
             .get(&DataKey::DelegatedAmount(address))
             .unwrap_or(0);
-        bal + delegated
+        Self::checked_add_amount(&env, bal, delegated)
     }
 
     pub fn balance(env: Env, account: Address) -> i128 {
@@ -538,6 +565,104 @@ impl GovernanceToken {
     }
 
     // -----------------------------------------------------------------------
+    // Governance proposal timelock
+    // -----------------------------------------------------------------------
+
+    pub fn get_timelock_period(env: Env) -> u64 {
+        env.storage()
+            .instance()
+            .get(&TIMELOCK_KEY)
+            .unwrap_or(TIMELOCK_PERIOD)
+    }
+
+    pub fn create_proposal(env: Env, admin: Address, proposal_id: u32) {
+        Self::extend_instance(&env);
+        let stored_admin: Address = env
+            .storage()
+            .instance()
+            .get(&ADMIN_KEY)
+            .unwrap_or_else(|| panic_with_error!(&env, GOVError::NotInitialized));
+        if admin != stored_admin {
+            panic_with_error!(&env, GOVError::Unauthorized);
+        }
+        admin.require_auth();
+
+        let key = DataKey::Proposal(proposal_id);
+        if env.storage().persistent().has(&key) {
+            panic_with_error!(&env, GOVError::ProposalAlreadyExists);
+        }
+
+        let proposal = GovernanceProposal {
+            passed: false,
+            executed: false,
+            execution_not_before: 0,
+        };
+        env.storage().persistent().set(&key, &proposal);
+        Self::extend_persistent(&env, &key);
+    }
+
+    pub fn mark_proposal_passed(env: Env, admin: Address, proposal_id: u32) {
+        Self::extend_instance(&env);
+        let stored_admin: Address = env
+            .storage()
+            .instance()
+            .get(&ADMIN_KEY)
+            .unwrap_or_else(|| panic_with_error!(&env, GOVError::NotInitialized));
+        if admin != stored_admin {
+            panic_with_error!(&env, GOVError::Unauthorized);
+        }
+        admin.require_auth();
+
+        let key = DataKey::Proposal(proposal_id);
+        let mut proposal: GovernanceProposal = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or_else(|| panic_with_error!(&env, GOVError::ProposalNotFound));
+
+        let timelock = Self::get_timelock_period(env.clone());
+        proposal.passed = true;
+        proposal.execution_not_before = env
+            .ledger()
+            .timestamp()
+            .checked_add(timelock)
+            .unwrap_or_else(|| panic_with_error!(&env, GOVError::ArithmeticOverflow));
+
+        env.storage().persistent().set(&key, &proposal);
+        Self::extend_persistent(&env, &key);
+    }
+
+    pub fn execute_proposal(env: Env, proposal_id: u32) {
+        Self::extend_instance(&env);
+        let key = DataKey::Proposal(proposal_id);
+        let mut proposal: GovernanceProposal = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or_else(|| panic_with_error!(&env, GOVError::ProposalNotFound));
+
+        if !proposal.passed {
+            panic_with_error!(&env, GOVError::ProposalNotPassed);
+        }
+        if proposal.executed {
+            panic_with_error!(&env, GOVError::ProposalAlreadyExecuted);
+        }
+        if env.ledger().timestamp() < proposal.execution_not_before {
+            panic_with_error!(&env, GOVError::TimelockActive);
+        }
+
+        proposal.executed = true;
+        env.storage().persistent().set(&key, &proposal);
+        Self::extend_persistent(&env, &key);
+    }
+
+    pub fn get_proposal(env: Env, proposal_id: u32) -> Option<GovernanceProposal> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Proposal(proposal_id))
+    }
+
+    // -----------------------------------------------------------------------
     // Internal helpers
     // -----------------------------------------------------------------------
 
@@ -547,16 +672,16 @@ impl GovernanceToken {
         if bal < amount {
             panic_with_error!(env, GOVError::InsufficientFunds);
         }
-        env.storage().persistent().set(&key, &(bal - amount));
+        let new_balance = Self::checked_sub_amount(env, bal, amount);
+        env.storage().persistent().set(&key, &new_balance);
         Self::extend_persistent(env, &key);
 
         // Update delegated amount for 'from's delegate
         if let Some(delegate) = Self::get_delegate(env.clone(), from.clone()) {
             let del_key = DataKey::DelegatedAmount(delegate.clone());
             let del_bal: i128 = env.storage().persistent().get(&del_key).unwrap_or(0);
-            env.storage()
-                .persistent()
-                .set(&del_key, &(del_bal - amount));
+            let new_delegated = Self::checked_sub_amount(env, del_bal, amount);
+            env.storage().persistent().set(&del_key, &new_delegated);
             Self::extend_persistent(env, &del_key);
         }
     }
@@ -564,16 +689,16 @@ impl GovernanceToken {
     fn _credit(env: &Env, to: &Address, amount: i128) {
         let key = DataKey::Balance(to.clone());
         let bal: i128 = env.storage().persistent().get(&key).unwrap_or(0);
-        env.storage().persistent().set(&key, &(bal + amount));
+        let new_balance = Self::checked_add_amount(env, bal, amount);
+        env.storage().persistent().set(&key, &new_balance);
         Self::extend_persistent(env, &key);
 
         // Update delegated amount for 'to's delegate
         if let Some(delegate) = Self::get_delegate(env.clone(), to.clone()) {
             let del_key = DataKey::DelegatedAmount(delegate.clone());
             let del_bal: i128 = env.storage().persistent().get(&del_key).unwrap_or(0);
-            env.storage()
-                .persistent()
-                .set(&del_key, &(del_bal + amount));
+            let new_delegated = Self::checked_add_amount(env, del_bal, amount);
+            env.storage().persistent().set(&del_key, &new_delegated);
             Self::extend_persistent(env, &del_key);
         }
     }
@@ -596,11 +721,25 @@ impl GovernanceToken {
             .persistent()
             .extend_ttl(key, PERSISTENT_BUMP_THRESHOLD, PERSISTENT_EXTEND_TO);
     }
+
+    fn checked_add_amount(env: &Env, left: i128, right: i128) -> i128 {
+        left.checked_add(right)
+            .unwrap_or_else(|| panic_with_error!(env, GOVError::ArithmeticOverflow))
+    }
+
+    fn checked_sub_amount(env: &Env, left: i128, right: i128) -> i128 {
+        left.checked_sub(right)
+            .unwrap_or_else(|| panic_with_error!(env, GOVError::ArithmeticOverflow))
+    }
 }
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+#[cfg(test)]
+#[path = "test.rs"]
+mod dedicated_test_suite;
 
 #[cfg(test)]
 mod test {
@@ -618,7 +757,7 @@ mod test {
         let id = e.register(GovernanceToken, ());
         e.mock_all_auths();
         let client = GovernanceTokenClient::new(e, &id);
-        client.initialize(&admin);
+        client.initialize(&admin, &0);
         (id, admin, client)
     }
 
@@ -679,13 +818,13 @@ mod test {
             invoke: &MockAuthInvoke {
                 contract: &id,
                 fn_name: "initialize",
-                args: (admin.clone(),).into_val(&e),
+                args: (admin.clone(), 0_u64).into_val(&e),
                 sub_invokes: &[],
             },
         }]);
 
         let client = GovernanceTokenClient::new(&e, &id);
-        client.initialize(&admin);
+        client.initialize(&admin, &0);
 
         let wasm_hash = crate::upgrade::testutils::upload_upgrade_target(&e);
         authorize_upgrade(&e, &id, &attacker, &wasm_hash);
@@ -729,7 +868,7 @@ mod test {
         let e = Env::default();
         let (_, admin, client) = setup(&e);
         let _ = admin; // already initialized via setup
-        let result = client.try_initialize(&Address::generate(&e));
+        let result = client.try_initialize(&Address::generate(&e), &0);
         assert_eq!(
             result.err(),
             Some(Ok(soroban_sdk::Error::from_contract_error(
@@ -786,12 +925,12 @@ mod test {
             invoke: &soroban_sdk::testutils::MockAuthInvoke {
                 contract: &id,
                 fn_name: "initialize",
-                args: (admin.clone(),).into_val(&e),
+                args: (admin.clone(), 0_u64).into_val(&e),
                 sub_invokes: &[],
             },
         }]);
         let client = GovernanceTokenClient::new(&e, &id);
-        client.initialize(&admin);
+        client.initialize(&admin, &0);
         let donor = Address::generate(&e);
         let result = client.try_mint(&donor, &100);
         assert!(result.is_err());
@@ -1359,5 +1498,40 @@ mod test {
                 GOVError::Unauthorized as u32
             )))
         );
+    }
+
+    #[test]
+    fn benchmark_costs() {
+        let e = Env::default();
+        let (_, admin, client) = setup(&e);
+        let donor = Address::generate(&e);
+
+        // 1. Benchmark initialize (already done in setup, but let's do it fresh)
+        let fresh_admin = Address::generate(&e);
+        let id = e.register(GovernanceToken, ());
+        let fresh_client = GovernanceTokenClient::new(&e, &id);
+        e.cost_estimate().budget().reset_unlimited();
+        fresh_client.initialize(&fresh_admin, &0);
+        let init_instr = e.cost_estimate().budget().cpu_instruction_cost();
+        let init_mem = e.cost_estimate().budget().memory_bytes_cost();
+
+        // 2. Benchmark mint
+        e.cost_estimate().budget().reset_unlimited();
+        client.mint(&donor, &1000);
+        let mint_instr = e.cost_estimate().budget().cpu_instruction_cost();
+        let mint_mem = e.cost_estimate().budget().memory_bytes_cost();
+
+        // 3. Benchmark transfer
+        let receiver = Address::generate(&e);
+        e.cost_estimate().budget().reset_unlimited();
+        client.transfer(&donor, &receiver, &500);
+        let xfer_instr = e.cost_estimate().budget().cpu_instruction_cost();
+        let xfer_mem = e.cost_estimate().budget().memory_bytes_cost();
+
+        extern crate std;
+        std::println!("BENCHMARK_RESULTS: governance_token");
+        std::println!("initialize: instr={}, mem={}", init_instr, init_mem);
+        std::println!("mint: instr={}, mem={}", mint_instr, mint_mem);
+        std::println!("transfer: instr={}, mem={}", xfer_instr, xfer_mem);
     }
 }

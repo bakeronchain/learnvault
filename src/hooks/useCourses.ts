@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query"
 import {
+	type CoursePrerequisite,
 	type CourseDetail,
 	type CourseDifficulty,
 	type CourseLesson,
 	type CourseLevel,
+	type CourseRatingSummary,
 	type CourseSummary,
 } from "../types/courses"
 
@@ -25,6 +27,26 @@ type ApiCourse = {
 	created_at?: string
 	updatedAt?: string
 	updated_at?: string
+	prerequisites?: Array<{
+		id?: number | string
+		slug?: string
+		title?: string
+		course_id?: number | string
+		course_slug?: string
+		course_title?: string
+	}>
+	prerequisite_courses?: Array<{
+		id?: number | string
+		slug?: string
+		title?: string
+		course_id?: number | string
+		course_slug?: string
+		course_title?: string
+	}>
+	rating_summary?: { average?: number; count?: number } | null
+	review_summary?: { average?: number; count?: number } | null
+	review_count?: number
+	average_rating?: number
 }
 
 type ApiLesson = {
@@ -40,6 +62,11 @@ type ApiLesson = {
 	estimated_minutes?: number
 	isMilestone?: boolean
 	is_milestone?: boolean
+	version?: number
+	isLatest?: boolean
+	is_latest?: boolean
+	changeSummary?: string | null
+	change_summary?: string | null
 }
 
 const defaultAccentClassName =
@@ -92,6 +119,25 @@ const normalizeCourse = (course: ApiCourse): CourseSummary => {
 	const trackLabel = formatTrackLabel(course.track)
 	const trackKey = normalizeTrackKey(course.track)
 
+	const rawSummary = course.rating_summary ?? course.review_summary
+	const summaryFromObject: CourseRatingSummary | null =
+		rawSummary &&
+		Number.isFinite(Number(rawSummary.average)) &&
+		Number.isFinite(Number(rawSummary.count))
+			? {
+					average: Number(rawSummary.average),
+					count: Number(rawSummary.count),
+				}
+			: null
+	const summaryFromFlat =
+		Number.isFinite(Number(course.average_rating)) &&
+		Number.isFinite(Number(course.review_count))
+			? {
+					average: Number(course.average_rating),
+					count: Number(course.review_count),
+				}
+			: null
+
 	return {
 		id: course.slug || String(course.id),
 		slug: course.slug || String(course.id),
@@ -106,6 +152,7 @@ const normalizeCourse = (course: ApiCourse): CourseSummary => {
 		createdAt: course.createdAt ?? course.created_at ?? "",
 		updatedAt: course.updatedAt ?? course.updated_at ?? "",
 		accentClassName: accentClassByTrack[trackKey] ?? defaultAccentClassName,
+		ratingSummary: summaryFromObject ?? summaryFromFlat,
 	}
 }
 
@@ -126,6 +173,12 @@ const normalizeLesson = (
 			? lesson.estimatedMinutes
 			: Number(lesson.estimated_minutes ?? 10),
 	isMilestone: Boolean(lesson.isMilestone ?? lesson.is_milestone),
+	version:
+		typeof lesson.version === "number"
+			? lesson.version
+			: Number.parseInt(String(lesson.version ?? "1"), 10),
+	isLatest: Boolean(lesson.isLatest ?? lesson.is_latest ?? true),
+	changeSummary: lesson.changeSummary ?? lesson.change_summary ?? null,
 })
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -242,13 +295,27 @@ export function useEnrolledCourses() {
 	}
 }
 
-export function useCourseDetail(idOrSlug: string | undefined) {
+export function useCourseDetail(
+	idOrSlug: string | undefined,
+	learnerAddress?: string,
+) {
 	const query = useQuery({
-		queryKey: ["course", idOrSlug],
+		queryKey: ["course", idOrSlug, learnerAddress],
 		queryFn: async (): Promise<CourseDetail> => {
-			const response = await fetchJson<ApiCourse & { lessons?: ApiLesson[] }>(
-				`/api/courses/${idOrSlug}`,
-			)
+			const params = new URLSearchParams()
+			if (learnerAddress) params.set("learner_address", learnerAddress)
+			const url = `/api/courses/${idOrSlug}${params.toString() ? `?${params.toString()}` : ""}`
+			const response = await fetchJson<
+				ApiCourse & {
+					lessons?: ApiLesson[]
+					enrollmentContentVersion?: number | null
+					enrollment_content_version?: number | null
+					latestContentVersion?: number
+					latest_content_version?: number
+					hasUpdatedContent?: boolean
+					has_updated_content?: boolean
+				}
+			>(url)
 			const course = normalizeCourse(response)
 			const lessons = (response.lessons ?? [])
 				.map((lesson) => normalizeLesson(lesson, course.slug))
@@ -256,7 +323,16 @@ export function useCourseDetail(idOrSlug: string | undefined) {
 
 			return {
 				...course,
+				enrollmentContentVersion:
+					response.enrollmentContentVersion ??
+					response.enrollment_content_version ??
+					null,
+				latestContentVersion:
+					response.latestContentVersion ?? response.latest_content_version ?? 1,
+				hasUpdatedContent:
+					response.hasUpdatedContent ?? response.has_updated_content ?? false,
 				lessons,
+				prerequisites: normalizePrerequisites(response),
 			}
 		},
 		enabled: Boolean(idOrSlug),
@@ -270,4 +346,21 @@ export function useCourseDetail(idOrSlug: string | undefined) {
 		error: query.error instanceof Error ? query.error.message : null,
 		refetch: query.refetch,
 	}
+}
+
+const normalizePrerequisites = (
+	course: ApiCourse,
+): CoursePrerequisite[] | undefined => {
+	const raw = course.prerequisites ?? course.prerequisite_courses
+	if (!Array.isArray(raw) || raw.length === 0) return undefined
+	const result = raw
+		.map((item) => {
+			const slug = String(item.slug ?? item.course_slug ?? item.id ?? "").trim()
+			const id = String(item.id ?? item.course_id ?? slug).trim()
+			const title = String(item.title ?? item.course_title ?? slug).trim()
+			if (!id || !slug || !title) return null
+			return { id, slug, title }
+		})
+		.filter((item): item is CoursePrerequisite => item !== null)
+	return result.length > 0 ? result : undefined
 }

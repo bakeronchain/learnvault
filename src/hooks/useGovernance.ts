@@ -77,8 +77,10 @@ export function useGovernance() {
 	const toProposalStatus = useCallback(
 		(status: unknown): Proposal["status"] => {
 			const normalized = String(status ?? "pending").toLowerCase()
+			if (normalized === "queued") return "Queued"
 			if (normalized === "approved" || normalized === "passed") return "Passed"
 			if (normalized === "rejected") return "Rejected"
+			if (normalized === "executed") return "Executed"
 			return "Active"
 		},
 		[],
@@ -338,6 +340,11 @@ export function useGovernance() {
 				["get_active_proposals", "getActiveProposals"],
 				[[]],
 			)
+			const queued = await readContractArray(
+				client,
+				["get_proposals_by_status", "getProposalsByStatus"],
+				[["Queued"], [{ status: "Queued" }], [{ tag: "Queued" }]],
+			)
 			const approved = await readContractArray(
 				client,
 				["get_proposals_by_status", "getProposalsByStatus"],
@@ -352,6 +359,9 @@ export function useGovernance() {
 			const grouped = [
 				...pending.map((proposal: unknown) =>
 					mapProposal(proposal as RawContractProposal, "Active"),
+				),
+				...queued.map((proposal: unknown) =>
+					mapProposal(proposal as RawContractProposal, "Queued"),
 				),
 				...approved.map((proposal: unknown) =>
 					mapProposal(proposal as RawContractProposal, "Passed"),
@@ -466,6 +476,62 @@ export function useGovernance() {
 		staleTime: 60 * 1000,
 	})
 
+	// Fetch governance parameters
+	const { data: govParams = { quorum: 0n, approvalBps: 0, votingPeriod: 0 } } = useQuery({
+		queryKey: ["governance", "parameters"],
+		queryFn: async () => {
+			if (!scholarshipTreasury) {
+				return { quorum: 0n, approvalBps: 0, votingPeriod: 0 }
+			}
+			const client = await loadClient("../contracts/scholarship_treasury")
+			if (!client) {
+				return { quorum: 0n, approvalBps: 0, votingPeriod: 0 }
+			}
+
+			let quorum = 0n
+			let approvalBps = 0
+			let votingPeriod = 0
+
+			// Fetch Quorum
+			try {
+				const fn = asMethod(client, "get_quorum", "getQuorum")
+				if (fn) {
+					const res = await fn({})
+					quorum = toBigIntSafe(res)
+				}
+			} catch (e) {
+				logger.error("Failed to fetch quorum", e)
+			}
+
+			// Fetch Approval BPS
+			try {
+				const fn = asMethod(client, "get_approval_bps", "getApprovalBps")
+				if (fn) {
+					const res = await fn({})
+					const unwrapped = unwrapResult(res)
+					approvalBps = typeof unwrapped === "number" ? unwrapped : Number(unwrapped || 0)
+				}
+			} catch (e) {
+				logger.error("Failed to fetch approval BPS", e)
+			}
+
+			// Fetch Voting Period
+			try {
+				const fn = asMethod(client, "get_voting_period", "getVotingPeriod")
+				if (fn) {
+					const res = await fn({})
+					const unwrapped = unwrapResult(res)
+					votingPeriod = typeof unwrapped === "number" ? unwrapped : Number(unwrapped || 0)
+				}
+			} catch (e) {
+				logger.error("Failed to fetch voting period", e)
+			}
+
+			return { quorum, approvalBps, votingPeriod }
+		},
+		staleTime: 5 * 60 * 1000,
+	})
+
 	// Mutation for casting a vote
 	const { mutateAsync: castVote, isPending: isVoting } = useMutation({
 		mutationFn: async ({
@@ -546,5 +612,8 @@ export function useGovernance() {
 		hasVoted,
 		getVoteChoice,
 		walletAddress: address,
+		quorum: govParams.quorum,
+		approvalBps: govParams.approvalBps,
+		votingPeriod: govParams.votingPeriod,
 	}
 }

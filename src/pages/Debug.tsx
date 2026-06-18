@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react"
 import { useTranslation } from "react-i18next"
+import NetworkSwitcher from "../components/NetworkSwitcher"
 const ContractExplorerPanel = lazy(
 	() => import("../components/debug/ContractExplorerPanel"),
 )
@@ -8,7 +9,7 @@ const Debugger: React.FC = () => {
 	const { t } = useTranslation()
 
 	return (
-		<div className="p-12 max-w-7xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
+		<div className="p-6 md:p-12 max-w-7xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
 			<header className="mb-12">
 				<h1 className="text-5xl font-black mb-4 tracking-tighter text-gradient">
 					{t("nav.debug")}
@@ -20,6 +21,11 @@ const Debugger: React.FC = () => {
 					)}
 				</p>
 			</header>
+
+			{/* Network Settings Section */}
+			<section className="mb-12">
+				<NetworkSwitcher />
+			</section>
 
 			<div className="glass-card p-10 rounded-[3rem] border border-white/5 relative overflow-hidden backdrop-blur-3xl shadow-2xl">
 				<div className="absolute top-0 right-0 p-8 opacity-5">

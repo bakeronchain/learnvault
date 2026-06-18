@@ -1,9 +1,14 @@
+import sgMail from "@sendgrid/mail"
 import { Resend } from "resend"
+import nodemailer from "nodemailer"
+import { logger } from "../lib/logger"
 import {
 	templates,
 	toPlainText,
 	type EmailVariables,
 } from "../templates/email-templates"
+
+const log = logger.child({ module: "email" })
 
 export interface EmailOptions {
 	to: string
@@ -15,13 +20,50 @@ export interface EmailOptions {
 export class EmailService {
 	private readonly from: string
 	private readonly resendClient?: Resend
+	private readonly transporter?:
+		| ReturnType<typeof nodemailer.createTransport>
+		| undefined
+	private readonly useSendGrid: boolean
+	private readonly sendGridApiKey?: string
+	private readonly smtpConfigured: boolean
 
-	constructor(apiKey?: string) {
+	constructor(sendGridApiKey?: string) {
 		this.from = process.env.EMAIL_FROM || "notifications@learnvault.xyz"
-		const resendApiKey = process.env.RESEND_API_KEY || apiKey
+		const resendApiKey = process.env.RESEND_API_KEY
+		const resolvedSendGridApiKey = process.env.EMAIL_API_KEY || sendGridApiKey
+
+		this.useSendGrid = Boolean(resolvedSendGridApiKey)
+		this.sendGridApiKey = resolvedSendGridApiKey || undefined
+		this.smtpConfigured = Boolean(
+			process.env.SMTP_HOST &&
+				process.env.SMTP_PORT &&
+				process.env.SMTP_USER &&
+				process.env.SMTP_PASS &&
+				process.env.SMTP_FROM,
+		)
+
 		if (resendApiKey) {
 			this.resendClient = new Resend(resendApiKey)
+		} else if (this.useSendGrid && this.sendGridApiKey) {
+			// SendGrid SDK uses a module singleton, so we set the API key once.
+			sgMail.setApiKey(this.sendGridApiKey)
+		} else if (this.smtpConfigured) {
+			this.transporter = nodemailer.createTransport({
+				host: process.env.SMTP_HOST,
+				port: Number(process.env.SMTP_PORT),
+				secure: false,
+				auth: {
+					user: process.env.SMTP_USER,
+					pass: process.env.SMTP_PASS,
+				},
+			})
 		}
+	}
+
+	private isValidEmail(to: string): boolean {
+		// Simple sanity check; avoids pulling in another dependency.
+		// Good enough to reject obviously invalid addresses.
+		return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)
 	}
 
 	private async render(
@@ -31,7 +73,7 @@ export class EmailService {
 		const templateFn = templates[templateName]
 
 		if (!templateFn) {
-			console.warn(`[EmailService] Template not found: ${templateName}`)
+			log.warn({ templateName }, "Email template not found")
 			return { html: "", text: "" }
 		}
 
@@ -42,28 +84,53 @@ export class EmailService {
 	}
 
 	async sendNotification(options: EmailOptions): Promise<boolean> {
-		const { html, text } = await this.render(options.template, options.data)
-
-		if (!this.resendClient) {
-			console.log(
-				`[EmailService] MOCK SEND to ${options.to}: ${options.subject}`,
-			)
-			console.log(html)
-			return true
+		if (!this.isValidEmail(options.to)) {
+			log.warn({ to: options.to }, "Invalid email address rejected")
+			return false
 		}
 
-		try {
-			await this.resendClient.emails.send({
-				from: this.from,
-				to: options.to,
-				subject: options.subject,
-				html,
-				text,
-			})
+		const { html, text } = await this.render(options.template, options.data)
 
+		try {
+			if (this.resendClient) {
+				await this.resendClient.emails.send({
+					from: this.from,
+					to: options.to,
+					subject: options.subject,
+					html,
+					text,
+				})
+				return true
+			}
+
+			if (this.useSendGrid && this.sendGridApiKey) {
+				await sgMail.send({
+					from: this.from,
+					to: options.to,
+					subject: options.subject,
+					html,
+					text,
+				})
+				return true
+			}
+
+			if (this.transporter) {
+				await this.transporter.sendMail({
+					from: this.from,
+					to: options.to,
+					subject: options.subject,
+					html,
+					text,
+				})
+				return true
+			}
+
+			// If no provider is configured, we don't want to crash production flows.
+			// The caller can treat this as a best-effort notification.
+			log.debug({ subject: options.subject }, "MOCK email send")
 			return true
 		} catch (error) {
-			console.error("[EmailService] Error sending email:", error)
+			log.error({ err: error }, "Error sending email")
 			return false
 		}
 	}
@@ -76,9 +143,7 @@ export class EmailService {
 		const adminEmails = process.env.ADMIN_EMAILS
 
 		if (!adminEmails) {
-			console.warn(
-				"[EmailService] ADMIN_EMAILS not set, skipping notification.",
-			)
+			log.warn("ADMIN_EMAILS not set, skipping admin notification")
 			return false
 		}
 
@@ -115,15 +180,12 @@ export class EmailService {
 		const adminEmails = process.env.ADMIN_EMAILS
 
 		if (!adminEmails) {
-			console.warn(
-				"[EmailService] ADMIN_EMAILS not set, skipping flag notification.",
-			)
+			log.warn("ADMIN_EMAILS not set, skipping admin flag notification")
 			return false
 		}
 
 		const adminLink = `${process.env.FRONTEND_URL || "http://localhost:3000"}/admin/moderation`
-
-		const body = `New content flag: ${contentType} #${contentId} reported by ${reporterAddress}. Reason: ${reason}. Review it here: ${adminLink}`
+		const body = `Content flagged: ${contentType} #${contentId}\nReporter: ${reporterAddress}\nReason: ${reason}\nReview: ${adminLink}`
 
 		const emails = adminEmails.split(",").map((email) => email.trim())
 
@@ -131,7 +193,7 @@ export class EmailService {
 		for (const email of emails) {
 			const success = await this.sendNotification({
 				to: email,
-				subject: `New Content Flag - ${contentType.toUpperCase()}`,
+				subject: "Content Flagged",
 				template: "admin-alert",
 				data: {
 					body,

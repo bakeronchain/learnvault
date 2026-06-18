@@ -16,12 +16,22 @@ import request from "supertest"
 import { pool } from "../db/index"
 import { inMemoryMilestoneStore } from "../db/milestone-store"
 import { errorHandler } from "../middleware/error.middleware"
-import { scholarsRouter } from "../routes/scholars.routes"
+import { createScholarsRouter } from "../routes/scholars.routes"
+import { type JwtService } from "../services/jwt.service"
 
-function buildApp() {
+const testJwtService: JwtService = {
+	signWalletToken: () => "mock-token",
+	verifyWalletToken: async (_token: string) => ({
+		sub: "GSCHOLAR1",
+		jti: "test-jti",
+	}),
+	revokeToken: async () => {},
+}
+
+const buildApp = (): express.Express => {
 	const app = express()
 	app.use(express.json())
-	app.use("/api", scholarsRouter)
+	app.use("/api", createScholarsRouter(testJwtService))
 	app.use(errorHandler)
 	return app
 }

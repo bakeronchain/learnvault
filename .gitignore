@@ -47,10 +47,12 @@ lerna-debug.log*
 packages/*
 # if you have other workspace packages, add them here
 !packages/.gitkeep
+!packages/learnvault-provider-sdk
 
 # generated contract client imports
 src/contracts/*
 !src/contracts/util.ts
 
 # test coverage
-coverage/
+coverage/target_local/
+target_local/

@@ -145,7 +145,7 @@ const checkRedis = async (): Promise<CheckResult> => {
 	const client = new Redis(redisUrl, {
 		maxRetriesPerRequest: 1,
 		enableOfflineQueue: false,
-		connectTimeout: 2000,
+		connectTimeout: 1500,
 	})
 	const startedAt = Date.now()
 
@@ -181,7 +181,8 @@ const checkHorizon = async (): Promise<CheckResult> => {
 	try {
 		const response = await fetch(horizonUrl, {
 			headers: { Accept: "application/json" },
-			signal: AbortSignal.timeout(5000),
+			// Keep the probe well under the endpoint's 2s response budget.
+			signal: AbortSignal.timeout(1500),
 		})
 
 		if (!response.ok) {

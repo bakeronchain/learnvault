@@ -26,6 +26,15 @@ export default {
 	async has_voted() {
 		return false
 	},
+	async get_quorum() {
+		return 0n
+	},
+	async get_approval_bps() {
+		return 0
+	},
+	async get_voting_period() {
+		return 0
+	},
 	async vote(_args: VoteArgs, _opts?: { publicKey?: string }) {
 		return {
 			async signAndSend(_opts?: { signTransaction?: unknown }) {

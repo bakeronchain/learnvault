@@ -3,6 +3,7 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<script type="module" src="/src/theme-init.ts"></script>
 
 		<script>
 			;(function () {
@@ -29,8 +30,18 @@
 				try {
 					var raw = localStorage.getItem(storageKey)
 					var stored = raw ? JSON.parse(raw) : null
-					// Default to dark — the app is designed dark-first
-					applyTheme(stored === "light" ? "light" : "dark")
+					// Prefer explicit user choice; fall back to OS colour-scheme preference
+					var prefersDark =
+						typeof window !== "undefined" &&
+						typeof window.matchMedia === "function" &&
+						window.matchMedia("(prefers-color-scheme: dark)").matches
+					var resolved =
+						stored === "light" || stored === "dark"
+							? stored
+							: prefersDark
+								? "dark"
+								: "light"
+					applyTheme(resolved)
 				} catch (e) {
 					applyTheme("dark")
 				}

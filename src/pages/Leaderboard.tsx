@@ -1,5 +1,5 @@
-import { Trophy } from "lucide-react"
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import { ChevronLeft, ChevronRight, Trophy } from "lucide-react"
+import React, { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import AddressDisplay from "../components/AddressDisplay"
 import { LeaderboardRowSkeleton } from "../components/SkeletonLoader"
@@ -9,54 +9,39 @@ import { useLeaderboard } from "../hooks/useLeaderboard"
 import { useWallet } from "../hooks/useWallet"
 import { type LeaderboardEntry } from "../util/mockLeaderboardData"
 
+const PAGE_SIZE = 10
+
 const Leaderboard: React.FC = () => {
 	const { t } = useTranslation()
 	const { address: currentUserAddress } = useWallet()
+	const [page, setPage] = useState(1)
 
-	const fetchLeaderboard = useCallback(async () => {
-		setIsLoading(true)
-		setError(null)
-		try {
-			const response = await fetch(`${API_URL}/api/scholars/leaderboard`)
+	const {
+		data: result,
+		isLoading,
+		error,
+		refetch,
+	} = useLeaderboard(currentUserAddress, page, PAGE_SIZE)
 
-			if (!response.ok)
-				throw new Error(
-					`Failed to load rankings (status ${response.status}). The server may be temporarily unavailable.`,
-				)
-			const result = (await response.json()) as {
-				rankings?: LeaderboardApiEntry[]
-				your_rank?: number | null
-			}
-			const rankings = Array.isArray(result.rankings) ? result.rankings : []
-			const mapped = rankings.map((item, index) => ({
-				id: `leader-${item.address}-${item.rank}-${index}`,
-				address: item.address,
-				lrnBalance: Number(item.lrn_balance ?? 0),
-				coursesCompleted: item.courses_completed ?? 0,
-				joinedDate: new Date(),
-				lastActive: new Date(),
-				rank: item.rank,
-				balance: item.lrn_balance ?? "0",
-				completedCourses: item.courses_completed ?? 0,
-				fullAddress: item.address,
-			}))
-			setLeaders(mapped)
-			setMyRank(typeof result.your_rank === "number" ? result.your_rank : null)
-		} catch (err) {
-			console.error(err)
-			setError(
-				err instanceof Error
-					? err.message
-					: "Unable to load rankings. Check your connection and try again.",
-			)
-		} finally {
-			setIsLoading(false)
-		}
-	}, [])
+	const leaders = useMemo(() => {
+		const rankings = Array.isArray(result?.rankings) ? result.rankings : []
+		return rankings.map((item, index) => ({
+			id: `leader-${item.address}-${item.rank}-${index}`,
+			address: item.address,
+			lrnBalance: Number(item.lrn_balance ?? 0),
+			coursesCompleted: item.courses_completed ?? 0,
+			joinedDate: new Date(),
+			lastActive: new Date(),
+			rank: item.rank,
+			balance: item.lrn_balance ?? "0",
+			completedCourses: item.courses_completed ?? 0,
+			fullAddress: item.address,
+		}))
+	}, [result?.rankings])
 
-	useEffect(() => {
-		fetchLeaderboard().catch(console.error)
-	}, [fetchLeaderboard])
+	const myRank = result?.your_rank ?? null
+	const total = Number(result?.total ?? leaders.length ?? 0)
+	const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
 	const leaderboardRows = useMemo(
 		() =>
@@ -78,14 +63,21 @@ const Leaderboard: React.FC = () => {
 		[leaders],
 	)
 
-	const isCurrentUser = (fullAddress: string) => {
-		return currentUserAddress?.toLowerCase() === fullAddress.toLowerCase()
+	const isCurrentUser = (fullAddress: string) =>
+		currentUserAddress?.toLowerCase() === fullAddress.toLowerCase()
+
+	const prevPage = () => {
+		setPage((current) => Math.max(1, current - 1))
+	}
+
+	const nextPage = () => {
+		setPage((current) => Math.min(totalPages, current + 1))
 	}
 
 	return (
 		<div aria-busy={isLoading} className="p-6 md:p-12 max-w-6xl mx-auto text-white animate-in fade-in slide-in-from-bottom-8 duration-1000">
 			<header className="mb-12 text-center">
-				<h1 className="text-5xl md:text-6xl font-black mb-4 tracking-tighter text-gradient">
+				<h1 className="text-4xl sm:text-5xl md:text-6xl font-black mb-4 tracking-tighter text-gradient">
 					{t("pages.leaderboard.title")}
 				</h1>
 				<p className="text-white/40 text-lg font-medium">
@@ -96,101 +88,148 @@ const Leaderboard: React.FC = () => {
 			{isLoading ? (
 				<LeaderboardRowSkeleton />
 			) : error ? (
-				<ErrorState message={error} onRetry={fetchLeaderboard} />
+				<ErrorState
+					message={error instanceof Error ? error.message : String(error)}
+					onRetry={() => void refetch()}
+				/>
 			) : leaderboardRows.length === 0 ? (
 				<EmptyState
 					icon={Trophy}
-					title="No scholars yet"
-					description="No scholars have earned LRN tokens yet. Be the first to complete a course!"
+					title="No learners ranked yet"
+					description="Complete a course to earn LRN tokens and claim your spot on the leaderboard!"
+					ctaLabel="Browse Courses"
+					ctaTo="/courses"
 				/>
 			) : (
 				<div className="glass-card overflow-hidden rounded-[2.5rem] border border-white/5 shadow-2xl">
-					<table className="w-full text-left border-collapse">
-						<thead>
-							<tr className="bg-white/5 border-b border-white/5">
-								<th className="py-6 px-8 text-sm font-bold uppercase tracking-widest text-white/40">
-									Rank
-								</th>
-								<th className="py-6 px-8 text-sm font-bold uppercase tracking-widest text-white/40">
-									Scholar
-								</th>
-								<th className="py-6 px-8 text-sm font-bold uppercase tracking-widest text-white/40 text-right">
-									LRN Balance
-								</th>
-								<th className="py-6 px-8 text-sm font-bold uppercase tracking-widest text-white/40 text-right">
-									Milestones
-								</th>
-							</tr>
-						</thead>
-						<tbody className="divide-y divide-white/5">
-							{leaderboardRows.map((leader) => (
-								<tr
-									key={leader.fullAddress}
-									className={`group hover:bg-white/[0.02] transition-colors ${
-										isCurrentUser(leader.fullAddress) ? "bg-brand-cyan/10" : ""
-									}`}
-								>
-									<td className="py-6 px-8">
-										<div
-											className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-lg ${
-												leader.rank === 1
-													? "bg-yellow-500 text-black shadow-[0_0_20px_rgba(234,179,8,0.3)]"
-													: leader.rank === 2
-														? "bg-slate-300 text-black"
-														: leader.rank === 3
-															? "bg-amber-600 text-black"
-															: "bg-white/10 text-white/60"
-											}`}
-										>
-											{leader.rank}
-										</div>
-									</td>
-									<td className="py-6 px-8 overflow-hidden">
-										<div className="flex items-center gap-4">
-											<div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-cyan to-brand-purple flex-shrink-0 opacity-80" />
-											<div>
-												<AddressDisplay
-													address={leader.fullAddress}
-													className="max-w-full"
-													addressClassName="font-bold text-white group-hover:text-brand-cyan transition-colors"
-													buttonClassName="h-6 w-6"
-												/>
-												{isCurrentUser(leader.fullAddress) && (
-													<span className="text-[10px] uppercase font-black tracking-tighter text-brand-cyan bg-brand-cyan/10 px-2 py-0.5 rounded">
-														You
-													</span>
-												)}
-											</div>
-										</div>
-									</td>
-									<td className="py-6 px-8 text-right">
-										<div className="text-2xl font-black text-brand-cyan">
-											{leader.balance}
-											<span className="text-xs ml-1 text-white/20 uppercase">
-												LRN
-											</span>
-										</div>
-									</td>
-									<td className="py-6 px-8 text-right">
-										<div className="inline-flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/5">
-											<span className="text-white/60 font-medium">
-												{leader.completedCourses}
-											</span>
-											<span className="w-2 h-2 bg-brand-purple rounded-full" />
-										</div>
-									</td>
+					<div className="responsive-table">
+						<table className="min-w-[720px] w-full text-left border-collapse">
+							<thead>
+								<tr className="bg-white/5 border-b border-white/5">
+									<th className="py-5 px-4 sm:px-6 text-sm font-bold uppercase tracking-widest text-white/40">
+										Rank
+									</th>
+									<th className="py-5 px-4 sm:px-6 text-sm font-bold uppercase tracking-widest text-white/40">
+										Scholar
+									</th>
+									<th className="py-5 px-4 sm:px-6 text-sm font-bold uppercase tracking-widest text-white/40 text-right">
+										LRN Balance
+									</th>
+									<th className="py-5 px-4 sm:px-6 text-sm font-bold uppercase tracking-widest text-white/40 text-right">
+										Milestones
+									</th>
 								</tr>
-							))}
-						</tbody>
-					</table>
+							</thead>
+							<tbody className="divide-y divide-white/5">
+								{leaderboardRows.map((leader) => (
+									<tr
+										key={leader.fullAddress}
+										data-testid="leaderboard-row"
+										className={`group hover:bg-white/[0.02] transition-colors ${
+											isCurrentUser(leader.fullAddress)
+												? "bg-brand-cyan/10"
+												: ""
+										}`}
+									>
+										<td className="py-5 px-4 sm:px-6">
+											<div
+												data-testid="leaderboard-rank-badge"
+												className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-lg ${
+													leader.rank === 1
+														? "bg-yellow-500 text-black shadow-[0_0_20px_rgba(234,179,8,0.3)]"
+														: leader.rank === 2
+															? "bg-slate-300 text-black"
+															: leader.rank === 3
+																? "bg-amber-600 text-black"
+																: "bg-white/10 text-white/60"
+												}`}
+											>
+												{leader.rank}
+											</div>
+										</td>
+										<td className="py-5 px-4 sm:px-6 overflow-hidden">
+											<div className="flex items-center gap-4">
+												<div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-cyan to-brand-purple flex-shrink-0 opacity-80" />
+												<div className="min-w-0">
+													<div data-testid="leaderboard-address">
+														<AddressDisplay
+															address={leader.fullAddress}
+															className="max-w-full"
+															addressClassName="font-bold text-white group-hover:text-brand-cyan transition-colors"
+															buttonClassName="h-6 w-6"
+															showExplorerLink={false}
+															showCopyButton={false}
+															fullOnHover={false}
+														/>
+													</div>
+													{isCurrentUser(leader.fullAddress) && (
+														<span className="text-[10px] uppercase font-black tracking-tighter text-brand-cyan bg-brand-cyan/10 px-2 py-0.5 rounded">
+															You
+														</span>
+													)}
+												</div>
+											</div>
+										</td>
+										<td className="py-5 px-4 sm:px-6 text-right">
+											<div className="text-2xl font-black text-brand-cyan">
+												{leader.balance}
+												<span className="text-xs ml-1 text-white/20 uppercase">
+													LRN
+												</span>
+											</div>
+										</td>
+										<td className="py-5 px-4 sm:px-6 text-right">
+											<div className="inline-flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/5">
+												<span className="text-white/60 font-medium">
+													{leader.completedCourses}
+												</span>
+												<span className="w-2 h-2 bg-brand-purple rounded-full" />
+											</div>
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
 
-					<div className="p-8 bg-white/5 border-t border-white/5 flex justify-between items-center">
+					<div className="p-6 bg-white/5 border-t border-white/5 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
 						<div className="text-sm font-medium text-white/40">
-							Showing {leaderboardRows.length} top learners
-							{myRank ? ` | Your rank: #${myRank}` : ""}
+							Showing {leaderboardRows.length} scholars
+							{currentUserAddress || myRank !== null ? (
+								<span data-testid="leaderboard-your-rank">
+									{" "}
+									| Your rank: {myRank ? `#${myRank}` : "Unranked"}
+								</span>
+							) : null}
 						</div>
-						<div className="text-[10px] uppercase tracking-widest font-black text-white/20">
-							Updated every block
+
+						<div className="flex items-center gap-3">
+							<button
+								type="button"
+								data-testid="leaderboard-prev-page"
+								onClick={prevPage}
+								disabled={page <= 1}
+								className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-white/10 px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/70 hover:text-white hover:border-white/30 disabled:opacity-40 disabled:cursor-not-allowed"
+							>
+								<ChevronLeft className="h-4 w-4" />
+								Prev
+							</button>
+							<span
+								data-testid="leaderboard-page-indicator"
+								className="text-xs uppercase tracking-widest text-white/40 font-black"
+							>
+								Page {page} of {totalPages}
+							</span>
+							<button
+								type="button"
+								data-testid="leaderboard-next-page"
+								onClick={nextPage}
+								disabled={page >= totalPages}
+								className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-white/10 px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/70 hover:text-white hover:border-white/30 disabled:opacity-40 disabled:cursor-not-allowed"
+							>
+								Next
+								<ChevronRight className="h-4 w-4" />
+							</button>
 						</div>
 					</div>
 				</div>

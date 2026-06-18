@@ -1268,6 +1268,7 @@ dependencies = [
 name = "scholar-nft"
 version = "0.0.1"
 dependencies = [
+ "course_milestone",
  "learnvault-shared",
  "soroban-sdk",
 ]

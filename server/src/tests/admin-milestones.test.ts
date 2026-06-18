@@ -3,6 +3,10 @@
  * Uses the in-memory store so no database is required.
  */
 
+// Provide an explicit JWT_SECRET so the admin middleware does not rely on a
+// hardcoded fallback (which was removed as part of the JWT security hardening).
+process.env.JWT_SECRET = "learnvault-secret"
+
 jest.mock("../db/index", () => ({
 	pool: {
 		query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
@@ -21,25 +25,6 @@ jest.mock("../services/stellar-contract.service", () => ({
 		callMintScholarNFT: jest
 			.fn()
 			.mockResolvedValue({ txHash: "test_tx_hash", simulated: false }),
-	},
-}))
-
-jest.mock("../services/email.service", () => ({
-	createEmailService: jest.fn().mockReturnValue({
-		sendNotification: jest.fn().mockResolvedValue(undefined),
-		sendAdminMilestoneNotification: jest.fn().mockResolvedValue(undefined),
-	}),
-}))
-
-jest.mock("../services/escrow-timeout.service", () => ({
-	markEscrowActivity: jest.fn().mockResolvedValue(undefined),
-}))
-
-jest.mock("../services/credential.service", () => ({
-	credentialService: {
-		mintCertificateIfComplete: jest
-			.fn()
-			.mockResolvedValue({ minted: false }),
 	},
 }))
 
@@ -85,15 +70,11 @@ beforeEach(() => {
 	// passes — the pool mock ensures no real SDK call is made.
 	process.env.STELLAR_SECRET_KEY = "FAKE_TEST_KEY"
 	process.env.COURSE_MILESTONE_CONTRACT_ID = "FAKE_TEST_CONTRACT"
-	process.env.FRONTEND_URL = "http://localhost:3000"
-	process.env.NODE_ENV = "test"
 })
 
 afterEach(() => {
 	delete process.env.STELLAR_SECRET_KEY
 	delete process.env.COURSE_MILESTONE_CONTRACT_ID
-	delete process.env.FRONTEND_URL
-	delete process.env.NODE_ENV
 })
 
 describe("POST /api/milestones/submit", () => {

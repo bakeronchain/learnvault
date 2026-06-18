@@ -11,7 +11,6 @@ import {
 } from "../middleware/auth.middleware"
 import { validate } from "../middleware/validate.middleware"
 import { type JwtService } from "../services/jwt.service"
-import { flagContent } from "../controllers/flag-content.controller"
 
 const VOTE_COLUMN: Record<string, string> = {
 	upvote: "upvotes",
@@ -58,9 +57,7 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 			const total = countResult.rows[0]?.count || 0
 
 			const result = await pool.query(
-				`SELECT * FROM comments WHERE proposal_id = $1 AND deleted_at IS NULL 
-				 AND id NOT IN (SELECT content_id FROM flagged_content WHERE content_type = 'comment' AND is_hidden = TRUE)
-				 ORDER BY is_pinned DESC, created_at ASC LIMIT $2 OFFSET $3`,
+				`SELECT * FROM comments WHERE proposal_id = $1 AND deleted_at IS NULL AND id NOT IN (SELECT content_id FROM flagged_content WHERE content_type = 'comment' AND is_hidden = TRUE) ORDER BY is_pinned DESC, created_at ASC LIMIT $2 OFFSET $3`,
 				[proposalId, limit, offset],
 			)
 			res.json({
@@ -79,6 +76,17 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 	 *     summary: Post a new comment
 	 *     tags: [Comments]
 	 *     security: [{ bearerAuth: [] }]
+	 *     responses:
+	 *       201:
+	 *         description: Comment created
+	 *       400:
+	 *         $ref: '#/components/responses/BadRequestError'
+	 *       401:
+	 *         $ref: '#/components/responses/UnauthorizedError'
+	 *       429:
+	 *         description: Rate limited
+	 *       500:
+	 *         $ref: '#/components/responses/InternalServerError'
 	 */
 	router.post(
 		"/comments",
@@ -220,6 +228,20 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 	 *     summary: Delete own comment (soft delete)
 	 *     tags: [Comments]
 	 *     security: [{ bearerAuth: [] }]
+	 *     parameters:
+	 *       - in: path
+	 *         name: id
+	 *         required: true
+	 *         schema: { type: integer }
+	 *     responses:
+	 *       200:
+	 *         description: Comment deleted
+	 *       401:
+	 *         $ref: '#/components/responses/UnauthorizedError'
+	 *       404:
+	 *         $ref: '#/components/responses/NotFoundError'
+	 *       500:
+	 *         $ref: '#/components/responses/InternalServerError'
 	 */
 	router.delete(
 		"/comments/:id",
@@ -258,6 +280,33 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 	 *     summary: Upvote or downvote a comment
 	 *     tags: [Comments]
 	 *     security: [{ bearerAuth: [] }]
+	 *     parameters:
+	 *       - in: path
+	 *         name: id
+	 *         required: true
+	 *         schema: { type: integer }
+	 *     requestBody:
+	 *       required: true
+	 *       content:
+	 *         application/json:
+	 *           schema:
+	 *             type: object
+	 *             required: [type]
+	 *             properties:
+	 *               type:
+	 *                 type: string
+	 *                 enum: [upvote, downvote]
+	 *     responses:
+	 *       200:
+	 *         description: Vote recorded
+	 *       400:
+	 *         $ref: '#/components/responses/BadRequestError'
+	 *       401:
+	 *         $ref: '#/components/responses/UnauthorizedError'
+	 *       404:
+	 *         $ref: '#/components/responses/NotFoundError'
+	 *       500:
+	 *         $ref: '#/components/responses/InternalServerError'
 	 */
 	router.put(
 		"/comments/:id/vote",
@@ -340,6 +389,32 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 	 *     summary: Pin a comment (proposal author only)
 	 *     tags: [Comments]
 	 *     security: [{ bearerAuth: [] }]
+	 *     parameters:
+	 *       - in: path
+	 *         name: id
+	 *         required: true
+	 *         schema: { type: integer }
+	 *     requestBody:
+	 *       required: true
+	 *       content:
+	 *         application/json:
+	 *           schema:
+	 *             type: object
+	 *             required: [pinned]
+	 *             properties:
+	 *               pinned:
+	 *                 type: boolean
+	 *     responses:
+	 *       200:
+	 *         description: Pin updated
+	 *       400:
+	 *         $ref: '#/components/responses/BadRequestError'
+	 *       401:
+	 *         $ref: '#/components/responses/UnauthorizedError'
+	 *       404:
+	 *         $ref: '#/components/responses/NotFoundError'
+	 *       500:
+	 *         $ref: '#/components/responses/InternalServerError'
 	 */
 	router.put(
 		"/comments/:id/pin",
@@ -391,34 +466,6 @@ export function createCommentsRouter(jwtService: JwtService): Router {
 			}
 		},
 	)
-
-	/**
-	 * @openapi
-	 * /api/content/flag:
-	 *   post:
-	 *     summary: Flag content (comment or proposal) for moderation
-	 *     tags: [Comments]
-	 *     security: [{ bearerAuth: [] }]
-	 *     requestBody:
-	 *       required: true
-	 *       content:
-	 *         application/json:
-	 *           schema:
-	 *             type: object
-	 *             required: [contentType, contentId, reason]
-	 *             properties:
-	 *               contentType:
-	 *                 type: string
-	 *                 enum: [comment, proposal]
-	 *               contentId:
-	 *                 type: integer
-	 *               reason:
-	 *                 type: string
-	 *     responses:
-	 *       201:
-	 *         description: Content flagged successfully
-	 */
-	router.post("/content/flag", requireAuth, flagContent)
 
 	return router
 }

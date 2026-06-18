@@ -245,8 +245,81 @@ proptest! {
     }
 }
 
-#[test]
-fn get_version_returns_semver() {
+    // Property-based tests for arithmetic invariants
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(100))]
+
+        // 1) Repeated mints to a single account should only increase balance
+        //    and total supply by the exact minted amounts (no decreases, no hidden fees).
+        #[test]
+        fn prop_repeated_mints_preserve_balance(amounts in prop::collection::vec(1i128..1_000_000i128, 1..20)) {
+            let e = Env::default();
+            let (_, _, client) = setup(&e);
+            let learner = Address::generate(&e);
+
+            let mut sum: i128 = 0;
+            for a in amounts.iter() {
+                client.mint(&learner, a);
+                sum = sum.checked_add(*a).expect("sum should not overflow with generated bounds");
+                // balance equals sum of all mints so far
+                assert_eq!(client.balance(&learner), sum);
+                // total supply equals sum across all accounts (only one account used here)
+                assert_eq!(client.total_supply(), sum);
+            }
+        }
+
+        // 2) Multiple accounts: total supply equals sum of all account balances
+        #[test]
+        fn prop_multiple_accounts_supply_consistent(
+            a in prop::collection::vec(1i128..1_000_000i128, 1..10),
+            b in prop::collection::vec(1i128..1_000_000i128, 1..10),
+        ) {
+            let e = Env::default();
+            let (_, _, client) = setup(&e);
+            let alice = Address::generate(&e);
+            let bob = Address::generate(&e);
+
+            let sum_a: i128 = a.iter().copied().sum();
+            let sum_b: i128 = b.iter().copied().sum();
+
+            for x in a.iter() { client.mint(&alice, x); }
+            for x in b.iter() { client.mint(&bob, x); }
+
+            assert_eq!(client.balance(&alice), sum_a);
+            assert_eq!(client.balance(&bob), sum_b);
+            assert_eq!(client.total_supply(), sum_a + sum_b);
+        }
+
+        // 3) Reputation is monotonic with balance: higher balance => reputation >= lower
+        #[test]
+        fn prop_reputation_monotonic(
+            a in prop::collection::vec(1i128..1_000_000i128, 1..10),
+            b in prop::collection::vec(1i128..1_000_000i128, 1..10),
+        ) {
+            let e = Env::default();
+            let (_, _, client) = setup(&e);
+            let alice = Address::generate(&e);
+            let bob = Address::generate(&e);
+
+            let sum_a: i128 = a.iter().copied().sum();
+            let sum_b: i128 = b.iter().copied().sum();
+
+            for x in a.iter() { client.mint(&alice, x); }
+            for x in b.iter() { client.mint(&bob, x); }
+
+            let rep_a = client.reputation_score(&alice);
+            let rep_b = client.reputation_score(&bob);
+
+            if sum_a >= sum_b {
+                assert!(rep_a >= rep_b);
+            } else {
+                assert!(rep_b >= rep_a);
+            }
+        }
+    }
+
+    #[test]
+    fn get_version_returns_semver() {
     let e = Env::default();
     let (_, _, client) = setup(&e);
     let version = client.get_version();
@@ -805,4 +878,130 @@ fn state_persists_after_upgrade() {
     assert_eq!(balance, 100);
     assert_eq!(supply, 100);
     assert_eq!(stored_hash, wasm_hash);
+}
+
+// --- burn ---
+
+#[test]
+fn burn_reduces_balance_and_supply() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let holder = Address::generate(&e);
+
+    client.mint(&holder, &100);
+    client.burn(&holder, &40);
+
+    assert_eq!(client.balance(&holder), 60);
+    assert_eq!(client.total_supply(), 60);
+}
+
+#[test]
+fn burn_emits_event() {
+    let e = Env::default();
+    let (contract_id, _, client) = setup(&e);
+    let holder = Address::generate(&e);
+
+    client.mint(&holder, &50);
+    client.burn(&holder, &20);
+
+    let events = e.events().all();
+    let found = events.iter().any(|(cid, _topics, _data)| cid == contract_id);
+    assert!(found, "burn event not found");
+}
+
+#[test]
+fn burn_insufficient_balance_reverts() {
+    let e = Env::default();
+    let (_, _, client) = setup(&e);
+    let holder = Address::generate(&e);
+
+    client.mint(&holder, &10);
+    let result = client.try_burn(&holder, &50);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            LRNError::InsufficientBalance as u32
+        )))
+    );
+}
+
+#[test]
+fn unauthorized_burn_reverts() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let holder = Address::generate(&e);
+    let attacker = Address::generate(&e);
+    let id = e.register(LearnToken, ());
+
+    e.mock_auths(&[MockAuth {
+        address: &admin,
+        invoke: &MockAuthInvoke {
+            contract: &id,
+            fn_name: "initialize",
+            args: (admin.clone(),).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+    let client = LearnTokenClient::new(&e, &id);
+    client.initialize(&admin);
+
+    e.mock_auths(&[MockAuth {
+        address: &admin,
+        invoke: &MockAuthInvoke {
+            contract: &id,
+            fn_name: "mint",
+            args: (holder.clone(), 100_i128).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+    client.mint(&holder, &100);
+
+    e.mock_auths(&[MockAuth {
+        address: &attacker,
+        invoke: &MockAuthInvoke {
+            contract: &id,
+            fn_name: "burn",
+            args: (holder.clone(), 10_i128).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+    let result = client.try_burn(&holder, &10);
+    assert!(result.is_err());
+    assert_eq!(client.balance(&holder), 100);
+    assert_eq!(client.total_supply(), 100);
+}
+
+#[test]
+fn benchmark_costs() {
+    let e = Env::default();
+
+    // 1. Benchmark Initialize
+    let admin = Address::generate(&e);
+    let id = e.register(LearnToken, ());
+    e.mock_all_auths();
+    let client = LearnTokenClient::new(&e, &id);
+
+    e.cost_estimate().budget().reset_unlimited();
+    client.initialize(&admin);
+    let init_instr = e.cost_estimate().budget().cpu_instruction_cost();
+    let init_mem = e.cost_estimate().budget().memory_bytes_cost();
+
+    // 2. Benchmark Mint
+    let learner = Address::generate(&e);
+    e.cost_estimate().budget().reset_unlimited();
+    client.mint(&learner, &100);
+    let mint_instr = e.cost_estimate().budget().cpu_instruction_cost();
+    let mint_mem = e.cost_estimate().budget().memory_bytes_cost();
+
+    // 3. Benchmark Reputation Score
+    e.cost_estimate().budget().reset_unlimited();
+    client.reputation_score(&learner);
+    let rep_instr = e.cost_estimate().budget().cpu_instruction_cost();
+    let rep_mem = e.cost_estimate().budget().memory_bytes_cost();
+
+    extern crate std;
+    std::println!("BENCHMARK_RESULTS: learn_token");
+    std::println!("initialize: instr={}, mem={}", init_instr, init_mem);
+    std::println!("mint: instr={}, mem={}", mint_instr, mint_mem);
+    std::println!("reputation_score: instr={}, mem={}", rep_instr, rep_mem);
 }

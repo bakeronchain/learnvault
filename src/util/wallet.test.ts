@@ -4,15 +4,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 const mockCall = vi.fn()
 const mockAccountId = vi.fn(() => ({ call: mockCall }))
 const mockAccounts = vi.fn(() => ({ accountId: mockAccountId }))
+const mockLogoutSession = vi.fn().mockResolvedValue(undefined)
 
 // --- Mock modules ---
 vi.mock("@creit.tech/stellar-wallets-kit", () => {
 	class MockKit {
-		static init = vi.fn()
-		static authModal = vi.fn()
-		static disconnect = vi.fn()
-		static getNetwork = vi.fn()
-		static selectedModule = { productId: "freighter" }
 		openModal = vi.fn()
 		disconnect = vi.fn()
 		setWallet = vi.fn()
@@ -43,6 +39,10 @@ vi.mock("@stellar/stellar-sdk", () => ({
 	},
 }))
 
+vi.mock("../lib/auth", () => ({
+	logoutSession: mockLogoutSession,
+}))
+
 vi.unmock("./wallet")
 
 import storage from "./storage"
@@ -51,6 +51,7 @@ import { fetchBalances, connectWallet, disconnectWallet } from "./wallet"
 beforeEach(() => {
 	vi.clearAllMocks()
 	localStorage.clear()
+	mockLogoutSession.mockResolvedValue(undefined)
 })
 
 describe("fetchBalances", () => {
@@ -116,16 +117,19 @@ describe("wallet persistence", () => {
 	})
 
 	it("clears wallet type on disconnect", async () => {
-		// Set up initial state
 		storage.setItem("walletId", "freighter")
 		storage.setItem("walletType", "freighter")
 		storage.setItem("walletAddress", "GTEST1234")
+		storage.setItem("walletNetwork", "LOCAL")
+		storage.setItem("networkPassphrase", "Standalone Network ; February 2017")
 
-		// Simulate disconnect by removing items
-		storage.removeItem("walletType")
-		storage.removeItem("walletId")
+		await disconnectWallet()
 
 		expect(storage.getItem("walletType")).toBeNull()
 		expect(storage.getItem("walletId")).toBeNull()
+		expect(storage.getItem("walletAddress")).toBeNull()
+		expect(storage.getItem("walletNetwork")).toBeNull()
+		expect(storage.getItem("networkPassphrase")).toBeNull()
+		expect(mockLogoutSession).toHaveBeenCalledTimes(1)
 	})
 })

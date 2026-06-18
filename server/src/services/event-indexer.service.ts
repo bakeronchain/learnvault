@@ -5,7 +5,14 @@ import {
 	INDEXER_CONFIG,
 	getPollingTargets,
 } from "../lib/event-config"
+import { getRpcCache, CacheKey } from "../lib/rpc-cache"
 import { leaderboardEmitter } from "../lib/leaderboard-emitter"
+import { invalidateApiResponseCacheType } from "../lib/api-response-cache"
+import { logger } from "../lib/logger"
+import { createNotification } from "../db/notifications-store"
+import { deliverNotificationChannels } from "./notification-delivery.service"
+
+const log = logger.child({ module: "indexer" })
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL! })
 
@@ -16,6 +23,196 @@ export interface IndexedEvent {
 	event_type: string
 	data: Record<string, unknown>
 	ledger_sequence: string // RPC returns string, DB bigint
+	tx_hash?: string
+	event_index?: number
+}
+
+export interface WebhookHorizonEvent {
+	id: string
+	type: string
+	contract: string
+	topic: string
+	ledger: string | number
+	value?: Record<string, unknown>
+}
+
+/**
+ * Extract transaction hash from event ID or data
+ * Event ID format: "<ledger_sequence>-<tx_hash>-<event_index>"
+ */
+function extractTxHash(eventId: string): string | undefined {
+	// Event IDs are typically formatted as: "0000428575-250fd482f34ac0d5387a77e62ae696126f22cb09377b8038cd1cf011c62dcbd-0"
+	const parts = eventId.split("-")
+	if (parts.length >= 2) {
+		return parts[1]
+	}
+	return undefined
+}
+
+/**
+ * Extract event index from event ID
+ */
+function extractEventIndex(eventId: string): number | undefined {
+	const parts = eventId.split("-")
+	if (parts.length >= 3) {
+		const index = Number.parseInt(parts[2], 10)
+		if (!Number.isNaN(index)) {
+			return index
+		}
+	}
+	return undefined
+}
+
+function affectsLeaderboard(topic: string): boolean {
+	const t = topic.toLowerCase()
+	return (
+		(t.includes("learntoken") && t.includes("mint")) ||
+		(t.includes("coursemilestone") && t.includes("milestonecomplete")) ||
+		(t.includes("scholarnft") && t.includes("minted"))
+	)
+}
+
+function affectsTreasuryStats(topic: string): boolean {
+	const t = topic.toLowerCase()
+	return (
+		(t.includes("scholarshiptreasury") &&
+			(t.includes("deposit") ||
+				t.includes("proposalcreated") ||
+				t.includes("votecastevent"))) ||
+		(t.includes("milestoneescrow") && t.includes("fundsdisbursed"))
+	)
+}
+
+/**
+ * Invalidate RPC cache entries that are stale after a new event is indexed.
+ * We only invalidate keys we can derive from the event data — everything else
+ * expires naturally via TTL.
+ */
+async function invalidateCacheForEvent(
+	topic: string,
+	data: Record<string, unknown>,
+): Promise<void> {
+	const cache = getRpcCache()
+	const addr = typeof data.address === "string" ? data.address : null
+
+	switch (topic) {
+		case "LearnToken_Mint":
+			if (addr) {
+				await cache.invalidate(CacheKey.learnBalance(addr))
+				await cache.invalidate(CacheKey.votingPower(addr))
+			}
+			break
+		case "CourseMilestone_MilestoneComplete":
+			if (addr) {
+				const courseId =
+					typeof data.courseId === "string" ? Number(data.courseId) : null
+				if (courseId !== null && !isNaN(courseId)) {
+					await cache.invalidate(CacheKey.enrollment(addr, courseId))
+				}
+			}
+			break
+		case "ScholarshipTreasury_Deposit":
+			// Deposit mints governance tokens — invalidate gov balance + voting power
+			if (addr) {
+				await cache.invalidate(CacheKey.govBalance(addr))
+				await cache.invalidate(CacheKey.votingPower(addr))
+			}
+			break
+		case "ScholarshipTreasury_VoteCastEvent": {
+			const voter =
+				typeof data.voter === "string" ? data.voter : null
+			if (voter) {
+				await cache.invalidate(CacheKey.votingPower(voter))
+			}
+			break
+		}
+		default:
+			break
+	}
+}
+
+/**
+ * Persist a single indexed event and return whether a new row was inserted.
+ */
+async function persistIndexedEvent(
+	contractId: string,
+	topic: string,
+	ev: {
+		id: string
+		type: string
+		ledger: string | number
+		topic?: unknown
+		value?: unknown
+	},
+): Promise<boolean> {
+	const ledger = Number(ev.ledger)
+	const txHash = extractTxHash(ev.id)
+	const eventIndex = extractEventIndex(ev.id)
+
+	const data = {
+		id: ev.id,
+		type: ev.type,
+		ledger: String(ev.ledger),
+		topic: ev.topic ?? topic,
+		value: ev.value,
+	}
+
+	const result = await pool.query(
+		`INSERT INTO events (contract, event_type, data, ledger_sequence, tx_hash, event_index)
+		 VALUES ($1, $2, $3, $4, $5, $6)
+		 ON CONFLICT (ledger_sequence, tx_hash, event_index) DO NOTHING
+		 RETURNING id`,
+		[contractId, topic, data, ledger, txHash, eventIndex],
+	)
+
+	await invalidateCacheForEvent(topic, data)
+
+	if ((result.rowCount ?? 0) > 0) {
+		if (topic === "LearnToken_Mint" || topic === "ScholarNFT::minted") {
+			leaderboardEmitter.emitUpdate()
+		}
+		return true
+	}
+
+	return false
+}
+
+/**
+ * Process events pushed via the Horizon webhook relay.
+ */
+export async function processWebhookEvents(
+	events: WebhookHorizonEvent[],
+): Promise<{ inserted: number; skipped: number }> {
+	let inserted = 0
+	let skipped = 0
+	const contractMaxLedger = new Map<string, number>()
+
+	for (const ev of events) {
+		try {
+			const ledger = Number(ev.ledger)
+			const wasInserted = await persistIndexedEvent(ev.contract, ev.topic, ev)
+			if (wasInserted) {
+				inserted++
+			} else {
+				skipped++
+			}
+
+			const currentMax = contractMaxLedger.get(ev.contract) ?? 0
+			if (ledger > currentMax) {
+				contractMaxLedger.set(ev.contract, ledger)
+			}
+		} catch (err) {
+			log.error({ err, eventId: ev.id, contract: ev.contract }, "Webhook event error")
+			skipped++
+		}
+	}
+
+	for (const [contract, lastLedger] of contractMaxLedger) {
+		await updateIndexerState(contract, lastLedger)
+	}
+
+	log.info({ inserted, skipped, count: events.length }, "Webhook events processed")
+	return { inserted, skipped }
 }
 
 /**
@@ -29,8 +226,12 @@ export async function indexEventsBatch(
 ): Promise<void> {
 	const targets = getPollingTargets()
 	let inserted = 0
+	let skipped = 0
 
 	for (const { contractId, topics } of targets) {
+		// Track max ledger for this contract
+		let maxLedgerForContract = startLedger
+
 		for (const topic of topics) {
 			const filters: StellarRpc.Api.EventFilter[] = [
 				{
@@ -52,43 +253,85 @@ export async function indexEventsBatch(
 					const ledger = Number(ev.ledger)
 					if (ledger > endLedger) continue
 
-					// Check idempotency
-					const exists = await pool.query(
-						"SELECT 1 FROM events WHERE contract = $1 AND ledger_sequence = $2",
-						[contractId, ledger],
-					)
-					if ((exists.rowCount ?? 0) > 0) continue
+					// Update max ledger for this contract
+					if (ledger > maxLedgerForContract) {
+						maxLedgerForContract = ledger
+					}
 
-					const data = { id: ev.id, type: ev.type, ledger: ev.ledger }
-
-					await pool.query(
-						`INSERT INTO events (contract, event_type, data, ledger_sequence)
-             VALUES ($1, $2, $3, $4)`,
-						[contractId, topic, data, ledger],
-					)
-					inserted++
-
-					// Notify leaderboard of potential balance changes
-					if (topic === "LearnToken_Mint" || topic === "ScholarNFT::minted") {
-						leaderboardEmitter.emitUpdate()
+					const wasInserted = await persistIndexedEvent(contractId, topic, ev)
+					if (wasInserted) {
+						inserted++
+					} else {
+						skipped++
 					}
 				}
 			} catch (err) {
-				console.error(`[indexer:${contractId}:${topic}] Error:`, err)
+				log.error({ err, contractId, topic }, "Indexer error")
 			}
 		}
+
+		// Update indexer state with last processed ledger for this contract
+		await updateIndexerState(contractId, maxLedgerForContract)
 	}
 
-	console.log(
-		`[indexer] Inserted ${inserted} events from ${startLedger}-${endLedger}`,
+	log.info({ inserted, startLedger, endLedger }, "Events indexed")
+}
+
+/**
+ * Update indexer state with last processed ledger for a contract
+ */
+export async function updateIndexerState(
+	contract: string,
+	lastLedger: number,
+): Promise<void> {
+	await pool.query(
+		`INSERT INTO indexer_state (contract, last_processed_ledger, last_processed_at)
+		 VALUES ($1, $2, CURRENT_TIMESTAMP)
+		 ON CONFLICT (contract) DO UPDATE SET
+			 last_processed_ledger = EXCLUDED.last_processed_ledger,
+			 last_processed_at = EXCLUDED.last_processed_at,
+			 updated_at = CURRENT_TIMESTAMP`,
+		[contract, lastLedger],
 	)
 }
 
-// Get last indexed ledger per contract (for resuming)
+/**
+ * Get last indexed ledger per contract from indexer_state table
+ * Falls back to events table max if no state exists
+ */
 export async function getLastIndexedLedger(contract: string): Promise<number> {
-	const res = await pool.query(
+	// First check indexer_state table
+	const stateRes = await pool.query(
+		"SELECT last_processed_ledger FROM indexer_state WHERE contract = $1",
+		[contract],
+	)
+
+	if (stateRes.rows.length > 0 && stateRes.rows[0].last_processed_ledger > 0) {
+		return Number(stateRes.rows[0].last_processed_ledger)
+	}
+
+	// Fallback to events table for backward compatibility
+	const eventsRes = await pool.query(
 		"SELECT MAX(ledger_sequence) FROM events WHERE contract = $1",
 		[contract],
 	)
-	return (res.rows[0]?.max as number) || INDEXER_CONFIG.startingLedger
+
+	return (eventsRes.rows[0]?.max as number) || INDEXER_CONFIG.startingLedger
+}
+
+/**
+ * Get all indexer state entries
+ */
+export async function getAllIndexerState(): Promise<
+	Array<{
+		contract: string
+		last_processed_ledger: number
+		last_processed_at: Date
+		updated_at: Date
+	}>
+> {
+	const result = await pool.query(
+		"SELECT contract, last_processed_ledger, last_processed_at, updated_at FROM indexer_state ORDER BY contract",
+	)
+	return result.rows
 }

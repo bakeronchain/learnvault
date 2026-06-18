@@ -29,6 +29,7 @@ import {
 	useDeleteWikiPage,
 	type WikiPage,
 } from "../hooks/useWiki"
+import i18n from "../i18n"
 import { apiFetchJson } from "../lib/api"
 import { getAuthToken } from "../util/auth"
 import { shortenContractId } from "../util/contract"
@@ -43,6 +44,7 @@ type AdminSection =
 	| "treasury"
 	| "scholarships"
 	| "contracts"
+	| "moderation"
 type CourseStatus = "draft" | "published"
 
 interface AdminCourse {
@@ -118,7 +120,7 @@ const formatDate = (value: string | undefined): string => {
 	const date = new Date(value)
 	if (Number.isNaN(date.getTime())) return value
 
-	return date.toLocaleDateString("en-GB", {
+	return date.toLocaleDateString(i18n.resolvedLanguage, {
 		day: "2-digit",
 		month: "short",
 		year: "numeric",
@@ -126,7 +128,7 @@ const formatDate = (value: string | undefined): string => {
 }
 
 const formatCount = (value: number): string =>
-	value.toLocaleString("en-US", { maximumFractionDigits: 0 })
+	value.toLocaleString(i18n.resolvedLanguage, { maximumFractionDigits: 0 })
 
 const formatPercent = (value: number): string => {
 	if (!Number.isFinite(value)) return "0.0%"
@@ -260,7 +262,7 @@ const MilestoneStatsBar: React.FC = () => {
 		<div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
 			{error && (
 				<p className="md:col-span-3 text-xs text-red-400">
-					Could not load stats — {error}. Refresh the page to try again.
+					Failed to load stats: {error}
 				</p>
 			)}
 			{items.map((item) => (
@@ -331,6 +333,7 @@ const Admin: React.FC = () => {
 							"treasury",
 							"scholarships",
 							"contracts",
+							"moderation",
 						] as const
 					).map((section) => (
 						<button
@@ -361,6 +364,7 @@ const Admin: React.FC = () => {
 				{activeSection === "wiki" && <WikiManagement />}
 				{activeSection === "scholarships" && <ScholarshipMetrics />}
 				{activeSection === "contracts" && <ContractInfo />}
+				{activeSection === "moderation" && <ModerationQueue />}
 			</main>
 		</div>
 	)
@@ -395,8 +399,7 @@ const CourseManagement: React.FC = () => {
 
 			{errorMessage && (
 				<p className="text-sm text-red-400 mb-4">
-					Could not load courses — {errorMessage}. Use the Refresh button above
-					to retry.
+					Failed to load courses: {errorMessage}
 				</p>
 			)}
 
@@ -482,6 +485,8 @@ const MilestoneQueue: React.FC = () => {
 		fetchMilestones,
 		approveMilestone,
 		rejectMilestone,
+		batchApproveMilestones,
+		batchRejectMilestones,
 	} = useAdminMilestones()
 	const courseOptions = useMemo(
 		() => ["All", ...courseOptionsData.map((course) => course.slug)],
@@ -494,6 +499,18 @@ const MilestoneQueue: React.FC = () => {
 		action: "approve" | "reject"
 		milestone: MilestoneSubmission
 	} | null>(null)
+	const [selectedMilestoneIds, setSelectedMilestoneIds] = useState<string[]>([])
+	const [batchState, setBatchState] = useState<{
+		action: "approve" | "reject"
+		total: number
+		inProgress: boolean
+		results: BatchMilestoneResponse | null
+	}>({
+		action: "approve",
+		total: 0,
+		inProgress: false,
+		results: null,
+	})
 
 	useEffect(() => {
 		void fetchMilestones(1, {
@@ -735,14 +752,13 @@ const MilestoneQueue: React.FC = () => {
 
 			{coursesErrorMessage && (
 				<p className="text-xs text-red-400 mb-2">
-					Could not load course filters — {coursesErrorMessage}. Filters may be
-					incomplete.
+					Failed to load course filters: {coursesErrorMessage}
 				</p>
 			)}
 
 			{error && (
 				<p className="text-xs text-red-400 mb-4">
-					Could not load milestones — {error}. Try refreshing the page.
+					Error loading milestones: {error}
 				</p>
 			)}
 
@@ -878,6 +894,7 @@ const MilestoneQueue: React.FC = () => {
 							type="button"
 							disabled={page <= 1}
 							onClick={() => handlePageChange(page - 1)}
+							aria-label="Previous page"
 							className="px-3 py-1 rounded-xl border border-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
 						>
 							← Prev
@@ -886,6 +903,7 @@ const MilestoneQueue: React.FC = () => {
 							type="button"
 							disabled={page >= totalPages}
 							onClick={() => handlePageChange(page + 1)}
+							aria-label="Next page"
 							className="px-3 py-1 rounded-xl border border-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
 						>
 							Next →
@@ -970,8 +988,7 @@ const UserLookup: React.FC = () => {
 				)}
 				{errorMessage && (
 					<p className="text-xs text-red-400 mt-3">
-						Could not load scholar profile — {errorMessage}. Check the address
-						and try again.
+						Failed to load scholar profile: {errorMessage}
 					</p>
 				)}
 
@@ -1100,8 +1117,7 @@ const TreasuryControls: React.FC = () => {
 			<div className="glass border border-white/5 rounded-2xl p-6">
 				{queryError && (
 					<p className="text-sm text-red-400 mb-4">
-						Could not load treasury contract state — {queryError}. Check your
-						network connection and try again.
+						Failed to load treasury contract state: {queryError}
 					</p>
 				)}
 

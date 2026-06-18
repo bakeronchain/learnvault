@@ -11,7 +11,10 @@ version.workspace = true
 cargo_inherit = true
 
 [lib]
-crate-type = ["cdylib"]
+# `rlib` is added alongside `cdylib` so the contract can be linked into other
+# crates' integration tests (e.g. scholar_nft's mint-on-completion flow).
+# `cdylib` is still produced for the on-chain wasm build.
+crate-type = ["cdylib", "rlib"]
 doctest = false
 
 [dependencies]

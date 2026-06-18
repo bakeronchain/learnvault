@@ -1,3 +1,4 @@
+import i18n from "../i18n"
 const DEFAULT_DECIMALS = 7
 
 export function formatLRN(
@@ -36,7 +37,8 @@ function formatToken(raw: bigint, decimals: number): string {
 	const wholePart = abs / divisor
 	const fracPart = abs % divisor
 
-	const wholeStr = wholePart.toLocaleString("en-US")
+	const locale = i18n.resolvedLanguage ?? undefined
+	const wholeStr = wholePart.toLocaleString(locale)
 	const fracStr = fracPart.toString().padStart(decimals, "0")
 
 	const formatted = `${wholeStr}.${fracStr}`

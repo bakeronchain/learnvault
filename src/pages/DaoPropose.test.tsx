@@ -7,10 +7,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { useToast } from "../components/Toast/ToastProvider"
 import { useProposals } from "../hooks/useProposals"
 import { useWallet } from "../hooks/useWallet"
+import {
+	hasProposalDraft,
+	loadProposalDraft,
+	saveProposalDraft,
+	clearProposalDraft,
+} from "../util/proposalDraft"
 import DaoPropose from "./DaoPropose"
 
 vi.mock("../hooks/useWallet", () => ({
 	useWallet: vi.fn(),
+}))
+
+vi.mock("../util/proposalDraft", () => ({
+	saveProposalDraft: vi.fn(),
+	loadProposalDraft: vi.fn(),
+	clearProposalDraft: vi.fn(),
+	hasProposalDraft: vi.fn(),
+	getDraftTimestamp: vi.fn(),
 }))
 
 vi.mock("../hooks/useProposals", () => ({
@@ -29,6 +43,10 @@ const mockUseWallet = vi.mocked(useWallet)
 const mockUseProposals = vi.mocked(useProposals)
 const mockUseToast = vi.mocked(useToast)
 const mockUseNavigate = vi.mocked(useNavigate)
+const mockHasProposalDraft = vi.mocked(hasProposalDraft)
+const mockLoadProposalDraft = vi.mocked(loadProposalDraft)
+const mockSaveProposalDraft = vi.mocked(saveProposalDraft)
+const mockClearProposalDraft = vi.mocked(clearProposalDraft)
 
 const mockNavigate = vi.fn()
 
@@ -347,6 +365,90 @@ describe("DaoPropose", () => {
 
 		await waitFor(() => {
 			expect(screen.getByText("Network error")).toBeInTheDocument()
+		})
+	})
+
+	describe("Draft functionality", () => {
+		it("shows restore prompt if draft exists on mount", async () => {
+			mockHasProposalDraft.mockReturnValue(true)
+			render(<DaoPropose />, { wrapper: createWrapper() })
+
+			expect(
+				screen.getByText(/You have an unsaved draft/i),
+			).toBeInTheDocument()
+			expect(screen.getByText("Restore Draft")).toBeInTheDocument()
+		})
+
+		it("restores draft when clicking Restore Draft", async () => {
+			const user = userEvent.setup()
+			mockHasProposalDraft.mockReturnValue(true)
+			mockLoadProposalDraft.mockReturnValue({
+				title: "Saved Title",
+				description: "Saved Description",
+				type: "scholarship",
+				applicationUrl: "",
+				fundingAmount: "",
+				parameterName: "",
+				parameterValue: "",
+				parameterReason: "",
+				courseTitle: "",
+				courseDescription: "",
+				courseDuration: "",
+				courseDifficulty: "",
+				savedAt: Date.now(),
+			})
+
+			render(<DaoPropose />, { wrapper: createWrapper() })
+
+			const restoreButton = screen.getByText("Restore Draft")
+			await user.click(restoreButton)
+
+			expect(screen.getByPlaceholderText("Enter proposal title")).toHaveValue(
+				"Saved Title",
+			)
+			expect(
+				screen.getByPlaceholderText(
+					"Enter the proposal details using Markdown formatting",
+				),
+			).toHaveValue("Saved Description")
+		})
+
+		it("clears draft after successful submission", async () => {
+			const user = userEvent.setup()
+			mockUseProposals.mockReturnValue({
+				createProposal: vi.fn().mockResolvedValue({ proposal_id: 123 }),
+				isSubmittingProposal: false,
+				votingPower: 100n,
+			} as unknown as ReturnType<typeof useProposals>)
+
+			render(<DaoPropose />, { wrapper: createWrapper() })
+
+			const titleInput = screen.getByPlaceholderText("Enter proposal title")
+			await user.type(titleInput, "Test Title")
+			const descInput = screen.getByPlaceholderText(
+				"Enter the proposal details using Markdown formatting",
+			)
+			await user.type(descInput, "Test Description")
+
+			const submitButton = screen.getByTestId("submit-proposal")
+			await user.click(submitButton)
+
+			await waitFor(() => {
+				expect(mockClearProposalDraft).toHaveBeenCalled()
+			})
+		})
+
+		it("allows deleting draft manually", async () => {
+			const user = userEvent.setup()
+			vi.spyOn(window, "confirm").mockReturnValue(true)
+			mockHasProposalDraft.mockReturnValue(true)
+
+			render(<DaoPropose />, { wrapper: createWrapper() })
+
+			const deleteButton = screen.getByText(/Discard/i)
+			await user.click(deleteButton)
+
+			expect(mockClearProposalDraft).toHaveBeenCalled()
 		})
 	})
 })

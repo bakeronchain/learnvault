@@ -13,7 +13,7 @@ type MockProposal = {
 	amount: string
 	votes_for: string
 	votes_against: string
-	status: "pending" | "approved" | "rejected"
+	status: "pending" | "approved" | "queued" | "rejected"
 	deadline: string | null
 	created_at: string
 	user_vote_support: boolean | null

@@ -6,6 +6,8 @@ import {
 	getAdminModerationStats,
 } from "../controllers/moderation.controller"
 import { requireAdmin } from "../middleware/admin.middleware"
+import { authMiddleware } from "../middleware/auth.middleware"
+import { flagContent } from "../controllers/flag-content.controller"
 
 export const moderationRouter = Router()
 
@@ -54,11 +56,7 @@ moderationRouter.get("/admin/moderation", requireAdmin, listFlaggedContent)
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  */
-moderationRouter.get(
-	"/admin/moderation/:flagId",
-	requireAdmin,
-	getFlagDetails,
-)
+moderationRouter.get("/admin/moderation/:flagId", requireAdmin, getFlagDetails)
 
 /**
  * @openapi
@@ -116,3 +114,39 @@ moderationRouter.get(
 	requireAdmin,
 	getAdminModerationStats,
 )
+
+/**
+ * @openapi
+ * /api/moderation/flag:
+ *   post:
+ *     tags: [Moderation]
+ *     summary: Flag a comment or proposal
+ *     description: Flags content for admin review. Authenticated users only.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [contentType, contentId, reason]
+ *             properties:
+ *               contentType:
+ *                 type: string
+ *                 enum: [comment, proposal]
+ *               contentId:
+ *                 type: integer
+ *               reason:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Content flagged successfully
+ *       400:
+ *         $ref: '#/components/responses/BadRequestError'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
+ */
+moderationRouter.post("/moderation/flag", authMiddleware, flagContent)

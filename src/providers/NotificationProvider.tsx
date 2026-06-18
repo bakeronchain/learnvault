@@ -55,6 +55,17 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
 		[],
 	)
 
+	React.useEffect(() => {
+		const handleGlobalError = (event: Event) => {
+			const customEvent = event as CustomEvent<string>
+			addNotification(customEvent.detail, "error")
+		}
+		window.addEventListener("app:error", handleGlobalError)
+		return () => {
+			window.removeEventListener("app:error", handleGlobalError)
+		}
+	}, [addNotification])
+
 	const contextValue = useMemo(() => ({ addNotification }), [addNotification])
 
 	return (

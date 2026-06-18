@@ -6,15 +6,19 @@ use soroban_sdk::{
     panic_with_error, symbol_short,
 };
 
-use learnvault_shared::upgrade;
-
-pub use upgrade::ContractUpgraded;
+// ---------------------------------------------------------------------------
+// Storage Constants (assuming ~6s ledger time)
+// ---------------------------------------------------------------------------
 
 const DAY_IN_LEDGERS: u32 = 17_280;
 const INSTANCE_BUMP_THRESHOLD: u32 = DAY_IN_LEDGERS;
-const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30;
+const INSTANCE_EXTEND_TO: u32 = DAY_IN_LEDGERS * 30; // 30 days
 const TTL_MIN: u32 = DAY_IN_LEDGERS;
-const TTL_MAX: u32 = DAY_IN_LEDGERS * 365;
+const TTL_MAX: u32 = DAY_IN_LEDGERS * 365; // 1 year
+
+use learnvault_shared::upgrade;
+
+pub use upgrade::ContractUpgraded;
 
 const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
 const TOKEN_COUNTER_KEY: Symbol = symbol_short!("TCOUNTER");
@@ -32,7 +36,6 @@ pub struct ScholarMetadata {
 pub enum DataKey {
     Admin,
     Counter,
-    Scholars,
     Owner(u64),
     TokenUri(u64),
     Revoked(u64),
@@ -86,6 +89,7 @@ pub enum ScholarNFTError {
     TokenExists = 6,
     Soulbound = 7,
     AlreadyRevoked = 8,
+    CounterOverflow = 9,
 }
 
 #[contract]
@@ -103,11 +107,6 @@ impl ScholarNFT {
         env.storage().instance().set(&TOKEN_COUNTER_KEY, &0_u64);
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::Counter, &0_u64);
-        let scholars: Vec<Address> = Vec::new(&env);
-        env.storage()
-            .persistent()
-            .set(&DataKey::Scholars, &scholars);
-        Self::extend_persistent(&env, &DataKey::Scholars);
 
         env.events()
             .publish((symbol_short!("init"),), InitializedEventData { admin });
@@ -142,17 +141,6 @@ impl ScholarNFT {
             .persistent()
             .set(&DataKey::Metadata(token_id), &metadata);
         Self::extend_persistent(&env, &DataKey::Metadata(token_id));
-
-        let mut scholars: Vec<Address> = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Scholars)
-            .unwrap_or_else(|| Vec::new(&env));
-        scholars.push_back(to.clone());
-        env.storage()
-            .persistent()
-            .set(&DataKey::Scholars, &scholars);
-        Self::extend_persistent(&env, &DataKey::Scholars);
 
         env.events().publish(
             (symbol_short!("minted"), token_id),
@@ -249,14 +237,17 @@ impl ScholarNFT {
 
     pub fn get_all_scholars(env: Env) -> Vec<Address> {
         Self::extend_instance(&env);
-        let key = DataKey::Scholars;
-        let scholars: Vec<Address> = env
-            .storage()
-            .persistent()
-            .get(&key)
-            .unwrap_or_else(|| Vec::new(&env));
-        if env.storage().persistent().has(&key) {
-            Self::extend_persistent(&env, &key);
+        let count = Self::token_counter(env.clone());
+        let mut scholars = Vec::new(&env);
+        for i in 1..=count {
+            if let Some(owner) = env
+                .storage()
+                .persistent()
+                .get::<_, Address>(&DataKey::Owner(i))
+            {
+                scholars.push_back(owner);
+                Self::extend_persistent(&env, &DataKey::Owner(i));
+            }
         }
         scholars
     }
@@ -283,7 +274,7 @@ impl ScholarNFT {
             Self::extend_persistent(&env, &revoked_key);
             panic_with_error!(&env, ScholarNFTError::TokenRevoked);
         }
-
+ 
         let key = DataKey::Owner(token_id);
         if let Some(owner) = env.storage().persistent().get::<_, Address>(&key) {
             Self::extend_persistent(&env, &key);
@@ -335,7 +326,9 @@ impl ScholarNFT {
             .instance()
             .get(&TOKEN_COUNTER_KEY)
             .unwrap_or(0_u64);
-        counter = counter.saturating_add(1);
+        counter = counter
+            .checked_add(1)
+            .unwrap_or_else(|| panic_with_error!(env, ScholarNFTError::CounterOverflow));
         env.storage().instance().set(&TOKEN_COUNTER_KEY, &counter);
         counter
     }
@@ -361,3 +354,6 @@ impl ScholarNFT {
 
 #[cfg(test)]
 mod test;
+
+#[cfg(test)]
+mod tests;

@@ -2,6 +2,7 @@ import express from "express"
 import request from "supertest"
 import { createAuthRouter } from "../routes/auth.routes"
 import { type AuthService } from "../services/auth.service"
+import { type JwtService } from "../services/jwt.service"
 
 const mockAuthService: jest.Mocked<AuthService> = {
 	getOrCreateNonce: jest.fn(),
@@ -9,13 +10,13 @@ const mockAuthService: jest.Mocked<AuthService> = {
 	verifyLinkSignature: jest.fn(),
 	createChallenge: jest.fn(),
 	verifySignedTransaction: jest.fn(),
-	logout: jest.fn(),
+	refreshSession: jest.fn(),
 }
 
 function buildApp() {
 	const app = express()
 	app.use(express.json())
-	app.use("/api/auth", createAuthRouter(mockAuthService))
+	app.use("/api/auth", createAuthRouter(mockAuthService, mockJwtService))
 	return app
 }
 
@@ -50,7 +51,10 @@ describe("Auth Routes", () => {
 
 	describe("POST /api/auth/challenge/verify", () => {
 		it("returns a token on successful verification", async () => {
-			mockAuthService.verifySignedTransaction.mockResolvedValue("mock_jwt_token")
+			mockAuthService.verifySignedTransaction.mockResolvedValue({
+				accessToken: "mock_jwt_token",
+				refreshToken: "mock_refresh_token",
+			})
 
 			const res = await request(buildApp())
 				.post("/api/auth/challenge/verify")
@@ -58,6 +62,7 @@ describe("Auth Routes", () => {
 
 			expect(res.status).toBe(200)
 			expect(res.body.token).toBe("mock_jwt_token")
+			expect(res.body.refreshToken).toBe("mock_refresh_token")
 			expect(res.body.tokenType).toBe("Bearer")
 		})
 
@@ -71,7 +76,9 @@ describe("Auth Routes", () => {
 
 	describe("GET /api/auth/nonce", () => {
 		it("returns a nonce for a given address", async () => {
-			mockAuthService.getOrCreateNonce.mockResolvedValue({ nonce: "mock_nonce" })
+			mockAuthService.getOrCreateNonce.mockResolvedValue({
+				nonce: "mock_nonce",
+			})
 
 			const res = await request(buildApp())
 				.get("/api/auth/nonce")
@@ -89,7 +96,10 @@ describe("Auth Routes", () => {
 
 	describe("POST /api/auth/verify", () => {
 		it("returns a token for a valid signature", async () => {
-			mockAuthService.verifyAndIssueToken.mockResolvedValue("mock_jwt_token")
+			mockAuthService.verifyAndIssueToken.mockResolvedValue({
+				accessToken: "mock_jwt_token",
+				refreshToken: "mock_refresh_token",
+			})
 
 			const res = await request(buildApp())
 				.post("/api/auth/verify")
@@ -97,6 +107,7 @@ describe("Auth Routes", () => {
 
 			expect(res.status).toBe(200)
 			expect(res.body.token).toBe("mock_jwt_token")
+			expect(res.body.refreshToken).toBe("mock_refresh_token")
 		})
 
 		it("returns 400 if fields are missing", async () => {
@@ -105,21 +116,27 @@ describe("Auth Routes", () => {
 		})
 	})
 
-	describe("POST /api/auth/logout", () => {
-		it("revokes the token on logout", async () => {
-			mockAuthService.logout.mockResolvedValue(undefined)
+	describe("POST /api/auth/refresh", () => {
+		it("rotates refresh token and returns a new pair", async () => {
+			mockAuthService.refreshSession.mockResolvedValue({
+				accessToken: "next_access",
+				refreshToken: "next_refresh",
+			})
 
 			const res = await request(buildApp())
-				.post("/api/auth/logout")
-				.set("Authorization", "Bearer mock_token")
+				.post("/api/auth/refresh")
+				.send({ refreshToken: "old_refresh" })
 
 			expect(res.status).toBe(200)
-			expect(mockAuthService.logout).toHaveBeenCalledWith("mock_token")
+			expect(res.body.token).toBe("next_access")
+			expect(res.body.refreshToken).toBe("next_refresh")
 		})
 
-		it("returns 401 if Authorization header is missing", async () => {
-			const res = await request(buildApp()).post("/api/auth/logout")
-			expect(res.status).toBe(401)
+		it("returns 400 if refreshToken is missing", async () => {
+			const res = await request(buildApp()).post("/api/auth/refresh").send({})
+			expect(res.status).toBe(400)
 		})
 	})
+
+	// Logout was removed from the API (token revocation is handled by the JWT blocklist service).
 })

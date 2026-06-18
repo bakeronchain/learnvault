@@ -79,10 +79,14 @@ const PeerReview: React.FC = () => {
 				)}
 
 				{!loading && items.length === 0 && (
-					<div className="glass rounded-2xl border border-white/10 p-10 text-center text-white/45 text-sm">
-						No submissions are available for you to review right now. You may
-						already have reviewed them, be enrolled in the same course, or need
-						a higher LRN balance to qualify.
+					<div className="p-4">
+						<EmptyState
+							icon="📬"
+							title="No submissions to review"
+							description="You may have already reviewed items, or need higher LRN to qualify."
+							ctaLabel="Refresh queue"
+							onCtaClick={() => void refresh()}
+						/>
 					</div>
 				)}
 

@@ -1,5 +1,8 @@
 import React from "react"
 import { Link } from "react-router-dom"
+import CourseCategoryBadge from "./CourseCategoryBadge"
+
+import BookmarkButton from "./BookmarkButton"
 
 interface CourseCardProps {
 	id: string
@@ -14,24 +17,6 @@ interface CourseCardProps {
 	onEnroll?: () => void
 }
 
-const difficultyConfig: Record<
-	CourseCardProps["difficulty"],
-	{ label: string; className: string }
-> = {
-	beginner: {
-		label: "Beginner",
-		className: "bg-brand-emerald/10 text-brand-emerald border-brand-emerald/20",
-	},
-	intermediate: {
-		label: "Intermediate",
-		className: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-	},
-	advanced: {
-		label: "Advanced",
-		className: "bg-red-500/10 text-red-500 border-red-500/20",
-	},
-}
-
 const CourseCard: React.FC<CourseCardProps> = ({
 	id,
 	title,
@@ -44,8 +29,6 @@ const CourseCard: React.FC<CourseCardProps> = ({
 	isEnrolled = false,
 	onEnroll,
 }) => {
-	const difficultyData = difficultyConfig[difficulty]
-
 	return (
 		<div className="glass-card flex flex-col h-full rounded-[2.5rem] border border-white/5 overflow-hidden hover:border-brand-cyan/40 hover:shadow-[0_0_40px_rgba(0,212,255,0.1)] transition-all duration-500 group relative">
 			{/* Decorative background glow */}
@@ -66,11 +49,14 @@ const CourseCard: React.FC<CourseCardProps> = ({
 				)}
 				{/* Difficulty Badge overlaying image */}
 				<div className="absolute top-5 left-5">
-					<span
-						className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border backdrop-blur-md ${difficultyData.className}`}
-					>
-						{difficultyData.label}
-					</span>
+					<CourseCategoryBadge
+						category={difficulty}
+						className="text-[10px] font-black uppercase tracking-widest backdrop-blur-md"
+					/>
+				</div>
+				{/* Bookmark toggle (hidden when wallet not connected) */}
+				<div className="absolute top-5 right-5">
+					<BookmarkButton courseId={id} />
 				</div>
 			</div>
 

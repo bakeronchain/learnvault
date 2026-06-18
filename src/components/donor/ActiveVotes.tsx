@@ -10,6 +10,8 @@ export const ActiveVotes: React.FC<ActiveVotesProps> = ({ votes }) => {
 		switch (status) {
 			case "active":
 				return "text-brand-cyan"
+			case "queued":
+				return "text-brand-amber"
 			case "passed":
 				return "text-brand-emerald"
 			case "rejected":
@@ -23,6 +25,8 @@ export const ActiveVotes: React.FC<ActiveVotesProps> = ({ votes }) => {
 		switch (status) {
 			case "active":
 				return "bg-brand-cyan/10 border-brand-cyan/30"
+			case "queued":
+				return "bg-brand-amber/10 border-brand-amber/30"
 			case "passed":
 				return "bg-brand-emerald/10 border-brand-emerald/30"
 			case "rejected":

@@ -40,23 +40,19 @@ export async function getFlagDetails(
 		// Get the actual content
 		let content: any = null
 		if (flag.content_type === "comment") {
-			const result = await pool.query(
-				`SELECT * FROM comments WHERE id = $1`,
-				[flag.content_id],
-			)
+			const result = await pool.query(`SELECT * FROM comments WHERE id = $1`, [
+				flag.content_id,
+			])
 			content = result.rows[0]
 		} else if (flag.content_type === "proposal") {
-			const result = await pool.query(
-				`SELECT * FROM proposals WHERE id = $1`,
-				[flag.content_id],
-			)
+			const result = await pool.query(`SELECT * FROM proposals WHERE id = $1`, [
+				flag.content_id,
+			])
 			content = result.rows[0]
 		}
 
 		// Get audit log
-		const auditLog = await flaggedContentStore.getAuditForFlag(
-			Number(flagId),
-		)
+		const auditLog = await flaggedContentStore.getAuditForFlag(Number(flagId))
 
 		res.json({ data: { flag, content, auditLog } })
 	} catch (err) {
@@ -65,10 +61,7 @@ export async function getFlagDetails(
 	}
 }
 
-export async function actionOnFlag(
-	req: Request,
-	res: Response,
-): Promise<void> {
+export async function actionOnFlag(req: Request, res: Response): Promise<void> {
 	const { flagId } = req.params
 	const body = req.body as ModerationActionRequest
 	const adminAddress = (req as any).user?.address || (req as any).adminAddress
@@ -97,6 +90,9 @@ export async function actionOnFlag(
 				)
 			}
 			// For proposals, we might want to archive them instead
+		} else if (action === "dismiss") {
+			// Dismiss/unhide the content
+			await flaggedContentStore.dismissContent(flag.content_type, flag.content_id)
 		}
 
 		// Update flag status
@@ -129,7 +125,8 @@ export async function getAdminModerationStats(
 ): Promise<void> {
 	try {
 		const pendingResult = await flaggedContentStore.getFlaggedContent("pending")
-		const reviewedResult = await flaggedContentStore.getFlaggedContent("reviewed")
+		const reviewedResult =
+			await flaggedContentStore.getFlaggedContent("reviewed")
 
 		const stats = {
 			pendingCount: pendingResult.length,

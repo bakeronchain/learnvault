@@ -7,6 +7,13 @@ export interface MilestoneReportFormValues {
 	acceptedTerms: boolean
 }
 
+export type MilestoneReportStatus =
+	| "pending"
+	| "approved"
+	| "rejected"
+	| "appealed"
+	| "final_rejected"
+
 export interface SubmittedMilestoneReport {
 	id: number
 	scholar_address: string
@@ -15,6 +22,7 @@ export interface SubmittedMilestoneReport {
 	evidence_github: string | null
 	evidence_ipfs_cid: string | null
 	evidence_description: string | null
-	status: string
-	resubmission_count: number
+	status: MilestoneReportStatus
+	appeal_reason: string | null
+	appeal_submitted_at: string | null
 }

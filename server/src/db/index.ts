@@ -50,12 +50,12 @@ const getPoolConfig = () => {
 class MockPool {
 	async connect() {
 		return {
-			query: async () => ({ rows: [] }),
+			query: async () => ({ rows: [], rowCount: 0 }),
 			release: () => {},
 		}
 	}
 	async query(_text: string, _params?: any[]) {
-		return { rows: [] }
+		return { rows: [], rowCount: 0 }
 	}
 }
 
@@ -90,13 +90,13 @@ export const initDb = async () => {
 			const client = await activePool.connect()
 			await client.query("SELECT 1")
 			client.release()
-			console.log("[db] Postgres connection verified")
+			log.info("Postgres connection verified")
 			await logPgStatStatementsSnapshot()
 		} else {
-			console.log("[db] In-memory mock database initialized")
+			log.info("In-memory mock database initialized")
 		}
 	} catch (err) {
-		console.error("[db] Connection check failed, falling back to mock:", err)
+		log.error({ err }, "Connection check failed, falling back to mock")
 		activePool = new MockPool()
 	}
 }

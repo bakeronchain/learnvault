@@ -304,6 +304,74 @@ describe("POST /api/courses", () => {
 		expect(res.status).toBe(403)
 		expect(res.body).toEqual({ error: "Forbidden" })
 	})
+
+	it("returns 400 when prerequisites is not an array", async () => {
+		const res = await request(buildApp())
+			.post("/api/courses")
+			.set("Authorization", `Bearer ${adminToken}`)
+			.send({
+				title: "Course",
+				slug: "course-1",
+				track: "web3",
+				difficulty: "beginner",
+				prerequisites: "not-an-array",
+			})
+		expect(res.status).toBe(400)
+		expect(res.body.error).toBe("prerequisites must be an array of course IDs")
+	})
+
+	it("returns 400 when prerequisites contains non-existent IDs", async () => {
+		mockedQuery.mockResolvedValueOnce({ rows: [] }) // checking if prerequisite IDs exist (none found)
+
+		const res = await request(buildApp())
+			.post("/api/courses")
+			.set("Authorization", `Bearer ${adminToken}`)
+			.send({
+				title: "Course",
+				slug: "course-1",
+				track: "web3",
+				difficulty: "beginner",
+				prerequisites: [999],
+			})
+		expect(res.status).toBe(400)
+		expect(res.body.error).toBe("One or more prerequisite course IDs do not exist")
+	})
+
+	it("creates course successfully with valid prerequisites", async () => {
+		mockedQuery
+			.mockResolvedValueOnce({ rows: [{ id: 1 }] }) // mock checking prerequisite ID existence
+			.mockResolvedValueOnce({
+				rows: [
+					{
+						id: 11,
+						slug: "new-course",
+						title: "New Course",
+						description: "",
+						cover_image_url: null,
+						track: "web3",
+						difficulty: "beginner",
+						published_at: null,
+						created_at: "2026-01-01T00:00:00.000Z",
+						updated_at: "2026-01-01T00:00:00.000Z",
+						prerequisites: [1],
+					},
+				],
+			})
+
+		const res = await request(buildApp())
+			.post("/api/courses")
+			.set("Authorization", `Bearer ${adminToken}`)
+			.send({
+				title: "New Course",
+				slug: "new-course",
+				track: "web3",
+				difficulty: "beginner",
+				prerequisites: [1],
+			})
+
+		expect(res.status).toBe(201)
+		expect(res.body.prerequisites).toEqual([1])
+	})
 })
 
 describe("PATCH /api/courses/:id", () => {
@@ -361,5 +429,60 @@ describe("PATCH /api/courses/:id", () => {
 			.send({ slug: "taken-slug" })
 		expect(res.status).toBe(409)
 		expect(res.body).toEqual({ error: "Slug already exists" })
+	})
+
+	it("returns 400 when prerequisites includes the course itself", async () => {
+		mockedQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 1 }] })
+
+		const res = await request(buildApp())
+			.patch("/api/courses/1")
+			.set("Authorization", `Bearer ${adminToken}`)
+			.send({ prerequisites: [1] })
+		expect(res.status).toBe(400)
+		expect(res.body.error).toBe("A course cannot be a prerequisite of itself")
+	})
+
+	it("returns 400 when updating prerequisites with non-existent IDs", async () => {
+		mockedQuery
+			.mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 1 }] })
+			.mockResolvedValueOnce({ rows: [] }) // checking if prerequisite IDs exist (none found)
+
+		const res = await request(buildApp())
+			.patch("/api/courses/1")
+			.set("Authorization", `Bearer ${adminToken}`)
+			.send({ prerequisites: [999] })
+		expect(res.status).toBe(400)
+		expect(res.body.error).toBe("One or more prerequisite course IDs do not exist")
+	})
+
+	it("updates course successfully with valid prerequisites", async () => {
+		mockedQuery
+			.mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 1 }] })
+			.mockResolvedValueOnce({ rows: [{ id: 2 }] }) // checking prerequisite ID existence (2 exists)
+			.mockResolvedValueOnce({
+				rows: [
+					{
+						id: 1,
+						slug: "stellar-basics",
+						title: "Updated Title",
+						description: "Desc",
+						cover_image_url: null,
+						track: "web3",
+						difficulty: "beginner",
+						published_at: null,
+						created_at: "2026-01-01T00:00:00.000Z",
+						updated_at: "2026-01-03T00:00:00.000Z",
+						prerequisites: [2],
+					},
+				],
+			})
+
+		const res = await request(buildApp())
+			.patch("/api/courses/1")
+			.set("Authorization", `Bearer ${adminToken}`)
+			.send({ prerequisites: [2] })
+
+		expect(res.status).toBe(200)
+		expect(res.body.prerequisites).toEqual([2])
 	})
 })

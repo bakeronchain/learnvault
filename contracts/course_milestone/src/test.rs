@@ -7,9 +7,10 @@ use soroban_sdk::{
 };
 
 use crate::{
-    CourseCompleted, CourseConfig, CourseMilestone, CourseMilestoneClient, DataKey, Error,
-    MilestoneCompleted, MilestoneStatus, VerifyBatchEntry,
+    ApprovalResult, CourseCompleted, CourseConfig, CourseMilestone, CourseMilestoneClient,
+    DataKey, Error, MilestoneCompleted, MilestoneStatus, VerifyBatchEntry,
 };
+use crate::errors::{MAX_COURSE_ID_LEN, MAX_MILESTONE_COUNT};
 
 #[contracttype]
 enum MockTokenDataKey {
@@ -147,6 +148,10 @@ fn submit_milestone(
     );
     client.submit_milestone(learner, course_id, &milestone_id, evidence_uri);
 }
+
+// =======================
+// ✅ ENROLL TESTS
+// =======================
 
 #[test]
 fn add_course_and_get_course_work() {
@@ -434,6 +439,53 @@ fn reject_milestone_marks_rejected_and_clears_submission() {
             .get_milestone_submission(&learner, &course_id, &1)
             .is_none()
     );
+}
+
+#[test]
+fn rejected_milestone_can_be_resubmitted() {
+    let (env, contract_id, admin, _token_id, client, _token_client) = setup();
+    let learner = Address::generate(&env);
+    let course_id = sid(&env, "rust-101");
+    let first_evidence_uri = sid(&env, "ipfs://proof-1");
+    let second_evidence_uri = sid(&env, "ipfs://proof-2");
+
+    add_course(&env, &contract_id, &admin, &client, &course_id, 3);
+    enroll(&env, &contract_id, &learner, &client, &course_id);
+    submit_milestone(
+        &env,
+        &contract_id,
+        &learner,
+        &client,
+        &course_id,
+        1,
+        &first_evidence_uri,
+    );
+
+    authorize(
+        &env,
+        &admin,
+        &contract_id,
+        "reject_milestone",
+        (admin.clone(), learner.clone(), course_id.clone(), 1_u32),
+    );
+    client.reject_milestone(&admin, &learner, &course_id, &1);
+
+    submit_milestone(
+        &env,
+        &contract_id,
+        &learner,
+        &client,
+        &course_id,
+        1,
+        &second_evidence_uri,
+    );
+
+    assert_eq!(client.get_milestone_state(&learner, &course_id, &1), MilestoneStatus::Pending);
+
+    let submission = client
+        .get_milestone_submission(&learner, &course_id, &1)
+        .expect("submission should exist after resubmission");
+    assert_eq!(submission.evidence_uri, second_evidence_uri);
 }
 
 #[test]
@@ -726,6 +778,10 @@ fn batch_verify_milestones_reverts_on_invalid_entry() {
     assert_eq!(token_client.balance(&learner1), 0);
 }
 
+// =======================
+// ✅ UPGRADE TESTS
+// =======================
+
 #[test]
 fn upgrade_requires_admin_auth() {
     let (env, contract_id, _admin, _token_id, client, _token_client) = setup();
@@ -780,3 +836,163 @@ fn state_persists_after_upgrade() {
     assert!(enrolled);
     assert_eq!(stored_hash, wasm_hash);
 }
+
+fn register_course(
+    env: &Env,
+    contract_id: &Address,
+    admin: &Address,
+    client: &CourseMilestoneClient<'static>,
+    course_id: &String,
+    milestone_count: u32,
+) {
+    authorize(
+        env,
+        admin,
+        contract_id,
+        "register_course",
+        (admin.clone(), course_id.clone(), milestone_count),
+    );
+    client.register_course(admin, course_id, &milestone_count);
+}
+
+#[test]
+fn register_course_rejects_empty_course_id() {
+    let (env, contract_id, admin, _, client, _) = setup();
+    let course_id = sid(&env, "");
+    authorize(
+        &env,
+        &admin,
+        &contract_id,
+        "register_course",
+        (admin.clone(), course_id.clone(), 3_u32),
+    );
+
+    let result = client.try_register_course(&admin, &course_id, &3);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidCourseId as u32
+        )))
+    );
+}
+
+#[test]
+fn register_course_rejects_course_id_over_max_length() {
+    let (env, contract_id, admin, _, client, _) = setup();
+    let long_id = "x".repeat((MAX_COURSE_ID_LEN + 1) as usize);
+    let course_id = sid(&env, &long_id);
+    authorize(
+        &env,
+        &admin,
+        &contract_id,
+        "register_course",
+        (admin.clone(), course_id.clone(), 3_u32),
+    );
+
+    let result = client.try_register_course(&admin, &course_id, &3);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidCourseId as u32
+        )))
+    );
+}
+
+#[test]
+fn register_course_rejects_zero_milestone_count() {
+    let (env, contract_id, admin, _, client, _) = setup();
+    let course_id = sid(&env, "course-a");
+    authorize(
+        &env,
+        &admin,
+        &contract_id,
+        "register_course",
+        (admin.clone(), course_id.clone(), 0_u32),
+    );
+
+    let result = client.try_register_course(&admin, &course_id, &0);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidMilestoneCount as u32
+        )))
+    );
+}
+
+#[test]
+fn register_course_rejects_milestone_count_above_max() {
+    let (env, contract_id, admin, _, client, _) = setup();
+    let course_id = sid(&env, "course-a");
+    let milestone_count = MAX_MILESTONE_COUNT + 1;
+    authorize(
+        &env,
+        &admin,
+        &contract_id,
+        "register_course",
+        (admin.clone(), course_id.clone(), milestone_count),
+    );
+
+    let result = client.try_register_course(&admin, &course_id, &milestone_count);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::InvalidMilestoneCount as u32
+        )))
+    );
+}
+
+#[test]
+fn register_course_rejects_duplicate_course_id() {
+    let (env, contract_id, admin, _, client, _) = setup();
+    let course_id = sid(&env, "duplicate-course");
+
+    register_course(&env, &contract_id, &admin, &client, &course_id, 3);
+    authorize(
+        &env,
+        &admin,
+        &contract_id,
+        "register_course",
+        (admin.clone(), course_id.clone(), 5_u32),
+    );
+
+    let result = client.try_register_course(&admin, &course_id, &5);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::AlreadyExists as u32
+        )))
+    );
+}
+
+#[test]
+fn register_course_accepts_boundary_values() {
+    let (env, contract_id, admin, _, client, _) = setup();
+    let min_id = sid(&env, "a");
+    let max_id = sid(&env, &"m".repeat(MAX_COURSE_ID_LEN as usize));
+
+    register_course(&env, &contract_id, &admin, &client, &min_id, 1);
+    register_course(
+        &env,
+        &contract_id,
+        &admin,
+        &client,
+        &max_id,
+        MAX_MILESTONE_COUNT,
+    );
+
+    assert_eq!(
+        client.get_course(&min_id),
+        Some(CourseConfig {
+            milestone_count: 1,
+            active: true,
+        })
+    );
+    assert_eq!(
+        client.get_course(&max_id),
+        Some(CourseConfig {
+            milestone_count: MAX_MILESTONE_COUNT,
+            active: true,
+        })
+    );
+}
+

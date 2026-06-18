@@ -1,5 +1,6 @@
 import { Router } from "express"
 import { getProfile, updateProfile } from "../controllers/profiles.controller"
+
 import { authMiddleware } from "../middleware/auth.middleware"
 
 export const profilesRouter = Router()
@@ -73,3 +74,4 @@ profilesRouter.get("/profiles/:address", (req, res) => {
 profilesRouter.put("/profiles/me", authMiddleware, (req, res) => {
 	void updateProfile(req, res)
 })
+

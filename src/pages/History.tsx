@@ -5,7 +5,6 @@ import { Link } from "react-router-dom"
 import { stellarNetwork } from "../contracts/util"
 import { useWallet } from "../hooks/useWallet"
 import { API_URL } from "../lib/api"
-import AddressDisplay from "../components/AddressDisplay"
 
 type ApiEvent = {
 	id: number
@@ -187,14 +186,9 @@ const History: React.FC = () => {
 				<h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-gradient">
 					Activity History
 				</h1>
-				<p className="text-white/50 mt-2 flex items-center gap-2">
-					Recent on-chain actions for 
-					<AddressDisplay 
-						address={address} 
-						addressClassName="text-brand-cyan font-bold"
-						showCopyButton={false}
-						showExplorerLink={false}
-					/>
+				<p className="text-white/50 mt-2">
+					Recent on-chain actions for {address.slice(0, 6)}...
+					{address.slice(-4)}
 				</p>
 			</header>
 
@@ -213,8 +207,14 @@ const History: React.FC = () => {
 						{error instanceof Error ? error.message : "Failed to load activity"}
 					</div>
 				) : items.length === 0 ? (
-					<div className="rounded-2xl border border-white/10 p-8 text-center text-white/50">
-						No transactions found for this wallet yet.
+					<div className="p-8">
+						<EmptyState
+							icon="📭"
+							title="No transactions yet"
+							description="You have no on-chain transactions for this wallet. Interact with courses or the treasury to generate activity."
+							ctaLabel="Browse learning"
+							ctaHref="/learn"
+						/>
 					</div>
 				) : (
 					<div className="space-y-3">

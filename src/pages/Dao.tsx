@@ -1,15 +1,18 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
+import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import { useDelegation } from "../hooks/useDelegation"
+import { useGovernance } from "../hooks/useGovernance"
 import { useProposals } from "../hooks/useProposals"
 import { useWallet } from "../hooks/useWallet"
+import { hasProposalDraft } from "../util/proposalDraft"
 
 const GOV_DECIMALS = 7
 const GOV_DIVISOR = 10 ** GOV_DECIMALS
 
-function formatGov(raw: string): string {
+function formatGov(raw: string, locale?: string): string {
 	const n = Number(raw) / GOV_DIVISOR
-	return n.toLocaleString("en-US", { maximumFractionDigits: 2 })
+	return n.toLocaleString(locale, { maximumFractionDigits: 2 })
 }
 
 function shortenAddress(addr: string): string {
@@ -18,8 +21,16 @@ function shortenAddress(addr: string): string {
 }
 
 export default function Dao() {
+	const { i18n } = useTranslation()
+	const locale = i18n.resolvedLanguage
 	const { address } = useWallet()
 	const { proposals, votingPower, isLoading } = useProposals()
+	const { quorum = 0n, approvalBps = 0, votingPeriod = 0 } = useGovernance()
+	const [hasDraft, setHasDraft] = useState(false)
+
+	useEffect(() => {
+		setHasDraft(hasProposalDraft())
+	}, [])
 	const {
 		delegatee,
 		isDelegating,
@@ -58,14 +69,14 @@ export default function Dao() {
 		}
 	}
 
-	const ownFmt = formatGov(ownBalance)
-	const delegatedFmt = formatGov(delegatedToMe)
-	const effectiveFmt = formatGov(onChainVotingPower)
+	const ownFmt = formatGov(ownBalance, locale)
+	const delegatedFmt = formatGov(delegatedToMe, locale)
+	const effectiveFmt = formatGov(onChainVotingPower, locale)
 
 	return (
 		<div className="p-8 md:p-12 max-w-5xl mx-auto text-white animate-in fade-in duration-700">
 			<header className="text-center mb-16">
-				<h1 className="text-6xl font-black mb-4 tracking-tighter text-gradient">
+				<h1 className="text-4xl sm:text-6xl font-black mb-4 tracking-tighter text-gradient">
 					DAO Governance
 				</h1>
 				<p className="text-white/40 text-lg font-medium max-w-2xl mx-auto">
@@ -73,6 +84,25 @@ export default function Dao() {
 					future of LearnVault.
 				</p>
 			</header>
+
+        {/* Governance Parameters Card */}
+        <div className="glass-card p-8 rounded-[2.5rem] border border-white/5 mb-12">
+          <p className="text-[10px] uppercase font-black text-white/30 tracking-[2px] mb-2">Governance Parameters</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="text-center">
+              <p className="text-xs text-white/30 uppercase">Quorum (GOV)</p>
+              <p className="text-xl font-black text-brand-cyan">{formatGov(quorum.toString(), locale)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-white/30 uppercase">Approval BPS</p>
+              <p className="text-xl font-black text-brand-purple">{approvalBps.toString()}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-white/30 uppercase">Voting Period (ledgers)</p>
+              <p className="text-xl font-black text-brand-emerald">{votingPeriod.toLocaleString(locale)}</p>
+            </div>
+          </div>
+        </div>
 
 			{/* Stats row */}
 			<div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
@@ -237,7 +267,7 @@ export default function Dao() {
 				</Link>
 				<Link
 					to="/dao/propose"
-					className={`px-10 py-4 glass text-white rounded-2xl font-black text-sm uppercase tracking-widest border border-white/10 transition-all ${
+					className={`relative px-10 py-4 glass text-white rounded-2xl font-black text-sm uppercase tracking-widest border border-white/10 transition-all ${
 						address
 							? "hover:bg-white/10 hover:scale-105 active:scale-95"
 							: "opacity-40 pointer-events-none"
@@ -245,6 +275,9 @@ export default function Dao() {
 					data-testid="create-proposal"
 				>
 					Create Proposal
+					{hasDraft && (
+						<span className="absolute -top-2 -right-2 w-4 h-4 bg-brand-amber rounded-full border-2 border-background animate-pulse" />
+					)}
 				</Link>
 			</div>
 

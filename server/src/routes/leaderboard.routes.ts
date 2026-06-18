@@ -1,9 +1,7 @@
 import { Router } from "express"
 
-import {
-	getLeaderboard,
-	streamLeaderboard,
-} from "../controllers/leaderboard.controller"
+import { getLeaderboard } from "../controllers/leaderboard.controller"
+import { apiResponseCache } from "../middleware/api-response-cache.middleware"
 
 export const leaderboardRouter = Router()
 
@@ -57,5 +55,4 @@ export const leaderboardRouter = Router()
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-leaderboardRouter.get("/leaderboard", getLeaderboard)
-leaderboardRouter.get("/leaderboard/stream", streamLeaderboard)
+leaderboardRouter.get("/leaderboard", apiResponseCache("leaderboard"), getLeaderboard)

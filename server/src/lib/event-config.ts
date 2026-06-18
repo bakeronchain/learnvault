@@ -41,10 +41,15 @@ export function getPollingTargets(): Array<{
 	contractId: string
 	topics: string[]
 }> {
-	return Object.entries(CONTRACT_IDS)
+	return (Object.entries(CONTRACT_IDS) as Array<[ContractName, string]>)
 		.map(([name, id]) => ({
 			contractId: id,
-			topics: (EVENTS_TO_INDEX as any)[name as ContractName] || [],
+			topics: (EVENTS_TO_INDEX[name] ?? []).map((topic) => EVENT_TOPICS[topic]),
 		}))
-		.filter((t) => t.topics.length > 0 && t.contractId)
+		.filter(
+			(t) =>
+				t.topics.length > 0 &&
+				typeof t.contractId === "string" &&
+				t.contractId.length > 0,
+		)
 }

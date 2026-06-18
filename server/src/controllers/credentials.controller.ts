@@ -3,6 +3,10 @@ import path from "path"
 import { type Request, type Response } from "express"
 
 import { pool } from "../db/index"
+import { logger } from "../lib/logger"
+import { verifyCredentialProof } from "../services/zk-credential-proof.service"
+
+const log = logger.child({ module: "credentials" })
 import { pinJsonToIPFS, getGatewayUrl } from "../services/pinata.service"
 
 // ---------------------------------------------------------------------------
@@ -46,8 +50,8 @@ async function loadCourses(): Promise<CourseMetadata[]> {
 	if (coursesCache) return coursesCache
 
 	const coursesPath = path.resolve(
-		__dirname,
-		"../../content/courses/index.json",
+		process.cwd(),
+		"content/courses/index.json",
 	)
 	const coursesData = await fs.readFile(coursesPath, "utf-8")
 	const courses = JSON.parse(coursesData) as Array<{
@@ -81,16 +85,16 @@ const DEFAULT_IMAGE = "scholar-nft-base.png"
 const IMAGE_CID_MAP: Record<string, string> = {
 	"scholar-nft-stellar.png":
 		process.env.BADGE_CID_STELLAR ??
-		"bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+		"bafybeiaby2ip2h3s675n4bw5rtw6dlatwapfo2zzztvo56q4shpatk2ffe",
 	"scholar-nft-soroban.png":
 		process.env.BADGE_CID_SOROBAN ??
-		"bafybeihvvlkvjkbxy6qxzjzqxzqxzqxzqxzqxzqxzqxzqxzqxzqxzqxzqx",
+		"bafybeih6o2ug36stpo6rqx35xubs736zclfgvkzv7xb5feahm55oouu5sm",
 	"scholar-nft-defi.png":
 		process.env.BADGE_CID_DEFI ??
-		"bafybeidefi123456789abcdefghijklmnopqrstuvwxyz1234567890abc",
+		"bafybeic6c5o6jusf24nms2s5s2vmjemyh5niyjetve455575pf3kha42xu",
 	"scholar-nft-base.png":
 		process.env.BADGE_CID_BASE ??
-		"bafybeiabc123456789defghijklmnopqrstuvwxyz1234567890abcdef",
+		"bafybeid2g5mt6wttyselah5xt32wepgsg24rfhdr4i2tzi25s5ngegawmy",
 }
 
 function getImageCID(courseId: string): string {
@@ -190,7 +194,7 @@ export async function createCredentialMetadata(
 			},
 		})
 	} catch (error) {
-		console.error("Error creating credential metadata:", error)
+		log.error({ err: error }, "Error creating credential metadata")
 
 		if (
 			error instanceof Error &&
@@ -249,10 +253,40 @@ export async function getCredentialsByAddress(
 
 		res.status(200).json({ data })
 	} catch (error) {
-		console.error("Error fetching credentials by address:", error)
+		log.error({ err: error }, "Error fetching credentials by address")
 		res.status(500).json({
 			error: "Internal server error",
 			message: "Failed to fetch credentials",
+		})
+	}
+}
+
+interface VerifyCredentialProofRequest {
+	proof: string
+	publicSignals: {
+		credentialHash: string
+		thresholdMet: string
+		nullifierHash: string
+	}
+}
+
+export async function verifyCredentialZkProof(
+	req: Request,
+	res: Response,
+): Promise<void> {
+	const { proof, publicSignals } = req.body as VerifyCredentialProofRequest
+	if (!proof || !publicSignals) {
+		res.status(400).json({ error: "proof and publicSignals are required" })
+		return
+	}
+	try {
+		const result = await verifyCredentialProof({ proof, publicSignals })
+		res.status(200).json({ data: result })
+	} catch (error) {
+		log.error({ err: error }, "Error verifying credential proof")
+		res.status(500).json({
+			error: "Internal server error",
+			message: "Failed to verify credential proof",
 		})
 	}
 }

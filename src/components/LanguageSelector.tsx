@@ -4,6 +4,11 @@ import { useTranslation } from "react-i18next"
 export const LanguageSelector: React.FC = () => {
 	const { i18n } = useTranslation()
 	const selectId = useId()
+	const currentLanguage = (
+		i18n.resolvedLanguage ||
+		i18n.language ||
+		"en"
+	).split("-")[0]
 
 	const handleLanguageChange = (
 		event: React.ChangeEvent<HTMLSelectElement>,
@@ -25,7 +30,7 @@ export const LanguageSelector: React.FC = () => {
 			</label>
 			<select
 				id={selectId}
-				value={i18n.language || "en"}
+				value={currentLanguage}
 				onChange={handleLanguageChange}
 				aria-label="Select language"
 				style={{
@@ -41,6 +46,9 @@ export const LanguageSelector: React.FC = () => {
 			>
 				<option value="en" style={{ color: "#000" }}>
 					🇺🇸 English
+				</option>
+				<option value="es" style={{ color: "#000" }}>
+					🇪🇸 Español
 				</option>
 				<option value="fr" style={{ color: "#000" }}>
 					🇫🇷 Français

@@ -1,5 +1,8 @@
 import { type Request, type Response } from "express"
 import { milestoneStore } from "../db/milestone-store"
+import { logger } from "../lib/logger"
+
+const log = logger.child({ module: "validator" })
 
 interface ValidationRequestBody {
 	report_id?: number
@@ -68,8 +71,8 @@ export const validateMilestone = async (
 			}
 		} catch {
 			// Database unavailable — log and continue with field validation only
-			console.warn(
-				"[validator] Could not query milestone store, proceeding with field validation only",
+			log.warn(
+				"Could not query milestone store, proceeding with field validation only",
 			)
 		}
 	}

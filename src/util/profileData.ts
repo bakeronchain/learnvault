@@ -1,10 +1,20 @@
 import { Horizon } from "@stellar/stellar-sdk"
 import { horizonUrl, rpcUrl, stellarNetwork } from "../contracts/util"
 
+export interface SocialLinks {
+	twitter?: string
+	github?: string
+	linkedin?: string
+	website?: string
+	discord?: string
+}
+
 export interface ProfileIdentity {
+	displayName?: string
 	bio: string
 	avatarUrl?: string
 	joinDateIso: string
+	socialLinks?: SocialLinks
 }
 
 export interface SkillTrackCompletion {
@@ -76,9 +86,11 @@ export const getProfileIdentity = (walletAddress: string): ProfileIdentity => {
 	try {
 		const parsed = JSON.parse(raw) as Partial<ProfileIdentity>
 		return {
+			displayName: parsed.displayName,
 			bio: parsed.bio ?? "",
 			avatarUrl: parsed.avatarUrl,
 			joinDateIso: parsed.joinDateIso ?? new Date().toISOString(),
+			socialLinks: parsed.socialLinks,
 		}
 	} catch {
 		return {
@@ -90,7 +102,9 @@ export const getProfileIdentity = (walletAddress: string): ProfileIdentity => {
 
 export const updateProfileIdentity = (
 	walletAddress: string,
-	patch: Partial<Pick<ProfileIdentity, "bio" | "avatarUrl">>,
+	patch: Partial<
+		Pick<ProfileIdentity, "displayName" | "bio" | "avatarUrl" | "socialLinks">
+	>,
 ) => {
 	const current = getProfileIdentity(walletAddress)
 	const next: ProfileIdentity = {

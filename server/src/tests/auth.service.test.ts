@@ -1,6 +1,9 @@
 import jwt from "jsonwebtoken"
 import { createTokenStore } from "../db/token-store"
-import { createJwtService, generateEphemeralDevJwtKeys } from "../services/jwt.service"
+import {
+	createJwtService,
+	generateEphemeralDevJwtKeys,
+} from "../services/jwt.service"
 
 describe("Auth / JWT Service", () => {
 	const { privateKeyPem, publicKeyPem } = generateEphemeralDevJwtKeys()
@@ -64,7 +67,6 @@ describe("Auth / JWT Service", () => {
 			await expect(jwtService.verifyWalletToken(tamperedToken)).rejects.toThrow(
 				/invalid signature|invalid token/i,
 			)
-
 		})
 
 		it("fails when using HS256 to verify (algorithm enforcement)", async () => {
@@ -99,8 +101,12 @@ describe("Auth / JWT Service", () => {
 			const token = jwtService.signWalletToken(address)
 			await jwtService.revokeToken(token)
 
-			await expect(jwtService.verifyWalletToken(token)).rejects.toThrow(/revoked/i)
-			await expect(jwtService.verifyWalletToken(token)).rejects.toThrow(/revoked/i)
+			await expect(jwtService.verifyWalletToken(token)).rejects.toThrow(
+				/revoked/i,
+			)
+			await expect(jwtService.verifyWalletToken(token)).rejects.toThrow(
+				/revoked/i,
+			)
 		})
 	})
 })

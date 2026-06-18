@@ -2,6 +2,7 @@
 
 use soroban_sdk::{
     Address, Env, Vec, contract, contracterror, contractimpl, contracttype, panic_with_error,
+    symbol_short,
 };
 
 #[contracterror]
@@ -28,7 +29,9 @@ impl FungibleAllowlist {
         if env.storage().instance().has(&DataKey::Admin) {
             panic_with_error!(&env, AllowlistError::AlreadyInitialized);
         }
+        admin.require_auth();
         env.storage().instance().set(&DataKey::Admin, &admin);
+        env.events().publish((symbol_short!("init"),), admin);
     }
 
     pub fn add_to_allowlist(env: Env, admin: Address, account: Address) {
@@ -46,6 +49,7 @@ impl FungibleAllowlist {
             env.storage()
                 .persistent()
                 .set(&DataKey::IsAllowed(account.clone()), &true);
+            env.events().publish((symbol_short!("added"),), account.clone());
         }
     }
 
@@ -64,6 +68,7 @@ impl FungibleAllowlist {
             env.storage()
                 .persistent()
                 .set(&DataKey::IsAllowed(account.clone()), &false);
+            env.events().publish((symbol_short!("removed"),), account.clone());
         }
     }
 
@@ -90,46 +95,9 @@ impl FungibleAllowlist {
             panic_with_error!(&env, AllowlistError::Unauthorized);
         }
         env.storage().instance().set(&DataKey::Admin, &new_admin);
+        env.events().publish((symbol_short!("new_admin"),), new_admin);
     }
 }
 
 #[cfg(test)]
-mod test {
-    use super::*;
-    use soroban_sdk::{Env, testutils::Address as _};
-
-    #[test]
-    fn test_allowlist_flow() {
-        let env = Env::default();
-        let admin = Address::generate(&env);
-        let alice = Address::generate(&env);
-        let bob = Address::generate(&env);
-
-        let contract_id = env.register_contract(None, FungibleAllowlist);
-        let client = FungibleAllowlistClient::new(&env, &contract_id);
-
-        client.initialize(&admin);
-        assert_eq!(client.is_allowed(&alice), false);
-        assert_eq!(client.get_allowlist().len(), 0);
-
-        env.mock_all_auths();
-
-        client.add_to_allowlist(&admin, &alice);
-        assert_eq!(client.is_allowed(&alice), true);
-        assert_eq!(client.get_allowlist().len(), 0);
-
-        client.add_to_allowlist(&admin, &bob);
-        assert_eq!(client.is_allowed(&bob), true);
-        assert_eq!(client.get_allowlist().len(), 0);
-
-        client.remove_from_allowlist(&admin, &alice);
-        assert_eq!(client.is_allowed(&alice), false);
-        assert_eq!(client.get_allowlist().len(), 0);
-
-        let new_admin = Address::generate(&env);
-        client.set_admin(&admin, &new_admin);
-
-        client.add_to_allowlist(&new_admin, &alice);
-        assert_eq!(client.is_allowed(&alice), true);
-    }
-}
+mod test;

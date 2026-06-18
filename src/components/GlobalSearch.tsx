@@ -6,50 +6,84 @@ import { useWikiPages } from "../hooks/useWiki"
 
 const GlobalSearch: React.FC = () => {
 	const [query, setQuery] = useState("")
+	const [debouncedQuery, setDebouncedQuery] = useState("")
 	const [isOpen, setIsOpen] = useState(false)
 	const [activeIndex, setActiveIndex] = useState(-1)
 	const navigate = useNavigate()
 	const containerRef = useRef<HTMLDivElement>(null)
 	const inputRef = useRef<HTMLInputElement>(null)
 	const listboxId = "global-search-listbox"
+	const abortControllerRef = useRef<AbortController | null>(null)
+	const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
 	const { courses = [] } = useCourses()
 	const { data: wikiPages = [] } = useWikiPages()
 
+	// Debounce search query
+	useEffect(() => {
+		if (debounceTimerRef.current) {
+			clearTimeout(debounceTimerRef.current)
+		}
+
+		debounceTimerRef.current = setTimeout(() => {
+			setDebouncedQuery(query)
+		}, 300)
+
+		return () => {
+			if (debounceTimerRef.current) {
+				clearTimeout(debounceTimerRef.current)
+			}
+		}
+	}, [query])
+
+	// Cancel in-flight requests when query changes
+	useEffect(() => {
+		if (abortControllerRef.current) {
+			abortControllerRef.current.abort()
+		}
+		abortControllerRef.current = new AbortController()
+
+		return () => {
+			if (abortControllerRef.current) {
+				abortControllerRef.current.abort()
+			}
+		}
+	}, [debouncedQuery])
+
 	const results =
-		query.length >= 2
+		debouncedQuery.length >= 2
 			? [
-					...courses
-						.filter(
-							(c) =>
-								c.title.toLowerCase().includes(query.toLowerCase()) ||
-								c.description.toLowerCase().includes(query.toLowerCase()),
-						)
-						.map((c) => ({
-							id: `course-${c.id}`,
-							title: c.title,
-							category: "Course",
-							link: `/courses`,
-						})),
-					...wikiPages
-						.filter(
-							(p) =>
-								p.title.toLowerCase().includes(query.toLowerCase()) ||
-								p.content.toLowerCase().includes(query.toLowerCase()),
-						)
-						.map((p) => ({
-							id: `wiki-${p.id}`,
-							title: p.title,
-							category: "Wiki",
-							link: `/wiki/${p.slug}`,
-						})),
-				].slice(0, 8)
+				...courses
+					.filter(
+						(c) =>
+							c.title.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
+							c.description.toLowerCase().includes(debouncedQuery.toLowerCase()),
+					)
+					.map((c) => ({
+						id: `course-${c.id}`,
+						title: c.title,
+						category: "Course",
+						link: `/courses`,
+					})),
+				...wikiPages
+					.filter(
+						(p) =>
+							p.title.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
+							p.content.toLowerCase().includes(debouncedQuery.toLowerCase()),
+					)
+					.map((p) => ({
+						id: `wiki-${p.id}`,
+						title: p.title,
+						category: "Wiki",
+						link: `/wiki/${p.slug}`,
+					})),
+			].slice(0, 8)
 			: []
 
 	// Reset active index whenever results change
 	useEffect(() => {
 		setActiveIndex(-1)
-	}, [results.length, query])
+	}, [results.length, debouncedQuery])
 
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
@@ -124,6 +158,7 @@ const GlobalSearch: React.FC = () => {
 						activeIndex >= 0 ? `search-option-${activeIndex}` : undefined
 					}
 					placeholder="Search..."
+					aria-label="Search"
 					className="glass border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm w-[180px] focus:w-[240px] focus:border-brand-cyan/40 focus:outline-none transition-all"
 					value={query}
 					onChange={(e) => {
@@ -169,8 +204,14 @@ const GlobalSearch: React.FC = () => {
 							))}
 						</div>
 					) : (
-						<div className="p-4 text-center text-xs text-white/40 italic">
-							No results for "{query}"
+						<div className="p-4">
+							<StateEmpty
+								icon="🔎"
+								title={`No results for "${query}"`}
+								description="Try different keywords or browse popular courses."
+								ctaLabel="Browse courses"
+								ctaHref="/learn"
+							/>
 						</div>
 					)}
 				</div>

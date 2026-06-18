@@ -1,89 +1,47 @@
-import { lazy, Suspense, type ReactNode } from "react"
-import { Outlet, Route, Routes } from "react-router-dom"
+import { Routes, Route, Outlet } from "react-router-dom"
 import ErrorBoundary from "./components/ErrorBoundary"
 import Footer from "./components/Footer"
 import NavBar from "./components/NavBar"
-import NetworkPreconnect from "./components/NetworkPreconnect"
-import { ToastProvider } from "./components/Toast/ToastProvider"
-import { WalletToastWatcher } from "./components/WalletToastWatcher"
+import Admin from "./pages/Admin"
+import Courses from "./pages/Courses"
+import Credential from "./pages/Credential"
+import Dao from "./pages/Dao"
+import DaoProposals from "./pages/DaoProposals"
+import Dashboard from "./pages/Dashboard"
 
-const Admin = lazy(() => import("./pages/Admin"))
-const Community = lazy(() => import("./pages/Community"))
-const Courses = lazy(() => import("./pages/Courses"))
-const Credential = lazy(() => import("./pages/Credential"))
-const Dao = lazy(() => import("./pages/Dao"))
-const DaoProposals = lazy(() => import("./pages/DaoProposals"))
-const DaoPropose = lazy(() => import("./pages/DaoPropose"))
-const Dashboard = lazy(() => import("./pages/Dashboard"))
-const Debug = lazy(() => import("./pages/Debug"))
-const Donor = lazy(() => import("./pages/Donor"))
-const Home = lazy(() => import("./pages/Home"))
-const History = lazy(() => import("./pages/History"))
-const Leaderboard = lazy(() => import("./pages/Leaderboard"))
-const Learn = lazy(() => import("./pages/Learn"))
-const LessonView = lazy(() => import("./pages/LessonView"))
-const NotFound = lazy(() => import("./pages/NotFound"))
-const PeerReview = lazy(() => import("./pages/PeerReview"))
-const Profile = lazy(() => import("./pages/Profile"))
-const ScholarshipApply = lazy(() => import("./pages/ScholarshipApply"))
-const Treasury = lazy(() => import("./pages/Treasury"))
-const Wiki = lazy(() => import("./pages/Wiki"))
-const WikiPage = lazy(() => import("./pages/WikiPage"))
-
-const renderRoute = (element: ReactNode) => (
-	<ErrorBoundary>
-		<Suspense fallback={<RouteFallback />}>{element}</Suspense>
-	</ErrorBoundary>
-)
+import Debug from "./pages/Debug"
+import Home from "./pages/Home"
+import Leaderboard from "./pages/Leaderboard"
+import Learn from "./pages/Learn"
+import NotFound from "./pages/NotFound"
+import Profile from "./pages/Profile"
+import ScholarshipApply from "./pages/ScholarshipApply"
+import Treasury from "./pages/Treasury"
 
 function App() {
+	useLocalizeDocumentAttributes()
+
 	return (
-		<ToastProvider>
-			<WalletToastWatcher />
-			<Routes>
-				<Route element={<AppLayout />}>
-					<Route path="/" element={renderRoute(<Home />)} />
-					<Route path="/courses" element={renderRoute(<Courses />)} />
-					<Route
-						path="/courses/:courseId/lessons/:lessonId"
-						element={renderRoute(<LessonView />)}
-					/>
-					<Route path="/learn" element={renderRoute(<Learn />)} />
-					<Route path="/dao" element={renderRoute(<Dao />)} />
-					<Route
-						path="/dao/proposals"
-						element={renderRoute(<DaoProposals />)}
-					/>
-					<Route path="/dao/propose" element={renderRoute(<DaoPropose />)} />
-					<Route path="/leaderboard" element={renderRoute(<Leaderboard />)} />
-					<Route path="/peer-review" element={renderRoute(<PeerReview />)} />
-					<Route path="/community" element={renderRoute(<Community />)} />
-					<Route path="/history" element={renderRoute(<History />)} />
-					<Route path="/profile" element={renderRoute(<Profile />)} />
-					<Route
-						path="/profile/:walletAddress"
-						element={renderRoute(<Profile />)}
-					/>
-					<Route
-						path="/scholarships/apply"
-						element={renderRoute(<ScholarshipApply />)}
-					/>
-					<Route path="/admin" element={renderRoute(<Admin />)} />
-					<Route path="/wiki" element={renderRoute(<Wiki />)} />
-					<Route path="/wiki/:slug" element={renderRoute(<WikiPage />)} />
-					<Route path="/treasury" element={renderRoute(<Treasury />)} />
-					<Route path="/donor" element={renderRoute(<Donor />)} />
-					<Route
-						path="/credentials/:id"
-						element={renderRoute(<Credential />)}
-					/>
-					<Route path="/dashboard" element={renderRoute(<Dashboard />)} />
-					<Route path="/debug" element={renderRoute(<Debug />)} />
-					<Route path="/debug/:contractName" element={renderRoute(<Debug />)} />
-					<Route path="*" element={renderRoute(<NotFound />)} />
-				</Route>
-			</Routes>
-		</ToastProvider>
+		<Routes>
+			<Route element={<AppLayout />}>
+				<Route path="/" element={<Home />} />
+				<Route path="/courses" element={<Courses />} />
+				<Route path="/learn" element={<Learn />} />
+				<Route path="/dao" element={<Dao />} />
+				<Route path="/dao/proposals" element={<DaoProposals />} />
+				<Route path="/leaderboard" element={<Leaderboard />} />
+				<Route path="/profile" element={<Profile />} />
+				<Route path="/scholarships/apply" element={<ScholarshipApply />} />
+				<Route path="/admin" element={<Admin />} />
+				<Route path="/treasury" element={<Treasury />} />
+				<Route path="/credentials/:nftId" element={<Credential />} />
+				<Route path="/dashboard" element={<Dashboard />} />
+
+				<Route path="/debug" element={<Debug />} />
+				<Route path="/debug/:contractName" element={<Debug />} />
+				<Route path="*" element={<NotFound />} />
+			</Route>
+		</Routes>
 	)
 }
 
@@ -104,16 +62,50 @@ const RouteFallback = () => (
 	</div>
 )
 
-const AppLayout = () => (
-	// Issue #61 — Theme-aware background using CSS variables + Tailwind dark: variant
-	<div className="min-h-screen flex flex-col pt-24 overflow-x-hidden w-full max-w-full bg-[var(--color-app-bg)] text-[var(--color-app-text)] transition-colors duration-300">
-		<NetworkPreconnect />
-		<NavBar />
-		<main id="main-content" className="flex-1 relative z-10" tabIndex={-1}>
-			<Outlet />
-		</main>
-		<Footer />
-	</div>
+const AppLayout = () => {
+	const location = useLocation()
+	const shouldReduceMotion = useReducedMotion()
+
+	const pageTransition: MotionProps = shouldReduceMotion
+		? {
+				initial: false,
+				animate: { opacity: 1 },
+				exit: { opacity: 1 },
+				transition: { duration: 0 },
+			}
+		: {
+				initial: { opacity: 0 },
+				animate: { opacity: 1 },
+				exit: { opacity: 0 },
+				transition: { duration: 0.2, ease: "easeOut" },
+			}
+
+	return (
+		<div className="min-h-screen flex flex-col pt-24 overflow-x-hidden w-full max-w-full bg-[var(--color-app-bg)] text-[var(--color-app-text)] transition-colors duration-300">
+			<NetworkPreconnect />
+			<TestnetBanner />
+			<NavBar />
+			<OnboardingTour />
+
+			<main id="main-content" className="relative z-10 flex-1" tabIndex={-1}>
+				<AnimatePresence mode="wait">
+					<motion.div key={location.pathname} {...pageTransition}>
+						<ErrorBoundary>
+							<Outlet />
+						</ErrorBoundary>
+					</motion.div>
+				</AnimatePresence>
+			</main>
+
+			<Footer />
+		</div>
+	)
+}
+
+const AppWithProvider = () => (
+	<NetworkProvider>
+		<App />
+	</NetworkProvider>
 )
 
-export default App
+export default AppWithProvider

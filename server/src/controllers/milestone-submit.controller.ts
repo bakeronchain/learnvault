@@ -6,6 +6,7 @@ import { logger } from "../lib/logger"
 const log = logger.child({ module: "milestones" })
 import { createEmailService } from "../services/email.service"
 import { markEscrowActivity } from "../services/escrow-timeout.service"
+import { verifyMilestoneReportEvidence } from "../services/github-oracle.service"
 
 interface MilestoneSubmitRequestBody {
 	scholarAddress?: string
@@ -69,6 +70,23 @@ export async function submitMilestoneReport(
 			await markEscrowActivity(scholarAddress, courseId)
 		} catch (trackingErr) {
 			console.error("[milestones] escrow activity update failed:", trackingErr)
+		}
+
+		// Kick off GitHub proof-of-work verification when PR evidence is given.
+		// Non-blocking: the persisted result gates the admin approval step later.
+		if (report.evidence_github) {
+			verifyMilestoneReportEvidence(report)
+				.then((result) => {
+					if (result) {
+						log.info(
+							{ reportId: report.id, verified: result.verified },
+							"GitHub oracle verification completed",
+						)
+					}
+				})
+				.catch((err) =>
+					log.error({ err, reportId: report.id }, "GitHub oracle verification failed"),
+				)
 		}
 
 		emailService

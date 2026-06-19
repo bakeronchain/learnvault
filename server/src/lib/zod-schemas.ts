@@ -139,6 +139,8 @@ export const milestoneSubmitBodySchema = z
 export const approveMilestoneBodySchema = z
 	.object({
 		note: optionalTrimmedString("note", 1000),
+		// Bypass a failed/unavailable GitHub oracle check and approve manually.
+		overrideOracle: z.boolean().optional(),
 	})
 	.strict()
 
@@ -290,31 +292,6 @@ export const enrollmentBodySchema = z
 	})
 	.strict()
 
-export const userProfileSchema = z
-	.object({
-		display_name: optionalTrimmedString("display_name", 50),
-		bio: optionalTrimmedString("bio", 2000),
-		avatar_url: z
-			.string({
-				invalid_type_error: "avatar_url must be a string",
-			})
-			.trim()
-			.url("avatar_url must be a valid URL")
-			.max(2048, "avatar_url must be 2048 characters or fewer")
-			.optional(),
-		twitter: optionalTrimmedString("twitter", 255),
-		github: optionalTrimmedString("github", 255),
-		website: z
-			.string({
-				invalid_type_error: "website must be a string",
-			})
-			.trim()
-			.url("website must be a valid URL")
-			.max(2048, "website must be 2048 characters or fewer")
-			.optional(),
-	})
-	.strict()
-
 export const bookmarkBodySchema = z
 	.object({
 		course_id: requiredString("course_id", 100),
@@ -367,4 +344,40 @@ export const userProfileSchema = z
 			.nullable(),
 	})
 	.strict()
+
+// Allowed course difficulty levels (case-insensitive lookups via the Set).
+export const difficultyValues = new Set([
+	"beginner",
+	"intermediate",
+	"advanced",
+])
+
+const courseImportRowSchema = z.object({
+	title: z.string(),
+	slug: z.string(),
+	track: z.string(),
+	difficulty: z.string(),
+	description: z.string().optional(),
+	coverImage: z.string().nullable().optional(),
+	published: z.boolean().optional(),
+})
+
+// Bulk course import accepts either raw CSV text or a parsed courses array.
+// Per-row validation is performed in the controller.
+export const courseBulkImportBodySchema = z.union([
+	z
+		.object({
+			csv: z.string().min(1, "csv must not be empty"),
+			preview: z.boolean().optional(),
+		})
+		.strict(),
+	z
+		.object({
+			courses: z
+				.array(courseImportRowSchema)
+				.min(1, "courses must include at least one row"),
+			preview: z.boolean().optional(),
+		})
+		.strict(),
+])
 

@@ -180,3 +180,20 @@ export const milestoneSubmissionLimiter = rateLimit({
 		"Milestone limit reached. You can submit 10 milestone reports per hour.",
 	),
 })
+
+/**
+ * OTP send/confirm limiter: 3 attempts per hour per phone number.
+ * Keyed by the `phone` field in the request body to prevent one user from
+ * burning OTP quota for another user's phone number via different IPs.
+ */
+export const otpLimiter = rateLimit({
+	windowMs: 60 * 60 * 1000,
+	limit: 3,
+	keyGenerator: createWalletKeyGenerator(["phone"]),
+	standardHeaders: "draft-7",
+	legacyHeaders: false,
+	validate: false,
+	handler: createRateLimitHandler(
+		"OTP limit reached. You can request 3 OTPs per hour per phone number.",
+	),
+})

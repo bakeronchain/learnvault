@@ -138,6 +138,24 @@ export const templates: Record<string, (vars: EmailVariables) => string> = {
 			vars,
 		),
 
+	"identity-verification": (vars) =>
+		baseLayout(
+			`
+    <h2 style="color: #4f46e5;">Verify your identity</h2>
+    <p>You requested identity verification on LearnVault. Click the button below to confirm your email address.</p>
+    <p style="text-align: center;">
+      <a href="${vars.callbackUrl}" class="button primary">Verify my email</a>
+    </p>
+    <p style="font-size: 13px; color: #555;">
+      Or copy and paste this link into your browser:<br>
+      <a href="${vars.callbackUrl}" style="word-break: break-all;">${vars.callbackUrl}</a>
+    </p>
+    <p style="font-size: 12px; color: #888;">This link expires in 24 hours. If you did not request this, you can safely ignore this email.</p>
+    <p>Best,<br>The LearnVault Team</p>
+  `,
+			vars,
+		),
+
 	"admin-alert": (vars) =>
 		baseLayout(
 			`

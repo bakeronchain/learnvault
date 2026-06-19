@@ -37,6 +37,7 @@ import {
 } from "./middleware/rate-limit.middleware"
 import { requestLogger } from "./middleware/request-logger.middleware"
 import { buildOpenApiSpec } from "./openapi"
+import { antiSybilRouter } from "./routes/anti-sybil.routes"
 import { adminMilestonesRouter } from "./routes/admin-milestones.routes"
 import { adminProviderKeysRouter } from "./routes/admin-provider-keys.routes"
 import { adminRouter } from "./routes/admin.routes"
@@ -204,6 +205,7 @@ app.use("/api", createCredentialsRouter(jwtService))
 app.use("/api", validatorRouter)
 app.use("/api", eventsRouter)
 app.use("/api/community", communityRouter)
+app.use("/api", antiSybilRouter)
 app.use("/api", createCommentsRouter(jwtService))
 app.use("/api", createPeerReviewRouter(jwtService))
 app.use("/api", leaderboardRouter)

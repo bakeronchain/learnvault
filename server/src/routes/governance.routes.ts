@@ -15,6 +15,7 @@ import {
 	getGovernanceIncentives,
 } from "../controllers/lrn-burn.controller"
 import { requireAdmin } from "../middleware/admin.middleware"
+import { authMiddleware } from "../middleware/auth.middleware"
 
 export const governanceRouter = Router()
 
@@ -212,15 +213,15 @@ governanceRouter.delete("/proposals/:id", requireAdmin, (req, res) => {
 	void cancelProposal(req, res)
 })
 
-// LRN Token Burn Mechanism endpoints (Issue #775)
-governanceRouter.post("/governance/burn-lrn", (req, res) => {
+// LRN Token Burn Mechanism endpoints (legacy paths; prefer POST /api/lrn/burn)
+governanceRouter.post("/governance/burn-lrn", authMiddleware, (req, res) => {
 	void burnLRNForGovernance(req, res)
 })
 
-governanceRouter.get("/governance/burn-history", (req, res) => {
+governanceRouter.get("/governance/burn-history", authMiddleware, (req, res) => {
 	void getBurnHistory(req, res)
 })
 
-governanceRouter.get("/governance/incentives", (req, res) => {
+governanceRouter.get("/governance/incentives", authMiddleware, (req, res) => {
 	void getGovernanceIncentives(req, res)
 })

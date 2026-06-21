@@ -1,10 +1,10 @@
 import { rpc as StellarRpc } from "@stellar/stellar-sdk"
-import { Pool } from "pg"
 import {
 	SOROBAN_RPC_URL,
 	INDEXER_CONFIG,
 	getPollingTargets,
 } from "../lib/event-config"
+import { pool } from "../db/index"
 import { getRpcCache, CacheKey } from "../lib/rpc-cache"
 import { leaderboardEmitter } from "../lib/leaderboard-emitter"
 import { invalidateApiResponseCacheType } from "../lib/api-response-cache"
@@ -13,8 +13,6 @@ import { createNotification } from "../db/notifications-store"
 import { deliverNotificationChannels } from "./notification-delivery.service"
 
 const log = logger.child({ module: "indexer" })
-
-const pool = new Pool({ connectionString: process.env.DATABASE_URL! })
 
 const rpc = new StellarRpc.Server(SOROBAN_RPC_URL)
 

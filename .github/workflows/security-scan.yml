@@ -17,7 +17,7 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci --legacy-peer-deps --force
       - name: Run npm audit
         # Known unfixable criticals in @creit.tech/stellar-wallets-kit -> @trezor/* -> protobufjs
         # These require a breaking major version downgrade of stellar-wallets-kit (tracked issue).

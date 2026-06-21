@@ -50,7 +50,7 @@ jobs:
           cache: npm
 
       - name: Install frontend dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci --legacy-peer-deps --force
 
       - name: Run lint and formatting checks
         run: |
@@ -133,7 +133,7 @@ jobs:
           cache: npm
 
       - name: Install backend dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci --legacy-peer-deps --force
         working-directory: server
 
       - name: Build backend
@@ -184,7 +184,7 @@ jobs:
           cache: npm
 
       - name: Install frontend dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci --legacy-peer-deps --force
 
       - name: Build frontend
         run: npm run build

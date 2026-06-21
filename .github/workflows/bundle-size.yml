@@ -23,7 +23,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci --legacy-peer-deps --force
 
       - name: Run size-limit analysis
         uses: andresz1/size-limit-action@v1.8.0

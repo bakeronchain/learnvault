@@ -29,3 +29,10 @@ export function clearAuthSession() {
 	localStorage.removeItem("refreshToken")
 	localStorage.removeItem("refresh_token")
 }
+
+/**
+ * Alias for clearAuthSession — removes all locally stored auth tokens.
+ * Prefer clearAuthSession for new call-sites; this export exists for
+ * compatibility with imports that use the shorter name.
+ */
+export const clearAuthToken = clearAuthSession

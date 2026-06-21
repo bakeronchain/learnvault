@@ -55,13 +55,15 @@ BEGIN
         FROM information_schema.columns
         WHERE table_name = 'user_profiles' AND column_name = 'updated_at'
     ) THEN
-        CREATE OR REPLACE FUNCTION update_user_profiles_updated_at()
-        RETURNS TRIGGER AS $$
-        BEGIN
-            NEW.updated_at = CURRENT_TIMESTAMP;
-            RETURN NEW;
-        END;
-        $$ LANGUAGE plpgsql;
+        EXECUTE $func$
+            CREATE OR REPLACE FUNCTION update_user_profiles_updated_at()
+            RETURNS TRIGGER AS $trig$
+            BEGIN
+                NEW.updated_at = CURRENT_TIMESTAMP;
+                RETURN NEW;
+            END;
+            $trig$ LANGUAGE plpgsql
+        $func$;
 
         DROP TRIGGER IF EXISTS trigger_user_profiles_updated_at ON user_profiles;
         CREATE TRIGGER trigger_user_profiles_updated_at

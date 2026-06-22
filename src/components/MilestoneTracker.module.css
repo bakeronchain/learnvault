@@ -8,10 +8,49 @@
 	padding: 20px;
 }
 
+.containerHorizontal {
+	display: flex;
+	flex-direction: row;
+	width: 100%;
+	gap: 16px;
+	padding: 16px 4px;
+	overflow-x: auto;
+	scroll-snap-type: x mandatory;
+	-webkit-overflow-scrolling: touch;
+	scrollbar-width: thin;
+}
+
+.containerHorizontal::-webkit-scrollbar {
+	height: 4px;
+}
+
+.containerHorizontal::-webkit-scrollbar-thumb {
+	background: rgba(255, 255, 255, 0.2);
+	border-radius: 999px;
+}
+
+.containerHorizontal::-webkit-scrollbar-track {
+	background: transparent;
+}
+
 .step {
 	display: flex;
 	position: relative;
 	padding-bottom: 30px;
+}
+
+.stepHorizontal {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	flex-shrink: 0;
+	width: 220px;
+	scroll-snap-align: start;
+	padding: 16px 0;
+}
+
+.stepHorizontal:not(:last-child)::after {
+	display: none;
 }
 
 /* Vertical connecting line */
@@ -52,6 +91,14 @@
 	border: 2px solid var(--pal-border);
 }
 
+.stepHorizontal .iconContainer {
+	margin-right: 0;
+	margin-bottom: 12px;
+	width: 44px;
+	height: 44px;
+	font-size: 1.4rem;
+}
+
 .step.locked .iconContainer {
 	background-color: #374151;
 	border-color: #4b5563;
@@ -85,6 +132,12 @@
 		box-shadow 0.2s ease;
 }
 
+.stepHorizontal .content {
+	width: 100%;
+	padding: 12px;
+	text-align: center;
+}
+
 .step.in_progress .content {
 	border-color: rgba(59, 130, 246, 0.3);
 	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
@@ -105,11 +158,21 @@
 	margin-bottom: 12px;
 }
 
+.stepHorizontal .header {
+	flex-direction: column;
+	gap: 8px;
+	text-align: center;
+}
+
 .title {
 	font-size: 1.1rem;
 	font-weight: 600;
 	color: #f3f4f6;
 	margin: 0;
+}
+
+.stepHorizontal .title {
+	font-size: 0.95rem;
 }
 
 .badge {
@@ -122,6 +185,11 @@
 	background: linear-gradient(135deg, #f59e0b, #d97706);
 	color: white;
 	box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+}
+
+.stepHorizontal .badge {
+	font-size: 0.7rem;
+	padding: 3px 8px;
 }
 
 .txLink {
@@ -147,7 +215,8 @@
 	background: #3b82f6;
 	color: white;
 	border: none;
-	padding: 8px 16px;
+	padding: 10px 20px;
+	min-height: 44px;
 	border-radius: 8px;
 	font-weight: 600;
 	cursor: pointer;
@@ -162,6 +231,14 @@
 .actionBtn:disabled {
 	opacity: 0.5;
 	cursor: not-allowed;
+}
+
+.stepHorizontal .actionBtn {
+	width: 100%;
+	padding: 8px 12px;
+	min-height: 44px;
+	font-size: 0.8rem;
+	margin-top: 12px;
 }
 
 @keyframes pulse {

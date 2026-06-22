@@ -1,6 +1,7 @@
 import React, { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useCourse } from "../hooks/useCourse"
+import { useIsMobile } from "../hooks/useIsMobile"
 import styles from "./MilestoneTracker.module.css"
 import TxHashLink from "./TxHashLink"
 
@@ -18,9 +19,11 @@ interface MilestoneTrackerProps {
 function MilestoneStep({
 	courseId,
 	milestone,
+	horizontal = false,
 }: {
 	courseId: string
 	milestone: Milestone
+	horizontal?: boolean
 }) {
 	const { getCourseProgress, completeMilestone, isCompletingMilestone } =
 		useCourse()
@@ -65,8 +68,12 @@ function MilestoneStep({
 		}
 	}
 
+	const stepClass = horizontal
+		? `${styles.stepHorizontal} ${styles[status]}`
+		: `${styles.step} ${styles[status]}`
+
 	return (
-		<div className={`${styles.step} ${styles[status]}`}>
+		<div className={stepClass}>
 			<div className={styles.iconContainer}>{getIcon()}</div>
 			<div className={styles.content}>
 				<div className={styles.header}>
@@ -81,14 +88,14 @@ function MilestoneStep({
 				</div>
 
 				{status === "locked" && (
-					<p style={{ fontSize: "0.9rem", color: "#9ca3af", margin: 0 }}>
+					<p style={{ fontSize: "0.85rem", color: "#9ca3af", margin: 0 }}>
 						{t("home.milestones.locked")}
 					</p>
 				)}
 
 				{status === "in_progress" && (
 					<div>
-						<p style={{ fontSize: "0.9rem", color: "#d1d5db", margin: 0 }}>
+						<p style={{ fontSize: "0.85rem", color: "#d1d5db", margin: 0 }}>
 							{t("home.milestones.inProgress")}
 						</p>
 						<button
@@ -107,7 +114,7 @@ function MilestoneStep({
 					<div>
 						<p
 							style={{
-								fontSize: "0.9rem",
+								fontSize: "0.85rem",
 								color: "#10b981",
 								margin: 0,
 								fontWeight: 600,
@@ -127,13 +134,20 @@ export function MilestoneTracker({
 	courseId,
 	milestones,
 }: MilestoneTrackerProps) {
+	const isMobile = useIsMobile()
+
 	return (
-		<div className={styles.container}>
+		<div
+			className={
+				isMobile ? styles.containerHorizontal : styles.container
+			}
+		>
 			{milestones.map((milestone) => (
 				<MilestoneStep
 					key={milestone.id}
 					courseId={courseId}
 					milestone={milestone}
+					horizontal={isMobile}
 				/>
 			))}
 		</div>

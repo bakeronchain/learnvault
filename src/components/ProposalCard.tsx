@@ -61,12 +61,13 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({
 	return (
 		<div className="flex flex-col h-full bg-white/5 border border-white/10 rounded-3xl hover:border-brand-cyan/30 transition-all duration-300 overflow-hidden">
 			<Card variant="primary" noPadding>
-				<div className="p-6 space-y-6">
-					{/* Header: Title and Amount */}
-					<div className="flex justify-between items-start gap-4">
-						<div>
-							<h3 className="text-xl font-bold text-white mb-1">{title}</h3>
-							<p className="text-sm text-white/50 font-mono">
+				<div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+					<div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-4">
+						<div className="min-w-0 w-full sm:w-auto">
+							<h3 className="text-lg sm:text-xl font-bold text-white mb-1 break-words">
+								{title}
+							</h3>
+							<p className="text-xs sm:text-sm text-white/50 font-mono truncate">
 								{shortenAddress(proposerAddress)}
 							</p>
 						</div>
@@ -75,8 +76,7 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({
 						</Badge>
 					</div>
 
-					{/* Status and Time */}
-					<div className="flex items-center gap-3">
+					<div className="flex flex-wrap items-center gap-2 sm:gap-3">
 						<Badge variant={getStatusColor() as any} size="sm">
 							{status.toUpperCase()}
 						</Badge>
@@ -86,9 +86,8 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({
 						/>
 					</div>
 
-					{/* Progress Bar */}
 					<div className="space-y-2">
-						<div className="flex justify-between text-xs font-bold uppercase tracking-tighter">
+						<div className="flex justify-between text-[10px] sm:text-xs font-bold uppercase tracking-tighter">
 							<span className="text-success">
 								YES: {yesVotes} ({yesPercentage.toFixed(0)}%)
 							</span>
@@ -108,12 +107,11 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({
 						</div>
 					</div>
 
-					{/* Action Buttons */}
-					<div className="flex gap-3 pt-2">
-						<div className="flex-1">
+					<div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-2">
+						<div className="flex-1 w-full sm:w-auto">
 							<Button
 								variant="success"
-								size="sm"
+								size="md"
 								isFullWidth
 								disabled={isClosed || hasVoted}
 								onClick={onVoteYes}
@@ -121,10 +119,10 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({
 								Vote YES
 							</Button>
 						</div>
-						<div className="flex-1">
+						<div className="flex-1 w-full sm:w-auto">
 							<Button
 								variant="error"
-								size="sm"
+								size="md"
 								isFullWidth
 								disabled={isClosed || hasVoted}
 								onClick={onVoteNo}

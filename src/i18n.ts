@@ -6,14 +6,12 @@ import en from "./locales/en.json"
 import es from "./locales/es.json"
 import fr from "./locales/fr.json"
 import sw from "./locales/sw.json"
-import ps from "./locales/ps.json"
 
 const resources = {
 	en: { translation: en },
 	es: { translation: es },
 	fr: { translation: fr },
 	sw: { translation: sw },
-	ps: { translation: ps },
 }
 
 void i18n
@@ -26,7 +24,7 @@ void i18n
 	// for all options read: https://www.i18next.com/overview/configuration-options
 	.init({
 		resources,
-		supportedLngs: ["en", "fr", "sw"],
+		supportedLngs: ["en", "es", "fr", "sw"],
 		nonExplicitSupportedLngs: true,
 		load: "languageOnly",
 		fallbackLng: "en",

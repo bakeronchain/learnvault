@@ -7,7 +7,7 @@ module.exports = {
 			list: ["t", "i18n.t"],
 			extensions: [".ts", ".tsx"],
 		},
-		lngs: ["en", "fr", "sw", "ps"],
+		lngs: ["en", "es", "fr", "sw"],
 		ns: ["translation"],
 		defaultLng: "en",
 		defaultNs: "translation",

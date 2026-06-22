@@ -1,11 +1,88 @@
 {
-	"home": {
-		"heroTitle": "Yay! Upo kwenye Stellar!"
-	},
 	"nav": {
 		"contractExplorer": "Mtafiti wa Mikataba",
+		"txExplorer": "Mtafiti wa Miamala",
+		"github": "GitHub",
+		"tutorial": "Mwongozo",
+		"viewDocs": "Tazama Nyaraka",
+		"debug": "Nyumbusha Mikataba",
+		"learn": "Jifunze",
 		"dashboard": "Dashibodi",
-		"courses": "Kozi"
+		"dao": "DAO",
+		"leaderboard": "Orodha ya Viongozaji",
+		"profile": "Wasifu Wangu",
+		"courses": "Kozi",
+		"treasury": "Hazina",
+		"discord": "Discord",
+		"twitter": "Twitter",
+		"docs": "Hati"
+	},
+	"home": {
+		"heroTitle": "Yay! Upo kwenye Stellar!",
+		"heroDesc": "Kiolezo cha maendeleo ya ndani kilicho disenged kusaidia kujenga dApps kwenye mtandao wa Stellar. Kazibu hii inakuwezesha kujaribu kwa urahisi kuunganishwa kwa pochi, mwingiliano wa mikataba mahimu, uthibitisho wa miamala, nk.",
+		"courseProgress": {
+			"title": "Maendeleo ya Kozi (Tatizo la Majaribio 55)",
+			"desc": "Fuata safari yako ya kujifunza na pata zawadi za LRN kwa kumaliza milepya kwenye mlipuko."
+		},
+		"milestones": {
+			"1": "Kamata Somo la 1",
+			"2": "Kapata Mtihani 1",
+			"3": "Jenga mukataba wako wa kwanza",
+			"locked": "Kamata milepya iliyotangulia kuachilia.",
+			"inProgress": "Unafanya kazi katika milepya hii sasa.",
+			"submittingText": "Kuwasilisha TX...",
+			"markComplete": "Alama Imekamilika",
+			"completedText": "Imekamilika kwa ufanisi!",
+			"tx": "TX",
+			"lrnReward": "+{{amount}} LRN"
+		},
+		"sampleContracts": {
+			"title": "Mikataba ya Mfano",
+			"guess": "Dhani Namba:",
+			"guessDesc1": "Ingiliana na mukataba wa mfano kutoka ",
+			"guessLink": "Mwongozo wa LearnVault",
+			"guessDesc2": " kwa kutumia mteja wa mukataba ulioundwa kiotomatiki.",
+			"other": "Au angalia mikataba mingine ya mfano kuanza:",
+			"oz": "Mikataba ya mfano ya OpenZeppelin",
+			"soroban": "Mikataba ya mfano ya Soroban"
+		},
+		"startBuilding": {
+			"title": "Anza Kujenga",
+			"step1": "Ongeza mukataba wako chini ya ",
+			"step2": "Mikataba imetengeneza na LearnVault unapoendesheza ",
+			"step3": "Mabadiliko yenye kutengenezwa kiotomatiki na ",
+			"step4": "Ingiliana na mukataba wako mara moja katika Mtafiti wa Mikataba",
+			"watch": "Tazama mchakato mzima kwenye yetu ",
+			"youtube": "mwongozo wa YouTube",
+			"inspired": "Jipei jimboni la ",
+			"examples": "vitanzi vya mfano",
+			"deploy": "Jina kutengeneza? ",
+			"mainnet": "Soma mwongozo wa ukuzaji kwenye mainnet"
+		},
+		"footer": {
+			"invoke": "Amri mukataba wako mahimu kwa kutumia ",
+			"contractLink": "Mtafiti wa Mikataba",
+			"browse": "Vinjari miamala yako ya ndani na ",
+			"txLink": "Mtafiti wa Miamala"
+		}
+	},
+	"connect": {
+		"connectWallet": "Kuunganisha Pochi",
+		"fund": "Akaunti ya Fedha",
+		"faucetLoading": "Kukamatia...",
+		"funded": "Akaunti imefadhiliwa kwa ufanisi!",
+		"fundErrorDetail": "Hitilafu katika kukamatia akaunti: {{detail}}",
+		"fundErrorUnknown": "Hitilafu katika kukamatia akaunti: Hitilafu isiyojulikana",
+		"fundErrorRetry": "Hitilafu katika kukamatia akaunti. Tafadhali jaribu tena.",
+		"alreadyFunded": "Akaunti tayari imefadhiliwa",
+		"local": "Ndani",
+		"networkConnect": "Unganisha pochi yako kwa kutumia mtandao huu.",
+		"networkMismatch": "Pochi iko kwenye {{wallet}}, unganisha kwa {{app}} badala yake."
+	},
+	"network": {
+		"testnetWarning": "Upo kwenye Stellar Testnet — tokeni hazina thamani halisi",
+		"futurenetWarning": "Upo kwenye Stellar Futurenet — mtandao wa majaribio kwa ajili ya majaribio",
+		"localWarning": "Upo kwenye Mtandao wa Ndani — kwa maendeleo tu"
 	},
 	"usdc": {
 		"getTestUSDC": "Pata USDC ya Majaribio",
@@ -13,5 +90,50 @@
 		"mintSuccess": "Umefanikiwa kuchapisha {{amount}} USDC kwa {{address}}...",
 		"mintError": "Hitilafu katika kuchapisha USDC: {{error}}",
 		"tooltip": "Pata tokeni {{amount}} za USDC za majaribio kwa ajili ya kujaribu michango na shughuli za hazina"
+	},
+	"wallet": {
+		"loading": "Inapakia...",
+		"connect": "Kuunganisha Pochi",
+		"balance": "Salio la Pochi: {{amount}} LRN",
+		"connectedAs": "Umeunganishwa kama ",
+		"disconnectPrompt": ". Je! Unataka kuondolewa?",
+		"disconnect": "Ondolewa",
+		"cancel": "Ghairi"
+	},
+	"pages": {
+		"learn": {
+			"title": "Jifunze",
+			"desc": "Hii ni ukurasa wa Jifunze."
+		},
+		"dao": {
+			"title": "DAO",
+			"desc": "Hii ni ukurasa wa DAO.",
+			"lastUpdated": "Ilisasishwa mwisho: {{time}}"
+		},
+		"leaderboard": {
+			"title": "Orodha ya Viongozaji",
+			"desc": "Wanajifunza wenye mbunifu wanaoorodhewa na salio la tokeni ya LRN. Jipei mahali yako.",
+			"rank": "Kiwango",
+			"learner": "Mwanajifunza",
+			"lrnBalance": "Salio la LRN",
+			"courses": "Kozi",
+			"joined": "Alijiunga",
+			"searchPlaceholder": "Tafuta kwa anwani ya pochi...",
+			"filterAll": "Wakati Mzima",
+			"filterMonth": "Mwezi Huu",
+			"filterWeek": "Wiki Hii",
+			"myRank": "Kiwango Changu",
+			"loadMore": "Pakia Zaidi",
+			"prev": "Iliyotangulia",
+			"next": "Inayofuata",
+			"noResults": "Hakuna wanajifunza wanaolingana na utafutaji wako.",
+			"connectPrompt": "Unganisha pochi yako kuona kiwango chako.",
+			"notRanked": "Haijaorodheshwa bado",
+			"page": "Ukurasa {{current}} wa {{total}}"
+		},
+		"profile": {
+			"title": "Wasifu Wangu",
+			"desc": "Hii ni ukurasa wa Wasifu Wangu."
+		}
 	}
 }

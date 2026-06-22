@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
+      - name: i18n key parity check
+        run: npm run i18n-check
+
       - name: Type check
         run: npm run typecheck
 

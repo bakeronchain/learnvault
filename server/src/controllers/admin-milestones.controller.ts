@@ -7,13 +7,20 @@ import {
 	listRecentPeerReviewsForReport,
 } from "../db/peer-review-store"
 
+import { logger } from "../lib/logger"
 import { type AdminRequest } from "../middleware/admin.middleware"
 import { credentialService } from "../services/credential.service"
 import { createEmailService } from "../services/email.service"
 import { markEscrowActivity } from "../services/escrow-timeout.service"
+import {
+	GithubOracleError,
+	verifyMilestoneReportEvidence,
+} from "../services/github-oracle.service"
 import { deliverNotificationChannels } from "../services/notification-delivery.service"
 import { stellarContractService } from "../services/stellar-contract.service"
 import { templates, toPlainText } from "../templates/email-templates"
+
+const log = logger.child({ module: "admin-milestones" })
 
 const emailService = createEmailService(
 	process.env.RESEND_API_KEY || process.env.EMAIL_API_KEY || "",
@@ -125,6 +132,47 @@ export async function getMilestoneById(
 	}
 }
 
+// ── POST /api/admin/milestones/:id/verify-oracle ─────────────────────────────
+// Manually (re-)run GitHub proof-of-work verification for a report's evidence.
+
+export async function verifyMilestoneOracle(
+	req: AdminRequest,
+	res: Response,
+): Promise<void> {
+	const id = Number(req.params.id)
+	if (!Number.isInteger(id) || id <= 0) {
+		res.status(400).json({ error: "Invalid milestone report id" })
+		return
+	}
+
+	try {
+		const report = await milestoneStore.getReportById(id)
+		if (!report) {
+			res.status(404).json({ error: "Milestone report not found" })
+			return
+		}
+		if (!report.evidence_github) {
+			res
+				.status(400)
+				.json({ error: "Report has no GitHub PR evidence to verify" })
+			return
+		}
+
+		const result = await verifyMilestoneReportEvidence(report)
+		res.status(200).json({ data: result })
+	} catch (err) {
+		if (err instanceof GithubOracleError) {
+			res.status(err.code === "INVALID_URL" ? 400 : 502).json({
+				error: err.message,
+				code: err.code,
+			})
+			return
+		}
+		log.error({ err }, "verifyMilestoneOracle error")
+		res.status(500).json({ error: "Failed to verify milestone evidence" })
+	}
+}
+
 export async function approveMilestone(
 	req: AdminRequest,
 	res: Response,
@@ -150,6 +198,45 @@ export async function approveMilestone(
 		if (!hasStellarMilestoneCredentials()) {
 			res.status(503).json({ error: "Stellar credentials not configured" })
 			return
+		}
+
+		// Oracle gate: corroborate GitHub proof-of-work before releasing escrow.
+		// An admin can bypass a failed/unavailable check with overrideOracle=true.
+		const overrideOracle =
+			(req.body as { overrideOracle?: boolean }).overrideOracle === true
+		if (report.evidence_github) {
+			let oracle: Awaited<ReturnType<typeof verifyMilestoneReportEvidence>> =
+				null
+			try {
+				oracle = await verifyMilestoneReportEvidence(report)
+			} catch (oracleErr) {
+				const code =
+					oracleErr instanceof GithubOracleError ? oracleErr.code : "UNKNOWN"
+				log.warn(
+					{ err: oracleErr, reportId: id, code },
+					"oracle verification errored during approval",
+				)
+				if (!overrideOracle) {
+					res.status(422).json({
+						error: "GitHub proof-of-work could not be verified",
+						code,
+						hint: "Retry, or approve with overrideOracle=true to bypass.",
+					})
+					return
+				}
+			}
+			if (oracle && !oracle.verified && !overrideOracle) {
+				res.status(422).json({
+					error: "GitHub proof-of-work verification failed",
+					data: {
+						checks: oracle.checks,
+						reasons: oracle.reasons,
+						evidenceHash: oracle.evidenceHash,
+					},
+					hint: "Approve with overrideOracle=true to bypass the failed check.",
+				})
+				return
+			}
 		}
 
 		// Trigger on-chain verify_milestone() call

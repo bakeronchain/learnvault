@@ -1,4 +1,10 @@
 import { pool } from "./index"
+import type {
+	OracleResultDetail,
+	OracleResultInput,
+} from "../services/github-oracle.service"
+
+export type { OracleResultDetail, OracleResultInput }
 
 export type MilestoneReportStatus =
 	| "pending"
@@ -26,6 +32,11 @@ export interface MilestoneReport {
 	resubmission_count: number
 	appeal_reason?: string | null
 	appeal_submitted_at?: string | null
+	/** GitHub oracle proof-of-work result (null until evidence is verified). */
+	oracle_verified?: boolean | null
+	oracle_evidence_hash?: string | null
+	oracle_checked_at?: string | null
+	oracle_detail?: OracleResultDetail | null
 	scholar_email?: string
 	scholar_name?: string
 	course_title?: string
@@ -145,6 +156,19 @@ class InMemoryMilestoneStore {
 		const report = this.reports.find((r) => r.id === id)
 		if (!report) return null
 		report.status = status
+		return report
+	}
+
+	async setOracleResult(
+		id: number,
+		result: OracleResultInput,
+	): Promise<MilestoneReport | null> {
+		const report = this.reports.find((r) => r.id === id)
+		if (!report) return null
+		report.oracle_verified = result.verified
+		report.oracle_evidence_hash = result.evidence_hash
+		report.oracle_detail = result.detail
+		report.oracle_checked_at = new Date().toISOString()
 		return report
 	}
 
@@ -358,6 +382,30 @@ export const milestoneStore = {
 			[status, id],
 		)
 		return result.rows[0] ?? null
+	},
+
+	async setOracleResult(
+		id: number,
+		result: OracleResultInput,
+	): Promise<MilestoneReport | null> {
+		if (!isRealPool())
+			return inMemoryMilestoneStore.setOracleResult(id, result)
+		const queryResult = await pool.query(
+			`UPDATE milestone_reports
+			 SET oracle_verified = $1,
+			     oracle_evidence_hash = $2,
+			     oracle_detail = $3,
+			     oracle_checked_at = NOW()
+			 WHERE id = $4
+			 RETURNING *`,
+			[
+				result.verified,
+				result.evidence_hash,
+				JSON.stringify(result.detail),
+				id,
+			],
+		)
+		return queryResult.rows[0] ?? null
 	},
 
 	async submitAppeal(

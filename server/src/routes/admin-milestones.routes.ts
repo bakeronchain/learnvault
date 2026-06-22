@@ -7,6 +7,7 @@ import {
 	batchApproveMilestones,
 	batchRejectMilestones,
 	rejectMilestone,
+	verifyMilestoneOracle,
 } from "../controllers/admin-milestones.controller"
 import { submitMilestoneReport } from "../controllers/milestone-submit.controller"
 import { resubmitMilestoneReport } from "../controllers/milestone-resubmit.controller"
@@ -79,6 +80,42 @@ adminMilestonesRouter.get(
 		params: milestoneReportIdParamSchema,
 	}),
 	getMilestoneById,
+)
+
+/**
+ * @openapi
+ * /api/admin/milestones/{id}/verify-oracle:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Run GitHub proof-of-work verification for a milestone report
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Oracle verification result
+ *       400:
+ *         $ref: '#/components/responses/BadRequestError'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
+ *       502:
+ *         description: GitHub API request failed
+ */
+adminMilestonesRouter.post(
+	"/admin/milestones/:id/verify-oracle",
+	requireAdmin,
+	validate({
+		params: milestoneReportIdParamSchema,
+	}),
+	verifyMilestoneOracle,
 )
 
 /**

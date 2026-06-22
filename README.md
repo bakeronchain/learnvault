@@ -323,6 +323,33 @@ return to the treasury.
 
 ---
 
+## Oracle-based milestone verification
+
+When a milestone is backed by a GitHub pull request, LearnVault corroborates the
+learner's claimed proof-of-work automatically instead of relying purely on
+manual review:
+
+- **On submission** — `POST /api/milestones/submit` runs the GitHub oracle in
+  the background and stores the result on the report (`oracle_verified`,
+  `oracle_evidence_hash`, `oracle_detail`).
+- **Checks performed** — the PR is fetched from the GitHub API and validated to
+  be (1) **merged**, (2) **authored by the learner's linked GitHub account**
+  (from their profile), and (3) **merged within the milestone window** (after the
+  milestone was created, on/before the submission time).
+- **Gating approval** — `POST /api/admin/milestones/:id/approve` re-runs the
+  oracle before the on-chain `verify_milestone()` call that releases escrow. A
+  failed or unavailable check returns `422` with the reasons; an admin may
+  override with `{"overrideOracle": true}`.
+- **On demand** — `POST /api/admin/milestones/:id/verify-oracle` returns the
+  verification result without changing state.
+- **CLI** — `scripts/oracle/verify-github-evidence.mjs <pr-url> [--login <user>]
+  [--window-start <iso>] [--window-end <iso>]` runs the same rules manually
+  (shared with the server via `scripts/oracle/github-evidence-core.mjs`).
+
+Set `GITHUB_TOKEN` to raise GitHub API rate limits and read private PRs.
+
+---
+
 ## Governance
 
 LearnVault's DAO governance covers:
@@ -367,7 +394,10 @@ transfers to token holders.
 
 - MilestoneEscrow and automated tranche disbursements
 - ScholarNFT credential system
-- Oracle-based milestone verification
+- Oracle-based milestone verification — GitHub proof-of-work (PR merged, authored
+  by the learner's linked account, within the milestone window) is verified on
+  submission and re-checked to gate milestone approval / escrow release. See
+  [Oracle verification](#oracle-based-milestone-verification).
 - Expanded course catalog (Web3, DeFi, Smart Contracts, ZK basics)
 - Mobile-responsive frontend
 - Community leaderboard

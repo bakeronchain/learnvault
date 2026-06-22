@@ -1,4 +1,10 @@
 import { type Request, type Response } from "express"
+import { pool } from "../db"
+import { logger } from "../lib/logger"
+
+const log = logger.child({ module: "community" })
+
+const VALID_EVENT_TYPES = new Set(["hackathon", "study_group", "workshop"])
 
 export type CommunityEvent = {
 	id: string
@@ -7,45 +13,64 @@ export type CommunityEvent = {
 	date: string
 	type: "hackathon" | "study_group" | "workshop"
 	link: string
+	created_at: string
 }
 
-// In-memory storage for events (since DB is a stub)
-const events: CommunityEvent[] = [
-	{
-		id: "1",
-		title: "Stellar Soroban Hackathon",
-		description: "Build the future of decentralized finance on Stellar.",
-		date: "2026-05-15T10:00:00Z",
-		type: "hackathon",
-		link: "https://stellar.org/hackathon",
-	},
-	{
-		id: "2",
-		title: "Rust for Soroban Workshop",
-		description: "Learn how to write secure smart contracts with Rust.",
-		date: "2026-05-20T14:00:00Z",
-		type: "workshop",
-		link: "https://learnvault.io/workshop/rust",
-	},
-]
-
-export const getEvents = (req: Request, res: Response) => {
-	res.json(events)
+function asNonEmptyString(value: unknown): string | null {
+	if (typeof value !== "string") return null
+	const trimmed = value.trim()
+	return trimmed.length > 0 ? trimmed : null
 }
 
-export const createEvent = (req: Request, res: Response) => {
-	const { title, description, date, type, link } = req.body
+export const getEvents = async (
+	req: Request,
+	res: Response,
+): Promise<void> => {
+	try {
+		const result = await pool.query(
+			`SELECT id::text, title, description, date, type, link, created_at
+			 FROM community_events
+			 ORDER BY date ASC`,
+		)
+		res.json(result.rows)
+	} catch (err) {
+		log.error({ err }, "Failed to fetch community events")
+		res.status(500).json({ error: "Failed to fetch community events" })
+	}
+}
+
+export const createEvent = async (
+	req: Request,
+	res: Response,
+): Promise<void> => {
+	const title = asNonEmptyString(req.body?.title)
+	const description = asNonEmptyString(req.body?.description)
+	const date = asNonEmptyString(req.body?.date)
+	const type = asNonEmptyString(req.body?.type)
+	const link = asNonEmptyString(req.body?.link)
+
 	if (!title || !description || !date || !type || !link) {
-		return res.status(400).json({ error: "Missing required fields" })
+		res.status(400).json({ error: "Missing required fields" })
+		return
 	}
-	const newEvent: CommunityEvent = {
-		id: (events.length + 1).toString(),
-		title,
-		description,
-		date,
-		type,
-		link,
+
+	if (!VALID_EVENT_TYPES.has(type)) {
+		res
+			.status(400)
+			.json({ error: "type must be one of: hackathon, study_group, workshop" })
+		return
 	}
-	events.push(newEvent)
-	res.status(201).json(newEvent)
+
+	try {
+		const result = await pool.query(
+			`INSERT INTO community_events (title, description, date, type, link)
+			 VALUES ($1, $2, $3, $4, $5)
+			 RETURNING id::text, title, description, date, type, link, created_at`,
+			[title, description, date, type, link],
+		)
+		res.status(201).json(result.rows[0])
+	} catch (err) {
+		log.error({ err }, "Failed to create community event")
+		res.status(500).json({ error: "Failed to create community event" })
+	}
 }

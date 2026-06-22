@@ -1,4 +1,5 @@
 import { Router } from "express"
+import { SponsorLicenseCheckoutController } from "../controllers/sponsor-license-checkout.controller"
 import {
 	createTrackSponsorship,
 	getOrganizationDashboard,
@@ -8,8 +9,12 @@ import {
 	upsertOrganizationProfile,
 	upsertScholarRegion,
 } from "../controllers/sponsors.controller"
+import { getPool } from "../db/index"
 
 export const sponsorsRouter = Router()
+const licenseCheckoutController = new SponsorLicenseCheckoutController(
+	getPool(),
+)
 
 sponsorsRouter.get("/sponsors/organizations/:walletAddress", (req, res) => {
 	void getOrganizationProfile(req, res)
@@ -44,3 +49,19 @@ sponsorsRouter.get(
 sponsorsRouter.put("/sponsors/scholar-region", (req, res) => {
 	void upsertScholarRegion(req, res)
 })
+
+// Bulk license checkout endpoints
+sponsorsRouter.post("/sponsors/license-checkout", (req, res) => {
+	void licenseCheckoutController.create(req, res)
+})
+
+sponsorsRouter.get("/sponsors/license-checkout/:walletAddress", (req, res) => {
+	void licenseCheckoutController.getByOrganization(req, res)
+})
+
+sponsorsRouter.get(
+	"/sponsors/license-checkout/recipient/:walletAddress",
+	(req, res) => {
+		void licenseCheckoutController.getByRecipient(req, res)
+	},
+)

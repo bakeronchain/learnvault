@@ -13,7 +13,6 @@ export function createEnrollmentsRouter(jwtService: JwtService): Router {
 	const router = Router()
 	const requireAuth = createRequireAuth(jwtService)
 
-<<<<<<< HEAD
 	/**
 	 * @openapi
 	 * /api/enrollments:
@@ -29,70 +28,54 @@ export function createEnrollmentsRouter(jwtService: JwtService): Router {
 	 *       required: true
 	 *       content:
 	 *         application/json:
-
-		/**
-		 * @openapi
-		 * /api/enrollments:
-		 *   post:
-		 *     tags: [Enrollments]
-		 *     summary: Create a new course enrollment
-		 *     security:
-		 *       - bearerAuth: []
-		 *     description: |
-		 *       Records a course enrollment in the database after validating
-		 *       the on-chain enrollment via the CourseMilestone contract.
-		 *     requestBody:
-		 *       required: true
-		 *       content:
-		 *         application/json:
-		 *           schema:
-		 *             type: object
-		 *             required:
-		 *               - learner_address
-		 *               - course_id
-		 *               - tx_hash
-		 *             properties:
-		 *               learner_address:
-		 *                 type: string
-		 *                 description: The learner's Stellar wallet address
-		 *               course_id:
-		 *                 type: string
-		 *                 description: The course identifier (e.g., "stellar-basics")
-		 *               tx_hash:
-		 *                 type: string
-		 *                 description: The transaction hash of the on-chain enrollment
-		 *           example:
-		 *             learner_address: "GABCD123456789..."
-		 *             course_id: "stellar-basics"
-		 *             tx_hash: "abc123def456"
-		 *     responses:
-		 *       201:
-		 *         description: Enrollment created successfully
-		 *         content:
-		 *           application/json:
-		 *             schema:
-		 *               type: object
-		 *               properties:
-		 *                 enrollment_id:
-		 *                   type: integer
-		 *                 enrolled_at:
-		 *                   type: string
-		 *                   format: date-time
-		 *       400:
-		 *         description: Validation error or not enrolled on-chain
-		 *         content:
-		 *           application/json:
-		 *             schema:
-		 *               $ref: '#/components/schemas/ErrorResponse'
-		 *       401:
-		 *         description: Unauthorized
-		 *       404:
-		 *         description: Course not found
-		 *       409:
-		 *         description: Already enrolled in this course
-		 *       500:
-		 *         $ref: '#/components/responses/InternalServerError'
-		 */
+	 *           schema:
+	 *             type: object
+	 *             required:
+	 *               - learner_address
+	 *               - course_id
+	 *               - tx_hash
+	 *             properties:
+	 *               learner_address:
+	 *                 type: string
+	 *                 description: The learner's Stellar wallet address
+	 *               course_id:
+	 *                 type: string
+	 *                 description: The course identifier (e.g., "stellar-basics")
+	 *               tx_hash:
+	 *                 type: string
+	 *                 description: The transaction hash of the on-chain enrollment
+	 *           example:
+	 *             learner_address: "GABCD123456789..."
+	 *             course_id: "stellar-basics"
+	 *             tx_hash: "abc123def456"
+	 *     responses:
+	 *       201:
+	 *         description: Enrollment created successfully
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               type: object
+	 *               properties:
+	 *                 enrollment_id:
+	 *                   type: integer
+	 *                 enrolled_at:
+	 *                   type: string
+	 *                   format: date-time
+	 *       400:
+	 *         description: Validation error or not enrolled on-chain
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/ErrorResponse'
+	 *       401:
+	 *         description: Unauthorized
+	 *       404:
+	 *         description: Course not found
+	 *       409:
+	 *         description: Already enrolled in this course
+	 *       500:
+	 *         $ref: '#/components/responses/InternalServerError'
+	 */
 	router.post(
 		"/enrollments",
 		requireAuth,
@@ -147,4 +130,3 @@ export function createEnrollmentsRouter(jwtService: JwtService): Router {
 
 	return router
 }
- * - tx_hash

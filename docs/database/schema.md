@@ -275,6 +275,20 @@ General analytics event logging.
     *   `idx_platform_events_type_created_at` on `(event_type, created_at DESC)`
     *   `idx_platform_events_created_at` on `(created_at DESC)`
 
+### 20. `certificates`
+Issued PDF course-completion certificates with tamper-evident content hashes.
+*   **Columns**:
+    *   `id` (SERIAL, PRIMARY KEY).
+    *   `user_id` (TEXT, NOT NULL): Stellar wallet address of the learner.
+    *   `course_id` (TEXT, FOREIGN KEY REFERENCES `courses(slug)` ON DELETE RESTRICT, NOT NULL): Course slug the certificate was issued for.
+    *   `issued_at` (TIMESTAMP WITH TIME ZONE, DEFAULT CURRENT_TIMESTAMP, NOT NULL).
+    *   `pdf_hash` (TEXT, NOT NULL): SHA-256 hex digest of the generated PDF bytes for external tamper verification.
+    *   `pdf_url` (TEXT): Optional storage URL (e.g. IPFS or CDN) for the PDF.
+*   **Constraints**: `UNIQUE(user_id, course_id)` ensures one canonical certificate per learner per course (idempotent re-downloads).
+*   **Indexes**:
+    *   `idx_certificates_user_id` on `(user_id)`
+    *   `idx_certificates_course_id` on `(course_id)`
+
 ---
 
 ## Indexing Strategy & Performance Rationale

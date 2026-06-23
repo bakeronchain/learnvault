@@ -8,11 +8,13 @@ const EVENT_OPTIONS = [
 	{ key: "milestone_rejected", label: "Milestone rejected" },
 	{ key: "vote_result", label: "Vote result" },
 	{ key: "disbursement", label: "Disbursement received" },
+	{ key: "voting_deadline_reminder", label: "Voting deadline approaching" },
 ] as const
 
 export default function NotificationSettings() {
 	const token = getAuthToken()
-	const { preferences, loading, saving, save } = useNotificationPreferences(token)
+	const { preferences, loading, saving, save } =
+		useNotificationPreferences(token)
 
 	const timezone = useMemo(
 		() => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
@@ -23,7 +25,9 @@ export default function NotificationSettings() {
 		return (
 			<section className="mx-auto max-w-3xl px-6 py-12">
 				<h1 className="text-2xl font-bold text-white">Notification settings</h1>
-				<p className="mt-3 text-white/70">Sign in to manage notification delivery.</p>
+				<p className="mt-3 text-white/70">
+					Sign in to manage notification delivery.
+				</p>
 			</section>
 		)
 	}
@@ -32,7 +36,9 @@ export default function NotificationSettings() {
 		<section className="mx-auto max-w-3xl px-6 py-12 space-y-8">
 			<div className="flex items-center justify-between gap-4">
 				<div>
-					<h1 className="text-2xl font-bold text-white">Notification settings</h1>
+					<h1 className="text-2xl font-bold text-white">
+						Notification settings
+					</h1>
 					<p className="mt-2 text-sm text-white/70">
 						Choose which events send browser and email notifications.
 					</p>
@@ -69,9 +75,7 @@ export default function NotificationSettings() {
 								<input
 									type="checkbox"
 									checked={preferences[emailKey]}
-									onChange={(e) =>
-										void save({ [emailKey]: e.target.checked })
-									}
+									onChange={(e) => void save({ [emailKey]: e.target.checked })}
 								/>
 								Email
 							</label>
@@ -125,7 +129,9 @@ export default function NotificationSettings() {
 				</button>
 			</div>
 
-			{loading && <p className="text-sm text-white/60">Loading preferences...</p>}
+			{loading && (
+				<p className="text-sm text-white/60">Loading preferences...</p>
+			)}
 			{saving && <p className="text-sm text-white/60">Saving changes...</p>}
 		</section>
 	)

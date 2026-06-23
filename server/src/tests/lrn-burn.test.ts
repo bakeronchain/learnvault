@@ -109,7 +109,9 @@ describe("POST /api/lrn/burn", () => {
 
 	it("returns 502 when Soroban RPC fails or times out", async () => {
 		mockedBurn.mockRejectedValue(
-			new SorobanRpcError("Soroban RPC call failed while invoking learn_token.burn"),
+			new SorobanRpcError(
+				"Soroban RPC call failed while invoking learn_token.burn",
+			),
 		)
 
 		const res = await request(app)

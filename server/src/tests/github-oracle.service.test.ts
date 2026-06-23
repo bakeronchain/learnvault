@@ -49,14 +49,18 @@ describe("parsePullRequestUrl", () => {
 	})
 
 	it("tolerates trailing path/query/fragment", () => {
-		expect(
-			parsePullRequestUrl(`${PR_URL}/files?w=1#diff`),
-		).toEqual({ owner: "acme", repo: "widgets", pullNumber: 42 })
+		expect(parsePullRequestUrl(`${PR_URL}/files?w=1#diff`)).toEqual({
+			owner: "acme",
+			repo: "widgets",
+			pullNumber: 42,
+		})
 	})
 
 	it("rejects non-PR urls", () => {
 		expect(parsePullRequestUrl("https://github.com/acme/widgets")).toBeNull()
-		expect(parsePullRequestUrl("https://example.com/acme/widgets/pull/1")).toBeNull()
+		expect(
+			parsePullRequestUrl("https://example.com/acme/widgets/pull/1"),
+		).toBeNull()
 		expect(parsePullRequestUrl("not a url")).toBeNull()
 	})
 })
@@ -103,7 +107,10 @@ describe("verifyGithubEvidence", () => {
 
 	it("fails when the PR is not merged", async () => {
 		const { fetchImpl } = mockFetch({ ...mergedPull, merged: false })
-		const result = await verifyGithubEvidence({ evidenceUrl: PR_URL, fetchImpl })
+		const result = await verifyGithubEvidence({
+			evidenceUrl: PR_URL,
+			fetchImpl,
+		})
 		expect(result.verified).toBe(false)
 		expect(result.checks.merged).toBe(false)
 		expect(result.reasons).toContain("Pull request is not merged.")
@@ -118,7 +125,9 @@ describe("verifyGithubEvidence", () => {
 		})
 		expect(result.verified).toBe(false)
 		expect(result.checks.authorMatches).toBe(false)
-		expect(result.reasons.join(" ")).toContain("does not match linked GitHub account")
+		expect(result.reasons.join(" ")).toContain(
+			"does not match linked GitHub account",
+		)
 	})
 
 	it("fails when merged outside the milestone window", async () => {
@@ -149,7 +158,10 @@ describe("verifyGithubEvidence", () => {
 	it("throws INVALID_URL for a non-PR url", async () => {
 		const { fetchImpl } = mockFetch(mergedPull)
 		await expect(
-			verifyGithubEvidence({ evidenceUrl: "https://github.com/acme", fetchImpl }),
+			verifyGithubEvidence({
+				evidenceUrl: "https://github.com/acme",
+				fetchImpl,
+			}),
 		).rejects.toMatchObject({ code: "INVALID_URL" })
 	})
 
@@ -168,9 +180,18 @@ describe("verifyGithubEvidence", () => {
 		const headerBag: Array<Record<string, string>> = []
 		const fetchImpl = (async (_url: string, opts: RequestInit) => {
 			headerBag.push(opts.headers as Record<string, string>)
-			return { ok: true, status: 200, statusText: "OK", json: async () => mergedPull }
+			return {
+				ok: true,
+				status: 200,
+				statusText: "OK",
+				json: async () => mergedPull,
+			}
 		}) as unknown as typeof fetch
-		await verifyGithubEvidence({ evidenceUrl: PR_URL, token: "secret", fetchImpl })
+		await verifyGithubEvidence({
+			evidenceUrl: PR_URL,
+			token: "secret",
+			fetchImpl,
+		})
 		expect(headerBag[0].authorization).toBe("Bearer secret")
 	})
 })

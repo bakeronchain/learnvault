@@ -7,10 +7,12 @@ export interface NotificationPreferences {
 	milestone_rejected: boolean
 	vote_result: boolean
 	disbursement: boolean
+	voting_deadline_reminder: boolean
 	email_milestone_approved: boolean
 	email_milestone_rejected: boolean
 	email_vote_result: boolean
 	email_disbursement: boolean
+	email_voting_deadline_reminder: boolean
 	quiet_hours_start: string | null
 	quiet_hours_end: string | null
 	quiet_hours_timezone: string | null
@@ -21,17 +23,20 @@ const defaultPrefs: NotificationPreferences = {
 	milestone_rejected: true,
 	vote_result: true,
 	disbursement: true,
+	voting_deadline_reminder: true,
 	email_milestone_approved: false,
 	email_milestone_rejected: false,
 	email_vote_result: false,
 	email_disbursement: false,
+	email_voting_deadline_reminder: false,
 	quiet_hours_start: null,
 	quiet_hours_end: null,
 	quiet_hours_timezone: null,
 }
 
 export function useNotificationPreferences(token?: string) {
-	const [preferences, setPreferences] = useState<NotificationPreferences>(defaultPrefs)
+	const [preferences, setPreferences] =
+		useState<NotificationPreferences>(defaultPrefs)
 	const [loading, setLoading] = useState(false)
 	const [saving, setSaving] = useState(false)
 
@@ -43,7 +48,9 @@ export function useNotificationPreferences(token?: string) {
 				headers: { Authorization: `Bearer ${token}` },
 			})
 			if (!res.ok) return
-			const data = (await res.json()) as { preferences: NotificationPreferences }
+			const data = (await res.json()) as {
+				preferences: NotificationPreferences
+			}
 			setPreferences(data.preferences)
 		} finally {
 			setLoading(false)
@@ -64,7 +71,9 @@ export function useNotificationPreferences(token?: string) {
 					body: JSON.stringify(updates),
 				})
 				if (!res.ok) return
-				const data = (await res.json()) as { preferences: NotificationPreferences }
+				const data = (await res.json()) as {
+					preferences: NotificationPreferences
+				}
 				setPreferences(data.preferences)
 			} finally {
 				setSaving(false)

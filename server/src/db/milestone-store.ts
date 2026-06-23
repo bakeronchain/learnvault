@@ -1,8 +1,8 @@
-import { pool } from "./index"
-import type {
-	OracleResultDetail,
-	OracleResultInput,
+import {
+	type OracleResultDetail,
+	type OracleResultInput,
 } from "../services/github-oracle.service"
+import { pool } from "./index"
 
 export type { OracleResultDetail, OracleResultInput }
 
@@ -388,8 +388,7 @@ export const milestoneStore = {
 		id: number,
 		result: OracleResultInput,
 	): Promise<MilestoneReport | null> {
-		if (!isRealPool())
-			return inMemoryMilestoneStore.setOracleResult(id, result)
+		if (!isRealPool()) return inMemoryMilestoneStore.setOracleResult(id, result)
 		const queryResult = await pool.query(
 			`UPDATE milestone_reports
 			 SET oracle_verified = $1,

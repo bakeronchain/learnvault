@@ -169,8 +169,7 @@ const DaoProposals: React.FC = () => {
 		selectedFromList?.id ?? fallbackSelected?.id ?? null
 	const selectedProposalQuery = useProposal(selectedProposalId)
 	const showVotesSection = Boolean(
-		selectedProposal &&
-			(!selectedProposal.isVotingOpen || showLiveVotes),
+		selectedProposal && (!selectedProposal.isVotingOpen || showLiveVotes),
 	)
 	const votesQuery = useProposalVotes(selectedProposalId, showVotesSection)
 	const selectedProposal =
@@ -368,10 +367,11 @@ const DaoProposals: React.FC = () => {
 						key={item}
 						type="button"
 						onClick={() => handleFilterChange(item)}
-						className={`px-5 py-2.5 rounded-full border text-xs font-black uppercase tracking-widest transition-all ${filter === item
+						className={`px-5 py-2.5 rounded-full border text-xs font-black uppercase tracking-widest transition-all ${
+							filter === item
 								? "bg-brand-cyan/10 border-brand-cyan/40 text-brand-cyan"
 								: "bg-white/5 border-white/10 text-white/70 hover:border-brand-cyan/30"
-							}`}
+						}`}
 					>
 						{item}
 					</button>
@@ -425,7 +425,9 @@ const DaoProposals: React.FC = () => {
 
 					<div className="grid gap-6 sm:gap-8 md:grid-cols-2">
 						<div>
-							<h3 className="text-lg sm:text-xl font-black mb-3">Description</h3>
+							<h3 className="text-lg sm:text-xl font-black mb-3">
+								Description
+							</h3>
 							<p className="text-white/70 text-sm sm:text-base leading-relaxed whitespace-pre-wrap mb-6 sm:mb-8 break-words">
 								{selectedProposal.description}
 							</p>
@@ -451,7 +453,9 @@ const DaoProposals: React.FC = () => {
 						</div>
 
 						<div>
-							<h3 className="text-lg sm:text-xl font-black mb-4">Voting Stats</h3>
+							<h3 className="text-lg sm:text-xl font-black mb-4">
+								Voting Stats
+							</h3>
 							<div className="mb-6">
 								<div className="flex justify-between text-xs font-black uppercase tracking-widest mb-2">
 									<span>Yes {yesPercent}%</span>
@@ -538,14 +542,25 @@ const DaoProposals: React.FC = () => {
 														key={`${vote.voterAddress}-${idx}`}
 														className="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2 text-[11px] sm:text-xs"
 													>
-														<span title={vote.voterAddress} className="font-mono text-white/70 truncate max-w-[80px] sm:max-w-none">
+														<span
+															title={vote.voterAddress}
+															className="font-mono text-white/70 truncate max-w-[80px] sm:max-w-none"
+														>
 															{vote.voterAddress.slice(0, 6)}...
 															{vote.voterAddress.slice(-4)}
 														</span>
-														<span className={vote.support ? "text-brand-cyan" : "text-brand-purple"}>
+														<span
+															className={
+																vote.support
+																	? "text-brand-cyan"
+																	: "text-brand-purple"
+															}
+														>
 															{vote.support ? "For" : "Against"}
 														</span>
-														<span className="text-white/60">{vote.weight.toString()}</span>
+														<span className="text-white/60">
+															{vote.weight.toString()}
+														</span>
 													</li>
 												))}
 												{(votesQuery.data?.votes?.length ?? 0) === 0 && (
@@ -558,7 +573,8 @@ const DaoProposals: React.FC = () => {
 									</>
 								) : (
 									<p className="text-xs text-white/40">
-										Voter list is shown after voting closes, or enable the opt-in toggle.
+										Voter list is shown after voting closes, or enable the
+										opt-in toggle.
 									</p>
 								)}
 							</div>
@@ -621,10 +637,11 @@ const DaoProposals: React.FC = () => {
 						key={proposal.id}
 						type="button"
 						onClick={() => handleSelectProposal(proposal.id)}
-						className={`glass-card p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[2.5rem] border text-left transition-all ${selectedProposal?.id === proposal.id
+						className={`glass-card p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[2.5rem] border text-left transition-all ${
+							selectedProposal?.id === proposal.id
 								? "border-brand-cyan/40"
 								: "border-white/5 hover:border-brand-cyan/20"
-							}`}
+						}`}
 					>
 						<div className="flex justify-between items-start gap-3 sm:gap-4 mb-3 sm:mb-4">
 							<div className="min-w-0">
@@ -655,7 +672,9 @@ const DaoProposals: React.FC = () => {
 									{ queued: proposal.status === "queued" },
 								)}
 							</span>
-							<span className="sm:ml-auto text-brand-cyan text-[10px]">View details</span>
+							<span className="sm:ml-auto text-brand-cyan text-[10px]">
+								View details
+							</span>
 						</div>
 					</button>
 				))}

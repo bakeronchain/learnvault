@@ -9,8 +9,8 @@ import {
 	rejectMilestone,
 	verifyMilestoneOracle,
 } from "../controllers/admin-milestones.controller"
-import { submitMilestoneReport } from "../controllers/milestone-submit.controller"
 import { resubmitMilestoneReport } from "../controllers/milestone-resubmit.controller"
+import { submitMilestoneReport } from "../controllers/milestone-submit.controller"
 import {
 	approveMilestoneBodySchema,
 	batchApproveMilestonesBodySchema,

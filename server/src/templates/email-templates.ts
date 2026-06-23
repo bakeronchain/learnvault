@@ -224,6 +224,19 @@ export const templates: Record<string, (vars: EmailVariables) => string> = {
   `,
 			vars,
 		),
+
+	"voting-deadline-reminder": (vars) =>
+		baseLayout(
+			`
+    <p>Hi ${vars.name},</p>
+    <p><strong>Voting closes in ${vars.timeRemaining}!</strong></p>
+    <p>The proposal <strong>${vars.proposalTitle}</strong> is approaching its voting deadline.</p>
+    <p>If you haven't voted yet, now is the time to make your voice heard.</p>
+    <p><a href="${vars.proposalUrl}" class="button warning">Vote Now</a></p>
+    <p>Best,<br>The LearnVault Team</p>
+  `,
+			vars,
+		),
 }
 
 /**

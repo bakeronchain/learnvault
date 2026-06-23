@@ -4,7 +4,10 @@ import {
 	getLrnBurnHistory,
 	postBurnLrn,
 } from "../controllers/lrn-burn.controller"
-import { TOKEN_BURNED_EVENT, tokenEventsEmitter } from "../lib/token-events-emitter"
+import {
+	TOKEN_BURNED_EVENT,
+	tokenEventsEmitter,
+} from "../lib/token-events-emitter"
 import { type AuthRequest, authMiddleware } from "../middleware/auth.middleware"
 
 export const lrnRouter = Router()

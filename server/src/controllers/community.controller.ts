@@ -22,10 +22,7 @@ function asNonEmptyString(value: unknown): string | null {
 	return trimmed.length > 0 ? trimmed : null
 }
 
-export const getEvents = async (
-	req: Request,
-	res: Response,
-): Promise<void> => {
+export const getEvents = async (req: Request, res: Response): Promise<void> => {
 	try {
 		const result = await pool.query(
 			`SELECT id::text, title, description, date, type, link, created_at

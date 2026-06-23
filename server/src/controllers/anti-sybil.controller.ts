@@ -385,8 +385,11 @@ export async function kycWebhook(req: Request, res: Response): Promise<void> {
 			.update(rawBody)
 			.digest("hex")
 
+		const sigBuf = Buffer.from(signature)
+		const expectedBuf = Buffer.from(expected)
 		if (
-			!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
+			sigBuf.length !== expectedBuf.length ||
+			!crypto.timingSafeEqual(sigBuf, expectedBuf)
 		) {
 			res.status(401).json({ error: "Invalid webhook signature" })
 			return

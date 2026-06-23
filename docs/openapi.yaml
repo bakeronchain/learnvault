@@ -733,8 +733,9 @@ paths:
       tags:
         - Profile
       summary: Get user profile
-      description: Returns a user's rich profile including bio, avatar, social links,
-        and stats.
+      description:
+        Returns a user's rich profile including bio, avatar, social links, and
+        stats.
       parameters:
         - in: path
           name: address
@@ -774,7 +775,8 @@ paths:
       tags:
         - Profile
       summary: Update user profile
-      description: Updates or creates the authenticated user's profile. Requires
+      description:
+        Updates or creates the authenticated user's profile. Requires
         authentication.
       security:
         - bearerAuth: []
@@ -839,7 +841,8 @@ paths:
       tags:
         - Profile
       summary: Delete user profile
-      description: Deletes the authenticated user's profile. Requires authentication.
+      description:
+        Deletes the authenticated user's profile. Requires authentication.
       security:
         - bearerAuth: []
       responses:
@@ -917,8 +920,9 @@ paths:
       tags:
         - Treasury
       summary: Get treasury statistics
-      description: Returns aggregated statistics including total deposits,
-        disbursements, scholars funded, active proposals, and donor count
+      description:
+        Returns aggregated statistics including total deposits, disbursements,
+        scholars funded, active proposals, and donor count
       responses:
         "200":
           description: Treasury statistics
@@ -956,7 +960,8 @@ paths:
       tags:
         - Treasury
       summary: Get treasury activity feed
-      description: Returns recent treasury events including deposits and disbursements
+      description:
+        Returns recent treasury events including deposits and disbursements
       parameters:
         - in: query
           name: limit
@@ -1061,7 +1066,8 @@ paths:
             applicant_address: GABCD123456789...
             full_name: Jane Doe
             course_id: stellar-basics
-            motivation: I want to learn blockchain development to build solutions for my
+            motivation:
+              I want to learn blockchain development to build solutions for my
               community.
             evidence_url: https://github.com/janedoe/portfolio
             amount: 1000
@@ -1081,7 +1087,9 @@ paths:
                   description: On-chain transaction hash
                 simulated:
                   type: boolean
-                  description: Whether the transaction was simulated (no secret key configured)
+                  description:
+                    Whether the transaction was simulated (no secret key
+                    configured)
       "400":
         description: Validation error
         content:
@@ -1101,8 +1109,9 @@ paths:
       tags:
         - Scholars
       summary: Get scholars leaderboard
-      description: Returns a paginated ranking of scholars by LRN balance, with
-        optional search.
+      description:
+        Returns a paginated ranking of scholars by LRN balance, with optional
+        search.
       responses:
         "200":
           description: Leaderboard fetched successfully
@@ -1113,7 +1122,8 @@ paths:
       tags:
         - Scholars
       summary: Get scholar profile
-      description: Returns a scholar's on-chain balances, enrolled courses, milestone
+      description:
+        Returns a scholar's on-chain balances, enrolled courses, milestone
         stats, credentials, and join date.
       parameters:
         - in: path
@@ -1225,7 +1235,8 @@ paths:
       tags:
         - Reviews
       summary: Get reviews for a course
-      description: Returns paginated reviews and average rating for a published course.
+      description:
+        Returns paginated reviews and average rating for a published course.
       parameters:
         - in: path
           name: idOrSlug
@@ -1271,7 +1282,8 @@ paths:
       tags:
         - Reviews
       summary: Submit a review for a course
-      description: Creates a review for a published course. Requires the learner to be
+      description:
+        Creates a review for a published course. Requires the learner to be
         enrolled. One review per learner per course.
       security:
         - bearerAuth: []
@@ -1602,7 +1614,8 @@ paths:
                 reason:
                   type: string
                   maxLength: 2000
-                  description: Explanation of why the scholar is appealing the rejection
+                  description:
+                    Explanation of why the scholar is appealing the rejection
       responses:
         "200":
           description: Appeal submitted
@@ -1851,8 +1864,9 @@ paths:
       tags:
         - Governance
       summary: List governance proposals
-      description: Returns a paginated list of governance proposals, optionally
-        filtered by status.
+      description:
+        Returns a paginated list of governance proposals, optionally filtered by
+        status.
       parameters:
         - in: query
           name: status
@@ -1916,7 +1930,8 @@ paths:
             example:
               author_address: GABCD123456789...
               title: Fund blockchain education program
-              description: A comprehensive program to teach blockchain development
+              description:
+                A comprehensive program to teach blockchain development
                 fundamentals.
               requested_amount: "1000"
               evidence_url: https://github.com/example/proposal
@@ -1936,7 +1951,8 @@ paths:
       tags:
         - Governance
       summary: Get voting power for an address
-      description: Returns the governance token balance and voting eligibility for the
+      description:
+        Returns the governance token balance and voting eligibility for the
         given Stellar address.
       parameters:
         - in: path
@@ -2159,9 +2175,10 @@ paths:
       tags:
         - Donors
       summary: Get donor impact statistics
-      description: Returns impact metrics for a specific donor including total
-        donated, scholars funded, milestones completed by funded scholars, and
-        average completion rate
+      description:
+        Returns impact metrics for a specific donor including total donated,
+        scholars funded, milestones completed by funded scholars, and average
+        completion rate
       parameters:
         - in: path
           name: address
@@ -2187,13 +2204,16 @@ paths:
                     example: 5
                   milestones_completed:
                     type: integer
-                    description: Total milestones completed by scholars funded by this donor
+                    description:
+                      Total milestones completed by scholars funded by this
+                      donor
                     example: 12
                   average_completion_rate:
                     type: number
                     format: float
-                    description: Average milestone completion rate for scholars funded by this donor
-                      (0-1)
+                    description:
+                      Average milestone completion rate for scholars funded by
+                      this donor (0-1)
                     example: 0.85
         "400":
           $ref: "#/components/responses/BadRequestError"
@@ -2206,7 +2226,8 @@ paths:
       tags:
         - Credentials
       summary: List credentials for a learner address
-      description: Returns all ScholarNFT credentials minted for the provided Stellar
+      description:
+        Returns all ScholarNFT credentials minted for the provided Stellar
         address, including revoked items.
       parameters:
         - in: path
@@ -2253,7 +2274,8 @@ paths:
     post:
       tags:
         - Credentials
-      summary: Generate and upload NFT metadata for a course completion credential
+      summary:
+        Generate and upload NFT metadata for a course completion credential
       description: |
         Creates ERC-721/ERC-1155 compliant metadata for a ScholarNFT credential,
         uploads it to IPFS via Pinata, and returns the ipfs:// URI for use in
@@ -2309,11 +2331,14 @@ paths:
                         properties:
                           name:
                             type: string
-                            example: Introduction to Stellar & Soroban — Course Completion
+                            example:
+                              Introduction to Stellar & Soroban — Course
+                              Completion
                           description:
                             type: string
-                            example: Issued to learners who complete all milestones in Introduction to
-                              Stellar & Soroban
+                            example:
+                              Issued to learners who complete all milestones in
+                              Introduction to Stellar & Soroban
                           image:
                             type: string
                             example: ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
@@ -2357,7 +2382,8 @@ paths:
                     example: Service unavailable
                   message:
                     type: string
-                    example: IPFS pinning service is not configured. Please contact the
+                    example:
+                      IPFS pinning service is not configured. Please contact the
                       administrator.
   /api/proposals/{proposalId}/comments:
     get:
@@ -2770,7 +2796,8 @@ paths:
                   description: Hash of current API key
                 reason:
                   type: string
-                  description: Reason for rotation (e.g., SCHEDULED, COMPROMISED)
+                  description:
+                    Reason for rotation (e.g., SCHEDULED, COMPROMISED)
       responses:
         "200":
           description: Key rotated successfully

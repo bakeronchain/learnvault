@@ -1,11 +1,8 @@
 import { type Request, type Response } from "express"
 
-import { type AuthRequest } from "../middleware/auth.middleware"
 import { tokenEventsEmitter } from "../lib/token-events-emitter"
-import {
-	burnLearnToken,
-	mapBurnError,
-} from "../services/learn-token.service"
+import { type AuthRequest } from "../middleware/auth.middleware"
+import { burnLearnToken, mapBurnError } from "../services/learn-token.service"
 import { lrnBurnStore } from "../services/lrn-burn-store.service"
 
 function parseAtomicAmount(raw: unknown): bigint | null {
@@ -94,10 +91,7 @@ export async function getLrnBurnHistory(
 
 	try {
 		const burns = await lrnBurnStore.listLrnBurnsByWallet(address)
-		const totalBurned = burns.reduce(
-			(sum, row) => sum + BigInt(row.amount),
-			0n,
-		)
+		const totalBurned = burns.reduce((sum, row) => sum + BigInt(row.amount), 0n)
 
 		res.json({
 			wallet_address: address,
@@ -151,10 +145,7 @@ export async function getGovernanceIncentives(
 
 	try {
 		const burns = await lrnBurnStore.listLrnBurnsByWallet(address)
-		const totalBurned = burns.reduce(
-			(sum, row) => sum + BigInt(row.amount),
-			0n,
-		)
+		const totalBurned = burns.reduce((sum, row) => sum + BigInt(row.amount), 0n)
 		const totalBurnedNumber = Number(totalBurned / 10_000_000n)
 
 		const votingPower = totalBurnedNumber * 1.5

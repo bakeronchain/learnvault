@@ -78,7 +78,9 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 	const popupLock = useRef(false)
 	const isMobile = useIsMobile()
 	const [mobileSigningXdr, setMobileSigningXdr] = useState<string | null>(null)
-	const mobileSigningResolver = useRef<((value: { signedTxXdr: string; signerAddress?: string }) => void) | null>(null)
+	const mobileSigningResolver = useRef<
+		((value: { signedTxXdr: string; signerAddress?: string }) => void) | null
+	>(null)
 
 	const nullify = (shouldLogout = false) => {
 		const hadWalletSession = Boolean(
@@ -246,7 +248,9 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 		[],
 	)
 
-	const activeSignTransaction = isMobile ? signTransactionMobile : signTransaction
+	const activeSignTransaction = isMobile
+		? signTransactionMobile
+		: signTransaction
 
 	const contextValue = useMemo(
 		() => ({

@@ -137,11 +137,7 @@ export function MilestoneTracker({
 	const isMobile = useIsMobile()
 
 	return (
-		<div
-			className={
-				isMobile ? styles.containerHorizontal : styles.container
-			}
-		>
+		<div className={isMobile ? styles.containerHorizontal : styles.container}>
 			{milestones.map((milestone) => (
 				<MilestoneStep
 					key={milestone.id}

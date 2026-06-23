@@ -85,7 +85,10 @@ export async function submitMilestoneReport(
 					}
 				})
 				.catch((err) =>
-					log.error({ err, reportId: report.id }, "GitHub oracle verification failed"),
+					log.error(
+						{ err, reportId: report.id },
+						"GitHub oracle verification failed",
+					),
 				)
 		}
 

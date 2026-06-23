@@ -17,13 +17,18 @@ interface DeliverOptions {
 	email?: string | null
 }
 
-const EMAIL_PREF_MAP: Partial<Record<NotificationType, keyof Awaited<ReturnType<typeof getNotificationPreferences>>>> =
-	{
-		milestone_approved: "email_milestone_approved",
-		milestone_rejected: "email_milestone_rejected",
-		vote_result: "email_vote_result",
-		disbursement: "email_disbursement",
-	}
+const EMAIL_PREF_MAP: Partial<
+	Record<
+		NotificationType,
+		keyof Awaited<ReturnType<typeof getNotificationPreferences>>
+	>
+> = {
+	milestone_approved: "email_milestone_approved",
+	milestone_rejected: "email_milestone_rejected",
+	vote_result: "email_vote_result",
+	disbursement: "email_disbursement",
+	voting_deadline_reminder: "email_voting_deadline_reminder",
+}
 
 function withinQuietHours(
 	start: string | null,
@@ -48,7 +53,9 @@ export async function deliverNotificationChannels(
 	options: DeliverOptions,
 ): Promise<void> {
 	try {
-		const preferences = await getNotificationPreferences(options.recipientAddress)
+		const preferences = await getNotificationPreferences(
+			options.recipientAddress,
+		)
 		if (!preferences[options.type]) {
 			await recordNotificationDelivery(
 				options.recipientAddress,
@@ -77,7 +84,9 @@ export async function deliverNotificationChannels(
 			return
 		}
 
-		const pushSubscriptions = await getPushSubscriptions(options.recipientAddress)
+		const pushSubscriptions = await getPushSubscriptions(
+			options.recipientAddress,
+		)
 		if (pushSubscriptions.length === 0) {
 			await recordNotificationDelivery(
 				options.recipientAddress,
@@ -122,7 +131,8 @@ export async function deliverNotificationChannels(
 			data: {
 				name: options.recipientAddress.slice(0, 8),
 				body: options.message,
-				actionUrl: options.href ?? `${process.env.FRONTEND_URL || ""}/dashboard`,
+				actionUrl:
+					options.href ?? `${process.env.FRONTEND_URL || ""}/dashboard`,
 				unsubscribeUrl: "#",
 			},
 		})
@@ -134,6 +144,9 @@ export async function deliverNotificationChannels(
 			sent ? "sent" : "failed",
 		)
 	} catch (err) {
-		console.error("[notification-delivery] deliverNotificationChannels error:", err)
+		console.error(
+			"[notification-delivery] deliverNotificationChannels error:",
+			err,
+		)
 	}
 }

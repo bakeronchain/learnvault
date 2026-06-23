@@ -99,11 +99,15 @@ export function evaluateChecks(payload, opts = {}) {
 		} else {
 			if (start !== null && mergedTime < start) {
 				withinWindow = false
-				reasons.push("Pull request was merged before the milestone window opened.")
+				reasons.push(
+					"Pull request was merged before the milestone window opened.",
+				)
 			}
 			if (end !== null && mergedTime > end) {
 				withinWindow = false
-				reasons.push("Pull request was merged after the milestone window closed.")
+				reasons.push(
+					"Pull request was merged after the milestone window closed.",
+				)
 			}
 		}
 	}

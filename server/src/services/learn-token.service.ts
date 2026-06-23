@@ -119,10 +119,7 @@ export async function getLearnTokenBalanceAtomic(
 	} catch (err) {
 		if (err instanceof SorobanRpcError) throw err
 		log.error({ err, address }, "getLearnTokenBalanceAtomic failed")
-		throw new SorobanRpcError(
-			"Failed to query learn_token balance",
-			err,
-		)
+		throw new SorobanRpcError("Failed to query learn_token balance", err)
 	}
 }
 
@@ -230,11 +227,7 @@ export async function burnLearnToken(
 
 	const balance = await getLearnTokenBalanceAtomic(holderAddress)
 	if (balance < amountAtomic) {
-		throw new InsufficientLrnBalanceError(
-			holderAddress,
-			amountAtomic,
-			balance,
-		)
+		throw new InsufficientLrnBalanceError(holderAddress, amountAtomic, balance)
 	}
 
 	let txHash: string

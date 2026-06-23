@@ -7,7 +7,7 @@ interface Props {
 	network?: "testnet" | "mainnet" | "futurenet"
 }
 
-type CountdownTone = "green" | "orange" | "red"
+type CountdownTone = "green" | "orange" | "red" | "urgent"
 
 interface CountdownState {
 	label: string
@@ -29,6 +29,15 @@ export function getProposalCountdownState(
 
 	if (secondsRemaining <= 0) {
 		return { label: "Voting closed", tone: "red", secondsRemaining: 0 }
+	}
+
+	if (secondsRemaining < HOUR_SECONDS) {
+		const minutes = Math.floor(secondsRemaining / MINUTE_SECONDS)
+		return {
+			label: `${minutes}m remaining — closing soon!`,
+			tone: "urgent",
+			secondsRemaining,
+		}
 	}
 
 	if (secondsRemaining < DAY_SECONDS) {
@@ -56,6 +65,7 @@ const toneClassMap: Record<CountdownTone, string> = {
 	green: "text-green-400",
 	orange: "text-orange-400",
 	red: "text-red-400",
+	urgent: "text-red-400 font-bold animate-pulse",
 }
 
 /**

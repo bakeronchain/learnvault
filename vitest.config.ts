@@ -17,7 +17,7 @@ export default defineConfig({
 			"src/pages/ScholarshipApply.test.tsx",
 		],
 		env: {
-			NODE_ENV: "development",
+			NODE_ENV: "test",
 			PUBLIC_SCHOLARSHIP_TREASURY_CONTRACT:
 				"CSCHOL1234567890ABCDEFGHIJKLMN9876543210ZYXWVUTSRQPO",
 			PUBLIC_GOVERNANCE_TOKEN_CONTRACT:

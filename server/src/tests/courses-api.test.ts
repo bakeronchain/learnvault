@@ -334,7 +334,9 @@ describe("POST /api/courses", () => {
 				prerequisites: [999],
 			})
 		expect(res.status).toBe(400)
-		expect(res.body.error).toBe("One or more prerequisite course IDs do not exist")
+		expect(res.body.error).toBe(
+			"One or more prerequisite course IDs do not exist",
+		)
 	})
 
 	it("creates course successfully with valid prerequisites", async () => {
@@ -452,7 +454,9 @@ describe("PATCH /api/courses/:id", () => {
 			.set("Authorization", `Bearer ${adminToken}`)
 			.send({ prerequisites: [999] })
 		expect(res.status).toBe(400)
-		expect(res.body.error).toBe("One or more prerequisite course IDs do not exist")
+		expect(res.body.error).toBe(
+			"One or more prerequisite course IDs do not exist",
+		)
 	})
 
 	it("updates course successfully with valid prerequisites", async () => {

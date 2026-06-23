@@ -1,9 +1,9 @@
 import { Button } from "@stellar/design-system"
 import React, { useEffect, useMemo, useState } from "react"
 import { Link, useParams } from "react-router-dom"
+import CourseReviewsPanel from "../components/CourseReviewsPanel"
 import { CourseForum } from "../components/forum/CourseForum"
 import LessonContent from "../components/LessonContent"
-import CourseReviewsPanel from "../components/CourseReviewsPanel"
 import LessonSidebar from "../components/LessonSidebar"
 import MilestoneSubmitPanel from "../components/MilestoneSubmitPanel"
 

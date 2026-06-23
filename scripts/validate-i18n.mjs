@@ -49,9 +49,7 @@ for (const locale of supportedLocales) {
 	// Check for missing keys in locale
 	const missingKeys = [...enKeys].filter((key) => !localeKeys.has(key))
 	if (missingKeys.length > 0) {
-		console.error(
-			`❌ ${locale}.json is missing ${missingKeys.length} key(s):`,
-		)
+		console.error(`❌ ${locale}.json is missing ${missingKeys.length} key(s):`)
 		missingKeys.forEach((key) => console.error(`   - ${key}`))
 		hasErrors = true
 	}
@@ -59,9 +57,7 @@ for (const locale of supportedLocales) {
 	// Check for extra keys in locale (not in en.json)
 	const extraKeys = [...localeKeys].filter((key) => !enKeys.has(key))
 	if (extraKeys.length > 0) {
-		console.warn(
-			`⚠️  ${locale}.json has ${extraKeys.length} extra key(s):`,
-		)
+		console.warn(`⚠️  ${locale}.json has ${extraKeys.length} extra key(s):`)
 		extraKeys.forEach((key) => console.warn(`   - ${key}`))
 	}
 

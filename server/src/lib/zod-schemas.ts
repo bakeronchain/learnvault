@@ -380,4 +380,3 @@ export const courseBulkImportBodySchema = z.union([
 		})
 		.strict(),
 ])
-

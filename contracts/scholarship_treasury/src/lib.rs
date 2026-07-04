@@ -34,7 +34,7 @@ const MIN_LRN_TO_PROPOSE_KEY: Symbol = symbol_short!("MINPROP");
 const SUPPORTED_ASSETS_KEY: Symbol = symbol_short!("ASSETS");
 const GOV_PER_USDC: i128 = 100;
 const PROPOSAL_DEADLINE_LEDGERS: u32 = 100_800;
-const VOTING_PERIOD_KEY: Symbol = symbol_short!("VOTINGPERIOD");
+const VOTING_PERIOD_KEY: Symbol = symbol_short!("VOTEPRD");
 const QUORUM_KEY: Symbol = symbol_short!("QUORUM");
 const APPROVAL_BPS_KEY: Symbol = symbol_short!("APPBPS");
 const MILESTONE_COUNT_KEY: Symbol = symbol_short!("MSCNT");
@@ -117,6 +117,7 @@ pub enum ProposalStatus {
     Executed,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[contracttype]
 pub enum ProposalKind {
     Disbursement,
@@ -210,6 +211,14 @@ pub struct VoteCastEvent {
     pub weight: i128,
 }
 
+const TIMELOCK_VAULT_KEY: Symbol = symbol_short!("TLVAULT");
+
+#[contractevent(topics = ["pause_changed"])]
+pub struct PauseChanged {
+    #[topic]
+    pub paused: bool,
+}
+
 #[contractimpl]
 #[allow(clippy::too_many_arguments)]
 impl ScholarshipTreasury {
@@ -288,7 +297,7 @@ impl ScholarshipTreasury {
         env.storage()
             .instance()
             .get::<_, u32>(&VOTING_PERIOD_KEY)
-            .unwrap_or(0)
+            .unwrap_or(PROPOSAL_DEADLINE_LEDGERS)
     }
 
     pub fn set_quorum(env: Env, new_quorum: i128) {
@@ -309,8 +318,16 @@ impl ScholarshipTreasury {
         env.storage().instance().set(&APPROVAL_BPS_KEY, &new_bps);
     }
 
-    // New admin setter for voting period
+    /// Admin-only: set the voting period in ledgers.
     pub fn set_voting_period(env: Env, new_period: u32) {
+        let admin = Self::admin(&env);
+        admin.require_auth();
+        if new_period == 0 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
+        env.storage().instance().set(&VOTING_PERIOD_KEY, &new_period);
+    }
+
     /// Admin-only: set the timelock delay in ledgers.
     pub fn set_timelock_delay(env: Env, admin: Address, ledgers: u32) {
         admin.require_auth();
@@ -345,20 +362,10 @@ impl ScholarshipTreasury {
     pub fn set_milestone_count(env: Env, count: u32) {
         let admin = Self::admin(&env);
         admin.require_auth();
-        if new_period == 0 {
+        if count == 0 {
             panic_with_error!(&env, Error::InvalidAmount);
         }
-        env.storage().instance().set(&VOTING_PERIOD_KEY, &new_period);
-    }
-
-    // New constant for optional timelock vault integration
-    const TIMELOCK_VAULT_KEY: Symbol = symbol_short!("TIMELockVault");
-
-    // New PauseChanged event emitted on pause/unpause
-    #[contractevent(topics = ["pause_changed"])]
-    pub struct PauseChanged {
-        #[topic]
-        pub paused: bool,
+        env.storage().instance().set(&MILESTONE_COUNT_KEY, &count);
     }
 
     /// Public getter for admin address
@@ -387,22 +394,9 @@ impl ScholarshipTreasury {
     }
 
     pub fn unpause(env: Env) {
-        // Allow admin or timelock vault to unpause
-        let caller = env.invoker();
         let admin = Self::admin(&env);
-        let authorized = if caller == admin {
-            true
-        } else {
-            match Self::get_timelock_vault(&env) {
-                Some(vault) => caller == vault,
-                None => false,
-            }
-        };
-        if !authorized {
-            panic_with_error!(&env, Error::Unauthorized);
-        }
+        admin.require_auth();
         env.storage().instance().set(&PAUSED_KEY, &false);
-        // Emit unpause event
         PauseChanged { paused: false }.publish(&env);
     }
 
@@ -623,15 +617,14 @@ impl ScholarshipTreasury {
             },
             ProposalKind::ParameterChange => {
                 if passed {
-                    // Apply parameter changes if non-zero values provided
                     if proposal.new_quorum > 0 {
-                        Self::set_quorum(&env, proposal.new_quorum);
+                        env.storage().instance().set(&QUORUM_KEY, &proposal.new_quorum);
                     }
                     if proposal.new_approval_bps > 0 {
-                        Self::set_approval_bps(&env, proposal.new_approval_bps);
+                        env.storage().instance().set(&APPROVAL_BPS_KEY, &proposal.new_approval_bps);
                     }
                     if proposal.new_voting_period > 0 {
-                        Self::set_voting_period(&env, proposal.new_voting_period);
+                        env.storage().instance().set(&VOTING_PERIOD_KEY, &proposal.new_voting_period);
                     }
                 }
             },
@@ -647,10 +640,6 @@ impl ScholarshipTreasury {
             .persistent()
             .set(&DataKey::FinalizedProposal(proposal_id), &ProposalStatus::Executed);
         Self::extend_persistent(&env, &DataKey::FinalizedProposal(proposal_id));
-
-        if passed {
-            Self::disburse_internal(&env, &proposal.applicant, proposal.amount);
-        }
 
         ProposalExecuted {
             proposal_id,
@@ -860,6 +849,10 @@ impl ScholarshipTreasury {
             ),
             executed: false,
             cancelled: false,
+            kind: ProposalKind::Disbursement,
+            new_quorum: 0,
+            new_approval_bps: 0,
+            new_voting_period: 0,
             queued_at: 0,
             veto_votes: 0,
         };

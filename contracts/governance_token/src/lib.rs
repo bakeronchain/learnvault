@@ -169,7 +169,7 @@ impl GovernanceToken {
             .set(&NAME_KEY, &String::from_str(&env, "LearnVault Governance"));
         env.storage()
             .instance()
-            .set(&SYMBOL_KEY, &symbol_short!("GOV"));
+            .set(&SYMBOL_KEY, &String::from_str(&env, "GOV"));
         env.storage().instance().set(&DECIMALS_KEY, &7_u32);
         let period = if timelock_period == 0 {
             TIMELOCK_PERIOD

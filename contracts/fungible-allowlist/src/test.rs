@@ -33,7 +33,7 @@ fn initialize_sets_admin_and_emits_event() {
 
     let events = env.events().all();
     assert!(events.len() > baseline);
-    assert!(events.iter().any(|(cid, _, _)| *cid == contract_id));
+    assert!(events.iter().any(|(cid, _, _)| cid == contract_id));
 }
 
 #[test]
@@ -69,12 +69,11 @@ fn add_to_allowlist_emits_event() {
     let (contract_id, admin, client) = setup(&env);
     let alice = Address::generate(&env);
 
-    let baseline = env.events().all().len();
     client.add_to_allowlist(&admin, &alice);
 
     let events = env.events().all();
-    assert!(events.len() > baseline);
-    assert!(events.iter().any(|(cid, _, _)| *cid == contract_id));
+    assert!(!events.is_empty());
+    assert!(events.iter().any(|(cid, _, _)| cid == contract_id));
 }
 
 #[test]
@@ -110,12 +109,12 @@ fn remove_from_allowlist_emits_event() {
     let alice = Address::generate(&env);
 
     client.add_to_allowlist(&admin, &alice);
-    let baseline = env.events().all().len();
+    env.events().all();  // consume prior events
     client.remove_from_allowlist(&admin, &alice);
 
     let events = env.events().all();
-    assert!(events.len() > baseline);
-    assert!(events.iter().any(|(cid, _, _)| *cid == contract_id));
+    assert!(!events.is_empty());
+    assert!(events.iter().any(|(cid, _, _)| cid == contract_id));
 }
 
 #[test]

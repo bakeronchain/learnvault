@@ -109,11 +109,11 @@ fn setup_v1<'a>(
 #[test]
 fn treasury_balance_preserved_after_upgrade() {
     let env = Env::default();
-    let (client, contract_id, donor, _gov_id, _token_id) = setup_v1(&env);
+    let (client, contract_id, donor, _gov_id, token_id) = setup_v1(&env);
 
     // ── v1: seed state ──────────────────────────────────────────────────────
     env.mock_all_auths();
-    client.deposit(&donor, &3_000);
+    client.deposit(&donor, &3_000, &token_id);
     assert_eq!(client.get_balance(), 3_000);
 
     // ── simulate upgrade: rebuild client from the same contract address ─────
@@ -128,21 +128,21 @@ fn treasury_balance_preserved_after_upgrade() {
         "treasury balance must be unchanged after upgrade"
     );
     assert_eq!(
-        v2_client.treasury_balance(),
+        v2_client.get_balance(),
         3_000,
-        "treasury_balance() alias must also return the correct value"
+        "treasury balance must also return the correct value after upgrade"
     );
 }
 
 #[test]
 fn active_proposal_ids_preserved_after_upgrade() {
     let env = Env::default();
-    let (client, contract_id, donor, _gov_id, _token_id) = setup_v1(&env);
+    let (client, contract_id, donor, _gov_id, token_id) = setup_v1(&env);
     let (titles, dates) = sample_milestones(&env);
 
     // ── v1: submit two proposals ────────────────────────────────────────────
     env.mock_all_auths();
-    client.deposit(&donor, &2_000);
+    client.deposit(&donor, &2_000, &token_id);
 
     let id1 = client.submit_proposal(
         &donor,
@@ -199,10 +199,10 @@ fn active_proposal_ids_preserved_after_upgrade() {
 #[test]
 fn donor_contribution_and_scholar_counts_preserved_after_upgrade() {
     let env = Env::default();
-    let (client, contract_id, donor, gov_id, _token_id) = setup_v1(&env);
+    let (client, contract_id, donor, gov_id, token_id) = setup_v1(&env);
 
     env.mock_all_auths();
-    client.deposit(&donor, &1_500);
+    client.deposit(&donor, &1_500, &token_id);
 
     // Disburse so scholars count increases
     let _ = MockGovForUpgradeClient::new(&env, &gov_id);

@@ -369,7 +369,7 @@ fn proposal_requires_three_milestones() {
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::InvalidAmount as u32
+            Error::InvalidMilestoneCount as u32
         )))
     );
 }
@@ -1050,7 +1050,7 @@ fn submit_proposal_wrong_milestone_count_fails() {
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
-            Error::InvalidAmount as u32
+            Error::InvalidMilestoneCount as u32
         )))
     );
 }
@@ -1937,7 +1937,7 @@ fn execute_proposal_passed_disburses_and_emits_event() {
 #[test]
 fn execute_proposal_rejected_fails_with_not_queued() {
     let env = Env::default();
-    let (client, _governance, donor, _recipient, _token_id, gov_client, admin) =
+    let (client, _governance, donor, _recipient, token_id, gov_client, admin) =
         setup_with_admin(&env);
     let applicant = Address::generate(&env);
 
@@ -2041,12 +2041,12 @@ fn cancel_proposal_prevents_vote_and_execute() {
 #[test]
 fn execute_proposal_fails_before_timelock_expires() {
     let env = Env::default();
-    let (client, _governance, donor, _recipient, _token_id, gov_client, admin) =
+    let (client, _governance, donor, _recipient, token_id, gov_client, admin) =
         setup_with_admin(&env);
     let applicant = Address::generate(&env);
 
     env.mock_all_auths();
-    client.deposit(&donor, &500);
+    client.deposit(&donor, &500, &token_id);
     client.set_quorum(&1);
     client.set_approval_bps(&5_000);
     let proposal_id = submit_sample_proposal(&env, &client, &applicant, 100);
@@ -2130,13 +2130,13 @@ fn veto_proposal_by_admin() {
 #[test]
 fn veto_proposal_by_supermajority() {
     let env = Env::default();
-    let (client, _governance, donor, _recipient, _token_id, gov_client, admin) =
+    let (client, _governance, donor, _recipient, token_id, gov_client, admin) =
         setup_with_admin(&env);
     let objector = Address::generate(&env);
 
     env.mock_all_auths();
     // Deposit 300 USDC -> total GOV issued = 30_000
-    client.deposit(&donor, &300);
+    client.deposit(&donor, &300, &token_id);
     client.set_quorum(&1);
     client.set_approval_bps(&5_000);
     let proposal_id = submit_sample_proposal(&env, &client, &donor, 100);
@@ -2167,12 +2167,12 @@ fn veto_proposal_by_supermajority() {
 #[test]
 fn veto_proposal_fails_without_supermajority() {
     let env = Env::default();
-    let (client, _governance, donor, _recipient, _token_id, gov_client, admin) =
+    let (client, _governance, donor, _recipient, token_id, gov_client, admin) =
         setup_with_admin(&env);
     let objector = Address::generate(&env);
 
     env.mock_all_auths();
-    client.deposit(&donor, &300);
+    client.deposit(&donor, &300, &token_id);
     client.set_quorum(&1);
     client.set_approval_bps(&5_000);
     let proposal_id = submit_sample_proposal(&env, &client, &donor, 100);
@@ -2204,12 +2204,12 @@ fn veto_proposal_fails_without_supermajority() {
 #[test]
 fn object_to_proposal_prevents_double_objection() {
     let env = Env::default();
-    let (client, _governance, donor, _recipient, _token_id, gov_client, admin) =
+    let (client, _governance, donor, _recipient, token_id, gov_client, admin) =
         setup_with_admin(&env);
     let objector = Address::generate(&env);
 
     env.mock_all_auths();
-    client.deposit(&donor, &300);
+    client.deposit(&donor, &300, &token_id);
     client.set_quorum(&1);
     client.set_approval_bps(&5_000);
     let proposal_id = submit_sample_proposal(&env, &client, &donor, 100);

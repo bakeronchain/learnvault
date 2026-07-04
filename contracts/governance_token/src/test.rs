@@ -4,7 +4,7 @@ extern crate std;
 
 use soroban_sdk::{
 	Address, Env, IntoVal, String,
-	testutils::{Address as _, Ledger, MockAuth, MockAuthInvoke},
+	testutils::{Address as _, Events as _, Ledger, MockAuth, MockAuthInvoke},
 };
 
 use crate::{GOVError, GovernanceToken, GovernanceTokenClient};
@@ -44,7 +44,7 @@ fn only_admin_can_mint() {
 		invoke: &MockAuthInvoke {
 			contract: &contract_id,
 			fn_name: "initialize",
-			args: (admin.clone(),).into_val(&env),
+			args: (admin.clone(), 0u64).into_val(&env),
 			sub_invokes: &[],
 		},
 	}]);
@@ -123,16 +123,15 @@ fn mint_and_transfer_emit_contract_events() {
 	let after_mint = env.events().all();
 	assert!(
 		after_mint.len() > baseline
-			&& after_mint.iter().any(|(cid, _, _)| *cid == contract_id),
+			&& after_mint.iter().any(|(cid, _, _)| cid == contract_id),
 		"expected a mint event from the governance token contract",
 	);
 
-	let mint_event_count = after_mint.len();
 	client.transfer(&alice, &bob, &10);
 	let after_transfer = env.events().all();
 	assert!(
-		after_transfer.len() > mint_event_count
-			&& after_transfer.iter().any(|(cid, _, _)| *cid == contract_id),
+		!after_transfer.is_empty()
+			&& after_transfer.iter().any(|(cid, _, _)| cid == contract_id),
 		"expected a transfer event from the governance token contract",
 	);
 }

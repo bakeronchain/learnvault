@@ -160,6 +160,9 @@ export const CacheKey = {
 	delegation: (addr: string) => `delegation:${addr}`,
 	enrollment: (addr: string, courseId: number) =>
 		`enrollment:${addr}:${courseId}`,
+	verifyCredential: (tokenId: string | number) =>
+		`verify:credential:${tokenId}`,
+	verifyAddress: (address: string) => `verify:address:${address}`,
 	// Prefix-only keys used for bulk invalidation
 	prefixBalance: (addr: string) => `balance:lrn:${addr}`,
 	prefixGovBalance: (addr: string) => `balance:gov:${addr}`,

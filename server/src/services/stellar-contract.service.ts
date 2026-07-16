@@ -1207,6 +1207,101 @@ async function getEnrolledCourses(_address: string): Promise<string[]> {
 	return []
 }
 
+async function getScholarNftOnChain(
+	tokenId: number,
+): Promise<{
+	owner: string | null
+	revoked: boolean
+	metadataUri: string | null
+	issuedAt: string | null
+}> {
+	if (!SCHOLAR_NFT_CONTRACT_ID) {
+		log.warn(
+			"[stellar] SCHOLAR_NFT_CONTRACT_ID not set — simulating on-chain NFT fetch",
+		)
+		return { owner: null, revoked: false, metadataUri: null, issuedAt: null }
+	}
+
+	try {
+		return await stellarRpcCircuitBreaker.call(async () => {
+			const {
+				Contract,
+				rpc,
+				TransactionBuilder,
+				Account,
+				Networks,
+				nativeToScVal,
+				scValToNative,
+			} = await import("@stellar/stellar-sdk")
+
+			const server = new rpc.Server(
+				STELLAR_NETWORK === "mainnet"
+					? "https://soroban-rpc.stellar.org"
+					: "https://soroban-testnet.stellar.org",
+			)
+			const contract = new Contract(SCHOLAR_NFT_CONTRACT_ID)
+			const passphrase =
+				STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET
+			const dummyAccount = new Account(
+				"GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBF3UKJQ2K5RQDD",
+				"0",
+			)
+
+			// 1. Query is_revoked
+			const txRevoked = new TransactionBuilder(dummyAccount, {
+				fee: "100",
+				networkPassphrase: passphrase,
+			})
+				.addOperation(
+					contract.call("is_revoked", nativeToScVal(tokenId, { type: "u64" })),
+				)
+				.setTimeout(30)
+				.build()
+
+			let revoked = false
+			const simRevoked = await server.simulateTransaction(txRevoked)
+			if (!rpc.Api.isSimulationError(simRevoked) && simRevoked.result?.retval) {
+				revoked = scValToNative(simRevoked.result.retval) as boolean
+			}
+
+			// 2. Query get_metadata
+			const txMeta = new TransactionBuilder(dummyAccount, {
+				fee: "100",
+				networkPassphrase: passphrase,
+			})
+				.addOperation(
+					contract.call(
+						"get_metadata",
+						nativeToScVal(tokenId, { type: "u64" }),
+					),
+				)
+				.setTimeout(30)
+				.build()
+
+			let owner: string | null = null
+			let metadataUri: string | null = null
+			let issuedAt: string | null = null
+
+			const simMeta = await server.simulateTransaction(txMeta)
+			if (!rpc.Api.isSimulationError(simMeta) && simMeta.result?.retval) {
+				const meta = scValToNative(simMeta.result.retval) as {
+					owner: string
+					metadata_uri: string
+					issued_at: bigint
+				}
+				owner = meta.owner
+				metadataUri = meta.metadata_uri
+				issuedAt = new Date(Number(meta.issued_at) * 1000).toISOString()
+			}
+
+			return { owner, revoked, metadataUri, issuedAt }
+		})
+	} catch (err) {
+		log.error({ err, tokenId }, "getScholarNftOnChain failed")
+		return { owner: null, revoked: false, metadataUri: null, issuedAt: null }
+	}
+}
+
 async function getScholarCredentials(address: string): Promise<any[]> {
 	try {
 		const result = await pool.query(
@@ -1261,4 +1356,5 @@ export const stellarContractService = {
 	getGovernanceDelegation,
 	getEnrolledCourses,
 	getScholarCredentials,
+	getScholarNftOnChain,
 }

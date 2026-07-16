@@ -25,6 +25,8 @@ const Home = lazy(() => import("./pages/Home"))
 const History = lazy(() => import("./pages/History"))
 const ImpactDashboard = lazy(() => import("./pages/ImpactDashboard"))
 const ImpactWidget = lazy(() => import("./pages/ImpactWidget"))
+const VerifyDetail = lazy(() => import("./pages/VerifyDetail"))
+const VerifyBadge = lazy(() => import("./pages/VerifyBadge"))
 const Leaderboard = lazy(() => import("./pages/Leaderboard"))
 const Learn = lazy(() => import("./pages/Learn"))
 const LessonVersionDiff = lazy(() => import("./pages/LessonVersionDiff"))
@@ -55,6 +57,10 @@ function App() {
 			<WalletToastWatcher />
 			<Routes>
 				<Route path="/impact/widget" element={renderRoute(<ImpactWidget />)} />
+				<Route
+					path="/verify/badge/:id"
+					element={renderRoute(<VerifyBadge />)}
+				/>
 				<Route element={<AppLayout />}>
 					<Route path="/" element={renderRoute(<Home />)} />
 					<Route path="/courses" element={renderRoute(<Courses />)} />
@@ -106,6 +112,7 @@ function App() {
 						path="/credentials/:id"
 						element={renderRoute(<Credential />)}
 					/>
+					<Route path="/verify/:id" element={renderRoute(<VerifyDetail />)} />
 					<Route path="/dashboard" element={renderRoute(<Dashboard />)} />
 					<Route path="/debug" element={renderRoute(<Debug />)} />
 					<Route path="/debug/:contractName" element={renderRoute(<Debug />)} />

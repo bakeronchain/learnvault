@@ -60,6 +60,7 @@ import { treasuryRouter } from "./routes/treasury.routes"
 import { createUploadRouter } from "./routes/upload.routes"
 import { createUserProfileRouter } from "./routes/user-profile.routes"
 import { validatorRouter } from "./routes/validator.routes"
+import { verifyRouter } from "./routes/verify.routes"
 import { webhooksRouter } from "./routes/webhooks.routes"
 import { wikiRouter } from "./routes/wiki.routes"
 import { createAuthService } from "./services/auth.service"
@@ -274,6 +275,7 @@ app.use("/api", mentorshipRouter)
 app.use("/api", createRecommendationsRouter(jwtService))
 app.use("/api", createForumRouter(jwtService))
 app.use("/api", createCredentialsRouter(jwtService))
+app.use("/api", verifyRouter)
 app.use("/api", validatorRouter)
 app.use("/api", eventsRouter)
 app.use("/api/community", communityRouter)

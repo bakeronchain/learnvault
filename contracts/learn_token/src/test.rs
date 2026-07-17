@@ -41,8 +41,13 @@ proptest! {
 } // close proptest!
 
 extern crate std;
-
-use soroban_sdk::{IntoVal, testutils::Events as _};
+use soroban_sdk::{
+    Address,
+    Env,
+    IntoVal,
+    String,
+    testutils::{Address as _, Events as _},
+};
 
 use crate::{DataKey, LRNError, LearnToken, LearnTokenClient};
 
@@ -374,7 +379,7 @@ fn double_initialize_rejected() {
     assert_eq!(
         result.err(),
         Some(Ok(soroban_sdk::Error::from_contract_error(
-            LRNError::Unauthorized as u32
+            LRNError::NotInitialized as u32
         )))
     );
 }

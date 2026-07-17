@@ -376,7 +376,6 @@ impl ScholarNFT {
             .instance()
             .get::<_, Address>(&ADMIN_KEY)
             .unwrap_or_else(|| panic_with_error!(env, ScholarNFTError::NotInitialized))
-<<<<<<< HEAD
     }
 
     fn extend_instance(env: &Env) {
@@ -387,16 +386,8 @@ impl ScholarNFT {
 
     fn extend_persistent(env: &Env, key: &DataKey) {
         env.storage().persistent().extend_ttl(key, TTL_MIN, TTL_MAX);
-=======
->>>>>>> e774eb8 (ci passed checks)
     }
 }
 
 #[cfg(test)]
 mod test;
-<<<<<<< HEAD
-
-#[cfg(test)]
-mod tests;
-=======
->>>>>>> e774eb8 (ci passed checks)

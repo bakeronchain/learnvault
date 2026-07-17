@@ -29,6 +29,8 @@ const VerifyDetail = lazy(() => import("./pages/VerifyDetail"))
 const VerifyBadge = lazy(() => import("./pages/VerifyBadge"))
 const Leaderboard = lazy(() => import("./pages/Leaderboard"))
 const Learn = lazy(() => import("./pages/Learn"))
+const MentorDirectory = lazy(() => import("./pages/MentorDirectory"))
+const MySessions = lazy(() => import("./pages/MySessions"))
 const LessonVersionDiff = lazy(() => import("./pages/LessonVersionDiff"))
 const LessonView = lazy(() => import("./pages/LessonView"))
 const NotFound = lazy(() => import("./pages/NotFound"))
@@ -77,6 +79,8 @@ function App() {
 					<Route path="/dao/propose" element={renderRoute(<DaoPropose />)} />
 					<Route path="/leaderboard" element={renderRoute(<Leaderboard />)} />
 					<Route path="/community" element={renderRoute(<Community />)} />
+					<Route path="/mentors" element={renderRoute(<MentorDirectory />)} />
+					<Route path="/my-sessions" element={renderRoute(<MySessions />)} />
 					<Route path="/history" element={renderRoute(<History />)} />
 					<Route path="/profile" element={renderRoute(<Profile />)} />
 					<Route

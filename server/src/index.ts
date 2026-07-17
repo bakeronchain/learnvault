@@ -56,6 +56,7 @@ import { createRecommendationsRouter } from "./routes/recommendations.routes"
 import { createReviewsRouter } from "./routes/reviews.routes"
 import { createScholarsRouter } from "./routes/scholars.routes"
 import { scholarshipsRouter } from "./routes/scholarships.routes"
+import { createStudioDraftsRouter } from "./routes/studio-drafts.routes"
 import { treasuryRouter } from "./routes/treasury.routes"
 import { createUploadRouter } from "./routes/upload.routes"
 import { createUserProfileRouter } from "./routes/user-profile.routes"
@@ -275,6 +276,7 @@ app.use("/api", mentorshipRouter)
 app.use("/api", createRecommendationsRouter(jwtService))
 app.use("/api", createForumRouter(jwtService))
 app.use("/api", createCredentialsRouter(jwtService))
+app.use("/api", createStudioDraftsRouter(jwtService))
 app.use("/api", verifyRouter)
 app.use("/api", validatorRouter)
 app.use("/api", eventsRouter)

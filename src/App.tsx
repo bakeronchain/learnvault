@@ -38,6 +38,8 @@ const Profile = lazy(() => import("./pages/Profile"))
 const ScholarshipApply = lazy(() => import("./pages/ScholarshipApply"))
 const SponsorPortal = lazy(() => import("./pages/SponsorPortal"))
 const SponsorCheckoutPage = lazy(() => import("./pages/SponsorCheckoutPage"))
+const StudioDrafts = lazy(() => import("./pages/StudioDrafts"))
+const StudioDraftReview = lazy(() => import("./pages/StudioDraftReview"))
 const Tracks = lazy(() => import("./pages/Tracks"))
 const Treasury = lazy(() => import("./pages/Treasury"))
 const Wiki = lazy(() => import("./pages/Wiki"))
@@ -106,6 +108,8 @@ function App() {
 						path="/sponsor/checkout"
 						element={renderRoute(<SponsorCheckoutPage />)}
 					/>
+					<Route path="/studio" element={renderRoute(<StudioDrafts />)} />
+					<Route path="/studio/review" element={renderRoute(<StudioDraftReview />)} />
 					<Route path="/impact" element={renderRoute(<ImpactDashboard />)} />
 					<Route path="/peer-review" element={renderRoute(<PeerReview />)} />
 					<Route

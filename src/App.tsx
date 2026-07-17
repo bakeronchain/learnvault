@@ -35,6 +35,7 @@ const NotFound = lazy(() => import("./pages/NotFound"))
 const NotificationSettings = lazy(() => import("./pages/NotificationSettings"))
 const PeerReview = lazy(() => import("./pages/PeerReview"))
 const Profile = lazy(() => import("./pages/Profile"))
+const QuadraticFunding = lazy(() => import("./pages/QuadraticFunding"))
 const ScholarshipApply = lazy(() => import("./pages/ScholarshipApply"))
 const SponsorPortal = lazy(() => import("./pages/SponsorPortal"))
 const SponsorCheckoutPage = lazy(() => import("./pages/SponsorCheckoutPage"))
@@ -100,6 +101,10 @@ function App() {
 					<Route path="/wiki/:slug" element={renderRoute(<WikiPage />)} />
 					<Route path="/tracks" element={renderRoute(<Tracks />)} />
 					<Route path="/treasury" element={renderRoute(<Treasury />)} />
+					<Route
+						path="/quadratic-funding"
+						element={renderRoute(<QuadraticFunding />)}
+					/>
 					<Route path="/donor" element={renderRoute(<Donor />)} />
 					<Route path="/sponsor" element={renderRoute(<SponsorPortal />)} />
 					<Route

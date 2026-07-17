@@ -23,6 +23,8 @@ const MILESTONE_ESCROW_CONTRACT_ID =
 const LEARN_TOKEN_CONTRACT_ID = process.env.LEARN_TOKEN_CONTRACT_ID ?? ""
 const GOVERNANCE_TOKEN_CONTRACT_ID =
 	process.env.GOVERNANCE_TOKEN_CONTRACT_ID ?? ""
+const ACHIEVEMENT_BADGE_CONTRACT_ID =
+	process.env.ACHIEVEMENT_BADGE_CONTRACT_ID ?? ""
 
 export interface ContractCallResult {
 	txHash: string | null
@@ -615,6 +617,79 @@ async function callMintScholarNFT(
 		},
 		3,
 		"callMintScholarNFT",
+	)
+}
+
+async function callMintAchievementBadge(
+	learnerAddress: string,
+	badgeType: string,
+	metadataUri: string,
+): Promise<ContractCallResult & { tokenId?: number }> {
+	if (!STELLAR_SECRET_KEY) {
+		throw new Error(
+			"STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction",
+		)
+	}
+	if (!ACHIEVEMENT_BADGE_CONTRACT_ID) {
+		throw new Error(
+			"ACHIEVEMENT_BADGE_CONTRACT_ID not configured — cannot submit on-chain transaction",
+		)
+	}
+
+	return withRetry(
+		async () => {
+			try {
+				const {
+					Keypair,
+					Contract,
+					TransactionBuilder,
+					Networks,
+					BASE_FEE,
+					rpc,
+					xdr,
+				} = await import("@stellar/stellar-sdk")
+
+				const server = new rpc.Server(
+					STELLAR_NETWORK === "mainnet"
+						? "https://soroban-rpc.stellar.org"
+						: "https://soroban-testnet.stellar.org",
+				)
+
+				const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
+				const account = await server.getAccount(keypair.publicKey())
+				const contract = new Contract(ACHIEVEMENT_BADGE_CONTRACT_ID)
+
+				const tx = new TransactionBuilder(account, {
+					fee: BASE_FEE,
+					networkPassphrase:
+						STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+				})
+					.addOperation(
+						contract.call(
+							"mint",
+							xdr.ScVal.scvString(learnerAddress),
+							xdr.ScVal.scvString(badgeType),
+							xdr.ScVal.scvString(metadataUri),
+						),
+					)
+					.setTimeout(30)
+					.build()
+
+				const prepared = await server.prepareTransaction(tx)
+				prepared.sign(keypair)
+
+				const result = await server.sendTransaction(prepared)
+				return { txHash: result.hash, simulated: false }
+			} catch (err) {
+				console.error("[stellar] Achievement badge mint failed:", err)
+				throw new Error(
+					"Achievement badge mint failed: " +
+						(err instanceof Error ? err.message : String(err)),
+				)
+			}
+		},
+		3,
+		"callMintAchievementBadge",
 	)
 }
 
@@ -1345,6 +1420,7 @@ export const stellarContractService = {
 	callVerifyMilestone,
 	emitRejectionEvent,
 	callMintScholarNFT,
+	callMintAchievementBadge,
 	isEnrolled,
 	submitScholarshipProposal,
 	castVote,

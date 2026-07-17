@@ -1,6 +1,6 @@
 import React, { useState } from "react"
 import { Helmet } from "react-helmet"
-import { useParams, Link } from "react-router-dom"
+import { useParams } from "react-router-dom"
 import TxHashLink from "../components/TxHashLink"
 import { useScholarNft } from "../hooks/useScholarNft"
 
@@ -67,8 +67,6 @@ const Credential: React.FC = () => {
 	const { id } = useParams<{ id: string }>()
 	const nftId = id?.trim() || undefined
 	const [copySuccess, setCopySuccess] = useState(false)
-	const [showEmbedModal, setShowEmbedModal] = useState(false)
-	const [embedCopied, setEmbedCopied] = useState(false)
 	const { credential: nft, status, error } = useScholarNft(nftId)
 
 	const copyToClipboard = () => {
@@ -277,20 +275,17 @@ const Credential: React.FC = () => {
 			</div>
 
 			<div className="flex flex-wrap justify-center gap-6 duration-1000 delay-300 animate-in slide-in-from-bottom-8">
-				<Link
-					to={`/verify/${nft.id}`}
-					className="rounded-2xl bg-gradient-to-r from-brand-cyan to-brand-blue px-10 py-4 text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-brand-cyan/20 transition-all hover:scale-105 active:scale-95"
-					aria-label={`Verify ${nft.programName} credential status`}
-				>
-					Verify Status
-				</Link>
-				<button
-					type="button"
-					onClick={() => setShowEmbedModal(true)}
-					className="glass rounded-2xl border border-white/10 px-10 py-4 text-sm font-black uppercase tracking-widest text-white transition-all hover:scale-105 hover:bg-white/10 active:scale-95"
-				>
-					Embed Badge
-				</button>
+				{nft.txHash ? (
+					<a
+						href={`https://stellar.expert/explorer/public/tx/${nft.txHash}`}
+						target="_blank"
+						rel="noopener noreferrer"
+						className="rounded-2xl bg-gradient-to-r from-brand-cyan to-brand-blue px-10 py-4 text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-brand-cyan/20 transition-all hover:scale-105 active:scale-95"
+						aria-label={`Verify ${nft.programName} credential on Stellar Explorer`}
+					>
+						Verify on-chain
+					</a>
+				) : null}
 				<a
 					href={`https://twitter.com/intent/tweet?text=${shareText}`}
 					className="rounded-2xl bg-[#1d9bf0] px-10 py-4 text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-[#1d9bf0]/20 transition-all hover:scale-105 active:scale-95"
@@ -315,50 +310,6 @@ const Credential: React.FC = () => {
 					Credential link copied to clipboard.
 				</p>
 			) : null}
-
-			{showEmbedModal && (
-				<div
-					className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300"
-					role="dialog"
-					aria-modal="true"
-				>
-					<div className="glass-card max-w-lg w-full p-8 rounded-[2.5rem] border border-white/10 shadow-2xl animate-in zoom-in-95 duration-300 relative text-left">
-						<h2 className="text-2xl font-black mb-2 tracking-tight text-white">
-							Embed Credential Badge
-						</h2>
-						<p className="text-white/60 text-sm leading-relaxed mb-6">
-							Copy and paste the HTML code below into your website or portfolio
-							to show off your verified credential.
-						</p>
-
-						<div className="bg-slate-950 p-4 rounded-xl border border-white/5 font-mono text-xs text-white/80 break-all select-all mb-6">
-							{`<iframe src="${window.location.origin}/verify/badge/${nft.id}" width="360" height="180" style="border:0;border-radius:16px;overflow:hidden" loading="lazy"></iframe>`}
-						</div>
-
-						<div className="flex flex-row gap-3">
-							<button
-								type="button"
-								onClick={async () => {
-									const code = `<iframe src="${window.location.origin}/verify/badge/${nft.id}" width="360" height="180" style="border:0;border-radius:16px;overflow:hidden" loading="lazy"></iframe>`
-									await navigator.clipboard.writeText(code)
-									setEmbedCopied(true)
-									setTimeout(() => setEmbedCopied(false), 2000)
-								}}
-								className="flex-1 px-6 py-3 bg-brand-cyan/20 border border-brand-cyan/40 text-brand-cyan font-black uppercase tracking-widest rounded-xl hover:bg-brand-cyan/30 hover:scale-105 active:scale-95 transition-all text-center"
-							>
-								{embedCopied ? "Copied!" : "Copy Snippet"}
-							</button>
-							<button
-								type="button"
-								onClick={() => setShowEmbedModal(false)}
-								className="flex-1 px-6 py-3 border border-white/10 text-white/80 font-black uppercase tracking-widest rounded-xl hover:bg-white/5 hover:scale-105 active:scale-95 transition-all"
-							>
-								Close
-							</button>
-						</div>
-					</div>
-				</div>
-			)}
 		</div>
 	)
 }

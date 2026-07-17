@@ -98,6 +98,7 @@ pub struct ScholarNFT;
 #[contractimpl]
 impl ScholarNFT {
     pub fn initialize(env: Env, admin: Address) {
+<<<<<<< HEAD
         if env.storage().instance().has(&ADMIN_KEY) {
             panic_with_error!(&env, ScholarNFTError::AlreadyInitialized);
         }
@@ -141,6 +142,37 @@ impl ScholarNFT {
             .persistent()
             .set(&DataKey::Metadata(token_id), &metadata);
         Self::extend_persistent(&env, &DataKey::Metadata(token_id));
+=======
+        if env.storage().instance().has(&DataKey::Admin) {
+            panic_with_error!(&env, ScholarNFTError::AlreadyInitialized);
+        }
+
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Admin, &admin);
+        env.storage().instance().set(&DataKey::TokenCount, &0_u32);
+    }
+
+    pub fn mint(env: Env, to: Address, metadata_uri: String) -> u32 {
+        let admin = Self::admin(&env);
+        admin.require_auth();
+
+        let next_token_id = env
+            .storage()
+            .instance()
+            .get::<_, u32>(&DataKey::TokenCount)
+            .unwrap_or(0)
+            + 1;
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::TokenOwner(next_token_id), &to);
+        env.storage()
+            .persistent()
+            .set(&DataKey::TokenUri(next_token_id), &metadata_uri);
+        env.storage()
+            .instance()
+            .set(&DataKey::TokenCount, &next_token_id);
+>>>>>>> e774eb8 (ci passed checks)
 
         env.events().publish(
             (symbol_short!("minted"), token_id),
@@ -194,6 +226,7 @@ impl ScholarNFT {
         Self::extend_instance(&env);
     }
 
+<<<<<<< HEAD
     pub fn token_uri(env: Env, token_id: u64) -> String {
         Self::extend_instance(&env);
         let key = DataKey::TokenUri(token_id);
@@ -233,6 +266,10 @@ impl ScholarNFT {
             .instance()
             .get(&TOKEN_COUNTER_KEY)
             .unwrap_or(0_u64)
+=======
+    pub fn transfer(env: Env, _from: Address, _to: Address, _token_id: u32) {
+        panic_with_error!(&env, ScholarNFTError::Soulbound);
+>>>>>>> e774eb8 (ci passed checks)
     }
 
     pub fn get_all_scholars(env: Env) -> Vec<Address> {
@@ -339,6 +376,7 @@ impl ScholarNFT {
             .instance()
             .get::<_, Address>(&ADMIN_KEY)
             .unwrap_or_else(|| panic_with_error!(env, ScholarNFTError::NotInitialized))
+<<<<<<< HEAD
     }
 
     fn extend_instance(env: &Env) {
@@ -349,11 +387,16 @@ impl ScholarNFT {
 
     fn extend_persistent(env: &Env, key: &DataKey) {
         env.storage().persistent().extend_ttl(key, TTL_MIN, TTL_MAX);
+=======
+>>>>>>> e774eb8 (ci passed checks)
     }
 }
 
 #[cfg(test)]
 mod test;
+<<<<<<< HEAD
 
 #[cfg(test)]
 mod tests;
+=======
+>>>>>>> e774eb8 (ci passed checks)

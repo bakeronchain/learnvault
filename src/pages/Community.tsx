@@ -2,8 +2,6 @@ import { Card, Icon, Badge } from "@stellar/design-system"
 import React, { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 
-import MentorshipPanel from "../components/MentorshipPanel"
-
 type CommunityEvent = {
 	id: string
 	title: string
@@ -84,7 +82,6 @@ const Community: React.FC = () => {
 						))}
 					</div>
 				)}
-				<MentorshipPanel />
 			</div>
 		</div>
 	)

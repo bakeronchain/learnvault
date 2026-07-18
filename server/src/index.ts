@@ -47,7 +47,7 @@ import { governanceRouter } from "./routes/governance.routes"
 import { healthRouter } from "./routes/health.routes"
 import { lrnRouter } from "./routes/lrn.routes"
 import { createMeRouter } from "./routes/me.routes"
-import { mentorshipRouter } from "./routes/mentorship.routes"
+import { mentorBookingRouter } from "./routes/mentor-booking.routes"
 import { createMilestoneAppealRouter } from "./routes/milestone-appeal.routes"
 import { moderationRouter } from "./routes/moderation.routes"
 import { notificationsRouter } from "./routes/notifications.routes"
@@ -271,7 +271,7 @@ app.use("/api", coursesRouter)
 app.use("/api", createEnrollmentsRouter(jwtService))
 app.use("/api", createScholarsRouter(jwtService))
 app.use("/api", scholarshipsRouter)
-app.use("/api", mentorshipRouter)
+app.use("/api", mentorBookingRouter)
 app.use("/api", createRecommendationsRouter(jwtService))
 app.use("/api", createForumRouter(jwtService))
 app.use("/api", createCredentialsRouter(jwtService))

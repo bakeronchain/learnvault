@@ -63,6 +63,7 @@ import { validatorRouter } from "./routes/validator.routes"
 import { verifyRouter } from "./routes/verify.routes"
 import { webhooksRouter } from "./routes/webhooks.routes"
 import { wikiRouter } from "./routes/wiki.routes"
+import { createBountyRouter } from "./routes/bounty.routes"
 import { createAuthService } from "./services/auth.service"
 import {
 	createJwtService,
@@ -293,9 +294,10 @@ app.use("/api", moderationRouter)
 app.use("/api", createUserProfileRouter(jwtService))
 app.use("/api", createUploadRouter(jwtService))
 app.use("/api", createReviewsRouter(jwtService))
-app.use("/api", notificationsRouter)
+	app.use("/api", notificationsRouter)
+	app.use("/api", createBountyRouter(jwtService))
 
-if (process.env.NODE_ENV !== "test") {
+	if (process.env.NODE_ENV !== "test") {
 	void import("./workers/escrow-timeout-worker").then(
 		({ startEscrowTimeoutWorker }) => {
 			void startEscrowTimeoutWorker().catch(console.error)
@@ -305,6 +307,12 @@ if (process.env.NODE_ENV !== "test") {
 	void import("./workers/deadline-reminder-worker").then(
 		({ startDeadlineReminderWorker }) => {
 			void startDeadlineReminderWorker().catch(console.error)
+		},
+	)
+
+	void import("./workers/bounty-expiry-worker").then(
+		({ startBountyExpiryWorker }) => {
+			void startBountyExpiryWorker().catch(console.error)
 		},
 	)
 }

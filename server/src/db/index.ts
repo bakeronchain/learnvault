@@ -81,7 +81,7 @@ export const initDb = async () => {
 				tx_hash TEXT,
 				enrolled_at TIMESTAMPTZ DEFAULT NOW(),
 				UNIQUE(learner_address, course_id)
-				);`
+				);`,
 			)
 			client.release()
 			log.info("Postgres connection verified")

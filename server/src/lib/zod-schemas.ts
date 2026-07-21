@@ -292,6 +292,37 @@ export const enrollmentBodySchema = z
 	})
 	.strict()
 
+export const createCohortBodySchema = z
+	.object({
+		name: requiredString("name", 100),
+		course_slug: requiredString("course_slug", 100),
+		start_date: requiredString("start_date", 10).regex(
+			/^\d{4}-\d{2}-\d{2}$/,
+			"start_date must be in YYYY-MM-DD format",
+		),
+		max_members: z
+			.number({ invalid_type_error: "max_members must be a number" })
+			.int("max_members must be an integer")
+			.min(2, "max_members must be at least 2")
+			.max(100, "max_members must be 100 or fewer")
+			.optional(),
+	})
+	.strict()
+
+export const cohortIdParamSchema = z
+	.object({
+		id: z
+			.string({ required_error: "id is required" })
+			.regex(/^\d+$/, "id must be a positive integer"),
+	})
+	.strict()
+
+export const listCohortsQuerySchema = z
+	.object({
+		course: optionalTrimmedString("course", 100),
+	})
+	.strict()
+
 export const bookmarkBodySchema = z
 	.object({
 		course_id: requiredString("course_id", 100),

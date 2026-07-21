@@ -1,6 +1,7 @@
 import { Button } from "@stellar/design-system"
 import React, { useEffect, useMemo, useState } from "react"
 import { Link, useParams } from "react-router-dom"
+import SquadsPanel from "../components/cohorts/SquadsPanel"
 import CourseReviewsPanel from "../components/CourseReviewsPanel"
 import { CourseForum } from "../components/forum/CourseForum"
 import LessonContent from "../components/LessonContent"
@@ -266,7 +267,11 @@ const LessonView: React.FC = () => {
 				</div>
 				<div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
 					<h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
-						{currentTab === "forum" ? "Community Forum" : lesson.title}
+						{currentTab === "forum"
+							? "Community Forum"
+							: currentTab === "squads"
+								? "Study Squads"
+								: lesson.title}
 					</h1>
 				</div>
 			</header>
@@ -333,6 +338,16 @@ const LessonView: React.FC = () => {
 					}`}
 				>
 					Forum
+				</button>
+				<button
+					onClick={() => setTab("squads")}
+					className={`pb-3 px-2 text-sm font-bold uppercase tracking-widest transition-colors ${
+						currentTab === "squads"
+							? "text-brand-cyan border-b-2 border-brand-cyan"
+							: "text-white/40 hover:text-white/70"
+					}`}
+				>
+					Squads
 				</button>
 			</div>
 
@@ -409,6 +424,8 @@ const LessonView: React.FC = () => {
 						<div className="animate-in fade-in">
 							<CourseForum courseId={course.slug} />
 						</div>
+					) : currentTab === "squads" ? (
+						<SquadsPanel courseSlug={course.slug} />
 					) : (
 						<LessonContent
 							lesson={lesson ?? loadingLesson}
@@ -424,15 +441,18 @@ const LessonView: React.FC = () => {
 						/>
 					)}
 
-					{lesson?.isMilestone && !isLoadingCourse && !isLoadingContent && (
-						<div className="mt-12 animate-in fade-in slide-in-from-top-4 duration-1000">
-							<MilestoneSubmitPanel
-								courseId={course.slug}
-								milestoneId={lesson.id}
-							/>
-						</div>
-					)}
-					{course && currentTab !== "forum" && (
+					{lesson?.isMilestone &&
+						currentTab !== "squads" &&
+						!isLoadingCourse &&
+						!isLoadingContent && (
+							<div className="mt-12 animate-in fade-in slide-in-from-top-4 duration-1000">
+								<MilestoneSubmitPanel
+									courseId={course.slug}
+									milestoneId={lesson.id}
+								/>
+							</div>
+						)}
+					{course && currentTab !== "forum" && currentTab !== "squads" && (
 						<CourseReviewsPanel
 							courseId={course.slug}
 							canReview={Boolean(nextLessonId === null && isCompleted)}

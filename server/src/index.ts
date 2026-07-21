@@ -36,6 +36,7 @@ import { adminProviderKeysRouter } from "./routes/admin-provider-keys.routes"
 import { adminRouter } from "./routes/admin.routes"
 import { antiSybilRouter } from "./routes/anti-sybil.routes"
 import { createAuthRouter } from "./routes/auth.routes"
+import { createCohortsRouter } from "./routes/cohorts.routes"
 import { createCommentsRouter } from "./routes/comments.routes"
 import { communityRouter } from "./routes/community.routes"
 import { coursesRouter } from "./routes/courses.routes"
@@ -269,6 +270,7 @@ app.use("/api/auth", createAuthRouter(authService, jwtService))
 app.use("/api", createMeRouter(jwtService))
 app.use("/api", coursesRouter)
 app.use("/api", createEnrollmentsRouter(jwtService))
+app.use("/api", createCohortsRouter(jwtService))
 app.use("/api", createScholarsRouter(jwtService))
 app.use("/api", scholarshipsRouter)
 app.use("/api", mentorBookingRouter)

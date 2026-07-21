@@ -36,6 +36,7 @@ import { adminProviderKeysRouter } from "./routes/admin-provider-keys.routes"
 import { adminRouter } from "./routes/admin.routes"
 import { antiSybilRouter } from "./routes/anti-sybil.routes"
 import { createAuthRouter } from "./routes/auth.routes"
+import badgesRouter from "./routes/badges.routes"
 import { createCommentsRouter } from "./routes/comments.routes"
 import { communityRouter } from "./routes/community.routes"
 import { coursesRouter } from "./routes/courses.routes"
@@ -294,6 +295,7 @@ app.use("/api", createUserProfileRouter(jwtService))
 app.use("/api", createUploadRouter(jwtService))
 app.use("/api", createReviewsRouter(jwtService))
 app.use("/api", notificationsRouter)
+app.use("/api/badges", badgesRouter)
 
 if (process.env.NODE_ENV !== "test") {
 	void import("./workers/escrow-timeout-worker").then(

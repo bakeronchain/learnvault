@@ -358,9 +358,99 @@ export function mapBurnError(err: unknown): {
 	return { status: 500, message: "Failed to burn LRN tokens" }
 }
 
+export const LRN_DECIMALS = 7
+
+export function lrnToAtomic(amount: number): bigint {
+	return BigInt(amount) * 10n ** BigInt(LRN_DECIMALS)
+}
+
+export async function mintLrn(
+	toAddress: string,
+	amountAtomic: bigint,
+): Promise<{ txHash: string }> {
+	if (amountAtomic <= 0n) {
+		throw new Error("Mint amount must be positive")
+	}
+	if (!STELLAR_SECRET_KEY) {
+		throw new SorobanRpcError(
+			"STELLAR_SECRET_KEY not configured — cannot submit on-chain mint",
+		)
+	}
+	if (!LEARN_TOKEN_CONTRACT_ID) {
+		throw new SorobanRpcError(
+			"LEARN_TOKEN_CONTRACT_ID not configured — cannot submit on-chain mint",
+		)
+	}
+
+	try {
+		const {
+			Keypair,
+			Contract,
+			TransactionBuilder,
+			Address,
+			BASE_FEE,
+			nativeToScVal,
+		} = await import("@stellar/stellar-sdk")
+		const server = await getRpcServer()
+		const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
+		const account = await server.getAccount(keypair.publicKey())
+		const contract = new Contract(LEARN_TOKEN_CONTRACT_ID)
+		const passphrase = await resolveNetworkPassphrase()
+		const tx = new TransactionBuilder(account, {
+			fee: BASE_FEE,
+			networkPassphrase: passphrase,
+		})
+			.addOperation(
+				contract.call(
+					"mint",
+					new Address(toAddress).toScVal(),
+					nativeToScVal(amountAtomic, { type: "i128" }),
+				),
+			)
+			.setTimeout(30)
+			.build()
+
+		const prepared = await server.prepareTransaction(tx)
+		prepared.sign(keypair)
+		const result = await server.sendTransaction(prepared)
+		if (!result.hash) {
+			throw new SorobanRpcError("Soroban RPC returned no transaction hash")
+		}
+
+		const cache = getRpcCache()
+		const cached = await cache.get(CacheKey.learnBalance(toAddress))
+		if (cached !== null) {
+			const newBalance = (BigInt(cached) + amountAtomic).toString()
+			await cache.set(CacheKey.learnBalance(toAddress), newBalance, TTL.BALANCE)
+		}
+
+		return { txHash: result.hash }
+	} catch (err) {
+		if (err instanceof SorobanRpcError) throw err
+		throw new SorobanRpcError(
+			"Soroban RPC call failed while invoking learn_token.mint",
+			err,
+		)
+	}
+}
+
+export function mapMintError(err: unknown): {
+	status: number
+	message: string
+} {
+	if (err instanceof SorobanRpcError || isRpcFailure(err)) {
+		return { status: 502, message: "Soroban RPC call failed" }
+	}
+	if (err instanceof Error && err.message.includes("positive")) {
+		return { status: 400, message: err.message }
+	}
+	return { status: 500, message: "Failed to mint LRN tokens" }
+}
+
 export const learnTokenService = {
 	getLearnTokenBalanceAtomic,
 	burnLearnToken,
+	mintLrn,
 	mapBurnError,
 	mintLearnTokenBonus,
 }

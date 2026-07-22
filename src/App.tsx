@@ -44,6 +44,9 @@ const Tracks = lazy(() => import("./pages/Tracks"))
 const Treasury = lazy(() => import("./pages/Treasury"))
 const Wiki = lazy(() => import("./pages/Wiki"))
 const WikiPage = lazy(() => import("./pages/WikiPage"))
+const BountyBoard = lazy(() => import("./pages/BountyBoard"))
+const BountyDetail = lazy(() => import("./pages/BountyDetail"))
+const CreateBounty = lazy(() => import("./pages/CreateBounty"))
 
 const renderRoute = (element: ReactNode) => (
 	<ErrorBoundary>
@@ -120,6 +123,9 @@ function App() {
 					<Route path="/dashboard" element={renderRoute(<Dashboard />)} />
 					<Route path="/debug" element={renderRoute(<Debug />)} />
 					<Route path="/debug/:contractName" element={renderRoute(<Debug />)} />
+					<Route path="/bounties" element={renderRoute(<BountyBoard />)} />
+					<Route path="/bounties/create" element={renderRoute(<CreateBounty />)} />
+					<Route path="/bounties/:id" element={renderRoute(<BountyDetail />)} />
 					<Route path="*" element={renderRoute(<NotFound />)} />
 				</Route>
 			</Routes>

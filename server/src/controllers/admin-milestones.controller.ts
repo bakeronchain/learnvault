@@ -1,5 +1,6 @@
 import { type Request, type Response } from "express"
 import sanitizeHtml from "sanitize-html"
+import { pool } from "../db"
 import { milestoneStore, type MilestoneReport } from "../db/milestone-store"
 import { createNotification } from "../db/notifications-store"
 import {
@@ -325,6 +326,8 @@ export async function approveMilestone(
 		} catch (mintErr) {
 			log.error({ err: mintErr }, "Certificate mint failed (non-blocking)")
 		}
+
+		void qualifyReferralIfFirstMilestone(report.scholar_address)
 
 		res.status(200).json({
 			data: {
@@ -783,5 +786,45 @@ export async function batchRejectMilestones(
 	} catch (err) {
 		console.error("[admin] batchRejectMilestones error:", err)
 		res.status(500).json({ error: "Failed to batch reject milestones" })
+	}
+}
+
+async function qualifyReferralIfFirstMilestone(
+	scholarAddress: string,
+): Promise<void> {
+	try {
+		const ref = await pool.query(
+			`SELECT id FROM referrals
+			 WHERE referred_addr = $1 AND status = 'pending'
+			 LIMIT 1`,
+			[scholarAddress],
+		)
+		if (ref.rows.length === 0) return
+
+		const countResult = await pool.query(
+			`SELECT COUNT(*)::int AS count
+			 FROM milestone_reports
+			 WHERE scholar_address = $1 AND status = 'approved'`,
+			[scholarAddress],
+		)
+		if (countResult.rows[0].count !== 1) return
+
+		await pool.query(
+			`UPDATE referrals SET status = 'qualified', qualified_at = NOW()
+			 WHERE id = $1 AND status = 'pending'`,
+			[ref.rows[0].id],
+		)
+
+		// TODO: enqueue LRN reward for both parties via learn-token.service.ts
+		// 1. Mint/transfer LRN to referrer (referrerAddr from referrals table)
+		// 2. Mint/transfer LRN to referred learner (scholarAddress)
+		// 3. Flip status to 'rewarded'
+
+		log.info(
+			{ scholarAddress, referralId: ref.rows[0].id },
+			"Referral qualified after first milestone",
+		)
+	} catch (err) {
+		log.error({ err, scholarAddress }, "Failed to qualify referral")
 	}
 }

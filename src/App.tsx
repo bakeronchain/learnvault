@@ -9,6 +9,7 @@ import TestnetBanner from "./components/TestnetBanner"
 import { ToastProvider } from "./components/Toast/ToastProvider"
 import { WalletToastWatcher } from "./components/WalletToastWatcher"
 import { useLocalizeDocumentAttributes } from "./hooks/uselocalizeDocumentAttributes"
+import { captureReferralParam } from "./hooks/useReferralClaim"
 import { NetworkProvider } from "./providers/NetworkProvider"
 
 const Admin = lazy(() => import("./pages/Admin"))
@@ -53,6 +54,7 @@ const renderRoute = (element: ReactNode) => (
 
 function App() {
 	useLocalizeDocumentAttributes()
+	captureReferralParam()
 
 	return (
 		<ToastProvider>

@@ -38,6 +38,10 @@ export const buildOpenApiSpec = () => {
 				{ name: "Credentials", description: "Scholar credential endpoints" },
 				{ name: "Events", description: "Event stream endpoints" },
 				{ name: "Leaderboard", description: "Learner ranking endpoints" },
+				{
+					name: "Streaks",
+					description: "Learning streak and daily goal endpoints",
+				},
 				{ name: "Comments", description: "Proposal comment endpoints" },
 				{
 					name: "Treasury",

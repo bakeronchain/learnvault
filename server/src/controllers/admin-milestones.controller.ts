@@ -17,6 +17,7 @@ import {
 	GithubOracleError,
 	verifyMilestoneReportEvidence,
 } from "../services/github-oracle.service"
+import { lrnToAtomic, mintLrn } from "../services/learn-token.service"
 import { deliverNotificationChannels } from "../services/notification-delivery.service"
 import { stellarContractService } from "../services/stellar-contract.service"
 import { templates, toPlainText } from "../templates/email-templates"
@@ -789,12 +790,50 @@ export async function batchRejectMilestones(
 	}
 }
 
+async function rewardLrnBonus(
+	referralId: number,
+	referrerAddr: string,
+	scholarAddress: string,
+): Promise<void> {
+	const amount = lrnToAtomic(100)
+	try {
+		await mintLrn(referrerAddr, amount)
+		log.info(
+			{ referrerAddr, amount: amount.toString() },
+			"LRN minted for referrer",
+		)
+	} catch (err) {
+		log.error({ err, referrerAddr }, "Failed to mint LRN for referrer")
+		return
+	}
+
+	try {
+		await mintLrn(scholarAddress, amount)
+		log.info(
+			{ scholarAddress, amount: amount.toString() },
+			"LRN minted for referred learner",
+		)
+	} catch (err) {
+		log.error(
+			{ err, scholarAddress },
+			"Failed to mint LRN for referred learner",
+		)
+		return
+	}
+
+	await pool.query(
+		`UPDATE referrals SET status = 'rewarded'
+		 WHERE id = $1 AND status = 'qualified'`,
+		[referralId],
+	)
+}
+
 async function qualifyReferralIfFirstMilestone(
 	scholarAddress: string,
 ): Promise<void> {
 	try {
 		const ref = await pool.query(
-			`SELECT id FROM referrals
+			`SELECT id, referrer_addr FROM referrals
 			 WHERE referred_addr = $1 AND status = 'pending'
 			 LIMIT 1`,
 			[scholarAddress],
@@ -809,21 +848,21 @@ async function qualifyReferralIfFirstMilestone(
 		)
 		if (countResult.rows[0].count !== 1) return
 
+		const referralId = ref.rows[0].id as number
+		const referrerAddr = ref.rows[0].referrer_addr as string
+
 		await pool.query(
 			`UPDATE referrals SET status = 'qualified', qualified_at = NOW()
 			 WHERE id = $1 AND status = 'pending'`,
-			[ref.rows[0].id],
+			[referralId],
 		)
-
-		// TODO: enqueue LRN reward for both parties via learn-token.service.ts
-		// 1. Mint/transfer LRN to referrer (referrerAddr from referrals table)
-		// 2. Mint/transfer LRN to referred learner (scholarAddress)
-		// 3. Flip status to 'rewarded'
 
 		log.info(
-			{ scholarAddress, referralId: ref.rows[0].id },
+			{ scholarAddress, referralId },
 			"Referral qualified after first milestone",
 		)
+
+		void rewardLrnBonus(referralId, referrerAddr, scholarAddress)
 	} catch (err) {
 		log.error({ err, scholarAddress }, "Failed to qualify referral")
 	}

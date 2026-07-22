@@ -18,6 +18,7 @@ import {
 } from "../services/github-oracle.service"
 import { deliverNotificationChannels } from "../services/notification-delivery.service"
 import { stellarContractService } from "../services/stellar-contract.service"
+import { recordMilestoneActivity } from "../services/streak.service"
 import { templates, toPlainText } from "../templates/email-templates"
 
 const log = logger.child({ module: "admin-milestones" })
@@ -253,6 +254,14 @@ export async function approveMilestone(
 			await markEscrowActivity(report.scholar_address, report.course_id)
 		} catch (trackingErr) {
 			console.error("[admin] escrow activity update failed:", trackingErr)
+		}
+		try {
+			await recordMilestoneActivity(report.scholar_address)
+		} catch (streakErr) {
+			log.error(
+				{ err: streakErr },
+				"streak activity update failed (non-blocking)",
+			)
 		}
 		const auditEntry = await milestoneStore.addAuditEntry({
 			report_id: id,
@@ -573,6 +582,14 @@ export async function batchApproveMilestones(
 					await markEscrowActivity(r.scholar_address, r.course_id)
 				} catch (trackingErr) {
 					console.error("[admin] escrow activity update failed:", trackingErr)
+				}
+				try {
+					await recordMilestoneActivity(r.scholar_address)
+				} catch (streakErr) {
+					console.error(
+						"[admin] streak activity update failed (non-blocking):",
+						streakErr,
+					)
 				}
 				await milestoneStore.addAuditEntry({
 					report_id: id,

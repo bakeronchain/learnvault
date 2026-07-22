@@ -56,6 +56,7 @@ import { createRecommendationsRouter } from "./routes/recommendations.routes"
 import { createReviewsRouter } from "./routes/reviews.routes"
 import { createScholarsRouter } from "./routes/scholars.routes"
 import { scholarshipsRouter } from "./routes/scholarships.routes"
+import { createStreaksRouter } from "./routes/streaks.routes"
 import { treasuryRouter } from "./routes/treasury.routes"
 import { createUploadRouter } from "./routes/upload.routes"
 import { createUserProfileRouter } from "./routes/user-profile.routes"
@@ -294,8 +295,8 @@ app.use("/api", moderationRouter)
 app.use("/api", createUserProfileRouter(jwtService))
 app.use("/api", createUploadRouter(jwtService))
 app.use("/api", createReviewsRouter(jwtService))
-	app.use("/api", notificationsRouter)
-	app.use("/api", createBountyRouter(jwtService))
+app.use("/api", notificationsRouter)
+app.use("/api", createStreaksRouter(jwtService))
 
 	if (process.env.NODE_ENV !== "test") {
 	void import("./workers/escrow-timeout-worker").then(

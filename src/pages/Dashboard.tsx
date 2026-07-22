@@ -1,4 +1,5 @@
 import RecommendationsCarousel from "../components/RecommendationsCarousel"
+import StreakWidget from "../components/StreakWidget"
 
 export default function Dashboard() {
 	return (
@@ -16,6 +17,9 @@ export default function Dashboard() {
 					enrolled courses, LRN balance, milestone progress, and on-chain
 					activity.
 				</p>
+			</div>
+			<div style={{ maxWidth: 1200, margin: "2rem auto 0" }}>
+				<StreakWidget />
 			</div>
 			<div style={{ maxWidth: 1200, margin: "2rem auto 0" }}>
 				<RecommendationsCarousel />

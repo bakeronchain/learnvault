@@ -17,6 +17,7 @@ export const EVENT_TOPICS = {
 	CourseMilestone_MilestoneComplete: "CourseMilestone::MilestoneComplete",
 	ScholarshipTreasury_Deposit: "ScholarshipTreasury::Deposit",
 	ScholarshipTreasury_ProposalCreated: "ScholarshipTreasury::ProposalCreated",
+	ScholarshipTreasury_ProposalExecuted: "ScholarshipTreasury::proposal_executed",
 	ScholarshipTreasury_VoteCastEvent: "ScholarshipTreasury::VoteCastEvent",
 	MilestoneEscrow_FundsDisbursed: "MilestoneEscrow::FundsDisbursed",
 	ScholarNft_Minted: "ScholarNFT::minted",
@@ -33,6 +34,7 @@ export const EVENTS_TO_INDEX: Record<ContractName, EventTopic[]> = {
 	scholarshipTreasury: [
 		"ScholarshipTreasury_Deposit",
 		"ScholarshipTreasury_ProposalCreated",
+		"ScholarshipTreasury_ProposalExecuted",
 		"ScholarshipTreasury_VoteCastEvent",
 	],
 	milestoneEscrow: ["MilestoneEscrow_FundsDisbursed"],

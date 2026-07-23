@@ -1341,6 +1341,170 @@ async function getScholarCredentials(address: string): Promise<any[]> {
 	}
 }
 
+async function createMilestoneEscrow(input: {
+	proposalId: number
+	scholarAddress: string
+	totalAmount: number | string | bigint
+	tranches?: number
+}, options: RequestTraceOptions = {}): Promise<ContractCallResult> {
+	if (!STELLAR_SECRET_KEY) {
+		throw new Error(
+			"STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction",
+		)
+	}
+	if (!MILESTONE_ESCROW_CONTRACT_ID) {
+		throw new Error(
+			"MILESTONE_ESCROW_CONTRACT_ID not configured — cannot submit on-chain transaction",
+		)
+	}
+
+	const tranches = input.tranches ?? 3
+
+	return stellarRpcCircuitBreaker.call(async () => {
+		try {
+			const {
+				Keypair,
+				Contract,
+				TransactionBuilder,
+				Memo,
+				Networks,
+				BASE_FEE,
+				rpc,
+				nativeToScVal,
+			} = await import("@stellar/stellar-sdk")
+
+			const server = new rpc.Server(
+				STELLAR_NETWORK === "mainnet"
+					? "https://soroban-rpc.stellar.org"
+					: "https://soroban-testnet.stellar.org",
+			)
+
+			const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
+			const account = await server.getAccount(keypair.publicKey())
+			const contract = new Contract(MILESTONE_ESCROW_CONTRACT_ID)
+
+			const txBuilder = new TransactionBuilder(account, {
+				fee: BASE_FEE,
+				networkPassphrase:
+					STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+			})
+			const requestMemoValue = buildRequestMemoValue(resolveRequestId(options))
+			if (requestMemoValue) {
+				txBuilder.addMemo(Memo.text(requestMemoValue))
+			}
+
+			const tx = txBuilder
+				.addOperation(
+					contract.call(
+						"create_escrow",
+						nativeToScVal(input.proposalId, { type: "u32" }),
+						nativeToScVal(input.scholarAddress, { type: "address" }),
+						nativeToScVal(String(input.totalAmount), { type: "i128" }),
+						nativeToScVal(tranches, { type: "u32" }),
+					),
+				)
+				.setTimeout(30)
+				.build()
+
+			const prepared = await server.prepareTransaction(tx)
+			prepared.sign(keypair)
+
+			const result = await server.sendTransaction(prepared)
+			return { txHash: result.hash, simulated: false }
+		} catch (err) {
+			log.error({ err }, "createMilestoneEscrow failed")
+			throw new Error("create_escrow failed: " + (err instanceof Error ? err.message : String(err)))
+		}
+	})
+}
+
+async function releaseTranche(
+	proposalId: number,
+	options: RequestTraceOptions = {},
+): Promise<ContractCallResult> {
+	if (!STELLAR_SECRET_KEY) {
+		throw new Error(
+			"STELLAR_SECRET_KEY not configured — cannot submit on-chain transaction",
+		)
+	}
+	if (!MILESTONE_ESCROW_CONTRACT_ID) {
+		throw new Error(
+			"MILESTONE_ESCROW_CONTRACT_ID not configured — cannot submit on-chain transaction",
+		)
+	}
+
+	return stellarRpcCircuitBreaker.call(async () => {
+		try {
+			const { Keypair, Contract, TransactionBuilder, Memo, Networks, BASE_FEE, rpc, nativeToScVal } =
+				await import("@stellar/stellar-sdk")
+
+			const server = new rpc.Server(
+				STELLAR_NETWORK === "mainnet"
+					? "https://soroban-rpc.stellar.org"
+					: "https://soroban-testnet.stellar.org",
+			)
+
+			const keypair = Keypair.fromSecret(STELLAR_SECRET_KEY)
+			const account = await server.getAccount(keypair.publicKey())
+			const contract = new Contract(MILESTONE_ESCROW_CONTRACT_ID)
+
+			const txBuilder = new TransactionBuilder(account, {
+				fee: BASE_FEE,
+				networkPassphrase: STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+			})
+			const requestMemoValue = buildRequestMemoValue(resolveRequestId(options))
+			if (requestMemoValue) {
+				txBuilder.addMemo(Memo.text(requestMemoValue))
+			}
+
+			const tx = txBuilder
+				.addOperation(
+					contract.call("release_tranche", nativeToScVal(proposalId, { type: "u32" })),
+				)
+				.setTimeout(30)
+				.build()
+
+			const prepared = await server.prepareTransaction(tx)
+			prepared.sign(keypair)
+
+			const result = await server.sendTransaction(prepared)
+			return { txHash: result.hash, simulated: false }
+		} catch (err) {
+			log.error({ err }, "release_tranche failed")
+			throw new Error("release_tranche failed: " + (err instanceof Error ? err.message : String(err)))
+		}
+	})
+}
+
+async function getProposalOnChain(proposalId: number): Promise<any | null> {
+	if (!SCHOLARSHIP_TREASURY_CONTRACT_ID) return null
+	try {
+		return await stellarRpcCircuitBreaker.call(async () => {
+			const { Contract, rpc, TransactionBuilder, Account, Networks, nativeToScVal, scValToNative } =
+				await import("@stellar/stellar-sdk")
+			const server = new rpc.Server(
+				STELLAR_NETWORK === "mainnet" ? "https://soroban-rpc.stellar.org" : "https://soroban-testnet.stellar.org",
+			)
+			const contract = new Contract(SCHOLARSHIP_TREASURY_CONTRACT_ID)
+			const dummy = new Account("GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBF3UKJQ2K5RQDD", "0")
+			const tx = new TransactionBuilder(dummy, {
+				fee: "100",
+				networkPassphrase: STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+			})
+				.addOperation(contract.call("get_proposal", nativeToScVal(proposalId, { type: "u32" })))
+				.setTimeout(30)
+				.build()
+			const sim = await server.simulateTransaction(tx)
+			if ((rpc.Api as any).isSimulationError(sim)) return null
+			const { scValToNative } = await import("@stellar/stellar-sdk")
+			return scValToNative(sim.result?.retval!)
+		})
+	} catch (err) {
+		log.error({ err, proposalId }, "getProposalOnChain failed")
+		return null
+	}
+}
+
 export const stellarContractService = {
 	callVerifyMilestone,
 	emitRejectionEvent,
@@ -1350,6 +1514,9 @@ export const stellarContractService = {
 	castVote,
 	cancelProposal,
 	reclaimInactiveEscrow,
+	createMilestoneEscrow,
+	releaseTranche,
+	getProposalOnChain,
 	getLearnTokenBalance,
 	getGovernanceTokenBalance,
 	getGovernanceVotingPower,

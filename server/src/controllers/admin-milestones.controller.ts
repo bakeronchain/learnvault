@@ -339,6 +339,29 @@ export async function approveMilestone(
 
 		void qualifyReferralIfFirstMilestone(report.scholar_address)
 
+		// If the scholar has an active escrow, release the next tranche
+		try {
+			const escrowRes = await pool.query(
+				`SELECT id, proposal_id, tranches, tranches_released FROM escrows WHERE scholar_address = $1 AND tranches_released < tranches ORDER BY created_at DESC LIMIT 1`,
+				[report.scholar_address],
+			)
+			if (escrowRes.rows.length > 0) {
+				const e = escrowRes.rows[0]
+				try {
+					const releaseRes = await stellarContractService.releaseTranche(Number(e.proposal_id), { requestId: req.requestId })
+					await pool.query(`UPDATE escrows SET tranches_released = tranches_released + 1 WHERE id = $1`, [e.id])
+					await pool.query(`INSERT INTO platform_events (event_type, data) VALUES ($1, $2::jsonb)`, [
+						"escrow_tranche_released",
+						JSON.stringify({ proposal_id: e.proposal_id, scholar_address: report.scholar_address, tx_hash: releaseRes.txHash }),
+					])
+				} catch (err) {
+					log.error({ err, proposal_id: e.proposal_id }, "failed to release escrow tranche (non-blocking)")
+				}
+			}
+		} catch (err) {
+			log.error({ err, reportId: id }, "escrow lookup/release failed (non-blocking)")
+		}
+
 		res.status(200).json({
 			data: {
 				reportId: id,

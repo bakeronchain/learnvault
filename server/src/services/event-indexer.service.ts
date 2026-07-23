@@ -226,6 +226,98 @@ async function persistIndexedEvent(
 		if (topic === "LearnToken_Mint" || topic === "ScholarNFT::minted") {
 			leaderboardEmitter.emitUpdate()
 		}
+
+		// When a scholarship proposal is executed on-chain, create the escrow on-chain and record it
+		if (topic === "ScholarshipTreasury::proposal_executed") {
+			try {
+				const value = (ev as any).value ?? {}
+				const rawProposalId = value?.proposal_id ?? value?.proposalId ?? value?.proposal ?? null
+				const passed = value?.passed === true || value?.passed === "true" || value?.passed === 1 || value?.passed === "1"
+				const rawAmount = value?.amount ?? value?.total_amount ?? null
+
+				if (rawProposalId != null && passed) {
+					const proposalId = Number(rawProposalId)
+					let scholarAddress: string | null = null
+					let totalAmountAtomic: bigint | null = null
+
+					// Try DB first: map on-chain proposal_id -> proposals.id
+					try {
+						const pRes = await pool.query(
+							"SELECT author_address, amount FROM proposals WHERE id = $1",
+							[proposalId],
+						)
+						if (pRes.rows.length > 0) {
+							scholarAddress = pRes.rows[0].author_address
+							if (rawAmount == null) {
+								const dbAmount = pRes.rows[0].amount
+								if (dbAmount != null) {
+									const amtNum = Number(dbAmount)
+									totalAmountAtomic = BigInt(Math.floor(amtNum * 10 ** 7))
+								}
+							}
+						}
+					} catch (dbErr) {
+						log.error({ err: dbErr, proposalId }, "DB lookup for proposal failed")
+					}
+
+					// If rawAmount provided in event, prefer it (assume atomic units)
+					if (rawAmount != null) {
+						try {
+							totalAmountAtomic = BigInt(String(rawAmount))
+						} catch (_) {
+							// ignore parse error
+						}
+					}
+
+					// Fallback to on-chain read for applicant/amount
+					if (!scholarAddress || totalAmountAtomic === null) {
+						try {
+							const { stellarContractService } = await import("./stellar-contract.service")
+							const onChain = await stellarContractService.getProposalOnChain(proposalId)
+							if (onChain) {
+								if (!scholarAddress && onChain.applicant) scholarAddress = String(onChain.applicant)
+								if (totalAmountAtomic === null && onChain.amount) {
+									try { totalAmountAtomic = BigInt(String(onChain.amount)) } catch (_) {}
+								}
+							}
+						} catch (chainErr) {
+							log.error({ err: chainErr, proposalId }, "on-chain proposal lookup failed")
+						}
+					}
+
+					if (scholarAddress && totalAmountAtomic !== null) {
+						try {
+							const { stellarContractService } = await import("./stellar-contract.service")
+							const txRes = await stellarContractService.createMilestoneEscrow({
+								proposalId,
+								scholarAddress,
+								totalAmount: totalAmountAtomic.toString(),
+								tranches: 3,
+							})
+
+							await pool.query(
+								`INSERT INTO escrows (proposal_id, scholar_address, total_amount, tranches, tranches_released, contract_escrow_id)
+								 VALUES ($1, $2, $3, $4, 0, $5)
+								 ON CONFLICT (proposal_id) DO NOTHING`,
+								[proposalId, scholarAddress, totalAmountAtomic.toString(), 3, proposalId],
+							)
+
+							await pool.query(
+								`INSERT INTO platform_events (event_type, data) VALUES ($1, $2::jsonb)`,
+								["escrow_created", JSON.stringify({ proposal_id: proposalId, scholar_address: scholarAddress, total_amount: totalAmountAtomic.toString(), tx_hash: txRes.txHash })],
+							)
+						} catch (err) {
+							log.error({ err, proposalId }, "failed to create record after create_escrow")
+						}
+					} else {
+						log.warn({ proposalId }, "insufficient data to create escrow: missing scholar or amount")
+					}
+				}
+			} catch (err) {
+				log.error({ err }, "proposal_executed handler failed")
+			}
+		}
+
 		return true
 	}
 

@@ -85,6 +85,8 @@ pub enum DataKey {
 #[contract]
 pub struct LearnToken;
 
+
+
 #[contractimpl]
 impl LearnToken {
     /// Initialise the contract. Can only be called once.
@@ -106,6 +108,7 @@ impl LearnToken {
         env.storage().instance().set(&DECIMALS_KEY, &7_u32);
 
         Self::extend_instance(&env);
+        env.storage().instance().set(&DataKey::TotalSupply, &0_i128);
     }
 
     // -----------------------------------------------------------------------

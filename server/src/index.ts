@@ -47,16 +47,18 @@ import { governanceRouter } from "./routes/governance.routes"
 import { healthRouter } from "./routes/health.routes"
 import { lrnRouter } from "./routes/lrn.routes"
 import { createMeRouter } from "./routes/me.routes"
-import { mentorshipRouter } from "./routes/mentorship.routes"
+import { mentorBookingRouter } from "./routes/mentor-booking.routes"
 import { createMilestoneAppealRouter } from "./routes/milestone-appeal.routes"
 import { moderationRouter } from "./routes/moderation.routes"
 import { notificationsRouter } from "./routes/notifications.routes"
 import { createPeerReviewRouter } from "./routes/peer-review.routes"
 import { qfRouter } from "./routes/qf.routes"
 import { createRecommendationsRouter } from "./routes/recommendations.routes"
+import { referralRouter } from "./routes/referral.routes"
 import { createReviewsRouter } from "./routes/reviews.routes"
 import { createScholarsRouter } from "./routes/scholars.routes"
 import { scholarshipsRouter } from "./routes/scholarships.routes"
+import { createStreaksRouter } from "./routes/streaks.routes"
 import { treasuryRouter } from "./routes/treasury.routes"
 import { createUploadRouter } from "./routes/upload.routes"
 import { createUserProfileRouter } from "./routes/user-profile.routes"
@@ -64,6 +66,7 @@ import { validatorRouter } from "./routes/validator.routes"
 import { verifyRouter } from "./routes/verify.routes"
 import { webhooksRouter } from "./routes/webhooks.routes"
 import { wikiRouter } from "./routes/wiki.routes"
+import { createBountyRouter } from "./routes/bounty.routes"
 import { createAuthService } from "./services/auth.service"
 import {
 	createJwtService,
@@ -272,7 +275,7 @@ app.use("/api", coursesRouter)
 app.use("/api", createEnrollmentsRouter(jwtService))
 app.use("/api", createScholarsRouter(jwtService))
 app.use("/api", scholarshipsRouter)
-app.use("/api", mentorshipRouter)
+app.use("/api", mentorBookingRouter)
 app.use("/api", createRecommendationsRouter(jwtService))
 app.use("/api", createForumRouter(jwtService))
 app.use("/api", createCredentialsRouter(jwtService))
@@ -294,10 +297,12 @@ app.use("/api", createMilestoneAppealRouter(jwtService))
 app.use("/api", moderationRouter)
 app.use("/api", createUserProfileRouter(jwtService))
 app.use("/api", createUploadRouter(jwtService))
+app.use("/api", referralRouter)
 app.use("/api", createReviewsRouter(jwtService))
 app.use("/api", notificationsRouter)
+app.use("/api", createStreaksRouter(jwtService))
 
-if (process.env.NODE_ENV !== "test") {
+	if (process.env.NODE_ENV !== "test") {
 	void import("./workers/escrow-timeout-worker").then(
 		({ startEscrowTimeoutWorker }) => {
 			void startEscrowTimeoutWorker().catch(console.error)
@@ -307,6 +312,12 @@ if (process.env.NODE_ENV !== "test") {
 	void import("./workers/deadline-reminder-worker").then(
 		({ startDeadlineReminderWorker }) => {
 			void startDeadlineReminderWorker().catch(console.error)
+		},
+	)
+
+	void import("./workers/bounty-expiry-worker").then(
+		({ startBountyExpiryWorker }) => {
+			void startBountyExpiryWorker().catch(console.error)
 		},
 	)
 }

@@ -9,6 +9,7 @@ import TestnetBanner from "./components/TestnetBanner"
 import { ToastProvider } from "./components/Toast/ToastProvider"
 import { WalletToastWatcher } from "./components/WalletToastWatcher"
 import { useLocalizeDocumentAttributes } from "./hooks/uselocalizeDocumentAttributes"
+import { captureReferralParam } from "./hooks/useReferralClaim"
 import { NetworkProvider } from "./providers/NetworkProvider"
 
 const Admin = lazy(() => import("./pages/Admin"))
@@ -29,6 +30,8 @@ const VerifyDetail = lazy(() => import("./pages/VerifyDetail"))
 const VerifyBadge = lazy(() => import("./pages/VerifyBadge"))
 const Leaderboard = lazy(() => import("./pages/Leaderboard"))
 const Learn = lazy(() => import("./pages/Learn"))
+const MentorDirectory = lazy(() => import("./pages/MentorDirectory"))
+const MySessions = lazy(() => import("./pages/MySessions"))
 const LessonVersionDiff = lazy(() => import("./pages/LessonVersionDiff"))
 const LessonView = lazy(() => import("./pages/LessonView"))
 const NotFound = lazy(() => import("./pages/NotFound"))
@@ -43,6 +46,9 @@ const Tracks = lazy(() => import("./pages/Tracks"))
 const Treasury = lazy(() => import("./pages/Treasury"))
 const Wiki = lazy(() => import("./pages/Wiki"))
 const WikiPage = lazy(() => import("./pages/WikiPage"))
+const BountyBoard = lazy(() => import("./pages/BountyBoard"))
+const BountyDetail = lazy(() => import("./pages/BountyDetail"))
+const CreateBounty = lazy(() => import("./pages/CreateBounty"))
 
 const renderRoute = (element: ReactNode) => (
 	<ErrorBoundary>
@@ -52,6 +58,7 @@ const renderRoute = (element: ReactNode) => (
 
 function App() {
 	useLocalizeDocumentAttributes()
+	captureReferralParam()
 
 	return (
 		<ToastProvider>
@@ -78,6 +85,8 @@ function App() {
 					<Route path="/dao/propose" element={renderRoute(<DaoPropose />)} />
 					<Route path="/leaderboard" element={renderRoute(<Leaderboard />)} />
 					<Route path="/community" element={renderRoute(<Community />)} />
+					<Route path="/mentors" element={renderRoute(<MentorDirectory />)} />
+					<Route path="/my-sessions" element={renderRoute(<MySessions />)} />
 					<Route path="/history" element={renderRoute(<History />)} />
 					<Route path="/profile" element={renderRoute(<Profile />)} />
 					<Route
@@ -121,6 +130,9 @@ function App() {
 					<Route path="/dashboard" element={renderRoute(<Dashboard />)} />
 					<Route path="/debug" element={renderRoute(<Debug />)} />
 					<Route path="/debug/:contractName" element={renderRoute(<Debug />)} />
+					<Route path="/bounties" element={renderRoute(<BountyBoard />)} />
+					<Route path="/bounties/create" element={renderRoute(<CreateBounty />)} />
+					<Route path="/bounties/:id" element={renderRoute(<BountyDetail />)} />
 					<Route path="*" element={renderRoute(<NotFound />)} />
 				</Route>
 			</Routes>

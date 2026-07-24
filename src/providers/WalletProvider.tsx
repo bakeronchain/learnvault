@@ -9,6 +9,7 @@ import {
 } from "react"
 import { MobileSigningModal } from "../components/MobileSigningModal"
 import { useIsMobile } from "../hooks/useIsMobile"
+import { useReferralClaim } from "../hooks/useReferralClaim"
 import { logoutSession } from "../lib/auth"
 import storage from "../util/storage"
 import { type MappedBalances } from "../util/wallet"
@@ -74,6 +75,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 	const [network, setNetwork] = useState<string>()
 	const [networkPassphrase, setNetworkPassphrase] = useState<string>()
 	const [isReconnecting, setIsReconnecting] = useState(true)
+	useReferralClaim(address)
 	const [isPending, startTransition] = useTransition()
 	const popupLock = useRef(false)
 	const isMobile = useIsMobile()

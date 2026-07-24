@@ -1,5 +1,6 @@
 import { pool } from "../db/index"
 import { milestoneStore } from "../db/milestone-store"
+import { invalidateApiResponseCacheType } from "../lib/api-response-cache"
 import { pinJsonToIPFS } from "./pinata.service"
 import {
 	stellarContractService,
@@ -65,6 +66,12 @@ async function mintCertificateIfComplete(
 			 VALUES ($1, $2, $3, $4)`,
 			[mintResult.tokenId, scholarAddress, courseId, tokenUri],
 		)
+
+		// New completion invalidates cached recommendations so the learner's
+		// next fetch reflects their updated history.
+		await invalidateApiResponseCacheType("recommendations").catch(() => {
+			/* Non-fatal */
+		})
 	}
 
 	return {

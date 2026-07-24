@@ -52,6 +52,7 @@ import { createMilestoneAppealRouter } from "./routes/milestone-appeal.routes"
 import { moderationRouter } from "./routes/moderation.routes"
 import { notificationsRouter } from "./routes/notifications.routes"
 import { createPeerReviewRouter } from "./routes/peer-review.routes"
+import { qfRouter } from "./routes/qf.routes"
 import { createRecommendationsRouter } from "./routes/recommendations.routes"
 import { referralRouter } from "./routes/referral.routes"
 import { createReviewsRouter } from "./routes/reviews.routes"
@@ -285,6 +286,7 @@ app.use("/api/community", communityRouter)
 app.use("/api", antiSybilRouter)
 app.use("/api", createCommentsRouter(jwtService))
 app.use("/api", createPeerReviewRouter(jwtService))
+app.use("/api", qfRouter)
 app.use("/api", governanceRouter)
 app.use("/api", lrnRouter)
 app.use("/api", treasuryRouter)

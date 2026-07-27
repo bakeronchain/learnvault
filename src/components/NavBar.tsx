@@ -40,6 +40,8 @@ export default function NavBar() {
 		{ to: "/peer-review", label: "Peer review" },
 		{ to: "/dao", label: t("nav.dao") },
 		{ to: "/community", label: "Community" },
+		{ to: "/mentors", label: "Mentors" },
+		{ to: "/my-sessions", label: "My Sessions" },
 		{ to: "/leaderboard", label: t("nav.leaderboard") },
 		{ to: "/impact", label: "Impact" },
 		{ to: "/history", label: "Activity" },

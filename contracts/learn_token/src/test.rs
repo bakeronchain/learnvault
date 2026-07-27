@@ -40,9 +40,7 @@ proptest! {
     }
 } // close proptest!
 
-extern crate std;
-
-use soroban_sdk::{IntoVal, testutils::Events as _};
+use soroban_sdk::{testutils::Events as _, IntoVal, String};
 
 use crate::{DataKey, LRNError, LearnToken, LearnTokenClient};
 
@@ -212,7 +210,7 @@ fn total_supply_starts_at_zero() {
 
 // --- fuzz tests ---
 
-use proptest::prelude::*;
+
 
 proptest! {
     #[test]

@@ -12,6 +12,7 @@ import ProfileEditForm, {
 	type ProfileFormData,
 } from "../components/ProfileEditForm"
 import { ProfileLinkedWallets } from "../components/ProfileLinkedWallets"
+import { ReferralCard } from "../components/ReferralCard"
 import { ReputationBadge } from "../components/ReputationBadge"
 import {
 	NoCredentialsEmptyState,
@@ -419,6 +420,7 @@ const Profile: React.FC = () => {
 				</section>
 			)}
 
+			{walletAddress && !paramAddress && <ReferralCard />}
 			<ProfileLinkedWallets />
 
 			<section>

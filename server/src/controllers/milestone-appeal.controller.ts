@@ -8,6 +8,7 @@ import { type AuthRequest } from "../middleware/auth.middleware"
 import { createEmailService } from "../services/email.service"
 import { deliverNotificationChannels } from "../services/notification-delivery.service"
 import { stellarContractService } from "../services/stellar-contract.service"
+import { recordMilestoneActivity } from "../services/streak.service"
 
 const log = logger.child({ module: "milestone-appeal" })
 
@@ -220,6 +221,14 @@ export async function resolveAppeal(
 				}
 			}
 			await milestoneStore.updateReportStatus(id, "approved")
+			try {
+				await recordMilestoneActivity(report.scholar_address)
+			} catch (streakErr) {
+				log.error(
+					{ err: streakErr },
+					"streak activity update failed (non-blocking)",
+				)
+			}
 		} else {
 			// Final rejection: emit on-chain rejection event (non-blocking)
 			if (hasStellarMilestoneCredentials()) {

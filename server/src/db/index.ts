@@ -65,13 +65,24 @@ export const pool = activePool
 /**
  * Verifies the database connection on startup.
  * Schema is managed exclusively via migrations (`npm run migrate`).
- * No DDL is executed here.
+ * Enrollment table DDL runs on startup.
  */
 export const initDb = async () => {
 	try {
 		if (activePool instanceof Pool) {
 			const client = await activePool.connect()
 			await client.query("SELECT 1")
+
+			await client.query(
+				`CREATE TABLE IF NOT EXISTS enrollments (
+				id SERIAL PRIMARY KEY,
+				learner_address TEXT NOT NULL,
+				course_id TEXT NOT NULL REFERENCES courses(id),
+				tx_hash TEXT,
+				enrolled_at TIMESTAMPTZ DEFAULT NOW(),
+				UNIQUE(learner_address, course_id)
+				);`,
+			)
 			client.release()
 			log.info("Postgres connection verified")
 			await logPgStatStatementsSnapshot()

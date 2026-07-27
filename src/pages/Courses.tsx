@@ -5,6 +5,7 @@ import BookmarkButton from "../components/BookmarkButton"
 import CourseCategoryBadge from "../components/CourseCategoryBadge"
 import { CourseFilter } from "../components/CourseFilter"
 import Pagination from "../components/Pagination"
+import RecommendationsCarousel from "../components/RecommendationsCarousel"
 import { CourseCardSkeleton } from "../components/skeletons/CourseCardSkeleton"
 import SponsorLogosForTrack from "../components/SponsorLogosForTrack"
 import { EmptyState } from "../components/states/emptyState"
@@ -157,6 +158,10 @@ const Courses: React.FC = () => {
 					hands-on progress with a clear first milestone.
 				</p>
 			</header>
+
+			<div className="mb-12">
+				<RecommendationsCarousel />
+			</div>
 
 			<CourseFilter
 				search={searchInput}

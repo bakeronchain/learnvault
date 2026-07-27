@@ -8,20 +8,28 @@ import Redis from "ioredis"
  * - /api/leaderboard: 300s
  * - /api/treasury/stats: 60s
  * - /api/courses: 600s
+ * - /api/recommendations/:address: 60s
  *
  * Cache keys are namespaced per endpoint type, and include the full URL
- * (path + query) to ensure distinct responses are cached separately.
+ * (path + query) to ensure distinct responses are cached separately. Since
+ * the learner address lives in the URL path, recommendations are naturally
+ * cached per learner.
  *
  * When `REDIS_URL` is not configured, this falls back to an in-process memory
  * cache (useful for local dev + unit tests).
  */
 
-export type ApiCacheType = "leaderboard" | "treasury_stats" | "courses"
+export type ApiCacheType =
+	| "leaderboard"
+	| "treasury_stats"
+	| "courses"
+	| "recommendations"
 
 export const API_RESPONSE_CACHE_TTLS: Record<ApiCacheType, number> = {
 	leaderboard: 300,
 	treasury_stats: 60,
 	courses: 600,
+	recommendations: 60,
 }
 
 const PREFIX = "learnvault:api-cache:"

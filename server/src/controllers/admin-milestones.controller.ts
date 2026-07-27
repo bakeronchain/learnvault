@@ -1,5 +1,6 @@
 import { type Request, type Response } from "express"
 import sanitizeHtml from "sanitize-html"
+import { pool } from "../db"
 import { milestoneStore, type MilestoneReport } from "../db/milestone-store"
 import { createNotification } from "../db/notifications-store"
 import {
@@ -16,8 +17,10 @@ import {
 	GithubOracleError,
 	verifyMilestoneReportEvidence,
 } from "../services/github-oracle.service"
+import { lrnToAtomic, mintLrn } from "../services/learn-token.service"
 import { deliverNotificationChannels } from "../services/notification-delivery.service"
 import { stellarContractService } from "../services/stellar-contract.service"
+import { recordMilestoneActivity } from "../services/streak.service"
 import { templates, toPlainText } from "../templates/email-templates"
 
 const log = logger.child({ module: "admin-milestones" })
@@ -254,6 +257,14 @@ export async function approveMilestone(
 		} catch (trackingErr) {
 			console.error("[admin] escrow activity update failed:", trackingErr)
 		}
+		try {
+			await recordMilestoneActivity(report.scholar_address)
+		} catch (streakErr) {
+			log.error(
+				{ err: streakErr },
+				"streak activity update failed (non-blocking)",
+			)
+		}
 		const auditEntry = await milestoneStore.addAuditEntry({
 			report_id: id,
 			validator_address: validatorAddress,
@@ -325,6 +336,8 @@ export async function approveMilestone(
 		} catch (mintErr) {
 			log.error({ err: mintErr }, "Certificate mint failed (non-blocking)")
 		}
+
+		void qualifyReferralIfFirstMilestone(report.scholar_address)
 
 		res.status(200).json({
 			data: {
@@ -574,6 +587,14 @@ export async function batchApproveMilestones(
 				} catch (trackingErr) {
 					console.error("[admin] escrow activity update failed:", trackingErr)
 				}
+				try {
+					await recordMilestoneActivity(r.scholar_address)
+				} catch (streakErr) {
+					console.error(
+						"[admin] streak activity update failed (non-blocking):",
+						streakErr,
+					)
+				}
 				await milestoneStore.addAuditEntry({
 					report_id: id,
 					validator_address: validatorAddress,
@@ -783,5 +804,83 @@ export async function batchRejectMilestones(
 	} catch (err) {
 		console.error("[admin] batchRejectMilestones error:", err)
 		res.status(500).json({ error: "Failed to batch reject milestones" })
+	}
+}
+
+async function rewardLrnBonus(
+	referralId: number,
+	referrerAddr: string,
+	scholarAddress: string,
+): Promise<void> {
+	const amount = lrnToAtomic(100)
+	try {
+		await mintLrn(referrerAddr, amount)
+		log.info(
+			{ referrerAddr, amount: amount.toString() },
+			"LRN minted for referrer",
+		)
+	} catch (err) {
+		log.error({ err, referrerAddr }, "Failed to mint LRN for referrer")
+		return
+	}
+
+	try {
+		await mintLrn(scholarAddress, amount)
+		log.info(
+			{ scholarAddress, amount: amount.toString() },
+			"LRN minted for referred learner",
+		)
+	} catch (err) {
+		log.error(
+			{ err, scholarAddress },
+			"Failed to mint LRN for referred learner",
+		)
+		return
+	}
+
+	await pool.query(
+		`UPDATE referrals SET status = 'rewarded'
+		 WHERE id = $1 AND status = 'qualified'`,
+		[referralId],
+	)
+}
+
+async function qualifyReferralIfFirstMilestone(
+	scholarAddress: string,
+): Promise<void> {
+	try {
+		const ref = await pool.query(
+			`SELECT id, referrer_addr FROM referrals
+			 WHERE referred_addr = $1 AND status = 'pending'
+			 LIMIT 1`,
+			[scholarAddress],
+		)
+		if (ref.rows.length === 0) return
+
+		const countResult = await pool.query(
+			`SELECT COUNT(*)::int AS count
+			 FROM milestone_reports
+			 WHERE scholar_address = $1 AND status = 'approved'`,
+			[scholarAddress],
+		)
+		if (countResult.rows[0].count !== 1) return
+
+		const referralId = ref.rows[0].id as number
+		const referrerAddr = ref.rows[0].referrer_addr as string
+
+		await pool.query(
+			`UPDATE referrals SET status = 'qualified', qualified_at = NOW()
+			 WHERE id = $1 AND status = 'pending'`,
+			[referralId],
+		)
+
+		log.info(
+			{ scholarAddress, referralId },
+			"Referral qualified after first milestone",
+		)
+
+		void rewardLrnBonus(referralId, referrerAddr, scholarAddress)
+	} catch (err) {
+		log.error({ err, scholarAddress }, "Failed to qualify referral")
 	}
 }

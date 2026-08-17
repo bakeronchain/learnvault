@@ -17,7 +17,7 @@ doctest = false
 [dependencies]
 learnvault-shared = { workspace = true }
 soroban-sdk = { workspace = true }
-stellar-registry = "0.0.4"
+stellar-registry = "0.1.0"
 
 [dev-dependencies]
 learnvault-shared = { workspace = true, features = ["testutils"] }

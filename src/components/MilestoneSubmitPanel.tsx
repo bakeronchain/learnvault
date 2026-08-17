@@ -2,6 +2,7 @@ import { Button } from "@stellar/design-system"
 import React, { useEffect, useRef, useState } from "react"
 import { useCourse } from "../hooks/useCourse"
 import { useNotification } from "../hooks/useNotification"
+import { useOnlineStatus } from "../hooks/useOnlineStatus"
 const API_BASE =
 	(import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "/api"
 
@@ -23,6 +24,7 @@ const MilestoneSubmitPanel: React.FC<MilestoneSubmitPanelProps> = ({
 		getEscrowTimeout,
 	} = useCourse()
 	const { addNotification } = useNotification()
+	const { isOnline } = useOnlineStatus()
 	const [githubUrl, setGithubUrl] = useState("")
 	const [description, setDescription] = useState("")
 	const hasWarnedRef = useRef(false)
@@ -358,12 +360,17 @@ const MilestoneSubmitPanel: React.FC<MilestoneSubmitPanelProps> = ({
 				</div>
 
 				<div className="pt-2">
+					{!isOnline && (
+						<p className="text-xs text-amber-300/80 mb-2 text-center">
+							Requires internet connection for wallet signing
+						</p>
+					)}
 					<Button
 						type="submit"
 						variant="primary"
 						size="md"
 						className="w-full py-6 rounded-2xl font-bold text-lg tracking-wide hover:shadow-[0_0_20px_rgba(0,195,255,0.3)] transition-all duration-300"
-						disabled={isCompletingMilestone || (!githubUrl && !description)}
+						disabled={isCompletingMilestone || !isOnline || (!githubUrl && !description)}
 					>
 						{isCompletingMilestone ? (
 							<span className="flex items-center gap-2">

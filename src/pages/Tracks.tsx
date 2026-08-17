@@ -1,7 +1,9 @@
 import React, { useState } from "react"
 import { Helmet } from "react-helmet"
 import { Link } from "react-router-dom"
+import { DownloadTrackButton } from "../components/DownloadTrackButton"
 import { useCourses, useEnrolledCourses } from "../hooks/useCourses"
+import { useOfflineDownload } from "../hooks/useOfflineQueue"
 import { useWallet } from "../hooks/useWallet"
 import { type CourseSummary } from "../types/courses"
 
@@ -256,6 +258,12 @@ const Tracks: React.FC = () => {
 	const { enrolledCourses, isLoading: enrolledLoading } = useEnrolledCourses()
 	const { address } = useWallet()
 	const [selectedNode, setSelectedNode] = useState<SkillNode | null>(null)
+	const {
+		progress: downloadProgress,
+		isDownloaded,
+		downloadTrack,
+		deleteTrack,
+	} = useOfflineDownload()
 
 	const enrolledMap = new Map(
 		enrolledCourses.map((ec) => [
@@ -352,11 +360,12 @@ const Tracks: React.FC = () => {
 					<div className="flex-1 min-w-0">
 						<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
 							{tracks.map((track) => (
-								<div
-									key={track.trackKey}
-									className="glass-card p-6 rounded-3xl border border-white/5"
-								>
-									<div className="flex items-center gap-2 mb-5">
+							<div
+								key={track.trackKey}
+								className="glass-card p-6 rounded-3xl border border-white/5"
+							>
+								<div className="flex items-center justify-between mb-5">
+									<div className="flex items-center gap-2">
 										<h2 className="text-base font-black text-white">
 											{track.trackLabel}
 										</h2>
@@ -364,6 +373,16 @@ const Tracks: React.FC = () => {
 											{track.nodes.length} courses
 										</span>
 									</div>
+									<DownloadTrackButton
+										trackSlug={track.trackKey}
+										trackTitle={track.trackLabel}
+										courseSlugs={track.nodes.map((n) => n.course.slug)}
+										isDownloaded={isDownloaded(track.trackKey)}
+										progress={downloadProgress}
+										onDownload={downloadTrack}
+										onDelete={deleteTrack}
+									/>
+								</div>
 
 									<div className="relative space-y-2">
 										{track.nodes.map((node, idx) => (

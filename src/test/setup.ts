@@ -1,3 +1,4 @@
+import "fake-indexeddb/auto"
 import "@testing-library/jest-dom/vitest"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, type RenderOptions } from "@testing-library/react"
@@ -25,6 +26,11 @@ vi.mock("react", async () => {
 // ---------------------------------------------------------------------------
 // Global Mocks
 // ---------------------------------------------------------------------------
+
+// Mock virtual:pwa-register (vite-plugin-pwa virtual module)
+vi.mock("virtual:pwa-register", () => ({
+	registerSW: vi.fn(() => vi.fn()),
+}))
 
 // Mock @creit.tech/stellar-wallets-kit
 vi.mock("@creit.tech/stellar-wallets-kit", () => mockStellarWalletsKit)

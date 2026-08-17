@@ -1,7 +1,9 @@
 import { Button, Card, Text } from "@stellar/design-system"
 import { Link } from "react-router-dom"
+import { DownloadedTracks } from "../components/DownloadedTracks"
 import { MilestoneTracker } from "../components/MilestoneTracker"
 import { useCourse } from "../hooks/useCourse"
+import { useOfflineDownload } from "../hooks/useOfflineQueue"
 
 const courseId = "stellar-basics"
 
@@ -14,6 +16,7 @@ const milestones = [
 export default function Learn() {
 	const { enroll, enrolledCourses, getCourseProgress, isCompletingMilestone } =
 		useCourse()
+	const { downloadedTracks, deleteTrack } = useOfflineDownload()
 
 	const isEnrolled = enrolledCourses.some((course) => course.id === courseId)
 	const progress = getCourseProgress(courseId)
@@ -27,6 +30,8 @@ export default function Learn() {
 			<Text as="h1" size="lg">
 				Learn
 			</Text>
+
+			<DownloadedTracks tracks={downloadedTracks} onDelete={deleteTrack} />
 
 			<Card>
 				<Text as="h2" size="md">

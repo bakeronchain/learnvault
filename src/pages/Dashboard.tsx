@@ -1,15 +1,18 @@
 import React from "react"
 import { Link } from "react-router-dom"
+import { DownloadedTracks } from "../components/DownloadedTracks"
 import RecommendationsCarousel from "../components/RecommendationsCarousel"
-import StreakWidget from "../components/StreakWidget"
 import {
 	DashboardStatsSkeleton,
 	NoCoursesEmptyState,
 } from "../components/SkeletonLoader"
+import StreakWidget from "../components/StreakWidget"
 import { useEnrolledCourses } from "../hooks/useCourses"
+import { useOfflineDownload } from "../hooks/useOfflineQueue"
 
 export default function Dashboard() {
 	const { enrolledCourses, isLoading } = useEnrolledCourses()
+	const { downloadedTracks, deleteTrack } = useOfflineDownload()
 
 	// A course is "in progress" when it has at least one milestone remaining,
 	// or when the total is unknown (totalCount === 0).
@@ -26,6 +29,8 @@ export default function Dashboard() {
 			<div className="max-w-5xl">
 				<StreakWidget />
 			</div>
+
+			<DownloadedTracks tracks={downloadedTracks} onDelete={deleteTrack} />
 
 			<section aria-labelledby="courses-in-progress-heading">
 				<h2

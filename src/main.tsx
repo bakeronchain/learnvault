@@ -7,6 +7,7 @@ import {
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { BrowserRouter } from "react-router-dom"
+import { registerSW } from "virtual:pwa-register"
 import "@stellar/design-system/build/styles.min.css"
 import "./index.css"
 import App from "./App.tsx"
@@ -15,6 +16,18 @@ import { NotificationProvider } from "./providers/NotificationProvider.tsx"
 import { WalletProvider } from "./providers/WalletProvider.tsx"
 import "./i18n"
 import { parseError } from "./util/error"
+
+// Register the service worker for offline support
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _updateSW = registerSW({
+	onNeedRefresh() {
+		// SW has new content — the AppUpdatePrompt component handles the UI
+		window.dispatchEvent(new CustomEvent("sw-update-available"))
+	},
+	onOfflineReady() {
+		window.dispatchEvent(new CustomEvent("sw-offline-ready"))
+	},
+})
 
 // Initialize Sentry for error monitoring
 initSentry({

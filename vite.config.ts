@@ -2,10 +2,58 @@ import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 import { nodePolyfills } from "vite-plugin-node-polyfills"
+import { VitePWA } from "vite-plugin-pwa"
 import wasm from "vite-plugin-wasm"
 // https://vite.dev/config/
 export default defineConfig({
-	plugins: [react(), tailwindcss(), nodePolyfills(), wasm()],
+	plugins: [
+		react(),
+		tailwindcss(),
+		nodePolyfills(),
+		wasm(),
+		VitePWA({
+			strategies: "injectManifest",
+			srcDir: "src",
+			filename: "sw.ts",
+			registerType: "autoUpdate",
+			devOptions: { enabled: true },
+			workbox: {
+				globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+				navigateFallback: "/index.html",
+				navigateFallbackDenylist: [/^\/api\//],
+			},
+			injectManifest: {
+				maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+				globIgnores: [
+					"**/contract-explorer-*.js",
+					"**/stellar_xdr_json_bg-*.wasm",
+				],
+			},
+			manifest: {
+				name: "LearnVault",
+				short_name: "LearnVault",
+				description:
+					"Decentralized education on Stellar — learn, earn, and prove your skills on-chain.",
+				theme_color: "#070910",
+				background_color: "#070910",
+				display: "standalone",
+				start_url: "/",
+				icons: [
+					{
+						src: "/assets/brand/logos/learnvault-icon-light.svg",
+						sizes: "any",
+						type: "image/svg+xml",
+						purpose: "any maskable",
+					},
+					{
+						src: "/favicon.ico",
+						sizes: "48x48",
+						type: "image/x-icon",
+					},
+				],
+			},
+		}),
+	],
 	optimizeDeps: {
 		esbuildOptions: {
 			loader: {

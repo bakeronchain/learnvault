@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { enqueueOutboxItem } from "../lib/offline-db"
 
 const storageKey = (courseSlug: string) => `learnvault:progress:${courseSlug}`
 
@@ -15,7 +16,16 @@ async function syncToServer(courseSlug: string, lessonIds: number[]) {
 			body: JSON.stringify({ courseSlug, lessonIds }),
 		})
 	} catch {
-		// Offline or endpoint unavailable — localStorage remains source of truth
+		// Offline or endpoint unavailable — enqueue for later sync
+		void enqueueOutboxItem({
+			id: crypto.randomUUID(),
+			type: "lesson_read",
+			payload: { courseSlug, lessonIds },
+			courseId: courseSlug,
+			createdAt: new Date().toISOString(),
+			status: "pending",
+			attempts: 0,
+		})
 	}
 }
 
@@ -31,12 +41,15 @@ function loadFromStorage(courseSlug: string): number[] {
 /**
  * Tracks which lessons the user has read (scrolled to the bottom of).
  * Persists in localStorage immediately and syncs to the server best-effort,
- * retrying when the browser comes back online.
+ * retrying when the browser comes back online. When offline, actions are
+ * queued to the outbox for later sync.
  */
 export function useLessonProgress(courseSlug: string | undefined) {
 	const [readLessonIds, setReadLessonIds] = useState<number[]>(() =>
 		courseSlug ? loadFromStorage(courseSlug) : [],
 	)
+	const readLessonIdsRef = useRef(readLessonIds)
+	readLessonIdsRef.current = readLessonIds
 
 	// Re-hydrate when the course changes
 	useEffect(() => {
@@ -69,10 +82,12 @@ export function useLessonProgress(courseSlug: string | undefined) {
 	// Retry server sync whenever the browser reconnects
 	useEffect(() => {
 		if (!courseSlug) return
-		const handleOnline = () => void syncToServer(courseSlug, readLessonIds)
+		const handleOnline = () => {
+			void syncToServer(courseSlug, readLessonIdsRef.current)
+		}
 		window.addEventListener("online", handleOnline)
 		return () => window.removeEventListener("online", handleOnline)
-	}, [courseSlug, readLessonIds])
+	}, [courseSlug])
 
 	return { readLessonIds, markLessonRead, isLessonRead }
 }

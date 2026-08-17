@@ -1,9 +1,11 @@
 import { lazy, Suspense, type ReactNode } from "react"
 import { Outlet, Route, Routes } from "react-router-dom"
+import { AppUpdatePrompt } from "./components/AppUpdatePrompt"
 import ErrorBoundary from "./components/ErrorBoundary"
 import Footer from "./components/Footer"
 import NavBar from "./components/NavBar"
 import NetworkPreconnect from "./components/NetworkPreconnect"
+import { OfflineIndicator } from "./components/OfflineIndicator"
 import { OnboardingTour } from "./components/OnboardingTour"
 import TestnetBanner from "./components/TestnetBanner"
 import { ToastProvider } from "./components/Toast/ToastProvider"
@@ -167,6 +169,8 @@ const AppLayout = () => (
 			<Outlet />
 		</main>
 		<Footer />
+		<OfflineIndicator />
+		<AppUpdatePrompt />
 	</div>
 )
 

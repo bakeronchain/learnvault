@@ -1,6 +1,6 @@
 import { Button } from "@stellar/design-system"
 import React, { useEffect, useMemo, useState } from "react"
-import { Link, useParams } from "react-router-dom"
+import { useParams } from "react-router-dom"
 import CourseReviewsPanel from "../components/CourseReviewsPanel"
 import { CourseForum } from "../components/forum/CourseForum"
 import LessonContent from "../components/LessonContent"
@@ -11,6 +11,7 @@ import { LessonListSkeleton } from "../components/skeletons/LessonListSkeleton"
 import { useCourse } from "../hooks/useCourse"
 import { useCourseDetail } from "../hooks/useCourses"
 import { useLessonProgress } from "../hooks/useLessonProgress"
+import { useOnlineStatus } from "../hooks/useOnlineStatus"
 import { useWallet } from "../hooks/useWallet"
 import {
 	completeLessonSession,
@@ -39,12 +40,12 @@ const LessonView: React.FC = () => {
 	const lessonId = parseInt(lessonIdParam || "0", 10)
 
 	const { address } = useWallet()
+	const { isOnline } = useOnlineStatus()
 	const {
 		getCourseProgress,
 		completeMilestone,
 		isCompletingMilestone,
 		enrolledCourses,
-		enroll,
 	} = useCourse()
 	const {
 		course,
@@ -164,15 +165,17 @@ const LessonView: React.FC = () => {
 						Wallet Required
 					</h2>
 					<p className="text-white/60 mb-8 text-lg">
-						Please connect your wallet to access track content and track your
-						learning milestones on-chain.
+						{!isOnline
+							? "You're offline. Connect to the internet to connect your wallet."
+							: "Please connect your wallet to access track content and track your learning milestones on-chain."}
 					</p>
 					<Button
 						variant="primary"
 						size="md"
 						onClick={() => void connectWallet()}
+						disabled={!isOnline}
 					>
-						Connect Wallet
+						{!isOnline ? "Offline — Connect to Internet" : "Connect Wallet"}
 					</Button>
 				</div>
 			</div>
@@ -424,14 +427,25 @@ const LessonView: React.FC = () => {
 						/>
 					)}
 
-					{lesson?.isMilestone && !isLoadingCourse && !isLoadingContent && (
-						<div className="mt-12 animate-in fade-in slide-in-from-top-4 duration-1000">
+				{lesson?.isMilestone && !isLoadingCourse && !isLoadingContent && (
+					<div className="mt-12 animate-in fade-in slide-in-from-top-4 duration-1000">
+						{!isOnline ? (
+							<div className="p-6 rounded-2xl border border-amber-500/30 bg-amber-500/5 text-center">
+								<p className="text-sm text-amber-200 font-bold">
+									Milestone submission requires an internet connection.
+								</p>
+								<p className="text-xs text-amber-200/60 mt-1">
+									Your progress will be saved locally and synced when you reconnect.
+								</p>
+							</div>
+						) : (
 							<MilestoneSubmitPanel
 								courseId={course.slug}
 								milestoneId={lesson.id}
 							/>
-						</div>
-					)}
+						)}
+					</div>
+				)}
 					{course && currentTab !== "forum" && (
 						<CourseReviewsPanel
 							courseId={course.slug}

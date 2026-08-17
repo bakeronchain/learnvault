@@ -1,0 +1,23 @@
+{
+  "name": "LearnVault",
+  "short_name": "LearnVault",
+  "description": "Decentralized education on Stellar — learn, earn, and prove your skills on-chain.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070910",
+  "theme_color": "#070910",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/assets/brand/logos/learnvault-icon-light.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}

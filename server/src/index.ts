@@ -36,6 +36,7 @@ import { adminProviderKeysRouter } from "./routes/admin-provider-keys.routes"
 import { adminRouter } from "./routes/admin.routes"
 import { antiSybilRouter } from "./routes/anti-sybil.routes"
 import { createAuthRouter } from "./routes/auth.routes"
+import { createBountyRouter } from "./routes/bounty.routes"
 import { createCommentsRouter } from "./routes/comments.routes"
 import { communityRouter } from "./routes/community.routes"
 import { coursesRouter } from "./routes/courses.routes"
@@ -58,6 +59,8 @@ import { referralRouter } from "./routes/referral.routes"
 import { createReviewsRouter } from "./routes/reviews.routes"
 import { createScholarsRouter } from "./routes/scholars.routes"
 import { scholarshipsRouter } from "./routes/scholarships.routes"
+import { createSep10Router } from "./routes/sep10.routes"
+import { stellarTomlRouter } from "./routes/stellar-toml.routes"
 import { createStreaksRouter } from "./routes/streaks.routes"
 import { treasuryRouter } from "./routes/treasury.routes"
 import { createUploadRouter } from "./routes/upload.routes"
@@ -66,12 +69,12 @@ import { validatorRouter } from "./routes/validator.routes"
 import { verifyRouter } from "./routes/verify.routes"
 import { webhooksRouter } from "./routes/webhooks.routes"
 import { wikiRouter } from "./routes/wiki.routes"
-import { createBountyRouter } from "./routes/bounty.routes"
 import { createAuthService } from "./services/auth.service"
 import {
 	createJwtService,
 	generateEphemeralDevJwtKeys,
 } from "./services/jwt.service"
+import { createSep10Service } from "./services/sep10.service"
 
 const envSchema = z.object({
 	PORT: z.coerce.number().int().positive().default(4000),
@@ -81,6 +84,7 @@ const envSchema = z.object({
 	REDIS_URL: z.string().optional(),
 	JWT_PRIVATE_KEY: z.string().optional(),
 	JWT_PUBLIC_KEY: z.string().optional(),
+	SEP10_SIGNING_SECRET: z.string().optional(),
 	// When "true" the CSP is sent as Content-Security-Policy-Report-Only so
 	// violations are logged but not blocked. Enabled automatically in staging
 	// (NODE_ENV=staging) and can be forced with CSP_REPORT_ONLY=true.
@@ -128,6 +132,22 @@ const nonceStore = createNonceStore(env.REDIS_URL)
 const tokenStore = createTokenStore(env.REDIS_URL)
 const jwtService = createJwtService(jwtPrivateKey, jwtPublicKey, tokenStore)
 const authService = createAuthService(nonceStore, jwtService)
+
+// SEP-10 signing key: generate ephemeral key in dev if not provided
+if (!env.SEP10_SIGNING_SECRET) {
+	if (isProduction) {
+		throw new Error(
+			"SEP10_SIGNING_SECRET environment variable is required in production",
+		)
+	}
+	logger.warn("SEP10_SIGNING_SECRET not found - generating ephemeral key")
+	const { Keypair } =
+		require("@stellar/stellar-sdk") as typeof import("@stellar/stellar-sdk")
+	const ephemeralKeypair = Keypair.random()
+	process.env.SEP10_SIGNING_SECRET = ephemeralKeypair.secret()
+}
+
+const sep10Service = createSep10Service(jwtService)
 
 const app = express()
 
@@ -270,6 +290,8 @@ void maybeMountOpenApiValidator(app)
 
 app.use("/api", healthRouter)
 app.use("/api/auth", createAuthRouter(authService, jwtService))
+app.use("/api/auth/sep10", createSep10Router(sep10Service))
+app.use("/", stellarTomlRouter)
 app.use("/api", createMeRouter(jwtService))
 app.use("/api", coursesRouter)
 app.use("/api", createEnrollmentsRouter(jwtService))
@@ -302,7 +324,7 @@ app.use("/api", createReviewsRouter(jwtService))
 app.use("/api", notificationsRouter)
 app.use("/api", createStreaksRouter(jwtService))
 
-	if (process.env.NODE_ENV !== "test") {
+if (process.env.NODE_ENV !== "test") {
 	void import("./workers/escrow-timeout-worker").then(
 		({ startEscrowTimeoutWorker }) => {
 			void startEscrowTimeoutWorker().catch(console.error)

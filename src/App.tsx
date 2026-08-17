@@ -21,6 +21,7 @@ const DaoProposals = lazy(() => import("./pages/DaoProposals"))
 const DaoPropose = lazy(() => import("./pages/DaoPropose"))
 const Dashboard = lazy(() => import("./pages/Dashboard"))
 const Debug = lazy(() => import("./pages/Debug"))
+const Donate = lazy(() => import("./pages/Donate"))
 const Donor = lazy(() => import("./pages/Donor"))
 const Home = lazy(() => import("./pages/Home"))
 const History = lazy(() => import("./pages/History"))
@@ -113,7 +114,8 @@ function App() {
 					<Route
 						path="/quadratic-funding"
 						element={renderRoute(<QuadraticFunding />)}
-					/>
+					/>{" "}
+					<Route path="/donate" element={renderRoute(<Donate />)} />
 					<Route path="/donor" element={renderRoute(<Donor />)} />
 					<Route path="/sponsor" element={renderRoute(<SponsorPortal />)} />
 					<Route
@@ -131,7 +133,10 @@ function App() {
 					<Route path="/debug" element={renderRoute(<Debug />)} />
 					<Route path="/debug/:contractName" element={renderRoute(<Debug />)} />
 					<Route path="/bounties" element={renderRoute(<BountyBoard />)} />
-					<Route path="/bounties/create" element={renderRoute(<CreateBounty />)} />
+					<Route
+						path="/bounties/create"
+						element={renderRoute(<CreateBounty />)}
+					/>
 					<Route path="/bounties/:id" element={renderRoute(<BountyDetail />)} />
 					<Route path="*" element={renderRoute(<NotFound />)} />
 				</Route>

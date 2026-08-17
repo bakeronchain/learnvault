@@ -41,6 +41,7 @@ import { createCommentsRouter } from "./routes/comments.routes"
 import { communityRouter } from "./routes/community.routes"
 import { coursesRouter } from "./routes/courses.routes"
 import { createCredentialsRouter } from "./routes/credentials.routes"
+import { donateRouter } from "./routes/donate.routes"
 import { createEnrollmentsRouter } from "./routes/enrollments.routes"
 import { eventsRouter } from "./routes/events.routes"
 import { createForumRouter } from "./routes/forum.routes"
@@ -311,6 +312,7 @@ app.use("/api", createPeerReviewRouter(jwtService))
 app.use("/api", qfRouter)
 app.use("/api", governanceRouter)
 app.use("/api", lrnRouter)
+app.use("/api", donateRouter)
 app.use("/api", treasuryRouter)
 app.use("/api", wikiRouter)
 app.use("/api", adminRouter)

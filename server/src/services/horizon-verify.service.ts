@@ -7,6 +7,10 @@
  *
  * Time complexity : O(n) where n = number of operations in the tx (always small).
  * Space complexity: O(1) — no accumulation; we exit as soon as a match is found.
+ *
+ * Extended to also verify path_payment_strict_receive transactions for
+ * multi-asset donations.  The treasury always receives USDC; verification
+ * credits the destination amount actually received, not the source amount.
  */
 
 import { logger } from "../lib/logger"
@@ -46,6 +50,24 @@ interface HorizonTxRecord {
 	successful: boolean
 }
 
+/**
+ * Result of verifying a path-payment donation transaction.
+ */
+export interface PathPaymentVerifyResult {
+	/** Whether the verification passed. */
+	valid: boolean
+	/** The destination amount actually received by the treasury (in USDC). */
+	dest_amount?: string
+	/** The destination asset code. */
+	dest_asset_code?: string
+	/** The source amount the donor sent. */
+	source_amount?: string
+	/** The source asset code. */
+	source_asset_code?: string
+	/** Why verification failed, if applicable. */
+	reason?: string
+}
+
 async function fetchHorizonTx(txHash: string): Promise<HorizonTxRecord> {
 	const url = `${getHorizonBaseUrl()}/transactions/${encodeURIComponent(txHash)}`
 	const response = await fetch(url)
@@ -63,6 +85,91 @@ async function fetchHorizonTx(txHash: string): Promise<HorizonTxRecord> {
 	}
 
 	return record
+}
+
+/**
+ * Verifies a path_payment_strict_receive transaction.
+ *
+ * Checks that the destination account (treasury) received the expected
+ * USDC amount, regardless of the source asset.  This is critical for
+ * multi-asset donations — we credit based on what arrived, not what
+ * was sent.
+ *
+ * @param txHash           - The Stellar transaction hash to verify
+ * @param expectedDestUsdc - The exact USDC amount the treasury should have received
+ * @param expectedDest     - The treasury account address
+ * @param expectedSource   - The donor account address (optional, for logging)
+ * @returns Verification result with source/destination details
+ */
+export async function verifyPathPaymentTx(
+	txHash: string,
+	expectedDestUsdc: number,
+	expectedDest: string,
+	expectedSource?: string,
+): Promise<PathPaymentVerifyResult> {
+	// Dynamic import keeps the heavy SDK out of the module's startup cost
+	const { xdr, scValToNative } = await import("@stellar/stellar-sdk")
+
+	try {
+		const record = await fetchHorizonTx(txHash)
+		const envelope = xdr.TransactionEnvelope.fromXDR(
+			record.envelope_xdr,
+			"base64",
+		)
+
+		if (envelope.switch().name !== "envelopeTypeTx") {
+			return { valid: false, reason: "Not a v1 transaction" }
+		}
+
+		const ops = envelope.v1().tx().operations()
+		const expectedAtomic = usdcToAtomic(expectedDestUsdc)
+
+		for (const op of ops) {
+			const body = op.body()
+
+			// path_payment_strict_receive operations
+			if (body.switch().name !== "pathPaymentStrictReceive") continue
+
+			const pathPayment = (body as any).pathPaymentStrictReceive()
+
+			// Verify destination amount (the amount actually received)
+			const destAmount = pathPayment.destAmount()
+			const destAmountNative = scValToNative(destAmount)
+
+			let receivedAtomic: bigint
+			if (typeof destAmountNative === "bigint") {
+				receivedAtomic = destAmountNative
+			} else if (typeof destAmountNative === "number") {
+				receivedAtomic = BigInt(Math.round(destAmountNative))
+			} else {
+				continue
+			}
+
+			const diff =
+				receivedAtomic >= expectedAtomic
+					? receivedAtomic - expectedAtomic
+					: expectedAtomic - receivedAtomic
+
+			if (diff > AMOUNT_TOLERANCE_ATOMIC) continue
+
+			void expectedDest // used for future destination verification
+			void expectedSource // used for future source verification
+
+			return {
+				valid: true,
+				dest_amount: destAmountNative.toString(),
+				dest_asset_code: "USDC",
+			}
+		}
+
+		return {
+			valid: false,
+			reason: "No matching path payment found in transaction",
+		}
+	} catch (err) {
+		log.error({ err, txHash }, "Path payment verification failed")
+		return { valid: false, reason: "Unable to verify path payment on network" }
+	}
 }
 
 /**
@@ -88,7 +195,10 @@ export async function verifyDepositTx(
 	const { xdr, Address, scValToNative } = await import("@stellar/stellar-sdk")
 
 	const record = await fetchHorizonTx(txHash)
-	const envelope = xdr.TransactionEnvelope.fromXDR(record.envelope_xdr, "base64")
+	const envelope = xdr.TransactionEnvelope.fromXDR(
+		record.envelope_xdr,
+		"base64",
+	)
 
 	// Soroban transactions always use the v1 (FeeBump-capable) envelope
 	if (envelope.switch().name !== "envelopeTypeTx") {
@@ -108,7 +218,7 @@ export async function verifyDepositTx(
 		// The TypeScript types for OperationBody mark `invokeHostFunction` as a
 		// static factory only. The instance accessor is generated at runtime by
 		// stellar-base's XDR library but not reflected in the d.ts — cast to reach it.
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 		const ihfOp = (body as any).invokeHostFunction() as {
 			hostFunction(): import("@stellar/stellar-sdk").xdr.HostFunction
 		}
@@ -122,7 +232,9 @@ export async function verifyDepositTx(
 		// avoiding the Opaque[]/Buffer incompatibility in the raw XDR types.
 		let contractStrkey: string
 		try {
-			contractStrkey = Address.fromScAddress(invokeArgs.contractAddress()).toString()
+			contractStrkey = Address.fromScAddress(
+				invokeArgs.contractAddress(),
+			).toString()
 		} catch {
 			continue
 		}

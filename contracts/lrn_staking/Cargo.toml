@@ -1,0 +1,20 @@
+[package]
+name = "lrn-staking"
+description = "Time-locked LRN staking with time-weighted governance power"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+version.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+doctest = false
+
+[dependencies]
+learnvault-shared = { workspace = true }
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+learnvault-shared = { workspace = true, features = ["testutils"] }
+soroban-sdk = { workspace = true, features = ["testutils"] }

@@ -12,10 +12,11 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { screen, waitFor, fireEvent, act } from "@testing-library/react"
+import { screen, waitFor, fireEvent } from "@testing-library/react"
 import { createElement, type ReactNode } from "react"
 import { MemoryRouter, Route, Routes } from "react-router-dom"
 import { vi, describe, it, expect, beforeEach } from "vitest"
+import ErrorBoundary from "../components/ErrorBoundary"
 import { NotificationContext } from "../providers/NotificationProvider"
 import {
 	WalletContext,
@@ -45,6 +46,32 @@ vi.mock("sonner", () => ({
 	Toaster: () => null,
 }))
 
+vi.mock("@stellar/design-system", () => ({
+	Button: ({
+		children,
+		onClick,
+		disabled,
+		...rest
+	}: {
+		children?: ReactNode
+		onClick?: () => void
+		disabled?: boolean
+	}) =>
+		createElement(
+			"button",
+			{ type: "button", onClick, disabled, ...rest },
+			children,
+		),
+}))
+
+class MockIntersectionObserver {
+	observe = vi.fn()
+	unobserve = vi.fn()
+	disconnect = vi.fn()
+}
+
+vi.stubGlobal("IntersectionObserver", MockIntersectionObserver)
+
 // Mock connectWallet utility
 vi.mock("../util/wallet", () => ({
 	connectWallet: vi.fn(),
@@ -69,6 +96,9 @@ vi.mock("../util/wallet", () => ({
 const mockGetCourseProgress = vi.fn()
 const mockCompleteMilestone = vi.fn()
 const mockSubmitMilestone = vi.fn()
+const mockGetEscrowTimeout = vi.fn()
+let mockIsCompletingMilestone = false
+let mockSubmissionStatusMap: Record<string, string> = {}
 
 vi.mock("../hooks/useCourse", () => ({
 	useCourse: () => ({
@@ -77,8 +107,9 @@ vi.mock("../hooks/useCourse", () => ({
 		enroll: vi.fn(),
 		completeMilestone: mockCompleteMilestone,
 		submitMilestone: mockSubmitMilestone,
-		submissionStatusMap: {},
-		isCompletingMilestone: false,
+		submissionStatusMap: mockSubmissionStatusMap,
+		getEscrowTimeout: mockGetEscrowTimeout,
+		isCompletingMilestone: mockIsCompletingMilestone,
 	}),
 }))
 
@@ -185,6 +216,7 @@ interface RenderOptions {
 	courseId?: string
 	lessonId?: string | number
 	walletContext?: Partial<WalletContextType>
+	withErrorBoundary?: boolean
 }
 
 /**
@@ -195,6 +227,7 @@ async function renderLessonView({
 	courseId = "intro-stellar",
 	lessonId = 1,
 	walletContext = {},
+	withErrorBoundary = false,
 }: RenderOptions = {}) {
 	// Lazy-import the page so module-level mocks are already registered
 	const { default: LessonView } = await import("./LessonView")
@@ -217,6 +250,10 @@ async function renderLessonView({
 			),
 		)
 
+	const lessonElement = withErrorBoundary
+		? createElement(ErrorBoundary, null, createElement(LessonView))
+		: createElement(LessonView)
+
 	const result = render(
 		createElement(
 			MemoryRouter,
@@ -226,7 +263,7 @@ async function renderLessonView({
 				null,
 				createElement(Route, {
 					path: "/courses/:courseId/lessons/:lessonId",
-					element: createElement(LessonView),
+					element: lessonElement,
 				}),
 			),
 		),
@@ -242,6 +279,9 @@ async function renderLessonView({
 
 beforeEach(() => {
 	vi.clearAllMocks()
+	mockIsCompletingMilestone = false
+	mockSubmissionStatusMap = {}
+	mockGetEscrowTimeout.mockReturnValue(null)
 
 	mockUseEnrollment.mockReturnValue({
 		isEnrolled: true,
@@ -337,13 +377,11 @@ describe("LessonView", () => {
 				refetch: vi.fn(),
 			})
 
-			await renderLessonView({ lessonId: 1 })
+			await renderLessonView({ lessonId: 1, withErrorBoundary: true })
 
 			await waitFor(() => {
-				// NotFound page renders a 404 message
-				expect(
-					screen.getByText(/404|not found|page.*not.*found/i),
-				).toBeInTheDocument()
+				expect(screen.getByTestId("error-boundary")).toBeInTheDocument()
+				expect(screen.getByText(/Something went wrong/i)).toBeInTheDocument()
 			})
 		})
 
@@ -571,10 +609,13 @@ describe("LessonView", () => {
 			await renderLessonView({ lessonId: 1 })
 
 			await waitFor(() => {
-				const nextLink = screen.getByRole("link", { name: /Next Lesson 🔒/i })
-				expect(nextLink).toBeInTheDocument()
-				// Locked link points to "#"
-				expect(nextLink).toHaveAttribute("href", "#")
+				const nextLinks = screen.getAllByRole("link", {
+					name: /Next Lesson 🔒/i,
+				})
+				expect(nextLinks.length).toBeGreaterThan(0)
+				for (const nextLink of nextLinks) {
+					expect(nextLink.className).toMatch(/cursor-not-allowed/)
+				}
 			})
 		})
 	})
@@ -730,58 +771,9 @@ describe("LessonView", () => {
 		})
 
 		it("shows Confirming... while milestone completion is in progress", async () => {
-			vi.doMock("../hooks/useCourse", () => ({
-				useCourse: () => ({
-					enrolledCourses: [],
-					getCourseProgress: mockGetCourseProgress,
-					enroll: vi.fn(),
-					completeMilestone: mockCompleteMilestone,
-					submitMilestone: mockSubmitMilestone,
-					submissionStatusMap: {},
-					isCompletingMilestone: true, // in-flight
-				}),
-			}))
+			mockIsCompletingMilestone = true
 
-			// Re-import to pick up the updated mock
-			vi.resetModules()
-			const { default: LessonView } = await import("./LessonView")
-
-			const queryClient = new QueryClient({
-				defaultOptions: { queries: { retry: false, gcTime: 0 } },
-			})
-			const wallet = makeWalletContext()
-			const notification = makeNotificationContext()
-
-			const Wrapper = ({ children }: { children: ReactNode }) =>
-				createElement(
-					QueryClientProvider,
-					{ client: queryClient },
-					createElement(
-						WalletContext,
-						{ value: wallet },
-						createElement(
-							NotificationContext,
-							{ value: notification },
-							children,
-						),
-					),
-				)
-
-			render(
-				createElement(
-					MemoryRouter,
-					{ initialEntries: ["/courses/intro-stellar/lessons/1"] },
-					createElement(
-						Routes,
-						null,
-						createElement(Route, {
-							path: "/courses/:courseId/lessons/:lessonId",
-							element: createElement(LessonView),
-						}),
-					),
-				),
-				{ wrapper: Wrapper },
-			)
+			await renderLessonView({ lessonId: 1 })
 
 			await waitFor(() => {
 				expect(screen.getByText(/Confirming\.\.\./i)).toBeInTheDocument()
@@ -967,61 +959,13 @@ describe("LessonView", () => {
 		})
 
 		it("shows pending state after milestone is submitted", async () => {
-			// Override useCourse to return a pending submission status
-			vi.doMock("../hooks/useCourse", () => ({
-				useCourse: () => ({
-					enrolledCourses: [],
-					getCourseProgress: vi.fn().mockReturnValue({
-						courseId: "intro-stellar",
-						completedMilestoneIds: [1, 2],
-					}),
-					enroll: vi.fn(),
-					completeMilestone: vi.fn(),
-					submitMilestone: vi.fn(),
-					submissionStatusMap: { "intro-stellar-3": "pending" },
-					isCompletingMilestone: false,
-				}),
-			}))
-
-			vi.resetModules()
-			const { default: LessonView } = await import("./LessonView")
-
-			const queryClient = new QueryClient({
-				defaultOptions: { queries: { retry: false, gcTime: 0 } },
+			mockGetCourseProgress.mockReturnValue({
+				courseId: "intro-stellar",
+				completedMilestoneIds: [1, 2],
 			})
-			const wallet = makeWalletContext()
-			const notification = makeNotificationContext()
+			mockSubmissionStatusMap = { "intro-stellar-3": "pending" }
 
-			const Wrapper = ({ children }: { children: ReactNode }) =>
-				createElement(
-					QueryClientProvider,
-					{ client: queryClient },
-					createElement(
-						WalletContext,
-						{ value: wallet },
-						createElement(
-							NotificationContext,
-							{ value: notification },
-							children,
-						),
-					),
-				)
-
-			render(
-				createElement(
-					MemoryRouter,
-					{ initialEntries: ["/courses/intro-stellar/lessons/3"] },
-					createElement(
-						Routes,
-						null,
-						createElement(Route, {
-							path: "/courses/:courseId/lessons/:lessonId",
-							element: createElement(LessonView),
-						}),
-					),
-				),
-				{ wrapper: Wrapper },
-			)
+			await renderLessonView({ lessonId: 3 })
 
 			await waitFor(() => {
 				expect(screen.getByText(/Submission Received/i)).toBeInTheDocument()

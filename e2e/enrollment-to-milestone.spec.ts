@@ -55,6 +55,23 @@ async function fulfillJson(route: Route, body: unknown, status = 200) {
 	})
 }
 
+async function disableServiceWorkerForMocks(page: Page) {
+	await page.addInitScript(() => {
+		if (!("serviceWorker" in navigator)) return
+
+		navigator.serviceWorker.register = (() =>
+			Promise.reject(
+				new Error("Service worker disabled in enrollment E2E"),
+			)) as typeof navigator.serviceWorker.register
+
+		void navigator.serviceWorker.getRegistrations().then((registrations) => {
+			for (const registration of registrations) {
+				void registration.unregister()
+			}
+		})
+	})
+}
+
 async function installEnrollmentMocks(
 	page: Page,
 	options: { initialEnrollments?: MockEnrollmentRecord[] } = {},
@@ -356,6 +373,7 @@ test.describe("Enrollment to Milestone E2E Flow", () => {
 	test.beforeEach(async ({ page }) => {
 		await installMockFreighter(page)
 		await mockHorizonBalances(page)
+		await disableServiceWorkerForMocks(page)
 	})
 
 	test("blocks direct lesson access until enrollment is persisted", async ({

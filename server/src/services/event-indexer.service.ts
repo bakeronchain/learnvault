@@ -112,11 +112,11 @@ async function invalidateCacheForEvent(
 			if (addr) {
 				const courseId =
 					typeof data.courseId === "string"
-						? Number(data.courseId)
+						? data.courseId
 						: typeof value.courseId === "string"
-							? Number(value.courseId)
+							? value.courseId
 							: null
-				if (courseId !== null && !isNaN(courseId)) {
+				if (courseId) {
 					await cache.invalidate(CacheKey.enrollment(addr, courseId))
 				}
 			}
@@ -231,8 +231,13 @@ async function persistIndexedEvent(
 		if (topic === "ScholarshipTreasury::proposal_executed") {
 			try {
 				const value = (ev as any).value ?? {}
-				const rawProposalId = value?.proposal_id ?? value?.proposalId ?? value?.proposal ?? null
-				const passed = value?.passed === true || value?.passed === "true" || value?.passed === 1 || value?.passed === "1"
+				const rawProposalId =
+					value?.proposal_id ?? value?.proposalId ?? value?.proposal ?? null
+				const passed =
+					value?.passed === true ||
+					value?.passed === "true" ||
+					value?.passed === 1 ||
+					value?.passed === "1"
 				const rawAmount = value?.amount ?? value?.total_amount ?? null
 
 				if (rawProposalId != null && passed) {
@@ -257,7 +262,10 @@ async function persistIndexedEvent(
 							}
 						}
 					} catch (dbErr) {
-						log.error({ err: dbErr, proposalId }, "DB lookup for proposal failed")
+						log.error(
+							{ err: dbErr, proposalId },
+							"DB lookup for proposal failed",
+						)
 					}
 
 					// If rawAmount provided in event, prefer it (assume atomic units)
@@ -272,22 +280,31 @@ async function persistIndexedEvent(
 					// Fallback to on-chain read for applicant/amount
 					if (!scholarAddress || totalAmountAtomic === null) {
 						try {
-							const { stellarContractService } = await import("./stellar-contract.service")
-							const onChain = await stellarContractService.getProposalOnChain(proposalId)
+							const { stellarContractService } =
+								await import("./stellar-contract.service")
+							const onChain =
+								await stellarContractService.getProposalOnChain(proposalId)
 							if (onChain) {
-								if (!scholarAddress && onChain.applicant) scholarAddress = String(onChain.applicant)
+								if (!scholarAddress && onChain.applicant)
+									scholarAddress = String(onChain.applicant)
 								if (totalAmountAtomic === null && onChain.amount) {
-									try { totalAmountAtomic = BigInt(String(onChain.amount)) } catch (_) {}
+									try {
+										totalAmountAtomic = BigInt(String(onChain.amount))
+									} catch (_) {}
 								}
 							}
 						} catch (chainErr) {
-							log.error({ err: chainErr, proposalId }, "on-chain proposal lookup failed")
+							log.error(
+								{ err: chainErr, proposalId },
+								"on-chain proposal lookup failed",
+							)
 						}
 					}
 
 					if (scholarAddress && totalAmountAtomic !== null) {
 						try {
-							const { stellarContractService } = await import("./stellar-contract.service")
+							const { stellarContractService } =
+								await import("./stellar-contract.service")
 							const txRes = await stellarContractService.createMilestoneEscrow({
 								proposalId,
 								scholarAddress,
@@ -299,18 +316,38 @@ async function persistIndexedEvent(
 								`INSERT INTO escrows (proposal_id, scholar_address, total_amount, tranches, tranches_released, contract_escrow_id)
 								 VALUES ($1, $2, $3, $4, 0, $5)
 								 ON CONFLICT (proposal_id) DO NOTHING`,
-								[proposalId, scholarAddress, totalAmountAtomic.toString(), 3, proposalId],
+								[
+									proposalId,
+									scholarAddress,
+									totalAmountAtomic.toString(),
+									3,
+									proposalId,
+								],
 							)
 
 							await pool.query(
 								`INSERT INTO platform_events (event_type, data) VALUES ($1, $2::jsonb)`,
-								["escrow_created", JSON.stringify({ proposal_id: proposalId, scholar_address: scholarAddress, total_amount: totalAmountAtomic.toString(), tx_hash: txRes.txHash })],
+								[
+									"escrow_created",
+									JSON.stringify({
+										proposal_id: proposalId,
+										scholar_address: scholarAddress,
+										total_amount: totalAmountAtomic.toString(),
+										tx_hash: txRes.txHash,
+									}),
+								],
 							)
 						} catch (err) {
-							log.error({ err, proposalId }, "failed to create record after create_escrow")
+							log.error(
+								{ err, proposalId },
+								"failed to create record after create_escrow",
+							)
 						}
 					} else {
-						log.warn({ proposalId }, "insufficient data to create escrow: missing scholar or amount")
+						log.warn(
+							{ proposalId },
+							"insufficient data to create escrow: missing scholar or amount",
+						)
 					}
 				}
 			} catch (err) {

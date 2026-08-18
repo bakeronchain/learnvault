@@ -6,9 +6,6 @@ import { stellarContractService } from "../services/stellar-contract.service"
 
 const log = logger.child({ module: "enrollments" })
 
-const COURSE_MILESTONE_CONTRACT_ID =
-	process.env.COURSE_MILESTONE_CONTRACT_ID ?? ""
-
 /**
  * Create a new enrollment for a learner in a course.
  * Validates on-chain enrollment first.
@@ -49,35 +46,21 @@ export const createEnrollment = async (
 			return
 		}
 
-		// Validate on-chain enrollment if contract ID is configured
-		// Only perform on-chain check if course_id is a numeric string
-		// (the contract uses u32 for course IDs, not string slugs)
-		if (COURSE_MILESTONE_CONTRACT_ID) {
-			// Try to parse course_id as a number
-			const courseIdNum = parseInt(course_id, 10)
+		// Validate on-chain enrollment when contract ID is configured
+		const courseMilestoneContractId =
+			process.env.COURSE_MILESTONE_CONTRACT_ID ?? ""
+		if (courseMilestoneContractId) {
+			const isEnrolledOnChain = await stellarContractService.isEnrolled(
+				learner_address,
+				course_id,
+				{ requestId: req.requestId },
+			)
 
-			if (!isNaN(courseIdNum) && courseIdNum > 0) {
-				// It's a valid numeric course ID, check on-chain
-				const isEnrolledOnChain = await stellarContractService.isEnrolled(
-					learner_address,
-					courseIdNum,
-					{ requestId: req.requestId },
-				)
-
-				if (!isEnrolledOnChain) {
-					res.status(400).json({
-						error: "Learner is not enrolled in this course on-chain",
-					})
-					return
-				}
-			} else {
-				// course_id is a string slug (e.g., "stellar-basics")
-				// Skip on-chain validation - mapping from slug to contract ID
-				// would require additional database logic
-				log.warn(
-					{ courseId: course_id },
-					"course_id is not numeric, skipping on-chain validation",
-				)
+			if (!isEnrolledOnChain) {
+				res.status(400).json({
+					error: "Learner is not enrolled in this course on-chain",
+				})
+				return
 			}
 		} else {
 			// If no contract configured, allow enrollment (development mode)
@@ -172,6 +155,12 @@ export const createEnrollment = async (
 			content_version: enrollment.content_version,
 		})
 	} catch (error) {
+		if ((error as { code?: string }).code === "23505") {
+			res.status(409).json({
+				error: "Already enrolled in this course",
+			})
+			return
+		}
 		log.error({ err: error }, "Error creating enrollment")
 		res.status(500).json({
 			error: "Failed to create enrollment",

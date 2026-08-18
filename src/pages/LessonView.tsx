@@ -1,6 +1,6 @@
 import { Button } from "@stellar/design-system"
-import React, { useEffect, useMemo, useState } from "react"
-import { useParams } from "react-router-dom"
+import React, { useCallback, useEffect, useMemo, useState } from "react"
+import { Link, useNavigate, useParams } from "react-router-dom"
 import CourseReviewsPanel from "../components/CourseReviewsPanel"
 import { CourseForum } from "../components/forum/CourseForum"
 import LessonContent from "../components/LessonContent"
@@ -10,6 +10,7 @@ import MilestoneSubmitPanel from "../components/MilestoneSubmitPanel"
 import { LessonListSkeleton } from "../components/skeletons/LessonListSkeleton"
 import { useCourse } from "../hooks/useCourse"
 import { useCourseDetail } from "../hooks/useCourses"
+import { useEnrollment } from "../hooks/useEnrollment"
 import { useLessonProgress } from "../hooks/useLessonProgress"
 import { useOnlineStatus } from "../hooks/useOnlineStatus"
 import { useWallet } from "../hooks/useWallet"
@@ -38,20 +39,27 @@ const LessonView: React.FC = () => {
 		lessonId: string
 	}>()
 	const lessonId = parseInt(lessonIdParam || "0", 10)
+	const navigate = useNavigate()
 
 	const { address } = useWallet()
 	const { isOnline } = useOnlineStatus()
-	const {
-		getCourseProgress,
-		completeMilestone,
-		isCompletingMilestone,
-		enrolledCourses,
-	} = useCourse()
+	const { getCourseProgress, completeMilestone, isCompletingMilestone } =
+		useCourse()
 	const {
 		course,
 		isLoading: isLoadingCourse,
 		error: courseError,
 	} = useCourseDetail(courseId, address)
+	const courseSlug = course?.slug ?? courseId ?? ""
+	const {
+		isEnrolled,
+		isChecking: isCheckingEnrollment,
+		isEnrolling,
+		needsPersistence,
+		error: enrollmentError,
+		enroll,
+		retryPersistence,
+	} = useEnrollment(courseSlug)
 
 	const [isLoadingContent, setIsLoadingContent] = useState(true)
 	const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -84,10 +92,6 @@ const LessonView: React.FC = () => {
 		[course, lessonId],
 	)
 	const allLessons = useMemo(() => course?.lessons ?? [], [course])
-	const isEnrolledInCourse = useMemo(
-		() => (course ? enrolledCourses.some((c) => c.id === course.slug) : false),
-		[course, enrolledCourses],
-	)
 	const prerequisites = course?.prerequisites ?? []
 	const hasPrerequisiteData = prerequisites.length > 0
 	const prerequisiteStatuses = useMemo(() => {
@@ -111,7 +115,7 @@ const LessonView: React.FC = () => {
 	}, [lessonId])
 
 	useEffect(() => {
-		if (!course || !lesson) return
+		if (!course || !lesson || !isEnrolled) return
 
 		startLessonSession(course.slug, lesson.id, lesson.estimatedMinutes)
 		const existing = getLessonTime(course.slug, lesson.id)
@@ -125,11 +129,29 @@ const LessonView: React.FC = () => {
 				setTimeSpentLabel(formatDuration(stopped.lesson.secondsSpent))
 			}
 		}
-	}, [course, lesson])
+	}, [course, lesson, isEnrolled])
 
 	useEffect(() => {
 		setIsSidebarOpen(false)
 	}, [lessonId])
+
+	const handleEnrollmentAction = useCallback(async () => {
+		const lessonPath = needsPersistence
+			? await retryPersistence()
+			: await enroll()
+		if (lessonPath) {
+			void navigate(lessonPath)
+		}
+	}, [enroll, navigate, needsPersistence, retryPersistence])
+
+	const enrollmentActionLabel = needsPersistence
+		? "Retry sync"
+		: isCheckingEnrollment
+			? "Checking..."
+			: isEnrolling
+				? "Enrolling..."
+				: "Enroll Now"
+	const isEnrollmentPending = isCheckingEnrollment || isEnrolling
 
 	if (!isLoadingCourse && (courseError || !course || !lesson)) {
 		// Let the route-level ErrorBoundary render so invalid courses surface a
@@ -202,6 +224,72 @@ const LessonView: React.FC = () => {
 		)
 	}
 
+	if (isCheckingEnrollment) {
+		return (
+			<div className="container mx-auto px-4 py-24 flex items-center justify-center">
+				<div
+					role="status"
+					aria-live="polite"
+					aria-busy="true"
+					aria-label="Checking enrollment"
+					className="glass-card max-w-lg w-full p-10 rounded-[2.5rem] border border-white/10 text-center animate-in fade-in duration-500"
+				>
+					<div className="w-16 h-16 mx-auto mb-6 rounded-full border-2 border-brand-cyan/30 border-t-brand-cyan animate-spin" />
+					<h2 className="text-2xl font-bold mb-3 text-white">
+						Checking enrollment
+					</h2>
+					<p className="text-white/60">
+						Verifying your access to this course before loading lesson content.
+					</p>
+				</div>
+			</div>
+		)
+	}
+
+	if (!isEnrolled) {
+		return (
+			<div className="container mx-auto px-4 py-24 flex items-center justify-center">
+				<div className="glass-card max-w-lg w-full p-10 rounded-[2.5rem] border border-white/10 text-center animate-in zoom-in-95 duration-500">
+					<div className="text-5xl mb-6" aria-hidden="true">
+						📚
+					</div>
+					<h2 className="text-2xl font-bold mb-4 text-white">
+						Enrollment Required
+					</h2>
+					<p className="text-white/60 mb-8">
+						Enroll in {course?.title ?? "this course"} to access lessons, the
+						forum, and milestone submissions.
+					</p>
+					{enrollmentError ? (
+						<p className="mb-6 text-sm text-red-300" role="alert">
+							{enrollmentError}
+						</p>
+					) : null}
+					<div className="flex flex-col gap-3">
+						<button
+							type="button"
+							onClick={() => {
+								void handleEnrollmentAction()
+							}}
+							disabled={isEnrollmentPending}
+							aria-busy={isEnrollmentPending}
+							aria-disabled={isEnrollmentPending}
+							className="w-full px-6 py-3 rounded-xl bg-white text-black font-semibold hover:bg-brand-cyan transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+						>
+							{enrollmentActionLabel}
+						</button>
+						<Link
+							to="/courses"
+							className="px-6 py-3 border border-white/10 bg-white/[0.03] text-white rounded-xl hover:bg-white/[0.08] text-sm font-semibold"
+						>
+							Browse Courses
+						</Link>
+					</div>
+				</div>
+			</div>
+		)
+	}
+
 	const progress = getCourseProgress(courseId || "")
 	const completedMilestones = progress.completedMilestoneIds
 
@@ -245,7 +333,7 @@ const LessonView: React.FC = () => {
 	const handleMarkComplete = async () => {
 		if (!courseId || !course || !lesson) return
 		if (hasPrerequisiteData && hasUnmetPrerequisites) return
-		if (!isEnrolledInCourse) return
+		if (!isEnrolled) return
 
 		const completedOnChain = await completeMilestone(courseId, lessonId)
 		if (completedOnChain) {
@@ -427,25 +515,26 @@ const LessonView: React.FC = () => {
 						/>
 					)}
 
-				{lesson?.isMilestone && !isLoadingCourse && !isLoadingContent && (
-					<div className="mt-12 animate-in fade-in slide-in-from-top-4 duration-1000">
-						{!isOnline ? (
-							<div className="p-6 rounded-2xl border border-amber-500/30 bg-amber-500/5 text-center">
-								<p className="text-sm text-amber-200 font-bold">
-									Milestone submission requires an internet connection.
-								</p>
-								<p className="text-xs text-amber-200/60 mt-1">
-									Your progress will be saved locally and synced when you reconnect.
-								</p>
-							</div>
-						) : (
-							<MilestoneSubmitPanel
-								courseId={course.slug}
-								milestoneId={lesson.id}
-							/>
-						)}
-					</div>
-				)}
+					{lesson?.isMilestone && !isLoadingCourse && !isLoadingContent && (
+						<div className="mt-12 animate-in fade-in slide-in-from-top-4 duration-1000">
+							{!isOnline ? (
+								<div className="p-6 rounded-2xl border border-amber-500/30 bg-amber-500/5 text-center">
+									<p className="text-sm text-amber-200 font-bold">
+										Milestone submission requires an internet connection.
+									</p>
+									<p className="text-xs text-amber-200/60 mt-1">
+										Your progress will be saved locally and synced when you
+										reconnect.
+									</p>
+								</div>
+							) : (
+								<MilestoneSubmitPanel
+									courseId={course.slug}
+									milestoneId={lesson.id}
+								/>
+							)}
+						</div>
+					)}
 					{course && currentTab !== "forum" && (
 						<CourseReviewsPanel
 							courseId={course.slug}

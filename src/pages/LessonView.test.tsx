@@ -83,6 +83,13 @@ vi.mock("../hooks/useCourse", () => ({
 }))
 
 const mockUseCourseDetail = vi.fn()
+const mockEnroll = vi.fn()
+const mockRetryPersistence = vi.fn()
+const mockUseEnrollment = vi.fn()
+
+vi.mock("../hooks/useEnrollment", () => ({
+	useEnrollment: (slug: string) => mockUseEnrollment(slug),
+}))
 
 vi.mock("../hooks/useCourses", () => ({
 	useCourseDetail: (id: string) => mockUseCourseDetail(id),
@@ -236,6 +243,17 @@ async function renderLessonView({
 beforeEach(() => {
 	vi.clearAllMocks()
 
+	mockUseEnrollment.mockReturnValue({
+		isEnrolled: true,
+		isChecking: false,
+		isEnrolling: false,
+		needsPersistence: false,
+		error: null,
+		firstLessonPath: "/courses/intro-stellar/lessons/1",
+		enroll: mockEnroll,
+		retryPersistence: mockRetryPersistence,
+	})
+
 	// Default: course loads successfully, lesson 1 is current, nothing completed
 	mockUseCourseDetail.mockReturnValue({
 		course: makeCourse(),
@@ -360,7 +378,119 @@ describe("LessonView", () => {
 	})
 
 	// -------------------------------------------------------------------------
-	// 2. Navigation to next/previous lesson
+	// 2. Enrollment gate — protected content requires persisted enrollment
+	// -------------------------------------------------------------------------
+	describe("enrollment gate", () => {
+		it("shows an accessible checking state without protected content while enrollment loads", async () => {
+			mockUseEnrollment.mockReturnValue({
+				isEnrolled: false,
+				isChecking: true,
+				isEnrolling: false,
+				needsPersistence: false,
+				error: null,
+				firstLessonPath: null,
+				enroll: mockEnroll,
+				retryPersistence: mockRetryPersistence,
+			})
+
+			await renderLessonView({ lessonId: 1 })
+
+			await waitFor(() => {
+				expect(
+					screen.getByRole("status", { name: /checking enrollment/i }),
+				).toHaveAttribute("aria-busy", "true")
+			})
+
+			expect(screen.queryByTestId("markdown-content")).not.toBeInTheDocument()
+			expect(screen.queryByText(/Track Outline/i)).not.toBeInTheDocument()
+			expect(
+				screen.queryByRole("button", { name: /Forum/i }),
+			).not.toBeInTheDocument()
+		})
+
+		it("blocks lesson content and shows an enroll action when not enrolled", async () => {
+			mockUseEnrollment.mockReturnValue({
+				isEnrolled: false,
+				isChecking: false,
+				isEnrolling: false,
+				needsPersistence: false,
+				error: null,
+				firstLessonPath: null,
+				enroll: mockEnroll,
+				retryPersistence: mockRetryPersistence,
+			})
+
+			await renderLessonView({ lessonId: 1 })
+
+			await waitFor(() => {
+				expect(
+					screen.getByRole("heading", { name: /Enrollment Required/i }),
+				).toBeInTheDocument()
+				expect(
+					screen.getByRole("button", { name: /Enroll Now/i }),
+				).toBeInTheDocument()
+			})
+
+			expect(screen.queryByTestId("markdown-content")).not.toBeInTheDocument()
+			expect(screen.queryByText(/Track Outline/i)).not.toBeInTheDocument()
+			expect(
+				screen.queryByRole("button", { name: /^Forum$/i }),
+			).not.toBeInTheDocument()
+		})
+
+		it("surfaces enrollment errors with role=alert on the gate screen", async () => {
+			mockUseEnrollment.mockReturnValue({
+				isEnrolled: false,
+				isChecking: false,
+				isEnrolling: false,
+				needsPersistence: false,
+				error: "Enrollment cancelled",
+				firstLessonPath: null,
+				enroll: mockEnroll,
+				retryPersistence: mockRetryPersistence,
+			})
+
+			await renderLessonView({ lessonId: 1 })
+
+			await waitFor(() => {
+				expect(screen.getByRole("alert")).toHaveTextContent(
+					/Enrollment cancelled/i,
+				)
+			})
+		})
+
+		it("does not render milestone submission UI when not enrolled", async () => {
+			mockGetCourseProgress.mockReturnValue({
+				courseId: "intro-stellar",
+				completedMilestoneIds: [1, 2],
+			})
+			mockUseEnrollment.mockReturnValue({
+				isEnrolled: false,
+				isChecking: false,
+				isEnrolling: false,
+				needsPersistence: false,
+				error: null,
+				firstLessonPath: null,
+				enroll: mockEnroll,
+				retryPersistence: mockRetryPersistence,
+			})
+
+			await renderLessonView({ lessonId: 3 })
+
+			await waitFor(() => {
+				expect(
+					screen.getByRole("heading", { name: /Enrollment Required/i }),
+				).toBeInTheDocument()
+			})
+
+			expect(
+				screen.queryByText(/Submit Milestone Evidence/i),
+			).not.toBeInTheDocument()
+		})
+	})
+
+	// -------------------------------------------------------------------------
+	// 3. Navigation to next/previous lesson
 	// -------------------------------------------------------------------------
 	describe("lesson navigation", () => {
 		it("renders a Next Lesson link pointing to the next lesson", async () => {
@@ -734,7 +864,7 @@ describe("LessonView", () => {
 	})
 
 	// -------------------------------------------------------------------------
-	// 7. Milestone submission form renders on milestone lessons
+	// 8. Milestone submission form renders on milestone lessons
 	// -------------------------------------------------------------------------
 	describe("milestone submission form", () => {
 		it("renders MilestoneSubmitPanel on a milestone lesson", async () => {

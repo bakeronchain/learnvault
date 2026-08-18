@@ -8,6 +8,28 @@ vi.mock("./BookmarkButton", () => ({
 	default: () => <button data-testid="bookmark">Bookmark</button>,
 }))
 
+vi.mock("./EnrollableCourseCard", () => ({
+	default: ({
+		title,
+		onBeforeEnroll,
+	}: {
+		title: string
+		onBeforeEnroll?: () => void
+	}) => (
+		<div>
+			<h3>{title}</h3>
+			<button
+				type="button"
+				onClick={() => {
+					onBeforeEnroll?.()
+				}}
+			>
+				Enroll Now
+			</button>
+		</div>
+	),
+}))
+
 const { default: RecommendationsCarousel } =
 	await import("./RecommendationsCarousel")
 
@@ -105,7 +127,7 @@ describe("RecommendationsCarousel", () => {
 		})
 	})
 
-	it("navigates to the course page when Enroll is clicked", async () => {
+	it("logs recommendation engagement when Enroll is clicked", async () => {
 		vi.mocked(global.fetch).mockResolvedValue({
 			ok: true,
 			json: async () => ({ data: SAMPLE_RECOMMENDATIONS }),

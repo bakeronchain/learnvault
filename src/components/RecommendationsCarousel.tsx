@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
 import { useWallet } from "../hooks/useWallet"
 import { createAuthHeaders } from "../lib/api"
-import CourseCard from "./CourseCard"
+import EnrollableCourseCard from "./EnrollableCourseCard"
 import { EmptyState } from "./states/emptyState"
 
 export interface Recommendation {
@@ -28,7 +27,6 @@ const RecommendationsCarousel: React.FC = () => {
 	const [recommendations, setRecommendations] = useState<Recommendation[]>([])
 	const [isLoading, setIsLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
-	const navigate = useNavigate()
 
 	useEffect(() => {
 		if (!address) return
@@ -70,7 +68,7 @@ const RecommendationsCarousel: React.FC = () => {
 		}
 	}, [address])
 
-	const handleEnrollClick = async (slug: string) => {
+	const logRecommendationClick = async (slug: string) => {
 		try {
 			await fetch(`/api/recommendations/engage`, {
 				method: "POST",
@@ -80,8 +78,6 @@ const RecommendationsCarousel: React.FC = () => {
 		} catch (err) {
 			console.error("Failed to log click:", err)
 		}
-
-		void navigate(`/courses/${slug}`)
 	}
 
 	if (!address) return null
@@ -155,7 +151,7 @@ const RecommendationsCarousel: React.FC = () => {
 						key={course.courseId}
 						className="flex-none w-80 sm:w-96 snap-center flex flex-col relative group"
 					>
-						<CourseCard
+						<EnrollableCourseCard
 							id={course.slug}
 							title={course.title}
 							description={course.description}
@@ -164,8 +160,9 @@ const RecommendationsCarousel: React.FC = () => {
 							lrnReward={0}
 							lessonCount={0}
 							coverImage={course.coverImage || undefined}
-							isEnrolled={false}
-							onEnroll={() => handleEnrollClick(course.slug)}
+							onBeforeEnroll={() => {
+								void logRecommendationClick(course.slug)
+							}}
 						/>
 						{/* Recommendation Reason Badge */}
 						<div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-cyan/20 backdrop-blur-md border border-brand-cyan/50 text-brand-cyan text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full whitespace-nowrap shadow-[0_0_15px_rgba(0,212,255,0.2)] z-20 transition-transform group-hover:-translate-y-1">

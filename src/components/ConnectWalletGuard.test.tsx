@@ -12,6 +12,10 @@ vi.mock("./ConnectAccount", () => ({
 	default: () => <button>Connect Wallet</button>,
 }))
 
+vi.mock("./PasskeySignup", () => ({
+	default: () => <button>Continue with Face ID</button>,
+}))
+
 vi.mock("@stellar/design-system", () => ({
 	Card: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 	Button: ({
@@ -46,9 +50,7 @@ describe("ConnectWalletGuard", () => {
 			</ConnectWalletGuard>,
 		)
 
-		expect(
-			screen.getByText(/connect your wallet to continue/i),
-		).toBeInTheDocument()
+		expect(screen.getByText(/get started with learnvault/i)).toBeInTheDocument()
 		expect(screen.queryByText("Protected Content")).not.toBeInTheDocument()
 	})
 
@@ -65,7 +67,7 @@ describe("ConnectWalletGuard", () => {
 
 		expect(screen.getByText("Protected Content")).toBeInTheDocument()
 		expect(
-			screen.queryByText(/connect your wallet to continue/i),
+			screen.queryByText(/get started with learnvault/i),
 		).not.toBeInTheDocument()
 	})
 
@@ -83,7 +85,7 @@ describe("ConnectWalletGuard", () => {
 		).toBeInTheDocument()
 	})
 
-	it("shows informational message about Stellar wallet requirement", () => {
+	it("shows informational message about the no-seed-phrase signup path", () => {
 		vi.mocked(useWallet).mockReturnValue(mockWallet() as any)
 
 		render(
@@ -92,7 +94,21 @@ describe("ConnectWalletGuard", () => {
 			</ConnectWalletGuard>,
 		)
 
-		expect(screen.getByText(/stellar wallet/i)).toBeInTheDocument()
+		expect(screen.getByText(/no seed phrase/i)).toBeInTheDocument()
+	})
+
+	it("shows the passkey signup option as the primary path when unauthenticated", () => {
+		vi.mocked(useWallet).mockReturnValue(mockWallet() as any)
+
+		render(
+			<ConnectWalletGuard>
+				<div>Protected Content</div>
+			</ConnectWalletGuard>,
+		)
+
+		expect(
+			screen.getByRole("button", { name: /continue with face id/i }),
+		).toBeInTheDocument()
 	})
 
 	it("re-activates guard when wallet is disconnected mid-session", () => {
@@ -122,9 +138,7 @@ describe("ConnectWalletGuard", () => {
 		)
 
 		expect(screen.queryByText("Protected Content")).not.toBeInTheDocument()
-		expect(
-			screen.getByText(/connect your wallet to continue/i),
-		).toBeInTheDocument()
+		expect(screen.getByText(/get started with learnvault/i)).toBeInTheDocument()
 	})
 
 	it("uses WalletContext address when rendered inside WalletProvider", () => {

@@ -123,6 +123,24 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 	}, [updateBalances])
 
 	const updateCurrentWalletState = async () => {
+		// Passkey wallets (issue #1055) aren't managed by StellarWalletsKit at
+		// all — there's no extension/module to poll. Their session is just our
+		// own storage + JWT, set directly by usePasskeyWallet.register(), so
+		// short-circuit before any of the kit-specific logic below runs.
+		if (storage.getItem("walletType") === "passkey") {
+			const walletAddr = storage.getItem("walletAddress")
+			if (!walletAddr) {
+				nullify(true)
+				return
+			}
+			if (walletAddr !== address) {
+				setAddress(walletAddr)
+				setNetwork(storage.getItem("walletNetwork") ?? undefined)
+				setNetworkPassphrase(storage.getItem("networkPassphrase") ?? undefined)
+			}
+			return
+		}
+
 		// There is no way, with StellarWalletsKit, to check if the wallet is
 		// installed/connected/authorized. We need to manage that on our side by
 		// checking our storage item.

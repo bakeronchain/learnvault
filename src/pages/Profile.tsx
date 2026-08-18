@@ -8,6 +8,7 @@ import AddressDisplay from "../components/AddressDisplay"
 
 import IdenticonAvatar from "../components/IdenticonAvatar"
 import LRNHistoryChart from "../components/LRNHistoryChart"
+import PasskeyDeviceManager from "../components/PasskeyDeviceManager"
 import ProfileEditForm, {
 	type ProfileFormData,
 } from "../components/ProfileEditForm"
@@ -396,6 +397,8 @@ const Profile: React.FC = () => {
 							Edit Profile
 						</button>
 					)}
+
+					{isOwnProfile && <PasskeyDeviceManager />}
 				</div>
 			</header>
 

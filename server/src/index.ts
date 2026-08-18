@@ -67,6 +67,7 @@ import { createUploadRouter } from "./routes/upload.routes"
 import { createUserProfileRouter } from "./routes/user-profile.routes"
 import { validatorRouter } from "./routes/validator.routes"
 import { verifyRouter } from "./routes/verify.routes"
+import { createWalletRouter } from "./routes/wallet.routes"
 import { webhooksRouter } from "./routes/webhooks.routes"
 import { wikiRouter } from "./routes/wiki.routes"
 import { createAuthService } from "./services/auth.service"
@@ -299,6 +300,7 @@ app.use("/api", createScholarsRouter(jwtService))
 app.use("/api", scholarshipsRouter)
 app.use("/api", mentorBookingRouter)
 app.use("/api", createRecommendationsRouter(jwtService))
+app.use("/api", createWalletRouter(jwtService))
 app.use("/api", createForumRouter(jwtService))
 app.use("/api", createCredentialsRouter(jwtService))
 app.use("/api", verifyRouter)

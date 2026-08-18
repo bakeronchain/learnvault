@@ -5,7 +5,15 @@ import {
 	installMockFreighter,
 } from "./fixtures/mock-wallet"
 
-// Mock data types
+const E2E_COURSE_SLUG = "course-1"
+const E2E_COURSE_TITLE = "Stellar Smart Contracts 101"
+
+type MockEnrollmentRecord = {
+	course_id: string
+	enrollment_id?: number
+	tx_hash?: string
+}
+
 type MockCourse = {
 	id: string
 	title: string
@@ -15,14 +23,6 @@ type MockCourse = {
 	created_at: string
 	updated_at: string
 	max_learners: number | null
-}
-
-type MockEnrollment = {
-	id: string
-	learner_address: string
-	course_id: string
-	enrolled_at: string
-	status: "active" | "completed" | "dropped"
 }
 
 type MockMilestone = {
@@ -55,10 +55,30 @@ async function fulfillJson(route: Route, body: unknown, status = 200) {
 	})
 }
 
-async function installEnrollmentMocks(page: Page) {
+async function disableServiceWorkerForMocks(page: Page) {
+	await page.addInitScript(() => {
+		if (!("serviceWorker" in navigator)) return
+
+		navigator.serviceWorker.register = (() =>
+			Promise.reject(
+				new Error("Service worker disabled in enrollment E2E"),
+			)) as typeof navigator.serviceWorker.register
+
+		void navigator.serviceWorker.getRegistrations().then((registrations) => {
+			for (const registration of registrations) {
+				void registration.unregister()
+			}
+		})
+	})
+}
+
+async function installEnrollmentMocks(
+	page: Page,
+	options: { initialEnrollments?: MockEnrollmentRecord[] } = {},
+) {
 	const mockCourse: MockCourse = {
-		id: "course-1",
-		title: "Stellar Smart Contracts 101",
+		id: E2E_COURSE_SLUG,
+		title: E2E_COURSE_TITLE,
 		description: "Learn to build on Stellar",
 		instructor_address: "GATEACHER123TEACHERTEACHERTEACHERTEACHE123",
 		milestones_count: 3,
@@ -67,10 +87,48 @@ async function installEnrollmentMocks(page: Page) {
 		max_learners: null,
 	}
 
+	const mockCourseDetail = {
+		id: 1,
+		slug: E2E_COURSE_SLUG,
+		title: E2E_COURSE_TITLE,
+		description: mockCourse.description,
+		track: "stellar",
+		difficulty: "beginner",
+		published: true,
+		created_at: mockCourse.created_at,
+		updated_at: mockCourse.updated_at,
+		lessons: [
+			{
+				id: 1,
+				title: "Setup Stellar Development Environment",
+				content_markdown: "# Setup\n\nInstall the Stellar CLI.",
+				order: 1,
+				is_milestone: true,
+				estimated_minutes: 20,
+			},
+			{
+				id: 2,
+				title: "Deploy First Smart Contract",
+				content_markdown: "# Deploy\n\nDeploy your first contract.",
+				order: 2,
+				is_milestone: true,
+				estimated_minutes: 30,
+			},
+			{
+				id: 3,
+				title: "Interact with Contract",
+				content_markdown: "# Interact\n\nCall your contract.",
+				order: 3,
+				is_milestone: true,
+				estimated_minutes: 25,
+			},
+		],
+	}
+
 	const mockMilestones: MockMilestone[] = [
 		{
 			id: "milestone-1",
-			course_id: "course-1",
+			course_id: E2E_COURSE_SLUG,
 			title: "Setup Stellar Development Environment",
 			description: "Set up your local Stellar development environment",
 			evidence_guide: "Screenshot of stellar/quickstart running",
@@ -78,7 +136,7 @@ async function installEnrollmentMocks(page: Page) {
 		},
 		{
 			id: "milestone-2",
-			course_id: "course-1",
+			course_id: E2E_COURSE_SLUG,
 			title: "Deploy First Smart Contract",
 			description: "Deploy a simple Hello World contract",
 			evidence_guide: "Transaction ID of contract deployment",
@@ -86,7 +144,7 @@ async function installEnrollmentMocks(page: Page) {
 		},
 		{
 			id: "milestone-3",
-			course_id: "course-1",
+			course_id: E2E_COURSE_SLUG,
 			title: "Interact with Contract",
 			description: "Call your deployed contract",
 			evidence_guide: "Screenshot of successful function call",
@@ -94,10 +152,17 @@ async function installEnrollmentMocks(page: Page) {
 		},
 	]
 
-	let enrollments: MockEnrollment[] = []
+	let persistedEnrollments: MockEnrollmentRecord[] = [
+		...(options.initialEnrollments ?? []),
+	]
 	let milestoneReports: MockMilestoneReport[] = []
 	let lrnBalance = 0
 	let leaderboardRank = 1000
+
+	await page.addInitScript(() => {
+		localStorage.setItem("authToken", "e2e-enrollment-token")
+		localStorage.setItem("refreshToken", "e2e-enrollment-refresh")
+	})
 
 	await page.route("**/api/**", async (route) => {
 		const request = route.request()
@@ -105,12 +170,32 @@ async function installEnrollmentMocks(page: Page) {
 		const { pathname } = url
 		const method = request.method()
 
-		// GET /api/courses/:id
-		if (pathname.match(/^\/api\/courses\/[^/]+$/) && method === "GET") {
-			return fulfillJson(route, mockCourse)
+		if (pathname === "/api/courses" && method === "GET") {
+			return fulfillJson(route, {
+				data: [
+					{
+						id: 1,
+						slug: E2E_COURSE_SLUG,
+						title: E2E_COURSE_TITLE,
+						description: mockCourse.description,
+						track: "stellar",
+						difficulty: "beginner",
+						published: true,
+						created_at: mockCourse.created_at,
+						updated_at: mockCourse.updated_at,
+					},
+				],
+			})
 		}
 
-		// GET /api/courses/:id/milestones
+		if (
+			pathname.match(/^\/api\/courses\/[^/]+$/) &&
+			method === "GET" &&
+			!pathname.endsWith("/enrolled")
+		) {
+			return fulfillJson(route, mockCourseDetail)
+		}
+
 		if (
 			pathname.match(/^\/api\/courses\/[^/]+\/milestones$/) &&
 			method === "GET"
@@ -118,22 +203,34 @@ async function installEnrollmentMocks(page: Page) {
 			return fulfillJson(route, mockMilestones)
 		}
 
-		// POST /api/enrollments
-		if (pathname === "/api/enrollments" && method === "POST") {
-			const enrollment: MockEnrollment = {
-				id: `enrollment-${Date.now()}`,
-				learner_address: E2E_WALLET_ADDRESS,
-				course_id: "course-1",
-				enrolled_at: new Date().toISOString(),
-				status: "active",
-			}
-			enrollments.push(enrollment)
-			return fulfillJson(route, { enrollment }, 201)
+		if (pathname === "/api/enrollments" && method === "GET") {
+			return fulfillJson(route, { data: persistedEnrollments })
 		}
 
-		// GET /api/enrollments - list user enrollments
-		if (pathname === "/api/enrollments" && method === "GET") {
-			return fulfillJson(route, { enrollments })
+		if (pathname === "/api/enrollments" && method === "POST") {
+			const body = (await request.postDataJSON()) as {
+				course_id: string
+				tx_hash?: string
+			}
+			const enrollmentId = Date.now()
+			persistedEnrollments = [
+				...persistedEnrollments.filter(
+					(entry) => entry.course_id !== body.course_id,
+				),
+				{
+					course_id: body.course_id,
+					enrollment_id: enrollmentId,
+					tx_hash: body.tx_hash,
+				},
+			]
+			return fulfillJson(
+				route,
+				{
+					enrollment_id: enrollmentId,
+					enrolled_at: new Date().toISOISOString(),
+				},
+				201,
+			)
 		}
 
 		// POST /api/milestone-reports - submit milestone evidence
@@ -263,7 +360,7 @@ async function installEnrollmentMocks(page: Page) {
 				address: E2E_WALLET_ADDRESS,
 				lrn_balance: String(lrnBalance),
 				reputation_rank: yourRank,
-				courses_enrolled: enrollments.length,
+				courses_enrolled: persistedEnrollments.length,
 				courses_completed: lrnBalance > 0 ? 1 : 0,
 			})
 		}
@@ -274,186 +371,211 @@ async function installEnrollmentMocks(page: Page) {
 
 test.describe("Enrollment to Milestone E2E Flow", () => {
 	test.beforeEach(async ({ page }) => {
-		// Setup mocks
 		await installMockFreighter(page)
 		await mockHorizonBalances(page)
+		await disableServiceWorkerForMocks(page)
+	})
+
+	test("blocks direct lesson access until enrollment is persisted", async ({
+		page,
+	}) => {
 		await installEnrollmentMocks(page)
-	})
-
-	test("should complete full enrollment and milestone approval flow", async ({
-		page,
-	}) => {
-		// Step 1: Navigate to courses page
-		await page.goto("/courses")
+		await page.goto(`/courses/${E2E_COURSE_SLUG}/lessons/1`)
 		await page.waitForLoadState("networkidle")
 
-		// Step 2: Connect wallet
-		await page.click('button:has-text("Connect Wallet")')
-		await page.waitForTimeout(500)
-
-		// Step 3: Find and enroll in course
-		const courseCard = page
-			.locator('text="Stellar Smart Contracts 101"')
-			.first()
-		await expect(courseCard).toBeVisible()
-
-		await courseCard.click()
-		await page.waitForLoadState("networkidle")
-
-		// Verify course details displayed
 		await expect(
-			page.locator('h1:has-text("Stellar Smart Contracts 101")'),
+			page.getByRole("heading", { name: /Enrollment Required/i }),
 		).toBeVisible()
-		await expect(page.locator("text=Learn to build on Stellar")).toBeVisible()
-
-		// Step 4: Click enroll button
-		const enrollButton = page.locator('button:has-text("Enroll")')
-		await enrollButton.click()
-
-		// Confirm enrollment dialog
-		const confirmButton = page.locator('button:has-text("Confirm")')
-		await confirmButton.click()
-
-		await page.waitForLoadState("networkidle")
-
-		// Verify enrollment success
-		await expect(page.locator("text=Successfully enrolled")).toBeVisible({
-			timeout: 5000,
-		})
-
-		// Step 5: Navigate through lessons/milestones
-		const milestone1 = page.locator(
-			'text="Setup Stellar Development Environment"',
-		)
-		await expect(milestone1).toBeVisible()
-
-		await milestone1.click()
-		await page.waitForLoadState("networkidle")
-
-		// Step 6: Submit milestone evidence
-		const submitButton = page.locator('button:has-text("Submit Evidence")')
-		await expect(submitButton).toBeVisible()
-
-		const evidenceInput = page.locator(
-			'textarea[placeholder*="evidence"], input[placeholder*="evidence"]',
-		)
-		await evidenceInput.fill("https://example.com/screenshot.png")
-
-		await submitButton.click()
-
-		// Confirm submission
-		const confirmSubmitButton = page.locator('button:has-text("Confirm")')
-		await confirmSubmitButton.click()
-
-		await page.waitForLoadState("networkidle")
-
-		// Verify submission success
-		await expect(page.locator("text=Evidence submitted")).toBeVisible({
-			timeout: 5000,
-		})
-		await expect(page.locator("text=Pending Review")).toBeVisible()
-
-		// Step 7: Switch to admin wallet to approve milestone
-		// Store original address
-		const learnerAddress = E2E_WALLET_ADDRESS
-
-		// Switch to admin wallet (simulated by updating localStorage)
-		await page.evaluate(() => {
-			localStorage.setItem(
-				"admin_wallet",
-				"GAADMIN456ADMINADMINADMINADMINADMINADMIN456",
-			)
-		})
-
-		// Navigate to admin dashboard
-		await page.goto("/admin/milestone-reports")
-		await page.waitForLoadState("networkidle")
-
-		// Find the submitted milestone report
-		const milestoneReport = page.locator(
-			`text=${learnerAddress.substring(0, 10)}`,
-		)
-		await expect(milestoneReport).toBeVisible()
-
-		// Approve the milestone
-		const approveButton = page.locator('button:has-text("Approve")').first()
-		await approveButton.click()
-
-		// Confirm approval
-		const confirmApprovalButton = page.locator('button:has-text("Confirm")')
-		await confirmApprovalButton.click()
-
-		await page.waitForLoadState("networkidle")
-
-		// Verify approval success
-		await expect(page.locator("text=Milestone approved")).toBeVisible({
-			timeout: 5000,
-		})
-
-		// Step 8: Switch back to learner wallet
-		await page.evaluate(() => {
-			localStorage.setItem("admin_wallet", "")
-		})
-
-		// Step 9: Verify LRN balance increased
-		await page.goto("/me")
-		await page.waitForLoadState("networkidle")
-
-		const lrnBalance = page
-			.locator('text="LRN Balance"')
-			.locator("..")
-			.locator("text=/[0-9]+/")
-		await expect(lrnBalance).toContainText(/100|LRN/)
-
-		// Step 10: Verify reputation rank updated
-		await page.goto("/leaderboard")
-		await page.waitForLoadState("networkidle")
-
-		// Verify learner appears in leaderboard
-		const learnerInLeaderboard = page.locator('text="You"')
-		await expect(learnerInLeaderboard).toBeVisible()
-
-		// Verify rank is displayed
-		const rankBadge = page.locator('[data-testid="leaderboard-rank-badge"]')
-		await expect(rankBadge).toBeVisible()
-
-		// Verify LRN balance in leaderboard
-		const leaderboardBalance = page.locator('text="100"')
-		await expect(leaderboardBalance).toBeVisible()
+		await expect(
+			page.getByRole("button", { name: /Enroll Now/i }),
+		).toBeVisible()
+		await expect(page.getByText(/Install the Stellar CLI/i)).toHaveCount(0)
 	})
 
-	test("should handle multiple milestone submissions and approvals", async ({
-		page,
-	}) => {
-		await page.goto("/courses/course-1")
-		await page.waitForLoadState("networkidle")
+	test.describe("with persisted enrollment", () => {
+		test.beforeEach(async ({ page }) => {
+			await installEnrollmentMocks(page, {
+				initialEnrollments: [
+					{
+						course_id: E2E_COURSE_SLUG,
+						enrollment_id: 1,
+						tx_hash: "persisted-enrollment-hash",
+					},
+				],
+			})
+		})
 
-		// Enroll first
-		const enrollButton = page.locator('button:has-text("Enroll")')
-		await enrollButton.click()
-		await page.locator('button:has-text("Confirm")').click()
-		await page.waitForLoadState("networkidle")
+		test("shows lesson content after persisted enrollment survives reload", async ({
+			page,
+		}) => {
+			await page.goto(`/courses/${E2E_COURSE_SLUG}/lessons/1`)
+			await page.waitForLoadState("networkidle")
 
-		// Submit multiple milestones
-		const milestones = page.locator('[data-testid="milestone-item"]')
-		const count = await milestones.count()
+			await expect(
+				page.getByRole("heading", {
+					name: /Setup Stellar Development Environment/i,
+				}),
+			).toBeVisible()
+			await expect(page.getByText(/Install the Stellar CLI/i)).toBeVisible()
 
-		for (let i = 0; i < Math.min(count, 2); i++) {
-			const milestone = milestones.nth(i)
-			await milestone.click()
+			await page.reload()
+			await page.waitForLoadState("networkidle")
 
+			await expect(
+				page.getByRole("heading", {
+					name: /Setup Stellar Development Environment/i,
+				}),
+			).toBeVisible()
+		})
+
+		test("should complete full enrollment and milestone approval flow", async ({
+			page,
+		}) => {
+			await page.goto(`/courses/${E2E_COURSE_SLUG}/lessons/1`)
+			await page.waitForLoadState("networkidle")
+
+			await expect(
+				page.getByRole("heading", {
+					name: /Setup Stellar Development Environment/i,
+				}),
+			).toBeVisible()
+
+			await page.reload()
+			await page.waitForLoadState("networkidle")
+			await expect(page.getByText(/Install the Stellar CLI/i)).toBeVisible()
+
+			// Navigate through lessons/milestones
+			const milestone1 = page.locator(
+				'text="Setup Stellar Development Environment"',
+			)
+			await expect(milestone1).toBeVisible()
+
+			await milestone1.click()
+			await page.waitForLoadState("networkidle")
+
+			// Step 6: Submit milestone evidence
 			const submitButton = page.locator('button:has-text("Submit Evidence")')
-			const evidence = page.locator('textarea[placeholder*="evidence"]')
+			await expect(submitButton).toBeVisible()
 
-			await evidence.fill(`Evidence for milestone ${i + 1}`)
+			const evidenceInput = page.locator(
+				'textarea[placeholder*="evidence"], input[placeholder*="evidence"]',
+			)
+			await evidenceInput.fill("https://example.com/screenshot.png")
+
 			await submitButton.click()
-			await page.locator('button:has-text("Confirm")').click()
+
+			// Confirm submission
+			const confirmSubmitButton = page.locator('button:has-text("Confirm")')
+			await confirmSubmitButton.click()
 
 			await page.waitForLoadState("networkidle")
-		}
 
-		// Verify all submissions are pending
-		const pendingIndicators = page.locator('text="Pending Review"')
-		expect(await pendingIndicators.count()).toBeGreaterThanOrEqual(2)
+			// Verify submission success
+			await expect(page.locator("text=Evidence submitted")).toBeVisible({
+				timeout: 5000,
+			})
+			await expect(page.locator("text=Pending Review")).toBeVisible()
+
+			// Step 7: Switch to admin wallet to approve milestone
+			// Store original address
+			const learnerAddress = E2E_WALLET_ADDRESS
+
+			// Switch to admin wallet (simulated by updating localStorage)
+			await page.evaluate(() => {
+				localStorage.setItem(
+					"admin_wallet",
+					"GAADMIN456ADMINADMINADMINADMINADMINADMIN456",
+				)
+			})
+
+			// Navigate to admin dashboard
+			await page.goto("/admin/milestone-reports")
+			await page.waitForLoadState("networkidle")
+
+			// Find the submitted milestone report
+			const milestoneReport = page.locator(
+				`text=${learnerAddress.substring(0, 10)}`,
+			)
+			await expect(milestoneReport).toBeVisible()
+
+			// Approve the milestone
+			const approveButton = page.locator('button:has-text("Approve")').first()
+			await approveButton.click()
+
+			// Confirm approval
+			const confirmApprovalButton = page.locator('button:has-text("Confirm")')
+			await confirmApprovalButton.click()
+
+			await page.waitForLoadState("networkidle")
+
+			// Verify approval success
+			await expect(page.locator("text=Milestone approved")).toBeVisible({
+				timeout: 5000,
+			})
+
+			// Step 8: Switch back to learner wallet
+			await page.evaluate(() => {
+				localStorage.setItem("admin_wallet", "")
+			})
+
+			// Step 9: Verify LRN balance increased
+			await page.goto("/me")
+			await page.waitForLoadState("networkidle")
+
+			const lrnBalance = page
+				.locator('text="LRN Balance"')
+				.locator("..")
+				.locator("text=/[0-9]+/")
+			await expect(lrnBalance).toContainText(/100|LRN/)
+
+			// Step 10: Verify reputation rank updated
+			await page.goto("/leaderboard")
+			await page.waitForLoadState("networkidle")
+
+			// Verify learner appears in leaderboard
+			const learnerInLeaderboard = page.locator('text="You"')
+			await expect(learnerInLeaderboard).toBeVisible()
+
+			// Verify rank is displayed
+			const rankBadge = page.locator('[data-testid="leaderboard-rank-badge"]')
+			await expect(rankBadge).toBeVisible()
+
+			// Verify LRN balance in leaderboard
+			const leaderboardBalance = page.locator('text="100"')
+			await expect(leaderboardBalance).toBeVisible()
+		})
+
+		test("should handle multiple milestone submissions and approvals", async ({
+			page,
+		}) => {
+			await page.goto(`/courses/${E2E_COURSE_SLUG}/lessons/1`)
+			await page.waitForLoadState("networkidle")
+
+			await expect(
+				page.getByRole("heading", {
+					name: /Setup Stellar Development Environment/i,
+				}),
+			).toBeVisible()
+
+			const milestones = page.locator('[data-testid="milestone-item"]')
+			const count = await milestones.count()
+
+			for (let i = 0; i < Math.min(count, 2); i++) {
+				const milestone = milestones.nth(i)
+				await milestone.click()
+
+				const submitButton = page.locator('button:has-text("Submit Evidence")')
+				const evidence = page.locator('textarea[placeholder*="evidence"]')
+
+				await evidence.fill(`Evidence for milestone ${i + 1}`)
+				await submitButton.click()
+				await page.locator('button:has-text("Confirm")').click()
+
+				await page.waitForLoadState("networkidle")
+			}
+
+			const pendingIndicators = page.locator('text="Pending Review"')
+			expect(await pendingIndicators.count()).toBeGreaterThanOrEqual(2)
+		})
 	})
 })

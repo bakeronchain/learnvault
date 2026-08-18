@@ -1,23 +1,14 @@
 import { BookOpen } from "lucide-react"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
-import { Link, useSearchParams } from "react-router-dom"
-import BookmarkButton from "../components/BookmarkButton"
-import CourseCategoryBadge from "../components/CourseCategoryBadge"
+import { useSearchParams } from "react-router-dom"
+import CatalogCourseCard from "../components/CatalogCourseCard"
 import { CourseFilter } from "../components/CourseFilter"
 import Pagination from "../components/Pagination"
 import RecommendationsCarousel from "../components/RecommendationsCarousel"
 import { CourseCardSkeleton } from "../components/skeletons/CourseCardSkeleton"
-import SponsorLogosForTrack from "../components/SponsorLogosForTrack"
 import { EmptyState } from "../components/states/emptyState"
 import { ErrorState } from "../components/states/errorState"
 import { useCourses } from "../hooks/useCourses"
-import { type CourseSummary } from "../types/courses"
-
-const levelStyles: Record<CourseSummary["level"], string> = {
-	Beginner: "bg-brand-emerald/20 text-brand-emerald border-brand-emerald/20",
-	Intermediate: "bg-brand-purple/20 text-brand-purple border-brand-purple/20",
-	Advanced: "bg-red-500/20 text-red-400 border-red-500/20",
-}
 
 const ITEMS_PER_PAGE = 4
 
@@ -201,66 +192,11 @@ const Courses: React.FC = () => {
 				<>
 					<div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 						{paginatedCourses.map((course, index) => (
-							<article
+							<CatalogCourseCard
 								key={course.id}
-								className="glass-card relative flex h-full flex-col overflow-hidden rounded-4xl border border-white/10"
-							>
-								<div className="absolute right-4 top-4 z-10">
-									<BookmarkButton courseId={course.id} />
-								</div>
-								<div
-									className={`h-36 border-b border-white/10 bg-linear-to-br ${course.accentClassName}`}
-								/>
-								<div className="flex h-full flex-col p-6">
-									<div className="mb-4 flex items-center justify-between gap-3">
-										<CourseCategoryBadge category={course.track} />
-										<span
-											className={`rounded-full border px-3 py-1 text-xs font-semibold ${levelStyles[course.level]}`}
-										>
-											{course.level}
-										</span>
-									</div>
-
-									<h2 className="mb-3 text-xl font-bold transition-colors duration-300 group-hover:text-brand-cyan">
-										{course.title}
-									</h2>
-									<p className="mb-5 text-sm leading-relaxed text-white/55">
-										{course.description}
-									</p>
-									{course.ratingSummary && course.ratingSummary.count > 0 ? (
-										<div className="mb-5 flex items-center gap-2 text-xs text-white/70">
-											<span className="text-yellow-300">
-												{"★".repeat(
-													Math.max(
-														1,
-														Math.min(
-															5,
-															Math.round(course.ratingSummary.average),
-														),
-													),
-												)}
-											</span>
-											<span>
-												{course.ratingSummary.average.toFixed(1)} (
-												{course.ratingSummary.count})
-											</span>
-										</div>
-									) : null}
-
-									<SponsorLogosForTrack track={course.track} compact />
-
-									<div className="mt-auto flex flex-col items-stretch justify-between gap-4 text-sm text-gray-400 sm:flex-row sm:items-center">
-										<span>{course.track}</span>
-										<Link
-											to={`/courses/${course.slug}/lessons/1`}
-											id={index === 0 ? "course-card-0" : undefined}
-											className="iridescent-border w-full rounded-xl px-4 py-2 text-center font-semibold text-white transition-transform hover:scale-105 sm:w-auto"
-										>
-											Open course
-										</Link>
-									</div>
-								</div>
-							</article>
+								course={course}
+								index={index}
+							/>
 						))}
 					</div>
 					<div className="mt-12">

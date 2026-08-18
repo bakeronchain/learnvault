@@ -164,6 +164,9 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 			nullify(true)
 		} else {
 			if (popupLock.current) return
+			// Rehydrate non-extension wallets from persisted storage without calling
+			// into StellarWalletsKit (e.g. E2E hot-wallet mock).
+			if (walletId !== "freighter" && walletAddr !== null) return
 			// If our storage item is there, then we try to get the user's address &
 			// network from their wallet. Note: `getAddress` MAY open their wallet
 			// extension, depending on which wallet they select!
@@ -171,7 +174,6 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 				const { wallet } = await loadWalletModule()
 				popupLock.current = true
 				wallet.setWallet(walletId)
-				if (walletId !== "freighter" && walletAddr !== null) return
 				const [a, n] = await Promise.all([
 					wallet.getAddress(),
 					wallet.getNetwork(),

@@ -86,6 +86,16 @@ describe("POST /api/enrollments", () => {
 		mockedQuery
 			.mockResolvedValueOnce({ rows: [{ id: 1 }] })
 			.mockResolvedValueOnce({ rows: [] })
+			.mockResolvedValueOnce({
+				rows: [
+					{
+						id: 1,
+						slug: COURSE_SLUG,
+						title: "Stellar Basics",
+						prerequisites: [],
+					},
+				],
+			})
 			.mockResolvedValueOnce({ rows: [{ content_version: 2 }] })
 			.mockResolvedValueOnce({
 				rows: [
@@ -154,6 +164,16 @@ describe("POST /api/enrollments", () => {
 		mockedQuery
 			.mockResolvedValueOnce({ rows: [{ id: 1 }] })
 			.mockResolvedValueOnce({ rows: [] })
+			.mockResolvedValueOnce({
+				rows: [
+					{
+						id: 1,
+						slug: COURSE_SLUG,
+						title: "Stellar Basics",
+						prerequisites: [],
+					},
+				],
+			})
 			.mockResolvedValueOnce({ rows: [{ content_version: 3 }] })
 			.mockResolvedValueOnce({
 				rows: [
@@ -189,6 +209,182 @@ describe("POST /api/enrollments", () => {
 		expect(res.status).toBe(400)
 		expect(res.body.error).toContain("learner_address must match")
 		expect(mockedQuery).not.toHaveBeenCalled()
+	})
+
+	it("validates on-chain enrollment with string course_id when contract is configured", async () => {
+		process.env.COURSE_MILESTONE_CONTRACT_ID = "CMILESTONE123"
+		const enrolledAt = "2026-05-27T12:00:00.000Z"
+		mockedQuery
+			.mockResolvedValueOnce({ rows: [{ id: 1 }] })
+			.mockResolvedValueOnce({ rows: [] })
+			.mockResolvedValueOnce({
+				rows: [
+					{
+						id: 1,
+						slug: COURSE_SLUG,
+						title: "Stellar Basics",
+						prerequisites: [],
+					},
+				],
+			})
+			.mockResolvedValueOnce({ rows: [{ content_version: 1 }] })
+			.mockResolvedValueOnce({
+				rows: [
+					{
+						id: 42,
+						enrolled_at: enrolledAt,
+						content_version: 1,
+					},
+				],
+			})
+
+		const res = await request(buildApp())
+			.post("/api/enrollments")
+			.set("Authorization", makeToken(LEARNER))
+			.send(enrollmentPayload)
+
+		expect(res.status).toBe(201)
+		expect(mockedIsEnrolled).toHaveBeenCalledWith(
+			LEARNER,
+			COURSE_SLUG,
+			expect.any(Object),
+		)
+	})
+
+	it("returns 400 when learner is not enrolled on-chain", async () => {
+		process.env.COURSE_MILESTONE_CONTRACT_ID = "CMILESTONE123"
+		mockedIsEnrolled.mockResolvedValue(false)
+		mockedQuery.mockResolvedValueOnce({ rows: [{ id: 1 }] })
+
+		const res = await request(buildApp())
+			.post("/api/enrollments")
+			.set("Authorization", makeToken(LEARNER))
+			.send(enrollmentPayload)
+
+		expect(res.status).toBe(400)
+		expect(res.body).toEqual({
+			error: "Learner is not enrolled in this course on-chain",
+		})
+		expect(mockedIsEnrolled).toHaveBeenCalledWith(
+			LEARNER,
+			COURSE_SLUG,
+			expect.any(Object),
+		)
+		const insertCall = mockedQuery.mock.calls.find(([sql]) =>
+			String(sql).includes("INSERT INTO enrollments"),
+		)
+		expect(insertCall).toBeUndefined()
+	})
+
+	it("returns 409 when a concurrent insert hits the unique constraint", async () => {
+		const enrolledAt = "2026-05-27T12:00:00.000Z"
+		mockedQuery
+			.mockResolvedValueOnce({ rows: [{ id: 1 }] })
+			.mockResolvedValueOnce({ rows: [] })
+			.mockResolvedValueOnce({
+				rows: [
+					{
+						id: 1,
+						slug: COURSE_SLUG,
+						title: "Stellar Basics",
+						prerequisites: [],
+					},
+				],
+			})
+			.mockResolvedValueOnce({ rows: [{ content_version: 1 }] })
+			.mockRejectedValueOnce({ code: "23505" })
+
+		const res = await request(buildApp())
+			.post("/api/enrollments")
+			.set("Authorization", makeToken(LEARNER))
+			.send(enrollmentPayload)
+
+		expect(res.status).toBe(409)
+		expect(res.body).toEqual({ error: "Already enrolled in this course" })
+	})
+
+	it("returns 409 with unmet prerequisites details when not completed", async () => {
+		mockedQuery
+			.mockResolvedValueOnce({ rows: [{ id: 1 }] })
+			.mockResolvedValueOnce({ rows: [] })
+			.mockResolvedValueOnce({
+				rows: [
+					{
+						id: 1,
+						slug: COURSE_SLUG,
+						title: "Stellar Basics",
+						prerequisites: [2],
+					},
+				],
+			})
+			.mockResolvedValueOnce({
+				rows: [
+					{
+						id: 2,
+						slug: "soroban-fundamentals",
+						title: "Soroban Fundamentals",
+					},
+				],
+			})
+			.mockResolvedValueOnce({ rows: [] })
+
+		const res = await request(buildApp())
+			.post("/api/enrollments")
+			.set("Authorization", makeToken(LEARNER))
+			.send(enrollmentPayload)
+
+		expect(res.status).toBe(409)
+		expect(res.body.error).toBe("Prerequisites not met")
+		expect(res.body.unmetPrerequisites).toEqual([
+			{ id: 2, slug: "soroban-fundamentals", title: "Soroban Fundamentals" },
+		])
+	})
+
+	it("enrolls successfully when prerequisites are met", async () => {
+		const enrolledAt = "2026-01-01T00:00:00.000Z"
+		mockedQuery
+			.mockResolvedValueOnce({ rows: [{ id: 1 }] })
+			.mockResolvedValueOnce({ rows: [] })
+			.mockResolvedValueOnce({
+				rows: [
+					{
+						id: 1,
+						slug: COURSE_SLUG,
+						title: "Stellar Basics",
+						prerequisites: [2],
+					},
+				],
+			})
+			.mockResolvedValueOnce({
+				rows: [
+					{
+						id: 2,
+						slug: "soroban-fundamentals",
+						title: "Soroban Fundamentals",
+					},
+				],
+			})
+			.mockResolvedValueOnce({
+				rows: [{ course_id: "soroban-fundamentals" }],
+			})
+			.mockResolvedValueOnce({ rows: [{ content_version: 1 }] })
+			.mockResolvedValueOnce({
+				rows: [
+					{
+						id: 100,
+						enrolled_at: enrolledAt,
+						content_version: 1,
+					},
+				],
+			})
+
+		const res = await request(buildApp())
+			.post("/api/enrollments")
+			.set("Authorization", makeToken(LEARNER))
+			.send(enrollmentPayload)
+
+		expect(res.status).toBe(201)
+		expect(res.body.enrollment_id).toBe(100)
 	})
 })
 

@@ -158,7 +158,7 @@ export const CacheKey = {
 	govBalance: (addr: string) => `balance:gov:${addr}`,
 	votingPower: (addr: string) => `voting_power:${addr}`,
 	delegation: (addr: string) => `delegation:${addr}`,
-	enrollment: (addr: string, courseId: number) =>
+	enrollment: (addr: string, courseId: string) =>
 		`enrollment:${addr}:${courseId}`,
 	verifyCredential: (tokenId: string | number) =>
 		`verify:credential:${tokenId}`,

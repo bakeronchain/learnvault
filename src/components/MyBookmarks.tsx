@@ -1,9 +1,9 @@
 import React from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { Link } from "react-router-dom"
 
 import { useBookmarks } from "../hooks/useBookmarks"
 import { useCourses } from "../hooks/useCourses"
-import CourseCard from "./CourseCard"
+import EnrollableCourseCard from "./EnrollableCourseCard"
 
 /**
  * Inner render — only mounted when we actually have bookmarks to display, so
@@ -14,7 +14,6 @@ const MyBookmarksList: React.FC<{ bookmarkedIds: Set<string> }> = ({
 	bookmarkedIds,
 }) => {
 	const { courses, isLoading: isLoadingCourses } = useCourses()
-	const navigate = useNavigate()
 
 	const bookmarkedCourses = courses.filter((c) => bookmarkedIds.has(c.id))
 
@@ -34,9 +33,9 @@ const MyBookmarksList: React.FC<{ bookmarkedIds: Set<string> }> = ({
 	return (
 		<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 items-start">
 			{bookmarkedCourses.map((course) => (
-				<CourseCard
+				<EnrollableCourseCard
 					key={course.id}
-					id={course.id}
+					id={course.slug}
 					title={course.title}
 					description={course.description}
 					difficulty={
@@ -46,9 +45,6 @@ const MyBookmarksList: React.FC<{ bookmarkedIds: Set<string> }> = ({
 					lrnReward={0}
 					lessonCount={0}
 					coverImage={course.coverImage ?? undefined}
-					onEnroll={() =>
-						navigate(`/courses?highlight=${encodeURIComponent(course.id)}`)
-					}
 				/>
 			))}
 		</div>

@@ -1,10 +1,18 @@
 import React, { useCallback } from "react"
+import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router-dom"
 import { useEnrollment } from "../hooks/useEnrollment"
 import { type CourseSummary } from "../types/courses"
+import { shortenContractId } from "../util/contract"
 import BookmarkButton from "./BookmarkButton"
 import CourseCategoryBadge from "./CourseCategoryBadge"
 import SponsorLogosForTrack from "./SponsorLogosForTrack"
+
+const LANGUAGE_LABELS: Record<string, string> = {
+	es: "ES",
+	fr: "FR",
+	sw: "SW",
+}
 
 const levelStyles: Record<CourseSummary["level"], string> = {
 	Beginner: "bg-brand-emerald/20 text-brand-emerald border-brand-emerald/20",
@@ -22,6 +30,7 @@ const CatalogCourseCard: React.FC<CatalogCourseCardProps> = ({
 	index,
 }) => {
 	const navigate = useNavigate()
+	const { t } = useTranslation()
 	const {
 		isEnrolled,
 		isChecking,
@@ -110,6 +119,44 @@ const CatalogCourseCard: React.FC<CatalogCourseCardProps> = ({
 							{course.ratingSummary.count})
 						</span>
 					</div>
+				) : null}
+
+				{course.availableLanguages && course.availableLanguages.length > 0 ? (
+					<div className="mb-3 flex flex-wrap items-center gap-1.5">
+						{course.availableLanguages.map((lang) => (
+							<span
+								key={lang}
+								className="rounded-full border border-brand-emerald/30 bg-brand-emerald/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-brand-emerald"
+							>
+								{LANGUAGE_LABELS[lang] ?? lang}
+							</span>
+						))}
+					</div>
+				) : null}
+				{course.isFallback ? (
+					<p className="mb-3 text-xs text-white/45">
+						{t("contentFallbackNotice", "Showing English — not yet translated")}
+					</p>
+				) : null}
+				{course.translationCoverage &&
+				course.translationCoverage.totalLessons > 0 &&
+				course.translationCoverage.translatedLessons <
+					course.translationCoverage.totalLessons ? (
+					<p className="mb-3 text-xs text-white/45">
+						{t("cataloguePartialCoverage", {
+							defaultValue: "{{translated}} of {{total}} lessons translated",
+							translated: course.translationCoverage.translatedLessons,
+							total: course.translationCoverage.totalLessons,
+						})}
+					</p>
+				) : null}
+				{course.isTranslation && course.translatorAddress ? (
+					<p className="mb-3 text-xs text-white/45">
+						{t("contentTranslatedBy", {
+							defaultValue: "Translated by {{translator}}",
+							translator: shortenContractId(course.translatorAddress),
+						})}
+					</p>
 				) : null}
 
 				<SponsorLogosForTrack track={course.track} compact />

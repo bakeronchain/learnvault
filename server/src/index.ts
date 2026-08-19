@@ -37,6 +37,7 @@ import { adminRouter } from "./routes/admin.routes"
 import { antiSybilRouter } from "./routes/anti-sybil.routes"
 import { createAuthRouter } from "./routes/auth.routes"
 import { createBountyRouter } from "./routes/bounty.routes"
+import { createAnchorsRouter } from "./routes/anchors.routes"
 import { createCommentsRouter } from "./routes/comments.routes"
 import { communityRouter } from "./routes/community.routes"
 import { coursesRouter } from "./routes/courses.routes"
@@ -325,6 +326,7 @@ app.use("/api", referralRouter)
 app.use("/api", createReviewsRouter(jwtService))
 app.use("/api", notificationsRouter)
 app.use("/api", createStreaksRouter(jwtService))
+app.use("/api", createAnchorsRouter(jwtService))
 
 if (process.env.NODE_ENV !== "test") {
 	void import("./workers/escrow-timeout-worker").then(

@@ -56,6 +56,8 @@ import { notificationsRouter } from "./routes/notifications.routes"
 import { createPeerReviewRouter } from "./routes/peer-review.routes"
 import { qfRouter } from "./routes/qf.routes"
 import { createRecommendationsRouter } from "./routes/recommendations.routes"
+import { onboardingRouter } from "./routes/onboarding.routes"
+import { createRelayRouter } from "./routes/relay.routes"
 import { referralRouter } from "./routes/referral.routes"
 import { createReviewsRouter } from "./routes/reviews.routes"
 import { createScholarsRouter } from "./routes/scholars.routes"
@@ -326,7 +328,10 @@ app.use("/api", referralRouter)
 app.use("/api", createReviewsRouter(jwtService))
 app.use("/api", notificationsRouter)
 app.use("/api", createStreaksRouter(jwtService))
+app.use("/api", onboardingRouter)
+app.use("/api", createRelayRouter(jwtService))
 app.use("/api", createAnchorsRouter(jwtService))
+
 
 if (process.env.NODE_ENV !== "test") {
 	void import("./workers/escrow-timeout-worker").then(

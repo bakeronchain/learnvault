@@ -197,3 +197,26 @@ export const otpLimiter = rateLimit({
 		"OTP limit reached. You can request 3 OTPs per hour per phone number.",
 	),
 })
+
+/**
+ * Per-account limiter for the gasless-onboarding fee-bump relayer (#1054).
+ * Keyed by the authenticated learner's wallet address (set by requireAuth,
+ * which must run before this middleware) rather than IP — the sponsor is
+ * paying real fees per request, so the limit must follow the account, not
+ * whatever network it happens to be behind.
+ */
+export const feeBumpRelayLimiter = rateLimit({
+	windowMs: 60 * 60 * 1000,
+	limit: 30,
+	keyGenerator: (req: Request): string => {
+		const walletAddress = (req as Request & { walletAddress?: string })
+			.walletAddress
+		return walletAddress ?? ipKeyGenerator(req.ip ?? "unknown")
+	},
+	standardHeaders: "draft-7",
+	legacyHeaders: false,
+	validate: false,
+	handler: createRateLimitHandler(
+		"Relay limit reached. You can relay up to 30 transactions per hour.",
+	),
+})

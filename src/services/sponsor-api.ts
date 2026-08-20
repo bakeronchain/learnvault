@@ -3,6 +3,8 @@ const API_BASE =
 	(import.meta.env.VITE_SERVER_URL as string | undefined) ||
 	"http://localhost:4000"
 
+const API_ORIGIN = API_BASE.startsWith("/") ? "" : new URL(API_BASE).origin
+
 interface DepositRequest {
 	donorAddress: string
 	amount: number
@@ -80,7 +82,7 @@ export async function depositToTreasury({
 	amount,
 	txHash,
 }: DepositRequest): Promise<DepositResponse> {
-	const response = await fetch(`${API_BASE}/api/treasury/deposit`, {
+	const response = await fetch(`${API_ORIGIN}/api/treasury/deposit`, {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
@@ -108,7 +110,7 @@ export async function getDepositsForAddress(
 ): Promise<Deposit[]> {
 	const encodedAddress = encodeURIComponent(address)
 	const response = await fetch(
-		`${API_BASE}/api/treasury/deposits/${encodedAddress}`,
+		`${API_ORIGIN}/api/treasury/deposits/${encodedAddress}`,
 	)
 
 	if (!response.ok) {

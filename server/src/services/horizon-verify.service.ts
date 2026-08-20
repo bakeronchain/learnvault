@@ -9,6 +9,7 @@
  * Space complexity: O(1) — no accumulation; we exit as soon as a match is found.
  */
 
+import { xdr, Address, scValToNative } from "@stellar/stellar-sdk"
 import { logger } from "../lib/logger"
 
 const log = logger.child({ module: "horizon-verify" })
@@ -16,6 +17,7 @@ const log = logger.child({ module: "horizon-verify" })
 const STELLAR_NETWORK = process.env.STELLAR_NETWORK ?? "testnet"
 const SCHOLARSHIP_TREASURY_CONTRACT_ID =
 	process.env.SCHOLARSHIP_TREASURY_CONTRACT_ID ?? ""
+const USDC_CONTRACT_ID = process.env.USDC_CONTRACT_ID ?? ""
 
 const USDC_DECIMALS = 7
 const AMOUNT_TOLERANCE_ATOMIC = 1n
@@ -83,12 +85,17 @@ export async function verifyDepositTx(
 			"SCHOLARSHIP_TREASURY_CONTRACT_ID not configured — cannot verify deposit",
 		)
 	}
-
-	// Dynamic import keeps the heavy SDK out of the module's startup cost
-	const { xdr, Address, scValToNative } = await import("@stellar/stellar-sdk")
+	if (!USDC_CONTRACT_ID) {
+		throw new Error(
+			"USDC_CONTRACT_ID not configured — cannot verify asset parameter",
+		)
+	}
 
 	const record = await fetchHorizonTx(txHash)
-	const envelope = xdr.TransactionEnvelope.fromXDR(record.envelope_xdr, "base64")
+	const envelope = xdr.TransactionEnvelope.fromXDR(
+		record.envelope_xdr,
+		"base64",
+	)
 
 	// Soroban transactions always use the v1 (FeeBump-capable) envelope
 	if (envelope.switch().name !== "envelopeTypeTx") {
@@ -105,13 +112,7 @@ export async function verifyDepositTx(
 		// Filter: only Soroban host-function invocations
 		if (body.switch().name !== "invokeHostFunction") continue
 
-		// The TypeScript types for OperationBody mark `invokeHostFunction` as a
-		// static factory only. The instance accessor is generated at runtime by
-		// stellar-base's XDR library but not reflected in the d.ts — cast to reach it.
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const ihfOp = (body as any).invokeHostFunction() as {
-			hostFunction(): import("@stellar/stellar-sdk").xdr.HostFunction
-		}
+		const ihfOp = body.value() as xdr.InvokeHostFunctionOp
 		const hf = ihfOp.hostFunction()
 		if (hf.switch().name !== "hostFunctionTypeInvokeContract") continue
 
@@ -122,7 +123,9 @@ export async function verifyDepositTx(
 		// avoiding the Opaque[]/Buffer incompatibility in the raw XDR types.
 		let contractStrkey: string
 		try {
-			contractStrkey = Address.fromScAddress(invokeArgs.contractAddress()).toString()
+			contractStrkey = Address.fromScAddress(
+				invokeArgs.contractAddress(),
+			).toString()
 		} catch {
 			continue
 		}
@@ -156,6 +159,16 @@ export async function verifyDepositTx(
 				: expectedAtomic - amountNative
 
 		if (diff > AMOUNT_TOLERANCE_ATOMIC) continue
+
+		// 5. Verify the third argument (asset) is exactly USDC_CONTRACT_ID
+		if (args.length < 3) continue
+		let assetStrkey: string
+		try {
+			assetStrkey = Address.fromScVal(args[2]).toString()
+		} catch {
+			continue
+		}
+		if (!USDC_CONTRACT_ID || assetStrkey !== USDC_CONTRACT_ID) continue
 
 		return true
 	}

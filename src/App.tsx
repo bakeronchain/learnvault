@@ -23,6 +23,8 @@ const DaoProposals = lazy(() => import("./pages/DaoProposals"))
 const DaoPropose = lazy(() => import("./pages/DaoPropose"))
 const Dashboard = lazy(() => import("./pages/Dashboard"))
 const Debug = lazy(() => import("./pages/Debug"))
+const Disputes = lazy(() => import("./pages/Disputes"))
+const DisputeDetail = lazy(() => import("./pages/DisputeDetail"))
 const Donor = lazy(() => import("./pages/Donor"))
 const Home = lazy(() => import("./pages/Home"))
 const History = lazy(() => import("./pages/History"))
@@ -133,8 +135,16 @@ function App() {
 					<Route path="/debug" element={renderRoute(<Debug />)} />
 					<Route path="/debug/:contractName" element={renderRoute(<Debug />)} />
 					<Route path="/bounties" element={renderRoute(<BountyBoard />)} />
-					<Route path="/bounties/create" element={renderRoute(<CreateBounty />)} />
+					<Route
+						path="/bounties/create"
+						element={renderRoute(<CreateBounty />)}
+					/>
 					<Route path="/bounties/:id" element={renderRoute(<BountyDetail />)} />
+					<Route path="/disputes" element={renderRoute(<Disputes />)} />
+					<Route
+						path="/disputes/:id"
+						element={renderRoute(<DisputeDetail />)}
+					/>
 					<Route path="*" element={renderRoute(<NotFound />)} />
 				</Route>
 			</Routes>

@@ -10,6 +10,10 @@ export type NotificationType =
 	| "disbursement"
 	| "proposal_passed"
 	| "voting_deadline_reminder"
+	| "dispute_opened"
+	| "dispute_juror_selected"
+	| "dispute_reveal_reminder"
+	| "dispute_resolved"
 
 export interface Notification {
 	id: number
@@ -54,6 +58,10 @@ export interface NotificationPreferences {
 	disbursement: boolean
 	proposal_passed: boolean
 	voting_deadline_reminder: boolean
+	dispute_opened: boolean
+	dispute_juror_selected: boolean
+	dispute_reveal_reminder: boolean
+	dispute_resolved: boolean
 	email_milestone_approved: boolean
 	email_milestone_rejected: boolean
 	email_vote_result: boolean
@@ -258,6 +266,10 @@ export async function getNotificationPreferences(
 			vote_result,
 			disbursement,
 			voting_deadline_reminder,
+			dispute_opened,
+			dispute_juror_selected,
+			dispute_reveal_reminder,
+			dispute_resolved,
 			email_milestone_approved,
 			email_milestone_rejected,
 			email_vote_result,
@@ -282,6 +294,10 @@ export async function getNotificationPreferences(
 			vote_result,
 			disbursement,
 			voting_deadline_reminder,
+			dispute_opened,
+			dispute_juror_selected,
+			dispute_reveal_reminder,
+			dispute_resolved,
 			email_milestone_approved,
 			email_milestone_rejected,
 			email_vote_result,
@@ -318,6 +334,10 @@ export async function updateNotificationPreferences(
 			vote_result,
 			disbursement,
 			voting_deadline_reminder,
+			dispute_opened,
+			dispute_juror_selected,
+			dispute_reveal_reminder,
+			dispute_resolved,
 			email_milestone_approved,
 			email_milestone_rejected,
 			email_vote_result,

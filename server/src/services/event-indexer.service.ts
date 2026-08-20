@@ -355,10 +355,202 @@ async function persistIndexedEvent(
 			}
 		}
 
+		if (
+			topic === "MilestoneArbitration::dispute_opened" ||
+			topic === "MilestoneArbitration::vote_committed" ||
+			topic === "MilestoneArbitration::vote_revealed" ||
+			topic === "MilestoneArbitration::dispute_resolved"
+		) {
+			await handleArbitrationEvent(topic, data, txHash)
+		}
+
 		return true
 	}
 
 	return false
+}
+
+// Matches milestone_arbitration's COMMIT_WINDOW_SECONDS -- used only to
+// back-derive an approximate `opened_at` for display, since the on-chain
+// DisputeOpened event carries the commit/reveal deadlines but not the open
+// timestamp itself.
+const COMMIT_WINDOW_SECONDS = 3 * 24 * 60 * 60
+
+/**
+ * Reactive side effects for milestone_arbitration dispute-lifecycle events:
+ * mirror the event into the `disputes` / `dispute_jurors` / `dispute_votes`
+ * read model, and notify the parties who need to act before a deadline
+ * passes. Best-effort throughout -- a notification failure never blocks
+ * indexing the event itself.
+ */
+async function handleArbitrationEvent(
+	topic: string,
+	data: { value?: unknown },
+	txHash: string | undefined,
+): Promise<void> {
+	try {
+		const { disputeStore } = await import("../db/dispute-store")
+		const value = (
+			data.value && typeof data.value === "object" ? data.value : {}
+		) as Record<string, unknown>
+
+		const disputeId = String(value.dispute_id ?? value.disputeId ?? "")
+		if (!disputeId) return
+
+		if (topic === "MilestoneArbitration::dispute_opened") {
+			const proposalId = Number(value.proposal_id ?? value.proposalId ?? 0)
+			const milestoneId = Number(value.milestone_id ?? value.milestoneId ?? 0)
+			const scholar = String(value.scholar ?? "")
+			const commitDeadlineSec = Number(
+				value.commit_deadline ?? value.commitDeadline ?? 0,
+			)
+			const revealDeadlineSec = Number(
+				value.reveal_deadline ?? value.revealDeadline ?? 0,
+			)
+			const panel = Array.isArray(value.panel) ? value.panel.map(String) : []
+
+			await disputeStore.upsertDisputeOpened({
+				disputeId,
+				proposalId,
+				milestoneId,
+				scholarAddress: scholar,
+				evidenceHash: String(value.evidence_hash ?? value.evidenceHash ?? ""),
+				scholarStake: String(value.scholar_stake ?? value.scholarStake ?? "0"),
+				openedAt: new Date((commitDeadlineSec - COMMIT_WINDOW_SECONDS) * 1000),
+				commitDeadline: new Date(commitDeadlineSec * 1000),
+				revealDeadline: new Date(revealDeadlineSec * 1000),
+				panel,
+				openTxHash: txHash ?? null,
+			})
+
+			const evidenceCid = await disputeStore.takePendingEvidence(
+				proposalId,
+				milestoneId,
+			)
+			if (evidenceCid) {
+				await disputeStore.setEvidenceCid(disputeId, evidenceCid)
+			}
+
+			if (scholar) {
+				void createNotification({
+					recipient_address: scholar,
+					type: "dispute_opened",
+					message: `Your dispute #${disputeId} over milestone #${milestoneId} has been opened. A panel of ${panel.length} jurors has been drawn.`,
+					href: `/disputes/${disputeId}`,
+					data: { disputeId, proposalId, milestoneId },
+				})
+				void deliverNotificationChannels({
+					recipientAddress: scholar,
+					type: "dispute_opened",
+					title: "Arbitration Dispute Opened",
+					message: `Dispute #${disputeId} is now with a panel of jurors.`,
+					href: `/disputes/${disputeId}`,
+				})
+			}
+
+			for (const juror of panel) {
+				void createNotification({
+					recipient_address: juror,
+					type: "dispute_juror_selected",
+					message: `You have been drawn onto the panel for dispute #${disputeId}. Commit your vote before the deadline.`,
+					href: `/disputes/juror/${disputeId}`,
+					data: { disputeId, proposalId, milestoneId, commitDeadlineSec },
+				})
+				void deliverNotificationChannels({
+					recipientAddress: juror,
+					type: "dispute_juror_selected",
+					title: "You've Been Selected as a Juror",
+					message: `Dispute #${disputeId} needs your committed vote before the commit window closes.`,
+					href: `/disputes/juror/${disputeId}`,
+				})
+			}
+		}
+
+		if (topic === "MilestoneArbitration::vote_committed") {
+			const juror = String(value.juror ?? "")
+			if (juror) {
+				await disputeStore.markCommitted(disputeId, juror)
+			}
+		}
+
+		if (topic === "MilestoneArbitration::vote_revealed") {
+			const juror = String(value.juror ?? "")
+			const vote = value.vote === true || value.vote === "true"
+			if (juror) {
+				await disputeStore.recordReveal({
+					disputeId,
+					jurorAddress: juror,
+					vote,
+					revealedAt: new Date(),
+					txHash: txHash ?? null,
+				})
+			}
+		}
+
+		if (topic === "MilestoneArbitration::dispute_resolved") {
+			const proposalId = Number(value.proposal_id ?? value.proposalId ?? 0)
+			const milestoneId = Number(value.milestone_id ?? value.milestoneId ?? 0)
+			const quorumMet = value.quorum_met === true || value.quorum_met === "true"
+			const outcome =
+				value.outcome === null || value.outcome === undefined
+					? null
+					: value.outcome === true || value.outcome === "true"
+			const votesFor = Number(value.votes_for ?? value.votesFor ?? 0)
+			const votesAgainst = Number(
+				value.votes_against ?? value.votesAgainst ?? 0,
+			)
+			const revealedCount = Number(
+				value.revealed_count ?? value.revealedCount ?? 0,
+			)
+
+			await disputeStore.markResolved({
+				disputeId,
+				outcome,
+				votesFor,
+				votesAgainst,
+				revealedCount,
+				quorumMet,
+				resolvedAt: new Date(),
+				resolveTxHash: txHash ?? null,
+			})
+
+			const dispute = await disputeStore.getDisputeById(disputeId)
+			if (dispute?.scholar_address) {
+				const outcomeText = !quorumMet
+					? "the panel did not reach quorum, so the rejection stands and your stake was refunded"
+					: outcome
+						? "the panel ruled in your favor -- the milestone tranche has been released"
+						: "the panel upheld the rejection"
+				void createNotification({
+					recipient_address: dispute.scholar_address,
+					type: "dispute_resolved",
+					message: `Dispute #${disputeId} has been resolved: ${outcomeText}.`,
+					href: `/disputes/${disputeId}`,
+					data: { disputeId, proposalId, milestoneId, outcome, quorumMet },
+				})
+				void deliverNotificationChannels({
+					recipientAddress: dispute.scholar_address,
+					type: "dispute_resolved",
+					title: "Dispute Resolved",
+					message: `Dispute #${disputeId} has been resolved.`,
+					href: `/disputes/${disputeId}`,
+				})
+			}
+
+			const jurors = await disputeStore.getJurorsForDispute(disputeId)
+			for (const juror of jurors) {
+				void createNotification({
+					recipient_address: juror.juror_address,
+					type: "dispute_resolved",
+					message: `Dispute #${disputeId} you served on has been resolved.`,
+					href: `/disputes/${disputeId}`,
+					data: { disputeId, proposalId, milestoneId, outcome, quorumMet },
+				})
+			}
+		}
+	} catch (err) {
+		log.error({ err, topic }, "arbitration event handler failed")
+	}
 }
 
 /**

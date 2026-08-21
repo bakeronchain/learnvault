@@ -1606,12 +1606,12 @@
   resolved "https://registry.npmjs.org/@noble/hashes/-/hashes-1.7.0.tgz"
   integrity sha512-HXydb0DgzTpDPwbVeDGCG1gIu7X6+AuU6Zl6av/E/KG8LMsvPntvq+w17CHRpKBmN6Ybdrt1eP3k4cj8DJa78w==
 
-"@noble/hashes@1.7.1", "@noble/hashes@^1.4.0", "@noble/hashes@^1.5.0":
+"@noble/hashes@1.7.1":
   version "1.7.1"
   resolved "https://registry.npmjs.org/@noble/hashes/-/hashes-1.7.1.tgz"
   integrity sha512-B8XBPsn4vT/KJAGqDzbwztd+6Yte3P4V7iafm24bxgDe/mlRuK6xmWPuCNrKt2vDafZ8MfJLlchDG/vYafQEjQ==
 
-"@noble/hashes@1.8.0", "@noble/hashes@^1.8.0", "@noble/hashes@~1.8.0":
+"@noble/hashes@1.8.0", "@noble/hashes@^1.4.0", "@noble/hashes@^1.5.0", "@noble/hashes@^1.8.0", "@noble/hashes@~1.8.0":
   version "1.8.0"
   resolved "https://registry.npmjs.org/@noble/hashes/-/hashes-1.8.0.tgz"
   integrity sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==
@@ -2703,7 +2703,7 @@
     buffer "^6.0.3"
     sha.js "^2.4.12"
 
-"@stellar/stellar-sdk@^14.2.0", "@stellar/stellar-sdk@^14.4.3":
+"@stellar/stellar-sdk@^14.2.0":
   version "14.6.1"
   resolved "https://registry.npmjs.org/@stellar/stellar-sdk/-/stellar-sdk-14.6.1.tgz"
   integrity sha512-A1rQWDLdUasXkMXnYSuhgep+3ZZzyuXJKdt5/KAIc0gkmSp906HTvUpbT4pu+bVr41tu0+J4Ugz9J4BQAGGytg==
@@ -2718,17 +2718,17 @@
     toml "^3.0.0"
     urijs "^1.19.1"
 
-"@stellar/stellar-sdk@^16.0.0":
-  version "16.0.1"
-  resolved "https://registry.npmjs.org/@stellar/stellar-sdk/-/stellar-sdk-16.0.1.tgz"
-  integrity sha512-bxKohaiyKVqoudRhbOOHeHhHIaeYV5Zab4rCjxhP4Ty1h1ozTLBOv8lWFnZz9ilBzXG8Bb7usQI3rlEcfvUynA==
+"@stellar/stellar-sdk@^16.0.0", "@stellar/stellar-sdk@^16.2.0":
+  version "16.2.0"
+  resolved "https://registry.yarnpkg.com/@stellar/stellar-sdk/-/stellar-sdk-16.2.0.tgz#be66570ffb9cb93c6557513fecd7cb608ac213b7"
+  integrity sha512-FV/Rm11QvrFzR5X9fIfb6Pg30KyYyrRkNezELGFmYDAYrzoPTjqo7vklnEPd2HEontzjJmZizWk8CjyIh5vp0w==
   dependencies:
     "@noble/ed25519" "^3.1.0"
     "@noble/hashes" "^2.2.0"
     "@stellar/js-xdr" "4.0.0"
-    axios "1.16.1"
+    axios "1.18.0"
     base32.js "^0.1.0"
-    bignumber.js "^11.1.1"
+    bignumber.js "^11.1.4"
     buffer "^6.0.3"
     commander "^14.0.3"
     eventsource "^4.1.0"
@@ -4254,7 +4254,7 @@ axios-retry@^4.5.0:
   dependencies:
     is-retry-allowed "^2.2.0"
 
-axios@1.16.0, axios@^1.13.3:
+axios@1.16.0:
   version "1.16.0"
   resolved "https://registry.npmjs.org/axios/-/axios-1.16.0.tgz"
   integrity sha512-6hp5CwvTPlN2A31g5dxnwAX0orzM7pmCRDLnZSX772mv8WDqICwFjowHuPs04Mc8deIld1+ejhtaMn5vp6b+1w==
@@ -4263,10 +4263,10 @@ axios@1.16.0, axios@^1.13.3:
     form-data "^4.0.5"
     proxy-from-env "^2.1.0"
 
-axios@1.16.1:
-  version "1.16.1"
-  resolved "https://registry.npmjs.org/axios/-/axios-1.16.1.tgz"
-  integrity sha512-caYkukvroVPO8KrzuJEb50Hm07KwfBZPEC3VeFHTsqWHvKTsy54hjJz9BS/cdaypROE2rH6xvm9mHX4fgWkr3A==
+axios@1.18.0, axios@^1.13.3:
+  version "1.18.0"
+  resolved "https://registry.yarnpkg.com/axios/-/axios-1.18.0.tgz#8a7f8854af280fcaae063272df2ed9f3837d2398"
+  integrity sha512-E32NzpYKp++W7XRe52rHiXV2ehxmh3wbdgO7MHeFM+vqxLBYHzt0ElkiImtOBxtOmyp0yoC8C6uESVV84Y2/hw==
   dependencies:
     follow-redirects "^1.16.0"
     form-data "^4.0.5"
@@ -4361,7 +4361,7 @@ big.js@6.2.2:
   resolved "https://registry.npmjs.org/big.js/-/big.js-6.2.2.tgz"
   integrity sha512-y/ie+Faknx7sZA5MfGA2xKlu0GDv8RWrXGsmlteyJQ2lvoKv9GBK/fpRMc2qlSoBAgNxrixICFCBefIq8WCQpQ==
 
-bignumber.js@^11.1.1:
+bignumber.js@^11.1.4:
   version "11.1.5"
   resolved "https://registry.npmjs.org/bignumber.js/-/bignumber.js-11.1.5.tgz"
   integrity sha512-6WmzCNtUnfKpbozq+hOgWaZMMzORmYBwF1xZScyoIX3QRYWeKTtxxwDOW5tIz7C9BdjkIYHGTcelCLkXg0mndw==
@@ -4822,12 +4822,12 @@ comma-separated-tokens@^2.0.0:
   resolved "https://registry.npmjs.org/comma-separated-tokens/-/comma-separated-tokens-2.0.3.tgz"
   integrity sha512-Fu4hJdvzeylCfQPp9SGWidpzrMs7tTrlu6Vb8XGaRGck8QSNZJJp538Wrb60Lax4fPwR64ViY468OIUTbRlGZg==
 
-commander@14.0.2, commander@^14.0.0, commander@^14.0.2:
+commander@14.0.2:
   version "14.0.2"
   resolved "https://registry.npmjs.org/commander/-/commander-14.0.2.tgz"
   integrity sha512-TywoWNNRbhoD0BXs1P3ZEScW8W5iKrnbithIl0YH+uCmBd0QpPOA8yc82DS3BIE5Ma6FnBVUsJ7wVUDz4dvOWQ==
 
-commander@^14.0.3:
+commander@^14.0.0, commander@^14.0.2, commander@^14.0.3:
   version "14.0.3"
   resolved "https://registry.npmjs.org/commander/-/commander-14.0.3.tgz"
   integrity sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw==

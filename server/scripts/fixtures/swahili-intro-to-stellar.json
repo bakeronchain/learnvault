@@ -1,0 +1,48 @@
+{
+	"courseSlug": "intro-to-stellar",
+	"languageCode": "sw",
+	"translatorAddress": "GLEARNVAULT-SW-SEED-TRANSLATOR",
+	"course": {
+		"title": "Utangulizi wa Stellar",
+		"description": "Jifunze misingi ya mtandao wa Stellar: akaunti, mali (assets), miamala, na Itifaki ya Muafaka wa Stellar (Stellar Consensus Protocol)."
+	},
+	"glossary": [
+		{ "term": "Stellar", "note": "Jina la mtandao — halitafsiriwi." },
+		{
+			"term": "XLM",
+			"note": "Ishara ya sarafu asilia ya Stellar (Lumens) — haitafsiriwi."
+		},
+		{ "term": "Horizon", "note": "Jina la API ya Stellar — halitafsiriwi." },
+		{ "term": "SDK", "note": "Kifupi cha kiufundi — hakitafsiriwi." },
+		{
+			"term": "Payment",
+			"note": "Jina la operesheni mahususi kwenye Stellar — halitafsiriwi."
+		},
+		{ "term": "Stellar CLI", "note": "Jina la zana ya amri — halitafsiriwi." },
+		{
+			"term": "stroops",
+			"note": "Kitengo kidogo zaidi cha XLM — hakitafsiriwi."
+		},
+		{
+			"term": "wallet",
+			"note": "Neno la kiufundi la pochi ya kidijitali — halitafsiriwi kwenye nyaraka za kiufundi."
+		}
+	],
+	"lessons": [
+		{
+			"orderIndex": 1,
+			"title": "Stellar ni Nini?",
+			"content": "## Stellar ni Nini?\n\nStellar ni itifaki ya malipo isiyo na kituo kimoja cha udhibiti (decentralized), yenye chanzo huria (open-source), inayowezesha miamala ya kimataifa yenye kasi na gharama ndogo.\n\n### Dhana Muhimu\n- **Lumens (XLM)**: Mali asilia inayotumika kulipa ada za miamala.\n- **Akaunti**: Hutambulika kwa ufunguo wa umma (public key); lazima iwe na kiwango cha chini cha XLM.\n- **Anchors**: Mashirika yanayounganisha fedha za kawaida (fiat) na sarafu za kidijitali kwenye mtandao."
+		},
+		{
+			"orderIndex": 2,
+			"title": "Akaunti na Jozi za Funguo (Keypairs)",
+			"content": "## Akaunti na Jozi za Funguo (Keypairs)\n\nKila akaunti ya Stellar hutambulika kwa **ufunguo wa umma** (public key, G...) na hudhibitiwa na **ufunguo wa siri** (secret key, S...).\n\n```bash\n# Tengeneza jozi ya funguo kwa kutumia Stellar CLI\nstellar keys generate --global alice\n```\n\nAkaunti lazima iwe na **fedha** za angalau XLM 1 (hifadhi ya msingi) kabla ya kuweza kufanya miamala."
+		},
+		{
+			"orderIndex": 3,
+			"title": "Kutuma Muamala Wako wa Kwanza",
+			"content": "## Kutuma Muamala Wako wa Kwanza\n\nMiamala kwenye Stellar ni vifurushi visivyoweza kugawanyika (atomic) vya **operesheni** (operations). Operesheni inayotumika zaidi ni `Payment`.\n\n### Hatua\n1. Jenga muamala kwa kutumia SDK.\n2. Tia saini kwa ufunguo wako wa siri.\n3. Wasilisha kwa Horizon.\n\nAda ni ndogo sana — kwa kawaida stroops 100 (XLM 0.00001)."
+		}
+	]
+}

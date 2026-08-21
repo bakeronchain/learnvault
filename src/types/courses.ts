@@ -2,7 +2,24 @@ export type CourseDifficulty = "beginner" | "intermediate" | "advanced"
 
 export type CourseLevel = "Beginner" | "Intermediate" | "Advanced"
 
-export interface CourseLesson {
+export type ContentLanguage = "en" | "es" | "fr" | "sw"
+
+// Present on any course/lesson response that resolved content by language —
+// independent of the UI locale. See src/providers/ContentLanguageProvider.tsx.
+export interface LanguageMeta {
+	languageServed: ContentLanguage
+	isTranslation: boolean
+	isFallback: boolean
+	isStale: boolean
+	translatorAddress: string | null
+}
+
+export interface TranslationCoverage {
+	totalLessons: number
+	translatedLessons: number
+}
+
+export interface CourseLesson extends Partial<LanguageMeta> {
 	id: number
 	courseId: string
 	title: string
@@ -37,7 +54,7 @@ export interface CourseReview {
 	isOwn?: boolean
 }
 
-export interface CourseSummary {
+export interface CourseSummary extends Partial<LanguageMeta> {
 	id: string
 	slug: string
 	title: string
@@ -52,6 +69,8 @@ export interface CourseSummary {
 	updatedAt: string
 	accentClassName: string
 	ratingSummary?: CourseRatingSummary | null
+	availableLanguages?: string[]
+	translationCoverage?: TranslationCoverage
 }
 
 export interface CourseDetail extends CourseSummary {

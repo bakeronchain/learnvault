@@ -40,6 +40,113 @@ type LessonRow = {
 	}>
 }
 
+// Content languages a course/lesson may be translated into. English is the
+// canonical source and is never stored in the translation tables.
+export const SUPPORTED_CONTENT_LANGS = ["es", "fr", "sw"] as const
+export type ContentLanguage = "en" | (typeof SUPPORTED_CONTENT_LANGS)[number]
+
+function resolveRequestedLanguage(req: Request): ContentLanguage {
+	const fromQuery =
+		typeof req.query.lang === "string"
+			? req.query.lang.trim().toLowerCase()
+			: ""
+	const fromHeader =
+		String(req.headers["accept-language"] ?? "")
+			.split(",")[0]
+			?.split("-")[0]
+			?.trim()
+			.toLowerCase() ?? ""
+	const candidate = fromQuery || fromHeader
+	return (SUPPORTED_CONTENT_LANGS as readonly string[]).includes(candidate)
+		? (candidate as ContentLanguage)
+		: "en"
+}
+
+// Extra columns present when a course SELECT is joined against
+// course_translations for a requested content language.
+type CourseTranslationFields = {
+	translation_language: string | null
+	translation_is_stale: boolean | null
+	translation_translator_address: string | null
+	available_languages: string[] | null
+	total_lessons: string | number | null
+	translated_lessons: string | number | null
+}
+
+type CourseLanguageMeta = {
+	languageServed: ContentLanguage
+	isTranslation: boolean
+	isFallback: boolean
+	isStale: boolean
+	translatorAddress: string | null
+	availableLanguages: string[]
+	translationCoverage: { totalLessons: number; translatedLessons: number }
+}
+
+function buildCourseLanguageMeta(
+	row: CourseTranslationFields,
+	requestedLang: ContentLanguage,
+): CourseLanguageMeta {
+	const isTranslation = Boolean(row.translation_language)
+	return {
+		languageServed: isTranslation ? requestedLang : "en",
+		isTranslation,
+		isFallback: requestedLang !== "en" && !isTranslation,
+		isStale: Boolean(row.translation_is_stale),
+		translatorAddress: row.translation_translator_address ?? null,
+		availableLanguages: Array.isArray(row.available_languages)
+			? row.available_languages.filter((lang): lang is string => Boolean(lang))
+			: [],
+		translationCoverage: {
+			totalLessons: Number(row.total_lessons ?? 0),
+			translatedLessons: Number(row.translated_lessons ?? 0),
+		},
+	}
+}
+
+type LessonTranslationRow = {
+	order_index: number
+	title: string
+	content_markdown: string
+	is_stale: boolean
+	translator_address: string
+}
+
+type LessonLanguageMeta = {
+	languageServed: ContentLanguage
+	isTranslation: boolean
+	isFallback: boolean
+	isStale: boolean
+	translatorAddress: string | null
+}
+
+function attachLessonLanguageMeta<T extends { title: string; content: string }>(
+	lesson: T,
+	translation: LessonTranslationRow | undefined,
+	requestedLang: ContentLanguage,
+): T & LessonLanguageMeta {
+	if (!translation) {
+		return {
+			...lesson,
+			languageServed: "en",
+			isTranslation: false,
+			isFallback: requestedLang !== "en",
+			isStale: false,
+			translatorAddress: null,
+		}
+	}
+	return {
+		...lesson,
+		title: translation.title,
+		content: translation.content_markdown,
+		languageServed: requestedLang,
+		isTranslation: true,
+		isFallback: false,
+		isStale: Boolean(translation.is_stale),
+		translatorAddress: translation.translator_address,
+	}
+}
+
 const toCourse = (row: CourseRow) => ({
 	id: row.id,
 	slug: row.slug,
@@ -110,6 +217,7 @@ export const getCourses = async (
 	res: Response,
 ): Promise<void> => {
 	try {
+		const requestedLang = resolveRequestedLanguage(req)
 		const track =
 			typeof req.query.track === "string" ? req.query.track.trim() : undefined
 		const search =
@@ -163,7 +271,6 @@ export const getCourses = async (
 		const params: unknown[] = []
 
 		if (!includeUnpublished) {
-			params.push(true)
 			conditions.push("c.published_at IS NOT NULL")
 		}
 
@@ -203,14 +310,16 @@ export const getCourses = async (
 		const total = Number.parseInt(totalResult.rows[0]?.count ?? "0", 10)
 		const totalPages = total === 0 ? 0 : Math.ceil(total / limit)
 
+		params.push(requestedLang)
+		const langParamIndex = params.length
 		params.push(limit)
 		params.push(offset)
 		const rowsResult = (await pool.query(
 			`SELECT
 				c.id,
 				c.slug,
-				c.title,
-				c.description,
+				COALESCE(ct.title, c.title) AS title,
+				COALESCE(ct.description, c.description) AS description,
 				c.cover_image_url,
 				c.track,
 				c.difficulty,
@@ -220,19 +329,40 @@ export const getCourses = async (
 				c.prerequisites,
 				COUNT(DISTINCT e.learner_address)::int AS students_count,
 				ROUND(AVG(cr.rating), 1) AS avg_rating,
-				COUNT(DISTINCT cr.id)::int AS review_count
+				COUNT(DISTINCT cr.id)::int AS review_count,
+				ct.language_code AS translation_language,
+				ct.is_stale AS translation_is_stale,
+				ct.translator_address AS translation_translator_address,
+				(
+					SELECT json_agg(cx.language_code)
+					FROM course_translations cx
+					WHERE cx.course_id = c.id AND cx.status = 'published'
+				) AS available_languages,
+				(
+					SELECT COUNT(*) FROM lessons l2
+					WHERE l2.course_id = c.id AND l2.is_active = TRUE
+				) AS total_lessons,
+				(
+					SELECT COUNT(*) FROM lesson_translations lt2
+					WHERE lt2.course_id = c.id AND lt2.language_code = $${langParamIndex} AND lt2.status = 'published'
+				) AS translated_lessons
 			 FROM courses c
 			 LEFT JOIN enrollments e ON e.course_id = c.slug
 			 LEFT JOIN course_reviews cr ON cr.course_id = c.id
+			 LEFT JOIN course_translations ct
+			   ON ct.course_id = c.id AND ct.language_code = $${langParamIndex} AND ct.status = 'published'
 			 ${whereClause}
-			 GROUP BY c.id, c.slug, c.title, c.description, c.cover_image_url, c.track, c.difficulty, c.published_at, c.created_at, c.updated_at, c.prerequisites
+			 GROUP BY c.id, c.slug, c.title, c.description, c.cover_image_url, c.track, c.difficulty, c.published_at, c.created_at, c.updated_at, c.prerequisites, ct.title, ct.description, ct.language_code, ct.is_stale, ct.translator_address
 			 ORDER BY c.created_at DESC
 			 LIMIT $${params.length - 1} OFFSET $${params.length}`,
 			params,
-		)) as { rows: CourseRow[] }
+		)) as { rows: Array<CourseRow & CourseTranslationFields> }
 
 		res.status(200).json({
-			data: rowsResult.rows.map(toCourse),
+			data: rowsResult.rows.map((row) => ({
+				...toCourse(row),
+				...buildCourseLanguageMeta(row, requestedLang),
+			})),
 			pagination: { page, limit, total },
 		})
 	} catch {
@@ -242,32 +372,60 @@ export const getCourses = async (
 
 export const getCourse = async (req: Request, res: Response): Promise<void> => {
 	try {
+		const requestedLang = resolveRequestedLanguage(req)
 		const idOrSlug = req.params.idOrSlug
 		const isNumericId = /^\d+$/.test(idOrSlug)
 
+		const translationJoinAndSelect = `
+			COALESCE(ct.title, c.title) AS title,
+			COALESCE(ct.description, c.description) AS description,
+			ct.language_code AS translation_language,
+			ct.is_stale AS translation_is_stale,
+			ct.translator_address AS translation_translator_address,
+			(
+				SELECT json_agg(cx.language_code)
+				FROM course_translations cx
+				WHERE cx.course_id = c.id AND cx.status = 'published'
+			) AS available_languages,
+			(
+				SELECT COUNT(*) FROM lessons l2
+				WHERE l2.course_id = c.id AND l2.is_active = TRUE
+			) AS total_lessons,
+			(
+				SELECT COUNT(*) FROM lesson_translations lt2
+				WHERE lt2.course_id = c.id AND lt2.language_code = $2 AND lt2.status = 'published'
+			) AS translated_lessons`
+
 		const query = isNumericId
-			? `SELECT c.id, c.slug, c.title, c.description, c.cover_image_url, c.track, c.difficulty, c.published_at, c.created_at, c.updated_at,
+			? `SELECT c.id, c.slug, c.cover_image_url, c.track, c.difficulty, c.published_at, c.created_at, c.updated_at,
 			          c.prerequisites, 0 AS students_count,
 			          ROUND(AVG(cr.rating), 1) AS avg_rating,
-			          COUNT(cr.id)::int AS review_count
+			          COUNT(cr.id)::int AS review_count,
+			          ${translationJoinAndSelect}
 			   FROM courses c
 			   LEFT JOIN course_reviews cr ON cr.course_id = c.id
+			   LEFT JOIN course_translations ct
+			     ON ct.course_id = c.id AND ct.language_code = $2 AND ct.status = 'published'
 			   WHERE c.id = $1 AND c.published_at IS NOT NULL
-			   GROUP BY c.id
+			   GROUP BY c.id, ct.title, ct.description, ct.language_code, ct.is_stale, ct.translator_address
 			   LIMIT 1`
-			: `SELECT c.id, c.slug, c.title, c.description, c.cover_image_url, c.track, c.difficulty, c.published_at, c.created_at, c.updated_at,
+			: `SELECT c.id, c.slug, c.cover_image_url, c.track, c.difficulty, c.published_at, c.created_at, c.updated_at,
 			          c.prerequisites, 0 AS students_count,
 			          ROUND(AVG(cr.rating), 1) AS avg_rating,
-			          COUNT(cr.id)::int AS review_count
+			          COUNT(cr.id)::int AS review_count,
+			          ${translationJoinAndSelect}
 			   FROM courses c
 			   LEFT JOIN course_reviews cr ON cr.course_id = c.id
+			   LEFT JOIN course_translations ct
+			     ON ct.course_id = c.id AND ct.language_code = $2 AND ct.status = 'published'
 			   WHERE c.slug = $1 AND c.published_at IS NOT NULL
-			   GROUP BY c.id
+			   GROUP BY c.id, ct.title, ct.description, ct.language_code, ct.is_stale, ct.translator_address
 			   LIMIT 1`
 
 		const courseResult = (await pool.query(query, [
 			isNumericId ? Number.parseInt(idOrSlug, 10) : idOrSlug,
-		])) as { rows: CourseRow[] }
+			requestedLang,
+		])) as { rows: Array<CourseRow & CourseTranslationFields> }
 
 		const course = courseResult.rows[0]
 		if (!course) {
@@ -353,14 +511,37 @@ export const getCourse = async (req: Request, res: Response): Promise<void> => {
 			[course.id, effectiveVersion],
 		)) as { rows: LessonRow[] }
 
+		const lessonTranslationsByOrderIndex = new Map<
+			number,
+			LessonTranslationRow
+		>()
+		if (requestedLang !== "en") {
+			const lessonTranslationsResult = (await pool.query(
+				`SELECT order_index, title, content_markdown, is_stale, translator_address
+				 FROM lesson_translations
+				 WHERE course_id = $1 AND language_code = $2 AND status = 'published'`,
+				[course.id, requestedLang],
+			)) as { rows: LessonTranslationRow[] }
+			for (const row of lessonTranslationsResult.rows) {
+				lessonTranslationsByOrderIndex.set(row.order_index, row)
+			}
+		}
+
 		res.status(200).json({
 			...toCourse(course),
+			...buildCourseLanguageMeta(course, requestedLang),
 			enrollmentContentVersion,
 			latestContentVersion,
 			hasUpdatedContent:
 				enrollmentContentVersion !== null &&
 				enrollmentContentVersion < latestContentVersion,
-			lessons: lessonResult.rows.map(toLesson),
+			lessons: lessonResult.rows.map((row) =>
+				attachLessonLanguageMeta(
+					toLesson(row),
+					lessonTranslationsByOrderIndex.get(row.order_index),
+					requestedLang,
+				),
+			),
 		})
 	} catch {
 		res.status(500).json({ error: "Internal server error" })
@@ -372,6 +553,7 @@ export const getCourseLessonById = async (
 	res: Response,
 ): Promise<void> => {
 	try {
+		const requestedLang = resolveRequestedLanguage(req)
 		const lessonId = Number.parseInt(req.params.id, 10)
 		if (!Number.isInteger(lessonId) || lessonId <= 0) {
 			res.status(404).json({ error: "Lesson not found" })
@@ -425,9 +607,25 @@ export const getCourseLessonById = async (
 			return
 		}
 
+		let translation: LessonTranslationRow | undefined
+		if (requestedLang !== "en") {
+			const translationResult = (await pool.query(
+				`SELECT order_index, title, content_markdown, is_stale, translator_address
+				 FROM lesson_translations
+				 WHERE course_id = $1 AND order_index = $2 AND language_code = $3 AND status = 'published'
+				 LIMIT 1`,
+				[lesson.course_id, lesson.order_index, requestedLang],
+			)) as { rows: LessonTranslationRow[] }
+			translation = translationResult.rows[0]
+		}
+
 		// Invalidate cached /api/courses responses after content changes.
 		void invalidateApiResponseCacheType("courses")
-		res.status(200).json(toLesson(lesson))
+		res
+			.status(200)
+			.json(
+				attachLessonLanguageMeta(toLesson(lesson), translation, requestedLang),
+			)
 	} catch {
 		res.status(500).json({ error: "Internal server error" })
 	}
@@ -611,6 +809,19 @@ export const updateLessonVersion = async (
 		)) as { rows: LessonRow[] }
 
 		const insertedLesson = insertedLessonResult.rows[0]
+
+		// Flag any existing translations of this lesson as stale — they were
+		// made from a source version that no longer reflects the active text.
+		// Never deletes or hides them, just marks them for a translator refresh.
+		await client.query(
+			`UPDATE lesson_translations
+			 SET is_stale = TRUE
+			 WHERE course_id = $1
+			   AND order_index = $2
+			   AND source_version < $3
+			   AND is_stale = FALSE`,
+			[course.id, orderIndex, insertedLesson.version],
+		)
 
 		await client.query(
 			`UPDATE lessons
@@ -928,18 +1139,29 @@ export const updateCourse = async (
 	req: Request,
 	res: Response,
 ): Promise<void> => {
-	try {
-		const id = Number.parseInt(req.params.id, 10)
-		if (!Number.isInteger(id) || id <= 0) {
-			res.status(404).json({ error: "Course not found" })
-			return
-		}
+	const id = Number.parseInt(req.params.id, 10)
+	if (!Number.isInteger(id) || id <= 0) {
+		res.status(404).json({ error: "Course not found" })
+		return
+	}
 
-		const existing = (await pool.query(
+	let client
+	try {
+		client = await pool.connect()
+	} catch {
+		res.status(500).json({ error: "Internal server error" })
+		return
+	}
+
+	try {
+		await client.query("BEGIN")
+
+		const existing = (await client.query(
 			`SELECT id FROM courses WHERE id = $1 LIMIT 1`,
 			[id],
 		)) as { rowCount: number; rows: Array<{ id: number }> }
 		if (existing.rowCount === 0) {
+			await client.query("ROLLBACK")
 			res.status(404).json({ error: "Course not found" })
 			return
 		}
@@ -953,18 +1175,24 @@ export const updateCourse = async (
 			setClauses.push(`${column} = $${values.length}`)
 		}
 
+		// title/description are the only translated course fields — editing
+		// either one bumps content_version and flags derived translations stale.
+		let touchesContent = false
+
 		if ("title" in body && typeof body.title === "string") {
 			const sanitizedTitle = sanitizeHtml(body.title.trim(), {
 				allowedTags: [],
 				allowedAttributes: {},
 			})
 			addField("title", sanitizedTitle)
+			touchesContent = true
 		}
 		if ("slug" in body && typeof body.slug === "string") {
 			addField("slug", body.slug.trim())
 		}
 		if ("description" in body && typeof body.description === "string") {
 			if (body.description.length > 2000) {
+				await client.query("ROLLBACK")
 				res.status(400).json({
 					error: "description must be 2000 characters or fewer",
 					field: "description",
@@ -976,6 +1204,7 @@ export const updateCourse = async (
 				allowedAttributes: {},
 			})
 			addField("description", sanitizedDescription)
+			touchesContent = true
 		}
 		if ("coverImage" in body) {
 			if (typeof body.coverImage === "string") {
@@ -990,6 +1219,7 @@ export const updateCourse = async (
 		if ("difficulty" in body && typeof body.difficulty === "string") {
 			const difficulty = body.difficulty.toLowerCase()
 			if (!difficultyValues.has(difficulty)) {
+				await client.query("ROLLBACK")
 				res
 					.status(400)
 					.json({ error: "Invalid difficulty", field: "difficulty" })
@@ -1009,6 +1239,7 @@ export const updateCourse = async (
 		if ("prerequisites" in body) {
 			const reqPrereqs = body.prerequisites
 			if (!Array.isArray(reqPrereqs)) {
+				await client.query("ROLLBACK")
 				res.status(400).json({
 					error: "prerequisites must be an array of course IDs",
 					field: "prerequisites",
@@ -1020,6 +1251,7 @@ export const updateCourse = async (
 					(item) => typeof item !== "number" || !Number.isInteger(item),
 				)
 			) {
+				await client.query("ROLLBACK")
 				res.status(400).json({
 					error: "prerequisites must be an array of integers",
 					field: "prerequisites",
@@ -1027,6 +1259,7 @@ export const updateCourse = async (
 				return
 			}
 			if (reqPrereqs.includes(id)) {
+				await client.query("ROLLBACK")
 				res.status(400).json({
 					error: "A course cannot be a prerequisite of itself",
 					field: "prerequisites",
@@ -1035,11 +1268,12 @@ export const updateCourse = async (
 			}
 			if (reqPrereqs.length > 0) {
 				const uniqueIds = Array.from(new Set(reqPrereqs))
-				const check = await pool.query(
+				const check = await client.query(
 					"SELECT id FROM courses WHERE id = ANY($1::integer[])",
 					[uniqueIds],
 				)
 				if (check.rows.length !== uniqueIds.length) {
+					await client.query("ROLLBACK")
 					res.status(400).json({
 						error: "One or more prerequisite course IDs do not exist",
 						field: "prerequisites",
@@ -1051,23 +1285,45 @@ export const updateCourse = async (
 		}
 
 		if (setClauses.length === 0) {
+			await client.query("ROLLBACK")
 			res.status(400).json({ error: "No valid fields provided" })
 			return
 		}
 
+		if (touchesContent) {
+			setClauses.push("content_version = content_version + 1")
+		}
+
 		values.push(id)
-		const result = (await pool.query(
+		const result = (await client.query(
 			`UPDATE courses
 			 SET ${setClauses.join(", ")}
 			 WHERE id = $${values.length}
-			 RETURNING id, slug, title, description, cover_image_url, track, difficulty, published_at, created_at, updated_at, prerequisites`,
+			 RETURNING id, slug, title, description, cover_image_url, track, difficulty, published_at, created_at, updated_at, prerequisites, content_version`,
 			values,
-		)) as { rows: CourseRow[] }
+		)) as { rows: Array<CourseRow & { content_version: number }> }
+
+		if (touchesContent) {
+			// Flag translations made from an older source_version as stale —
+			// never deleted, never silently served as current. Applies to every
+			// status (a translator mid-draft also needs to know their base moved).
+			await client.query(
+				`UPDATE course_translations
+				 SET is_stale = TRUE
+				 WHERE course_id = $1
+				   AND source_version < $2
+				   AND is_stale = FALSE`,
+				[id, result.rows[0].content_version],
+			)
+		}
+
+		await client.query("COMMIT")
 
 		// Invalidate cached /api/courses responses after content changes.
 		void invalidateApiResponseCacheType("courses")
 		res.status(200).json(toCourse(result.rows[0]))
 	} catch (error) {
+		await client.query("ROLLBACK")
 		if (typeof error === "object" && error && "code" in error) {
 			const code = (error as { code?: string }).code
 			if (code === "23505") {
@@ -1076,5 +1332,7 @@ export const updateCourse = async (
 			}
 		}
 		res.status(500).json({ error: "Internal server error" })
+	} finally {
+		client.release()
 	}
 }

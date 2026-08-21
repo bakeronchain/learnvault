@@ -40,7 +40,7 @@ import { createAuthRouter } from "./routes/auth.routes"
 import { createBountyRouter } from "./routes/bounty.routes"
 import { createCommentsRouter } from "./routes/comments.routes"
 import { communityRouter } from "./routes/community.routes"
-import { coursesRouter } from "./routes/courses.routes"
+import { createCoursesRouter } from "./routes/courses.routes"
 import { createCredentialsRouter } from "./routes/credentials.routes"
 import { createDisputeRouter } from "./routes/dispute.routes"
 import { createEnrollmentsRouter } from "./routes/enrollments.routes"
@@ -66,6 +66,7 @@ import { scholarshipsRouter } from "./routes/scholarships.routes"
 import { createSep10Router } from "./routes/sep10.routes"
 import { stellarTomlRouter } from "./routes/stellar-toml.routes"
 import { createStreaksRouter } from "./routes/streaks.routes"
+import { createTranslationsRouter } from "./routes/translations.routes"
 import { treasuryRouter } from "./routes/treasury.routes"
 import { createUploadRouter } from "./routes/upload.routes"
 import { createUserProfileRouter } from "./routes/user-profile.routes"
@@ -298,7 +299,8 @@ app.use("/api/auth", createAuthRouter(authService, jwtService))
 app.use("/api/auth/sep10", createSep10Router(sep10Service))
 app.use("/", stellarTomlRouter)
 app.use("/api", createMeRouter(jwtService))
-app.use("/api", coursesRouter)
+app.use("/api", createCoursesRouter(jwtService))
+app.use("/api", createTranslationsRouter(jwtService))
 app.use("/api", createEnrollmentsRouter(jwtService))
 app.use("/api", createScholarsRouter(jwtService))
 app.use("/api", scholarshipsRouter)

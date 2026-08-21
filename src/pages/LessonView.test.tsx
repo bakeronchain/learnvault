@@ -17,6 +17,7 @@ import { createElement, type ReactNode } from "react"
 import { MemoryRouter, Route, Routes } from "react-router-dom"
 import { vi, describe, it, expect, beforeEach } from "vitest"
 import ErrorBoundary from "../components/ErrorBoundary"
+import { ContentLanguageProvider } from "../providers/ContentLanguageProvider"
 import { NotificationContext } from "../providers/NotificationProvider"
 import {
 	WalletContext,
@@ -246,7 +247,11 @@ async function renderLessonView({
 			createElement(
 				WalletContext,
 				{ value: wallet },
-				createElement(NotificationContext, { value: notification }, children),
+				createElement(
+					NotificationContext,
+					{ value: notification },
+					createElement(ContentLanguageProvider, null, children),
+				),
 			),
 		)
 

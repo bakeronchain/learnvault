@@ -1274,6 +1274,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "scholarship-claim"
+version = "0.0.1"
+dependencies = [
+ "learnvault-shared",
+ "soroban-sdk",
+]
+
+[[package]]
 name = "scholarship-treasury"
 version = "0.0.1"
 dependencies = [

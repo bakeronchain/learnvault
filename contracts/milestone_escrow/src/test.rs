@@ -500,6 +500,200 @@ fn last_tranche_rounding_releases_33_33_34_for_100_over_3_tranches() {
     assert_eq!(token_client(&env, &token).balance(&contract_id), 0);
 }
 
+// ---------------------------------------------------------------------------
+// Arbitration wiring
+// ---------------------------------------------------------------------------
+
+/// A minimal stand-in for `milestone_arbitration::MilestoneArbitration`'s
+/// read surface. `milestone_escrow` only ever calls `get_release_outcome`
+/// through the `ArbitrationClient` trait client, so this is all a test needs
+/// to exercise `release_tranche_via_arbitration` without a crate dependency
+/// on the real arbitration contract.
+mod mock_arbitration {
+    use soroban_sdk::{Env, Map, Symbol, contract, contractimpl, symbol_short};
+
+    const OUTCOMES_KEY: Symbol = symbol_short!("OUTCOMES");
+
+    #[contract]
+    pub struct MockArbitration;
+
+    #[contractimpl]
+    impl MockArbitration {
+        pub fn set_outcome(
+            env: Env,
+            dispute_id: u64,
+            proposal_id: u32,
+            milestone_id: u32,
+            release: bool,
+        ) {
+            let mut outcomes: Map<u64, (u32, u32, bool)> = env
+                .storage()
+                .instance()
+                .get(&OUTCOMES_KEY)
+                .unwrap_or_else(|| Map::new(&env));
+            outcomes.set(dispute_id, (proposal_id, milestone_id, release));
+            env.storage().instance().set(&OUTCOMES_KEY, &outcomes);
+        }
+
+        pub fn get_release_outcome(env: Env, dispute_id: u64) -> Option<(u32, u32, bool)> {
+            let outcomes: Map<u64, (u32, u32, bool)> = env
+                .storage()
+                .instance()
+                .get(&OUTCOMES_KEY)
+                .unwrap_or_else(|| Map::new(&env));
+            outcomes.get(dispute_id)
+        }
+    }
+}
+
+use mock_arbitration::{MockArbitration, MockArbitrationClient};
+
+fn deploy_mock_arbitration(env: &Env) -> MockArbitrationClient<'_> {
+    let contract_id = env.register(MockArbitration, ());
+    MockArbitrationClient::new(env, &contract_id)
+}
+
+#[test]
+fn set_arbitration_contract_bootstraps_once() {
+    let (env, contract_id, _token, admin, _treasury, _scholar) = setup();
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+    let arbitration = Address::generate(&env);
+
+    set_caller(
+        &client,
+        "set_arbitration_contract",
+        &admin,
+        (arbitration.clone(),),
+    );
+    client.set_arbitration_contract(&arbitration);
+    assert_eq!(client.get_arbitration_contract(), Some(arbitration.clone()));
+
+    let other = Address::generate(&env);
+    set_caller(
+        &client,
+        "set_arbitration_contract",
+        &admin,
+        (other.clone(),),
+    );
+    let result = client.try_set_arbitration_contract(&other);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::ArbitrationAlreadySet as u32
+        )))
+    );
+}
+
+#[test]
+fn arbitration_change_respects_timelock() {
+    let (env, contract_id, _token, _admin, _treasury, _scholar) = setup();
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+    let first = Address::generate(&env);
+    let second = Address::generate(&env);
+
+    client.env.mock_all_auths();
+    client.set_arbitration_contract(&first);
+    client.queue_arbitration_change(&second);
+
+    let pending = client.get_pending_arbitration_change().unwrap();
+    assert_eq!(pending.new_arbitration, second);
+
+    // Too early.
+    let result = client.try_execute_arbitration_change();
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::ArbitrationTimelockNotExpired as u32
+        )))
+    );
+    assert_eq!(client.get_arbitration_contract(), Some(first.clone()));
+
+    set_timestamp(&env, pending.ready_at);
+    client.execute_arbitration_change();
+    assert_eq!(client.get_arbitration_contract(), Some(second));
+    assert!(client.get_pending_arbitration_change().is_none());
+}
+
+#[test]
+fn cancel_arbitration_change_removes_pending() {
+    let (env, contract_id, _token, admin, _treasury, _scholar) = setup();
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+    let first = Address::generate(&env);
+    let second = Address::generate(&env);
+    let _ = admin;
+
+    client.env.mock_all_auths();
+    client.set_arbitration_contract(&first);
+    client.queue_arbitration_change(&second);
+    client.cancel_arbitration_change();
+
+    assert!(client.get_pending_arbitration_change().is_none());
+    assert_eq!(client.get_arbitration_contract(), Some(first));
+}
+
+#[test]
+fn release_tranche_via_arbitration_releases_on_favorable_outcome() {
+    let (env, contract_id, token, _admin, _treasury, scholar) = setup();
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+    create_escrow(&client, 1, &scholar, 100, 2);
+
+    let arbitration = deploy_mock_arbitration(&env);
+    client.env.mock_all_auths();
+    client.set_arbitration_contract(&arbitration.address);
+
+    arbitration.set_outcome(&7, &1, &1, &true);
+    client.release_tranche_via_arbitration(&1, &7);
+
+    assert_eq!(token_client(&env, &token).balance(&scholar), 50);
+    let escrow = client.get_escrow(&1).unwrap();
+    assert_eq!(escrow.tranches_released, 1);
+
+    // The same dispute id can never authorize a second release.
+    let result = client.try_release_tranche_via_arbitration(&1, &7);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::DisputeAlreadyConsumed as u32
+        )))
+    );
+}
+
+#[test]
+fn release_tranche_via_arbitration_rejects_unfavorable_outcome() {
+    let (env, contract_id, token, _admin, _treasury, scholar) = setup();
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+    create_escrow(&client, 1, &scholar, 100, 2);
+
+    let arbitration = deploy_mock_arbitration(&env);
+    client.env.mock_all_auths();
+    client.set_arbitration_contract(&arbitration.address);
+
+    arbitration.set_outcome(&7, &1, &1, &false);
+    let result = client.try_release_tranche_via_arbitration(&1, &7);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::ArbitrationNotFavorable as u32
+        )))
+    );
+    assert_eq!(token_client(&env, &token).balance(&scholar), 0);
+}
+
+#[test]
+fn release_tranche_via_arbitration_without_arbitration_set_fails() {
+    let (env, contract_id, _token, _admin, _treasury, scholar) = setup();
+    let client = MilestoneEscrowClient::new(&env, &contract_id);
+    create_escrow(&client, 1, &scholar, 100, 2);
+
+    let result = client.try_release_tranche_via_arbitration(&1, &7);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::ArbitrationNotSet as u32
+        )))
+    );
+}
+
 #[cfg(test)]
 mod fuzz_tests {
     use super::*;

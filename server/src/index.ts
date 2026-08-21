@@ -42,6 +42,7 @@ import { createCommentsRouter } from "./routes/comments.routes"
 import { communityRouter } from "./routes/community.routes"
 import { createCoursesRouter } from "./routes/courses.routes"
 import { createCredentialsRouter } from "./routes/credentials.routes"
+import { createDisputeRouter } from "./routes/dispute.routes"
 import { createEnrollmentsRouter } from "./routes/enrollments.routes"
 import { eventsRouter } from "./routes/events.routes"
 import { createForumRouter } from "./routes/forum.routes"
@@ -333,6 +334,7 @@ app.use("/api", createStreaksRouter(jwtService))
 app.use("/api", onboardingRouter)
 app.use("/api", createRelayRouter(jwtService))
 app.use("/api", createAnchorsRouter(jwtService))
+app.use("/api", createDisputeRouter(jwtService))
 
 if (process.env.NODE_ENV !== "test") {
 	void import("./workers/escrow-timeout-worker").then(

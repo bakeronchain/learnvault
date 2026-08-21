@@ -2,6 +2,7 @@ import { Card } from "@stellar/design-system"
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import ConnectWalletGuard from "../components/ConnectWalletGuard"
+import EscalateDisputeButton from "../components/EscalateDisputeButton"
 import MilestoneReportForm from "../components/MilestoneReportForm"
 import {
 	useScholarMilestones,
@@ -314,15 +315,26 @@ export default function ScholarMilestones() {
 																</span>
 															</div>
 														</div>
-														{milestone.status === "rejected" && (
-															<button
-																type="button"
-																onClick={() => setResubmitMilestone(milestone)}
-																className="w-full sm:w-auto min-h-[44px] rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 transition-colors"
-															>
-																Resubmit
-															</button>
-														)}
+														<div className="flex flex-col sm:flex-row gap-2">
+															{milestone.status === "rejected" && (
+																<button
+																	type="button"
+																	onClick={() =>
+																		setResubmitMilestone(milestone)
+																	}
+																	className="w-full sm:w-auto min-h-[44px] rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 transition-colors"
+																>
+																	Resubmit
+																</button>
+															)}
+															{(milestone.status === "rejected" ||
+																milestone.status === "final_rejected") && (
+																<EscalateDisputeButton
+																	milestoneId={milestone.milestone_id}
+																	rejectedAt={null}
+																/>
+															)}
+														</div>
 													</div>
 												</div>
 											))}

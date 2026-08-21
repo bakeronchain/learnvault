@@ -14,6 +14,9 @@ export function useContractIds() {
 		CONTRACT_IDS.scholarshipTreasury,
 	)
 	const milestoneEscrow = normalizeContractId(CONTRACT_IDS.milestoneEscrow)
+	const milestoneArbitration = normalizeContractId(
+		CONTRACT_IDS.milestoneArbitration,
+	)
 	const usdc =
 		normalizeContractId(import.meta.env.PUBLIC_USDC_CONTRACT_ID as string) ??
 		normalizeContractId(import.meta.env.VITE_USDC_CONTRACT_ID as string)
@@ -25,6 +28,7 @@ export function useContractIds() {
 		courseMilestone,
 		scholarshipTreasury,
 		milestoneEscrow,
+		milestoneArbitration,
 		usdc,
 		isDeployed: (id: string | undefined): id is string => Boolean(id),
 	}

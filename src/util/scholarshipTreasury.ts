@@ -1,19 +1,11 @@
-import {
-	BASE_FEE,
-	Contract,
-	Transaction,
-	TransactionBuilder,
-	nativeToScVal,
-	rpc,
-} from "@stellar/stellar-sdk"
+import { Contract, nativeToScVal } from "@stellar/stellar-sdk"
 import { networkPassphrase, rpcUrl } from "../contracts/util"
 import { useWallet } from "../hooks/useWallet"
 import {
 	SCHOLARSHIP_TREASURY_CONTRACT,
 	amountToAtomicUnits,
 } from "./scholarshipApplications"
-
-type AnyRecord = Record<string, unknown>
+import { prepareAndConfirmTransaction } from "./soroban-transaction"
 
 type WalletSignTransaction =
 	| ((
@@ -68,56 +60,6 @@ const formatUnknownError = (value: unknown): string => {
 	} catch {
 		return "Transaction failed"
 	}
-}
-
-const resolveSignedTransactionXdr = (
-	value: unknown,
-	fallbackXdr: string,
-): string => {
-	if (typeof value === "string" && value.trim()) return value
-	if (!value || typeof value !== "object") return fallbackXdr
-
-	const maybeResult = value as AnyRecord
-	for (const key of ["signedTransaction", "signedTxXdr", "xdr"]) {
-		const candidate = maybeResult[key]
-		if (typeof candidate === "string" && candidate.trim()) {
-			return candidate
-		}
-	}
-
-	return fallbackXdr
-}
-
-const HEX_HASH_PATTERN = /\b[a-f0-9]{64}\b/i
-
-const extractTransactionHash = (
-	value: unknown,
-	seen = new Set<unknown>(),
-): string | undefined => {
-	if (value == null) return undefined
-	if (typeof value === "string") {
-		return HEX_HASH_PATTERN.test(value)
-			? value.match(HEX_HASH_PATTERN)?.[0]
-			: undefined
-	}
-	if (typeof value !== "object") return undefined
-	if (seen.has(value)) return undefined
-	seen.add(value)
-
-	if (Array.isArray(value)) {
-		for (const item of value) {
-			const found = extractTransactionHash(item, seen)
-			if (found) return found
-		}
-		return undefined
-	}
-
-	for (const nested of Object.values(value as AnyRecord)) {
-		const found = extractTransactionHash(nested, seen)
-		if (found) return found
-	}
-
-	return undefined
 }
 
 const getScholarshipTreasuryContractId = (): string | undefined =>
@@ -178,8 +120,6 @@ export class ScholarshipTreasury implements ScholarshipTreasuryContract {
 		}
 
 		try {
-			const server = new rpc.Server(rpcUrl, { allowHttp: true })
-			const sourceAccount = await server.getAccount(this.address)
 			const contract = new Contract(this.contractId)
 			const operation = contract.call(
 				"deposit",
@@ -188,42 +128,13 @@ export class ScholarshipTreasury implements ScholarshipTreasuryContract {
 				nativeToScVal(assetContractId, { type: "address" }),
 			)
 
-			const transaction = new TransactionBuilder(sourceAccount, {
-				fee: BASE_FEE,
+			return await prepareAndConfirmTransaction({
+				operation,
+				address: this.address,
 				networkPassphrase,
+				rpcUrl,
+				signTransaction,
 			})
-				.addOperation(operation)
-				.setTimeout(30)
-				.build()
-
-			const prepared = await server.prepareTransaction(transaction)
-			const signed = await Promise.resolve(
-				signTransaction(prepared.toXDR(), { networkPassphrase }),
-			)
-			const signedXdr = resolveSignedTransactionXdr(signed, prepared.toXDR())
-			const response = await server.sendTransaction(
-				new Transaction(signedXdr, networkPassphrase),
-			)
-			if (response.status === "ERROR") {
-				const errorResult =
-					typeof response.errorResult === "string"
-						? response.errorResult
-						: undefined
-				throw new Error(
-					errorResult
-						? `Deposit failed: ${errorResult}`
-						: "Deposit failed to submit",
-				)
-			}
-
-			const txHash = response.hash ?? extractTransactionHash(response)
-			if (!txHash) {
-				throw new Error(
-					"Deposit submitted but no transaction hash was returned",
-				)
-			}
-
-			return txHash
 		} catch (error) {
 			console.error("Failed to deposit into scholarship treasury:", error)
 			throw new Error(formatUnknownError(error))

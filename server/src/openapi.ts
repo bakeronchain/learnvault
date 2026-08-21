@@ -48,6 +48,11 @@ export const buildOpenApiSpec = () => {
 					description: "Treasury statistics and activity endpoints",
 				},
 				{ name: "Upload", description: "IPFS file upload endpoints" },
+				{
+					name: "Translations",
+					description:
+						"Course/lesson content translation, translator workspace, and glossary endpoints",
+				},
 			],
 			components: {
 				securitySchemes: {
@@ -278,6 +283,51 @@ export const buildOpenApiSpec = () => {
 							published: { type: "boolean" },
 							createdAt: { type: "string", format: "date-time" },
 							updatedAt: { type: "string", format: "date-time" },
+							studentsCount: { type: "integer" },
+							prerequisites: { type: "array", items: { type: "integer" } },
+							avgRating: { type: "number", nullable: true },
+							reviewCount: { type: "integer" },
+							languageServed: {
+								type: "string",
+								enum: ["en", "es", "fr", "sw"],
+								description: "The content language actually returned.",
+							},
+							isTranslation: {
+								type: "boolean",
+								description:
+									"True when languageServed is a published translation, not English.",
+							},
+							isFallback: {
+								type: "boolean",
+								description:
+									"True when a non-English language was requested but no published translation exists, so English was served instead.",
+							},
+							isStale: {
+								type: "boolean",
+								description:
+									"True when the served translation was made from an older revision of the English source. Still served — never silently hidden.",
+							},
+							translatorAddress: {
+								type: "string",
+								nullable: true,
+								description:
+									"Wallet address credited for the served translation, or null for English/no translation.",
+							},
+							availableLanguages: {
+								type: "array",
+								items: { type: "string", enum: ["es", "fr", "sw"] },
+								description:
+									"Languages with at least one published translation for this course (course- or lesson-level), regardless of staleness.",
+							},
+							translationCoverage: {
+								type: "object",
+								properties: {
+									totalLessons: { type: "integer" },
+									translatedLessons: { type: "integer" },
+								},
+								description:
+									"How many of the course's lessons have a published translation in the requested language — lets a learner see partial coverage before committing.",
+							},
 						},
 						required: [
 							"id",
@@ -296,6 +346,11 @@ export const buildOpenApiSpec = () => {
 							title: { type: "string" },
 							content: { type: "string" },
 							order: { type: "integer" },
+							estimatedMinutes: { type: "integer" },
+							isMilestone: { type: "boolean" },
+							version: { type: "integer" },
+							isLatest: { type: "boolean" },
+							changeSummary: { type: "string", nullable: true },
 							quiz: {
 								type: "array",
 								items: {
@@ -309,8 +364,132 @@ export const buildOpenApiSpec = () => {
 							},
 							createdAt: { type: "string", format: "date-time" },
 							updatedAt: { type: "string", format: "date-time" },
+							languageServed: {
+								type: "string",
+								enum: ["en", "es", "fr", "sw"],
+							},
+							isTranslation: { type: "boolean" },
+							isFallback: { type: "boolean" },
+							isStale: { type: "boolean" },
+							translatorAddress: { type: "string", nullable: true },
 						},
 						required: ["id", "courseId", "title", "content", "order"],
+					},
+					CourseTranslation: {
+						type: "object",
+						properties: {
+							id: { type: "integer" },
+							courseId: { type: "integer" },
+							languageCode: { type: "string", enum: ["es", "fr", "sw"] },
+							title: { type: "string" },
+							description: { type: "string" },
+							status: {
+								type: "string",
+								enum: ["draft", "in_review", "published"],
+							},
+							translatorAddress: { type: "string" },
+							reviewedByAddress: { type: "string", nullable: true },
+							sourceVersion: { type: "integer" },
+							isStale: { type: "boolean" },
+							publishedAt: {
+								type: "string",
+								format: "date-time",
+								nullable: true,
+							},
+							updatedAt: { type: "string", format: "date-time" },
+						},
+					},
+					LessonTranslation: {
+						type: "object",
+						properties: {
+							id: { type: "integer" },
+							courseId: { type: "integer" },
+							orderIndex: { type: "integer" },
+							languageCode: { type: "string", enum: ["es", "fr", "sw"] },
+							title: { type: "string" },
+							content: { type: "string" },
+							status: {
+								type: "string",
+								enum: ["draft", "in_review", "published"],
+							},
+							translatorAddress: { type: "string" },
+							reviewedByAddress: { type: "string", nullable: true },
+							sourceVersion: { type: "integer" },
+							isStale: { type: "boolean" },
+							publishedAt: {
+								type: "string",
+								format: "date-time",
+								nullable: true,
+							},
+							updatedAt: { type: "string", format: "date-time" },
+						},
+					},
+					GlossaryTerm: {
+						type: "object",
+						properties: {
+							id: { type: "integer" },
+							term: { type: "string" },
+							note: { type: "string", nullable: true },
+						},
+						required: ["id", "term"],
+					},
+					TranslatorGrant: {
+						type: "object",
+						properties: {
+							id: { type: "integer" },
+							wallet_address: { type: "string" },
+							language_code: { type: "string", enum: ["es", "fr", "sw"] },
+							granted_by: { type: "string" },
+							granted_at: { type: "string", format: "date-time" },
+							revoked_at: {
+								type: "string",
+								format: "date-time",
+								nullable: true,
+							},
+						},
+					},
+					TranslatorQueue: {
+						type: "object",
+						properties: {
+							untranslated: {
+								type: "array",
+								items: {
+									type: "object",
+									properties: {
+										courseSlug: { type: "string" },
+										courseTitle: { type: "string" },
+										orderIndex: { type: "integer" },
+										lessonTitle: { type: "string" },
+									},
+								},
+							},
+							inReview: {
+								type: "array",
+								items: {
+									type: "object",
+									properties: {
+										kind: { type: "string", enum: ["course", "lesson"] },
+										courseSlug: { type: "string" },
+										orderIndex: { type: "integer", nullable: true },
+										title: { type: "string" },
+										submittedAt: { type: "string", format: "date-time" },
+									},
+								},
+							},
+							stale: {
+								type: "array",
+								items: {
+									type: "object",
+									properties: {
+										kind: { type: "string", enum: ["course", "lesson"] },
+										courseSlug: { type: "string" },
+										orderIndex: { type: "integer", nullable: true },
+										title: { type: "string" },
+										staleSinceVersion: { type: "integer" },
+									},
+								},
+							},
+						},
 					},
 					GovernanceProposalInput: {
 						type: "object",

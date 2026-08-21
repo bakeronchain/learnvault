@@ -36,6 +36,8 @@ const MentorDirectory = lazy(() => import("./pages/MentorDirectory"))
 const MySessions = lazy(() => import("./pages/MySessions"))
 const LessonVersionDiff = lazy(() => import("./pages/LessonVersionDiff"))
 const LessonView = lazy(() => import("./pages/LessonView"))
+const TranslatorWorkspace = lazy(() => import("./pages/TranslatorWorkspace"))
+const TranslatorQueue = lazy(() => import("./pages/TranslatorQueue"))
 const NotFound = lazy(() => import("./pages/NotFound"))
 const NotificationSettings = lazy(() => import("./pages/NotificationSettings"))
 const PeerReview = lazy(() => import("./pages/PeerReview"))
@@ -108,6 +110,11 @@ function App() {
 						path="/admin/lesson-diff"
 						element={renderRoute(<LessonVersionDiff />)}
 					/>
+					<Route path="/translate" element={renderRoute(<TranslatorQueue />)} />
+					<Route
+						path="/translate/:courseId"
+						element={renderRoute(<TranslatorWorkspace />)}
+					/>
 					<Route path="/wiki" element={renderRoute(<Wiki />)} />
 					<Route path="/wiki/:slug" element={renderRoute(<WikiPage />)} />
 					<Route path="/tracks" element={renderRoute(<Tracks />)} />
@@ -133,7 +140,10 @@ function App() {
 					<Route path="/debug" element={renderRoute(<Debug />)} />
 					<Route path="/debug/:contractName" element={renderRoute(<Debug />)} />
 					<Route path="/bounties" element={renderRoute(<BountyBoard />)} />
-					<Route path="/bounties/create" element={renderRoute(<CreateBounty />)} />
+					<Route
+						path="/bounties/create"
+						element={renderRoute(<CreateBounty />)}
+					/>
 					<Route path="/bounties/:id" element={renderRoute(<BountyDetail />)} />
 					<Route path="*" element={renderRoute(<NotFound />)} />
 				</Route>

@@ -1,4 +1,5 @@
 import React from "react"
+import { useTranslation } from "react-i18next"
 
 export const DIFFICULTY_OPTIONS = [
 	{ label: "All Levels", value: "" },
@@ -20,6 +21,17 @@ export interface CourseTrackOption {
 	value: string
 }
 
+export interface CourseLanguageOption {
+	label: string
+	value: string
+}
+
+export const CONTENT_LANGUAGE_OPTIONS: readonly CourseLanguageOption[] = [
+	{ label: "es", value: "es" },
+	{ label: "fr", value: "fr" },
+	{ label: "sw", value: "sw" },
+]
+
 interface CourseFilterProps {
 	search: string
 	onSearchChange: (value: string) => void
@@ -28,6 +40,9 @@ interface CourseFilterProps {
 	track: string
 	trackOptions?: readonly CourseTrackOption[]
 	onTrackChange: (value: string) => void
+	language?: string
+	languageOptions?: readonly CourseLanguageOption[]
+	onLanguageChange?: (value: string) => void
 	onClear: () => void
 	hasActiveFilters: boolean
 }
@@ -40,9 +55,13 @@ export const CourseFilter: React.FC<CourseFilterProps> = ({
 	track,
 	trackOptions = TRACK_OPTIONS,
 	onTrackChange,
+	language = "",
+	languageOptions = CONTENT_LANGUAGE_OPTIONS,
+	onLanguageChange,
 	onClear,
 	hasActiveFilters,
 }) => {
+	const { t } = useTranslation()
 	return (
 		<div className="mb-10 space-y-4">
 			{/* Search input */}
@@ -124,6 +143,52 @@ export const CourseFilter: React.FC<CourseFilterProps> = ({
 						</button>
 					))}
 				</div>
+
+				{onLanguageChange ? (
+					<>
+						<div
+							className="w-px h-5 bg-white/10 hidden sm:block"
+							aria-hidden="true"
+						/>
+						{/* Content language */}
+						<div
+							className="flex items-center gap-2 flex-wrap w-full sm:w-auto"
+							role="group"
+							aria-label={t(
+								"catalogueLanguageFilterLabel",
+								"Filter by lesson language",
+							)}
+						>
+							<button
+								type="button"
+								onClick={() => onLanguageChange("")}
+								aria-pressed={language === ""}
+								className={`w-full sm:w-auto px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest border transition-all ${
+									language === ""
+										? "bg-brand-emerald/10 border-brand-emerald/40 text-brand-emerald"
+										: "bg-white/5 border-white/10 text-white/55 hover:border-white/25 hover:text-white/80"
+								}`}
+							>
+								{t("catalogueLanguageFilterAll", "All languages")}
+							</button>
+							{languageOptions.map((opt) => (
+								<button
+									key={opt.value}
+									type="button"
+									onClick={() => onLanguageChange(opt.value)}
+									aria-pressed={language === opt.value}
+									className={`w-full sm:w-auto px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest border transition-all ${
+										language === opt.value
+											? "bg-brand-emerald/10 border-brand-emerald/40 text-brand-emerald"
+											: "bg-white/5 border-white/10 text-white/55 hover:border-white/25 hover:text-white/80"
+									}`}
+								>
+									{opt.label}
+								</button>
+							))}
+						</div>
+					</>
+				) : null}
 
 				{/* Clear */}
 				{hasActiveFilters && (

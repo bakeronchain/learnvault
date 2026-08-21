@@ -34,7 +34,7 @@
     "test:contracts": "cargo test --workspace",
     "test:watch": "cargo watch -x 'test --workspace'",
     "test:coverage": "vitest run --coverage",
-    "i18n:scan": "npx i18next-scanner --config ./i18next-scanner.config.js",
+    "i18n:scan": "npx i18next-scanner --config ./i18next-scanner.config.cjs",
     "i18n:pseudo": "node scripts/generate-pseudo-locale.mjs"
   },
   "workspaces": [

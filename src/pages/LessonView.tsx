@@ -1,6 +1,7 @@
 import { Button } from "@stellar/design-system"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
+import { ContentLanguageSelector } from "../components/ContentLanguageSelector"
 import CourseReviewsPanel from "../components/CourseReviewsPanel"
 import { CourseForum } from "../components/forum/CourseForum"
 import LessonContent from "../components/LessonContent"
@@ -14,6 +15,7 @@ import { useEnrollment } from "../hooks/useEnrollment"
 import { useLessonProgress } from "../hooks/useLessonProgress"
 import { useOnlineStatus } from "../hooks/useOnlineStatus"
 import { useWallet } from "../hooks/useWallet"
+import { useContentLanguage } from "../providers/ContentLanguageProvider"
 import {
 	completeLessonSession,
 	formatDuration,
@@ -43,13 +45,14 @@ const LessonView: React.FC = () => {
 
 	const { address } = useWallet()
 	const { isOnline } = useOnlineStatus()
+	const { contentLanguage } = useContentLanguage()
 	const { getCourseProgress, completeMilestone, isCompletingMilestone } =
 		useCourse()
 	const {
 		course,
 		isLoading: isLoadingCourse,
 		error: courseError,
-	} = useCourseDetail(courseId, address)
+	} = useCourseDetail(courseId, address, contentLanguage)
 	const courseSlug = course?.slug ?? courseId ?? ""
 	const {
 		isEnrolled,
@@ -359,6 +362,7 @@ const LessonView: React.FC = () => {
 					<h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
 						{currentTab === "forum" ? "Community Forum" : lesson.title}
 					</h1>
+					{currentTab !== "forum" ? <ContentLanguageSelector /> : null}
 				</div>
 			</header>
 			{/* Course progress bar */}

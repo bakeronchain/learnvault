@@ -1,4 +1,4 @@
--- Rollback for 031_milestone_arbitration.sql
+-- Rollback for 032_milestone_arbitration.sql
 -- WARNING: destroys all indexed dispute/juror/vote history.
 
 DROP TABLE IF EXISTS pending_dispute_evidence;

@@ -1,5 +1,5 @@
 -- ============================================================
--- Migration 031: On-chain milestone arbitration (issue #1082)
+-- Migration 032: On-chain milestone arbitration (issue #1082)
 -- ============================================================
 -- Off-chain read model for the milestone_arbitration Soroban contract. The
 -- chain is the source of truth for every state transition; these tables

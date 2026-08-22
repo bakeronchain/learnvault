@@ -41,6 +41,34 @@ const MILESTONE_COUNT_KEY: Symbol = symbol_short!("MSCNT");
 const TIMELOCK_LEDGER_KEY: Symbol = symbol_short!("TLOCK");
 const DEFAULT_TIMELOCK_LEDGERS: u32 = DAY_IN_LEDGERS * 2; // 48 hours
 
+// --- Yield strategy (allocation) controls -----------------------------------
+// `MAX_ALLOC_BPS` is the governance-set ceiling (in basis points) on the share
+// of total treasury value that may ever be at risk in strategies. Enforced on
+// every allocation.
+const MAX_ALLOC_BPS_KEY: Symbol = symbol_short!("MAXALOC");
+// `LIQ_BUFFER_BPS` is the liquidity-buffer margin (in basis points) that must
+// remain idle *on top of* all approved-but-unpaid proposals. Allocating below
+// this floor is rejected so an approved scholarship can never be blocked by an
+// investment.
+const LIQ_BUFFER_BPS_KEY: Symbol = symbol_short!("BUFBPS");
+// Registered strategy adapter address.
+const STRATEGY_KEY: Symbol = symbol_short!("STRATGY");
+// Outstanding principal currently at risk in strategies (atomic units).
+const ALLOC_PRINCIPAL_KEY: Symbol = symbol_short!("ALLOCP");
+// Outstanding unrealized yield currently held at the strategy (atomic units).
+const ALLOC_YIELD_KEY: Symbol = symbol_short!("ALLOCY");
+// Cumulative yield recognized/harvested into the treasury to date (reporting).
+const TOTAL_YIELD_KEY: Symbol = symbol_short!("YLDACC");
+// Conservative defaults. These are policy knobs; the DAO (via admin, itself
+// governed) may raise or lower them after execution.
+const DEFAULT_MAX_ALLOC_BPS: u32 = 2_500; // 25% of treasury value at most
+const DEFAULT_LIQUIDITY_BUFFER_BPS: u32 = 2_000; // +20% margin over committed
+// Running total of approved-but-unpaid disbursement proposals. The liquidity
+// buffer must always keep idle balance above this commitment. Maintained as a
+// single counter because Soroban persistent storage does not expose key
+// enumeration.
+const COMMITTED_KEY: Symbol = symbol_short!("CMTMEU");
+
 #[derive(Clone)]
 #[contracttype]
 pub enum DataKey {
@@ -80,6 +108,40 @@ pub struct ProposalQueued {
     pub execution_ready_at: u32,
 }
 
+#[contractevent(topics = ["allocated"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Allocated {
+    #[topic]
+    pub strategy: Address,
+    pub amount: i128,
+}
+
+#[contractevent(topics = ["deallocated"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Deallocated {
+    #[topic]
+    pub strategy: Address,
+    pub amount: i128,
+    pub returned: i128,
+}
+
+#[contractevent(topics = ["harvested"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Harvested {
+    #[topic]
+    pub strategy: Address,
+    pub amount: i128,
+    pub yield_amount: i128,
+}
+
+#[contractevent(topics = ["emergency_withdraw"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EmergencyWithdrawal {
+    #[topic]
+    pub strategy: Address,
+    pub amount: i128,
+}
+
 #[derive(Clone)]
 #[contracttype]
 pub struct Proposal {
@@ -99,6 +161,8 @@ pub struct Proposal {
     pub executed: bool,
     pub cancelled: bool,
     pub kind: ProposalKind,
+    // Target strategy for allocation/deallocation proposals (None otherwise).
+    pub strategy: Option<Address>,
     // Fields for parameter change proposals (optional)
     pub new_quorum: i128,
     pub new_approval_bps: u32,
@@ -122,6 +186,8 @@ pub enum ProposalStatus {
 pub enum ProposalKind {
     Disbursement,
     ParameterChange,
+    Allocation,
+    Deallocation,
 }
 
 #[contracterror]
@@ -159,6 +225,16 @@ pub enum Error {
     VetoNotMet = 22,
     /// Asset is not in the supported assets list.
     UnsupportedAsset = 23,
+    /// No strategy adapter is registered for allocation.
+    StrategyNotRegistered = 24,
+    /// Allocation would exceed the governance-set max_allocation_bps ceiling.
+    AllocationCapExceeded = 25,
+    /// Allocation would leave idle balance below the liquidity buffer floor.
+    LiquidityBufferBreached = 26,
+    /// Amount to deallocate exceeds the outstanding principal at the strategy.
+    ExceedsAllocated = 27,
+    /// The supplied strategy address is not the registered adapter.
+    UnknownStrategy = 28,
 }
 
 #[contract]
@@ -628,7 +704,37 @@ impl ScholarshipTreasury {
                     }
                 }
             },
+            ProposalKind::Allocation => {
+                if passed {
+                    if !proposal.strategy.is_some() {
+                        panic_with_error!(&env, Error::StrategyNotRegistered);
+                    }
+                    Self::allocate_internal(
+                        &env,
+                        proposal.strategy.clone().unwrap(),
+                        proposal.amount,
+                    );
+                }
+            },
+            ProposalKind::Deallocation => {
+                if passed {
+                    if !proposal.strategy.is_some() {
+                        panic_with_error!(&env, Error::StrategyNotRegistered);
+                    }
+                    Self::deallocate_internal(
+                        &env,
+                        proposal.strategy.clone().unwrap(),
+                        proposal.amount,
+                    );
+                }
+            },
         }
+
+        // A disbursement proposal is no longer approved-but-unpaid once it has
+        // executed; drop it from the committed obligation that the liquidity
+        // buffer must cover.
+        Self::release_commitment(&env, proposal.kind.clone(), proposal.amount);
+
         // Persist updated proposal (executed flag already set)
         env.storage()
             .persistent()
@@ -644,7 +750,15 @@ impl ScholarshipTreasury {
         ProposalExecuted {
             proposal_id,
             passed,
-            amount: if passed && proposal.kind == ProposalKind::Disbursement { proposal.amount } else { 0 },
+            amount: if passed
+                && (proposal.kind == ProposalKind::Disbursement
+                    || proposal.kind == ProposalKind::Allocation
+                    || proposal.kind == ProposalKind::Deallocation)
+            {
+                proposal.amount
+            } else {
+                0
+            },
         }
         .publish(&env);
     }
@@ -675,6 +789,13 @@ impl ScholarshipTreasury {
         }
 
         proposal.cancelled = true;
+
+        // If the proposal was approved-but-unpaid (Queued), cancelling it
+        // releases the committed obligation the liquidity buffer must cover.
+        if status == ProposalStatus::Queued || status == ProposalStatus::Approved {
+            Self::release_commitment(&env, proposal.kind.clone(), proposal.amount);
+        }
+
         env.storage()
             .persistent()
             .set(&DataKey::Proposal(proposal_id), &proposal);
@@ -692,6 +813,236 @@ impl ScholarshipTreasury {
             .instance()
             .get::<_, i128>(&TOTAL_KEY)
             .unwrap_or(0)
+    }
+
+    /// Idle USDC balance not committed to any strategy. This is what
+    /// `get_balance` has always meant (the disbursable idle balance), so it is
+    /// preserved and an explicit `get_idle` alias is provided.
+    pub fn get_idle(env: Env) -> i128 {
+        Self::get_balance(env.clone())
+    }
+
+    /// Outstanding principal at risk in the registered strategy (atomic units),
+    /// excluding unrealized yield held at the strategy.
+    pub fn get_allocated(env: Env) -> i128 {
+        Self::allocated_principal(&env)
+    }
+
+    /// Unrealized yield currently held at the strategy, not yet harvested.
+    /// Clamped at zero (a negative value means the strategy is impaired).
+    pub fn get_accrued_yield(env: Env) -> i128 {
+        let v = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&ALLOC_YIELD_KEY)
+            .unwrap_or(0);
+        if v < 0 {
+            0
+        } else {
+            v
+        }
+    }
+
+    /// Recognized impairment (loss) at the strategy, reported as a non-negative
+    /// figure so `get_total_value` can be reconciled with principal + yield.
+    pub fn get_impairment(env: Env) -> i128 {
+        let v = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&ALLOC_YIELD_KEY)
+            .unwrap_or(0);
+        if v < 0 {
+            -v
+        } else {
+            0
+        }
+    }
+
+    /// Cumulative yield recognized into the treasury since inception
+    /// (reporting accessor; harvested yield accrues to `TOTAL_KEY` and is
+    /// disbursable like any idle balance).
+    pub fn get_total_yield(env: Env) -> i128 {
+        env.storage()
+            .instance()
+            .get::<_, i128>(&TOTAL_YIELD_KEY)
+            .unwrap_or(0)
+    }
+
+    /// Total treasury value: idle + outstanding total at the strategy
+    /// (principal + unrealized yield). This is mark-to-market value, against
+    /// which the allocation cap is computed.
+    /// Register the strategy adapter. Admin-only. This only names the venue;
+    /// funds still move only via an executed governance proposal.
+    pub fn set_strategy(env: Env, strategy: Address) {
+        Self::assert_initialized(&env);
+        let admin = Self::admin(&env);
+        admin.require_auth();
+        env.storage().instance().set(&STRATEGY_KEY, &strategy);
+    }
+
+    pub fn get_strategy(env: Env) -> Option<Address> {
+        env.storage().instance().get(&STRATEGY_KEY)
+    }
+
+    /// Governance-set ceiling (in basis points) on the share of total treasury
+    /// value at risk. Enforced on every allocation. Admin only.
+    pub fn set_max_allocation_bps(env: Env, bps: u32) {
+        Self::assert_initialized(&env);
+        let admin = Self::admin(&env);
+        admin.require_auth();
+        if bps > 10_000 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
+        env.storage().instance().set(&MAX_ALLOC_BPS_KEY, &bps);
+    }
+
+    pub fn get_max_allocation_bps(env: Env) -> u32 {
+        env.storage()
+            .instance()
+            .get::<_, u32>(&MAX_ALLOC_BPS_KEY)
+            .unwrap_or(DEFAULT_MAX_ALLOC_BPS)
+    }
+
+    /// Liquidity-buffer margin (in basis points) that must remain idle on top
+    /// of all approved-but-unpaid proposals. Admin only.
+    pub fn set_liquidity_buffer_bps(env: Env, bps: u32) {
+        Self::assert_initialized(&env);
+        let admin = Self::admin(&env);
+        admin.require_auth();
+        if bps > 10_000 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
+        env.storage().instance().set(&LIQ_BUFFER_BPS_KEY, &bps);
+    }
+
+    pub fn get_liquidity_buffer_bps(env: Env) -> u32 {
+        env.storage()
+            .instance()
+            .get::<_, u32>(&LIQ_BUFFER_BPS_KEY)
+            .unwrap_or(DEFAULT_LIQUIDITY_BUFFER_BPS)
+    }
+
+    /// Total treasury value: idle + outstanding total at the strategy.
+    /// Mark-to-market value, against which the allocation cap is computed.
+    pub fn get_total_value(env: Env) -> i128 {
+        let idle = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&TOTAL_KEY)
+            .unwrap_or(0);
+        let at_strategy = Self::strategy_total(&env);
+        Self::checked_add_i128(&env, idle, at_strategy)
+    }
+
+    /// Current strategy position: (principal, unrealized_yield, max_withdrawable).
+    pub fn get_position(env: Env) -> (i128, i128, i128) {
+        let strategy = env
+            .storage()
+            .instance()
+            .get::<_, Address>(&STRATEGY_KEY);
+        if !strategy.is_some() {
+            return (0, 0, 0);
+        }
+        let addr = strategy.unwrap();
+        let principal = Self::allocated_principal(&env);
+        let yield_ = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&ALLOC_YIELD_KEY)
+            .unwrap_or(0);
+        let max = Self::strategy_max_withdrawable(&env, &addr);
+        (principal, yield_, max)
+    }
+
+    /// Harvest currently-unrealized strategy yield into the treasury.
+    /// Admin-only. Rounding always favours the treasury.
+    pub fn harvest(env: Env) {
+        Self::assert_initialized(&env);
+        let admin = Self::admin(&env);
+        admin.require_auth();
+
+        let strategy = env
+            .storage()
+            .instance()
+            .get::<_, Address>(&STRATEGY_KEY)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::StrategyNotRegistered));
+
+        // Accrued yield = reported value minus principal. If the strategy is
+        // impaired (value below principal) there is nothing to harvest.
+        let principal = Self::allocated_principal(&env);
+        let balance = Self::strategy_total(&env);
+        if balance <= principal {
+            let _ = strategy;
+            return;
+        }
+        let yield_amount = balance - principal;
+
+        let returned = Self::strategy_withdraw(&env, &strategy, yield_amount);
+        if returned < 0 {
+            panic_with_error!(&env, Error::ArithmeticOverflow);
+        }
+
+        Self::apply_strategy_returns(&env, returned);
+
+        // Realized yield is tracked for reporting and is disbursable like any
+        // idle balance (apply_strategy_returns already credited it to idle).
+        let total_yield = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&TOTAL_YIELD_KEY)
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&TOTAL_YIELD_KEY, &Self::checked_add_i128(&env, total_yield, returned));
+
+        Harvested {
+            strategy,
+            amount: returned,
+            yield_amount: returned,
+        }
+        .publish(&env);
+    }
+
+    /// Pull everything recoverable from the strategy back to idle, callable by
+    /// the pause authority without waiting for the timelock, and while paused.
+    /// Losing unrealized yield is acceptable; being unable to exit is not.
+    pub fn emergency_withdraw(env: Env, strategy: Address) {
+        Self::assert_initialized(&env);
+
+        let admin = Self::admin(&env);
+        admin.require_auth();
+
+        let registered = env
+            .storage()
+            .instance()
+            .get::<_, Address>(&STRATEGY_KEY);
+        if !registered.is_some() || registered.unwrap() != strategy {
+            panic_with_error!(&env, Error::UnknownStrategy);
+        }
+
+        // Ask the strategy to return everything it can (max_withdrawable).
+        let max = Self::strategy_max_withdrawable(&env, &strategy);
+        let returned = if max <= 0 {
+            0
+        } else {
+            let r = Self::strategy_withdraw(&env, &strategy, max);
+            if r < 0 {
+                panic_with_error!(&env, Error::ArithmeticOverflow);
+            }
+            r
+        };
+
+        // Reconcile accounting to the strategy's current reported balance. If
+        // the venue returned nothing or the position is fully impaired, this
+        // writes principal/yield down to match balance_of so `get_total_value`
+        // reflects the loss without panicking.
+        Self::apply_strategy_returns(&env, returned);
+
+        EmergencyWithdrawal {
+            strategy,
+            amount: returned,
+        }
+        .publish(&env);
     }
 
     pub fn get_total_disbursed(env: Env) -> i128 {
@@ -850,6 +1201,7 @@ impl ScholarshipTreasury {
             executed: false,
             cancelled: false,
             kind: ProposalKind::Disbursement,
+            strategy: None,
             new_quorum: 0,
             new_approval_bps: 0,
             new_voting_period: 0,
@@ -884,6 +1236,152 @@ impl ScholarshipTreasury {
 
         ProposalSubmitted {
             applicant,
+            proposal_id,
+            amount,
+        }
+        .publish(&env);
+
+        proposal_id
+    }
+
+    /// Submit an allocation proposal (move `amount` of idle USDC into the
+    /// strategy). Like every other proposal it must pass the vote, be
+    /// finalized, and clear the timelock before `execute_proposal` moves funds.
+    pub fn submit_allocation_proposal(env: Env, proposer: Address, strategy: Address, amount: i128) -> u32 {
+        Self::assert_initialized(&env);
+        Self::assert_not_paused(&env);
+        if amount <= 0 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
+        proposer.require_auth();
+        // The proposer must hold minimum governance reputation, mirroring
+        // submit_proposal, so spam is bounded.
+        let gov_contract = Self::governance_contract(&env);
+        let gov_client = governance::client(&env, &gov_contract);
+        let min_lrn_to_propose = Self::get_min_lrn_to_propose(env.clone());
+        if gov_client.balance(&proposer) < min_lrn_to_propose {
+            panic_with_error!(&env, Error::InsufficientReputation);
+        }
+
+        let proposal_id = env
+            .storage()
+            .instance()
+            .get::<_, u32>(&NEXT_PROPOSAL_KEY)
+            .unwrap_or(1);
+
+        let proposal = Proposal {
+            id: proposal_id,
+            applicant: proposer.clone(),
+            amount,
+            program_name: String::from_str(&env, "Strategy allocation"),
+            program_url: String::from_str(&env, ""),
+            program_description: String::from_str(&env, ""),
+            start_date: String::from_str(&env, ""),
+            milestone_titles: Vec::new(&env),
+            milestone_dates: Vec::new(&env),
+            submitted_at: env.ledger().timestamp(),
+            yes_votes: 0,
+            no_votes: 0,
+            deadline_ledger: Self::checked_add_u32(
+                &env,
+                env.ledger().sequence(),
+                Self::get_voting_period(env.clone()),
+            ),
+            executed: false,
+            cancelled: false,
+            kind: ProposalKind::Allocation,
+            strategy: Some(strategy),
+            new_quorum: 0,
+            new_approval_bps: 0,
+            new_voting_period: 0,
+            queued_at: 0,
+            veto_votes: 0,
+        };
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Proposal(proposal_id), &proposal);
+        Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
+
+        let next_proposal_id = Self::checked_add_u32(&env, proposal_id, 1);
+        env.storage()
+            .instance()
+            .set(&NEXT_PROPOSAL_KEY, &next_proposal_id);
+
+        ProposalSubmitted {
+            applicant: proposer,
+            proposal_id,
+            amount,
+        }
+        .publish(&env);
+
+        proposal_id
+    }
+
+    /// Submit a deallocation proposal (withdraw `amount` from the strategy back
+    /// to idle). Same governance pipeline as allocation.
+    pub fn submit_deallocation_proposal(env: Env, proposer: Address, strategy: Address, amount: i128) -> u32 {
+        Self::assert_initialized(&env);
+        Self::assert_not_paused(&env);
+        if amount <= 0 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
+        proposer.require_auth();
+
+        let gov_contract = Self::governance_contract(&env);
+        let gov_client = governance::client(&env, &gov_contract);
+        let min_lrn_to_propose = Self::get_min_lrn_to_propose(env.clone());
+        if gov_client.balance(&proposer) < min_lrn_to_propose {
+            panic_with_error!(&env, Error::InsufficientReputation);
+        }
+
+        let proposal_id = env
+            .storage()
+            .instance()
+            .get::<_, u32>(&NEXT_PROPOSAL_KEY)
+            .unwrap_or(1);
+
+        let proposal = Proposal {
+            id: proposal_id,
+            applicant: proposer.clone(),
+            amount,
+            program_name: String::from_str(&env, "Strategy deallocation"),
+            program_url: String::from_str(&env, ""),
+            program_description: String::from_str(&env, ""),
+            start_date: String::from_str(&env, ""),
+            milestone_titles: Vec::new(&env),
+            milestone_dates: Vec::new(&env),
+            submitted_at: env.ledger().timestamp(),
+            yes_votes: 0,
+            no_votes: 0,
+            deadline_ledger: Self::checked_add_u32(
+                &env,
+                env.ledger().sequence(),
+                Self::get_voting_period(env.clone()),
+            ),
+            executed: false,
+            cancelled: false,
+            kind: ProposalKind::Deallocation,
+            strategy: Some(strategy),
+            new_quorum: 0,
+            new_approval_bps: 0,
+            new_voting_period: 0,
+            queued_at: 0,
+            veto_votes: 0,
+        };
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Proposal(proposal_id), &proposal);
+        Self::extend_persistent(&env, &DataKey::Proposal(proposal_id));
+
+        let next_proposal_id = Self::checked_add_u32(&env, proposal_id, 1);
+        env.storage()
+            .instance()
+            .set(&NEXT_PROPOSAL_KEY, &next_proposal_id);
+
+        ProposalSubmitted {
+            applicant: proposer,
             proposal_id,
             amount,
         }
@@ -1065,6 +1563,15 @@ impl ScholarshipTreasury {
             .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
             .unwrap_or_else(|| panic_with_error!(&env, Error::ProposalNotFound));
 
+        // Idempotency guard for the committed obligation: only count the
+        // proposal's amount the first time it transitions to an approved state.
+        let exists = env
+            .storage()
+            .persistent()
+            .get::<_, ProposalStatus>(&DataKey::FinalizedProposal(proposal_id));
+        let was_already_approved = exists == Some(ProposalStatus::Queued)
+            || exists == Some(ProposalStatus::Approved);
+
         let status = if passed {
             let current_ledger = env.ledger().sequence();
             proposal.queued_at = current_ledger;
@@ -1075,6 +1582,10 @@ impl ScholarshipTreasury {
 
             let timelock_delay = Self::get_timelock_delay(env.clone());
             let execution_ready_at = Self::checked_add_u32(&env, current_ledger, timelock_delay);
+
+            if !was_already_approved {
+                Self::commit_proposal(&env, proposal.kind.clone(), proposal.amount);
+            }
 
             ProposalQueued {
                 proposal_id,
@@ -1175,7 +1686,7 @@ impl ScholarshipTreasury {
     pub fn veto_proposal(env: Env, caller: Address, proposal_id: u32) {
         caller.require_auth();
 
-        let mut proposal = env
+        let proposal = env
             .storage()
             .persistent()
             .get::<_, Proposal>(&DataKey::Proposal(proposal_id))
@@ -1203,6 +1714,10 @@ impl ScholarshipTreasury {
         if !is_admin && !supermajority_met {
             panic_with_error!(&env, Error::VetoNotMet);
         }
+
+        // The proposal was approved-but-unpaid; vetoing it releases the
+        // committed obligation that the liquidity buffer must cover.
+        Self::release_commitment(&env, proposal.kind.clone(), proposal.amount);
 
         env.storage()
             .persistent()
@@ -1378,6 +1893,227 @@ impl ScholarshipTreasury {
         String::from_str(&env, "1.0.0")
     }
 
+    // -------------------------------------------------------------------------
+    // Yield strategy internals (invoked only from executed governance props)
+    // -------------------------------------------------------------------------
+
+    /// Internal allocation. Called only from `execute_proposal` for an
+    /// executed `Allocation` proposal. Moves idle USDC into the strategy and
+    /// enforces both the cap and the liquidity buffer.
+    fn allocate_internal(env: &Env, strategy: Address, amount: i128) {
+        if amount <= 0 {
+            panic_with_error!(env, Error::InvalidAmount);
+        }
+        let registered = env
+            .storage()
+            .instance()
+            .get::<_, Address>(&STRATEGY_KEY);
+        if !registered.is_some() || registered.unwrap() != strategy {
+            panic_with_error!(env, Error::UnknownStrategy);
+        }
+
+        let idle = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&TOTAL_KEY)
+            .unwrap_or(0);
+        if amount > idle {
+            panic_with_error!(env, Error::InsufficientFunds);
+        }
+
+        // 1) Allocation cap: current outstanding + amount must not exceed
+        //    max_allocation_bps of total treasury value. Rounding always
+        //    favours the treasury (floor the allowed amount).
+        let outstanding = Self::strategy_total(env);
+        let cap_bps: u128 = Self::get_max_allocation_bps(env.clone()) as u128;
+        let total_value = Self::checked_add_i128(env, idle, outstanding);
+        let allowed_cap = total_value.checked_mul(cap_bps as i128).unwrap_or(0) / 10_000;
+        if outstanding + amount > allowed_cap {
+            panic_with_error!(env, Error::AllocationCapExceeded);
+        }
+
+        // 2) Liquidity buffer: post-allocation idle must cover approved-but-
+        //    unpaid proposals plus their margin. Allocating below this floor
+        //    is rejected so an approved scholarship can never be blocked.
+        let committed = Self::approved_unpaid_total(env);
+        let buffer_bps: u128 = Self::get_liquidity_buffer_bps(env.clone()) as u128;
+        let required_idle = committed.checked_mul((10_000 + buffer_bps) as i128).unwrap_or(0) / 10_000;
+        if idle - amount < required_idle {
+            panic_with_error!(env, Error::LiquidityBufferBreached);
+        }
+
+        // 3) Move funds to the strategy and record principal.
+        let usdc = env
+            .storage()
+            .instance()
+            .get::<_, Address>(&USDC_KEY)
+            .unwrap_or_else(|| panic_with_error!(env, Error::NotInitialized));
+        soroban_sdk::token::TokenClient::new(env, &usdc)
+            .transfer(&env.current_contract_address(), &strategy, &amount);
+        strategy::client(env, &strategy).deposit(&amount);
+
+        let current_principal = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&ALLOC_PRINCIPAL_KEY)
+            .unwrap_or(0);
+        let new_principal = Self::checked_add_i128(env, current_principal, amount);
+        env.storage()
+            .instance()
+            .set(&ALLOC_PRINCIPAL_KEY, &new_principal);
+
+        // Decrement idle
+        let new_idle = Self::checked_sub_i128(env, idle, amount);
+        env.storage().instance().set(&TOTAL_KEY, &new_idle);
+
+        Allocated {
+            strategy,
+            amount,
+        }
+        .publish(env);
+    }
+
+    /// Internal deallocation. Called only from `execute_proposal` for an
+    /// executed `Deallocation` proposal. Withdraws from the strategy and
+    /// writes the returned capital back to idle. Loss is represented without
+    /// panicking.
+    fn deallocate_internal(env: &Env, strategy: Address, amount: i128) {
+        if amount <= 0 {
+            panic_with_error!(env, Error::InvalidAmount);
+        }
+        let registered = env
+            .storage()
+            .instance()
+            .get::<_, Address>(&STRATEGY_KEY);
+        if !registered.is_some() || registered.unwrap() != strategy {
+            panic_with_error!(env, Error::UnknownStrategy);
+        }
+
+        let worth = Self::strategy_total(env);
+        if amount > worth {
+            panic_with_error!(env, Error::ExceedsAllocated);
+        }
+
+        // Withdraw the requested amount (or all recoverable if less remains),
+        // returning capital to the treasury. Impaired yield / loss is captured
+        // by writing back only what the strategy actually returns.
+        let ask = if amount < worth { amount } else { worth };
+        let returned = Self::strategy_withdraw(env, &strategy, ask);
+        if returned < 0 {
+            panic_with_error!(env, Error::ArithmeticOverflow);
+        }
+
+        Self::apply_strategy_returns(env, returned);
+
+        Deallocated {
+            strategy: strategy.clone(),
+            amount: ask,
+            returned,
+        }
+        .publish(env);
+    }
+
+    /// Sum of all approved-but-unpaid disbursement proposal amounts. This is
+    /// the commitment the liquidity buffer must always cover with idle balance.
+    /// Maintained as a running counter (see COMMITTED_KEY).
+    fn approved_unpaid_total(env: &Env) -> i128 {
+        env.storage()
+            .instance()
+            .get::<_, i128>(&COMMITTED_KEY)
+            .unwrap_or(0)
+    }
+
+    /// Add a just-approved disbursement proposal to the committed (approved-but
+    /// -unpaid) total. Call site: finalize_proposal on transition to Queued /
+    /// legacy Approved.
+    fn commit_proposal(env: &Env, kind: ProposalKind, amount: i128) {
+        if kind != ProposalKind::Disbursement || amount <= 0 {
+            return;
+        }
+        let current = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&COMMITTED_KEY)
+            .unwrap_or(0);
+        let new_total = Self::checked_add_i128(env, current, amount);
+        env.storage().instance().set(&COMMITTED_KEY, &new_total);
+    }
+
+    /// Remove a cancelled/vetoed/executed disbursement proposal from the
+    /// committed obligation. Call sites: veto_proposal, cancel_proposal
+    /// (on Queued), execute_proposal (after disbursing).
+    fn release_commitment(env: &Env, kind: ProposalKind, amount: i128) {
+        if kind != ProposalKind::Disbursement || amount <= 0 {
+            return;
+        }
+        let current = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&COMMITTED_KEY)
+            .unwrap_or(0);
+        let new_total = Self::checked_sub_i128(env, current, amount);
+        env.storage().instance().set(&COMMITTED_KEY, &new_total);
+    }
+
+    fn allocated_principal(env: &Env) -> i128 {
+        env.storage()
+            .instance()
+            .get::<_, i128>(&ALLOC_PRINCIPAL_KEY)
+            .unwrap_or(0)
+    }
+
+    /// Total recoverable value at the strategy as currently reported
+    /// (principal + unrealized yield).
+    fn strategy_total(env: &Env) -> i128 {
+        let strategy = env
+            .storage()
+            .instance()
+            .get::<_, Address>(&STRATEGY_KEY);
+        if !strategy.is_some() {
+            return 0;
+        }
+        strategy::client(env, &strategy.unwrap()).balance_of()
+    }
+
+    fn strategy_max_withdrawable(env: &Env, addr: &Address) -> i128 {
+        strategy::client(env, addr).max_withdrawable()
+    }
+
+    fn strategy_withdraw(env: &Env, addr: &Address, amount: i128) -> i128 {
+        strategy::client(env, addr).withdraw(&amount, &env.current_contract_address())
+    }
+
+    /// Reflect the actual returned amount back into local accounting, writing
+    /// down principal/yield for partial withdrawal or loss without panicking.
+    /// The strategy's reported remaining balance is authoritative, so yield
+    /// and any impairment are always consistent with `get_total_value`.
+    /// Rounding always favours the treasury: principal is never written below
+    /// zero, and a residual loss above principal is absorbed as negative yield.
+    fn apply_strategy_returns(env: &Env, returned: i128) {
+        // 1) Credit the returned funds back to idle balance.
+        let idle = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&TOTAL_KEY)
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&TOTAL_KEY, &Self::checked_add_i128(env, idle, returned));
+
+        // 2) Re-split principal/yield from the strategy's remaining reported
+        //    value, favouring the treasury (principal preserved first).
+        let principal = Self::allocated_principal(env);
+        let remaining = Self::strategy_total(env);
+        let new_principal = if remaining < principal {
+            remaining
+        } else {
+            principal
+        };
+        let new_yield = remaining - new_principal; // signed: negative => impairment
+        env.storage().instance().set(&ALLOC_PRINCIPAL_KEY, &new_principal);
+        env.storage().instance().set(&ALLOC_YIELD_KEY, &new_yield);
+    }
+
     fn extend_instance(env: &Env) {
         env.storage()
             .instance()
@@ -1423,6 +2159,35 @@ mod governance {
 }
 
 pub use governance::GovernanceTokenClient;
+
+mod strategy {
+    use soroban_sdk::{Address, Env};
+
+    pub fn client<'a>(env: &Env, contract_id: &Address) -> StrategyClient<'a> {
+        StrategyClient::new(env, contract_id)
+    }
+
+    // The adapter contract that venue funds are deposited into. The treasury is
+    // never hard-wired to one venue: set_strategy names the adapter, and a new
+    // venue can be swapped in without a treasury upgrade.
+    #[soroban_sdk::contractclient(name = "StrategyClient")]
+    #[allow(dead_code)]
+    pub trait StrategyInterface {
+        /// Record a deposit of `amount` atomic units from the treasury. The
+        /// strategy is expected to have received the corresponding USDC.
+        fn deposit(env: Env, amount: i128);
+        /// Withdraw `amount` (or all that is recoverable) and transfer the
+        /// returned funds to `to`. Returns the amount actually returned.
+        fn withdraw(env: Env, amount: i128, to: Address) -> i128;
+        /// Total recoverable value currently held at the strategy, marked to
+        /// market including any accrued yield or impairment.
+        fn balance_of(env: Env) -> i128;
+        /// Maximum amount currently withdrawable from the strategy.
+        fn max_withdrawable(env: Env) -> i128;
+    }
+}
+
+pub use strategy::StrategyClient;
 
 mod token {
     #[cfg(test)]

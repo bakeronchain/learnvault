@@ -27,6 +27,38 @@ export interface TreasuryEvent {
 	created_at: string
 }
 
+export type AllocationEventType =
+	| "allocated"
+	| "deallocated"
+	| "harvested"
+	| "emergency_withdraw"
+
+export interface AllocationEvent {
+	type: AllocationEventType
+	strategy?: string
+	amount?: string
+	returned?: string
+	yield_amount?: string
+	tx_hash: string
+	created_at: string
+}
+
+export interface VenueInfo {
+	/** Strategy adapter contract address, or null when fully idle. */
+	address: string | null
+	/** Human-readable name of the venue holding allocated funds. */
+	name: string
+}
+
+export interface TreasuryAllocations {
+	idle_usdc: string
+	allocated_usdc: string
+	accrued_yield: string
+	total_yield: string
+	venue: VenueInfo
+	events: AllocationEvent[]
+}
+
 const API_BASE =
 	(import.meta.env.VITE_API_BASE_URL as string | undefined) ||
 	(import.meta.env.VITE_SERVER_URL as string | undefined) ||
@@ -51,8 +83,17 @@ export async function fetchTreasuryActivityPage(
 	if (!response.ok) {
 		throw new Error("Failed to load treasury activity")
 	}
-	const data = (await response.json()) as { events?: TreasuryEvent[] }
-	return data.events ?? []
+	// The API returns { data: TreasuryEvent[], pagination }.
+	const body = (await response.json()) as { data?: TreasuryEvent[] }
+	return body.data ?? []
+}
+
+export async function fetchTreasuryAllocations(): Promise<TreasuryAllocations> {
+	const response = await fetch(`${API_BASE}/treasury/allocations`)
+	if (!response.ok) {
+		throw new Error("Failed to load treasury allocations")
+	}
+	return (await response.json()) as TreasuryAllocations
 }
 
 export function useTreasury() {
@@ -65,6 +106,13 @@ export function useTreasury() {
 	} = useQuery({
 		queryKey: ["treasury", "stats"],
 		queryFn: fetchTreasuryStats,
+		staleTime: 60 * 1000,
+		refetchInterval: 60_000,
+	})
+
+	const allocationsQuery = useQuery({
+		queryKey: ["treasury", "allocations"],
+		queryFn: fetchTreasuryAllocations,
 		staleTime: 60 * 1000,
 		refetchInterval: 60_000,
 	})
@@ -86,9 +134,13 @@ export function useTreasury() {
 
 	return {
 		stats,
+		allocations: allocationsQuery.data,
+		isAllocationsLoading: allocationsQuery.isLoading,
 		activity,
 		isLoading: isStatsLoading || activityQuery.isLoading,
-		isError: Boolean(statsError || activityQuery.error),
+		isError: Boolean(
+			statsError || activityQuery.error || allocationsQuery.error,
+		),
 		hasMoreActivity: activityQuery.hasNextPage,
 		isLoadingMoreActivity: activityQuery.isFetchingNextPage,
 		loadMoreActivity: () => {
@@ -96,6 +148,7 @@ export function useTreasury() {
 		},
 		refetch: () => {
 			void refetchStats()
+			void allocationsQuery.refetch()
 			void activityQuery.refetch()
 		},
 	}

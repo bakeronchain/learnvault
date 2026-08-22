@@ -1,0 +1,23 @@
+[package]
+name = "strategy-lending"
+description = "Yield strategy adapter for Soroban lending markets (USDC interest accrual + loss modes)"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+version.workspace = true
+
+[package.metadata.stellar]
+cargo_inherit = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dependencies]
+learnvault-shared = { workspace = true }
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+learnvault-shared = { workspace = true, features = ["testutils"] }
+soroban-sdk = { workspace = true, features = ["testutils"] }

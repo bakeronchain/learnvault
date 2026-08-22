@@ -76,7 +76,12 @@ function affectsTreasuryStats(topic: string): boolean {
 		(t.includes("scholarshiptreasury") &&
 			(t.includes("deposit") ||
 				t.includes("proposalcreated") ||
-				t.includes("votecastevent"))) ||
+				t.includes("votecastevent") ||
+				// Strategy allocation lifecycle changes idle/allocated/yield.
+				t.includes("allocated") ||
+				t.includes("deallocated") ||
+				t.includes("harvested") ||
+				t.includes("emergency_withdraw"))) ||
 		(t.includes("milestoneescrow") && t.includes("fundsdisbursed"))
 	)
 }

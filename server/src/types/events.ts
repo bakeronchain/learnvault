@@ -19,6 +19,11 @@ export const EVENT_TOPICS = {
 	ScholarshipTreasury_ProposalCreated: "ScholarshipTreasury::ProposalCreated",
 	ScholarshipTreasury_ProposalExecuted: "ScholarshipTreasury::proposal_executed",
 	ScholarshipTreasury_VoteCastEvent: "ScholarshipTreasury::VoteCastEvent",
+	// Strategy allocation lifecycle (emitted by scholarship_treasury)
+	ScholarshipTreasury_Allocated: "ScholarshipTreasury::allocated",
+	ScholarshipTreasury_Deallocated: "ScholarshipTreasury::deallocated",
+	ScholarshipTreasury_Harvested: "ScholarshipTreasury::harvested",
+	ScholarshipTreasury_EmergencyWithdrawal: "ScholarshipTreasury::emergency_withdraw",
 	MilestoneEscrow_FundsDisbursed: "MilestoneEscrow::FundsDisbursed",
 	ScholarNft_Minted: "ScholarNFT::minted",
 	ScholarNft_Revoked: "ScholarNFT::revoked",
@@ -36,6 +41,10 @@ export const EVENTS_TO_INDEX: Record<ContractName, EventTopic[]> = {
 		"ScholarshipTreasury_ProposalCreated",
 		"ScholarshipTreasury_ProposalExecuted",
 		"ScholarshipTreasury_VoteCastEvent",
+		"ScholarshipTreasury_Allocated",
+		"ScholarshipTreasury_Deallocated",
+		"ScholarshipTreasury_Harvested",
+		"ScholarshipTreasury_EmergencyWithdrawal",
 	],
 	milestoneEscrow: ["MilestoneEscrow_FundsDisbursed"],
 	scholarNft: ["ScholarNft_Minted", "ScholarNft_Revoked"],
@@ -61,7 +70,28 @@ export const EVENT_DATA_SCHEMAS: Partial<Record<EventTopicValue, z.ZodSchema>> =
 			token_id: z.string().regex(/^\d+$/),
 			reason: z.string(),
 		}),
-		// Add others...
+		// Strategy allocation lifecycle events.
+		// Payload shapes mirror the #[contractevent] structs in
+		// contracts/scholarship_treasury/src/lib.rs; amounts are u128/i128
+		// serialized as strings by the RPC layer.
+		"ScholarshipTreasury::allocated": z.object({
+			strategy: z.string(),
+			amount: z.string().regex(/^-?\d+$/),
+		}),
+		"ScholarshipTreasury::deallocated": z.object({
+			strategy: z.string(),
+			amount: z.string().regex(/^-?\d+$/),
+			returned: z.string().regex(/^-?\d+$/),
+		}),
+		"ScholarshipTreasury::harvested": z.object({
+			strategy: z.string(),
+			amount: z.string().regex(/^-?\d+$/),
+			yield_amount: z.string().regex(/^-?\d+$/),
+		}),
+		"ScholarshipTreasury::emergency_withdraw": z.object({
+			strategy: z.string(),
+			amount: z.string().regex(/^-?\d+$/),
+		}),
 	}
 
 // DB Event row

@@ -49,6 +49,7 @@ export default function NavBar() {
 		{ to: "/donor", label: "Donor" },
 		{ to: "/sponsor", label: "Sponsor" },
 		{ to: "/treasury", label: t("nav.treasury") },
+		{ to: "/disputes", label: "Disputes" },
 	]
 
 	const closeMenu = () => setMenuOpen(false)

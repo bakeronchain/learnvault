@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
+import { type ContentLanguageCode } from "../providers/ContentLanguageProvider"
 import {
+	type ContentLanguage,
 	type CoursePrerequisite,
 	type CourseDetail,
 	type CourseDifficulty,
@@ -7,6 +9,7 @@ import {
 	type CourseLevel,
 	type CourseRatingSummary,
 	type CourseSummary,
+	type TranslationCoverage,
 } from "../types/courses"
 
 type CourseListResponse = {
@@ -47,6 +50,13 @@ type ApiCourse = {
 	review_summary?: { average?: number; count?: number } | null
 	review_count?: number
 	average_rating?: number
+	languageServed?: ContentLanguage
+	isTranslation?: boolean
+	isFallback?: boolean
+	isStale?: boolean
+	translatorAddress?: string | null
+	availableLanguages?: string[]
+	translationCoverage?: TranslationCoverage
 }
 
 type ApiLesson = {
@@ -67,6 +77,11 @@ type ApiLesson = {
 	is_latest?: boolean
 	changeSummary?: string | null
 	change_summary?: string | null
+	languageServed?: ContentLanguage
+	isTranslation?: boolean
+	isFallback?: boolean
+	isStale?: boolean
+	translatorAddress?: string | null
 }
 
 const defaultAccentClassName =
@@ -153,6 +168,13 @@ const normalizeCourse = (course: ApiCourse): CourseSummary => {
 		updatedAt: course.updatedAt ?? course.updated_at ?? "",
 		accentClassName: accentClassByTrack[trackKey] ?? defaultAccentClassName,
 		ratingSummary: summaryFromObject ?? summaryFromFlat,
+		languageServed: course.languageServed,
+		isTranslation: course.isTranslation,
+		isFallback: course.isFallback,
+		isStale: course.isStale,
+		translatorAddress: course.translatorAddress ?? null,
+		availableLanguages: course.availableLanguages,
+		translationCoverage: course.translationCoverage,
 	}
 }
 
@@ -179,6 +201,11 @@ const normalizeLesson = (
 			: Number.parseInt(String(lesson.version ?? "1"), 10),
 	isLatest: Boolean(lesson.isLatest ?? lesson.is_latest ?? true),
 	changeSummary: lesson.changeSummary ?? lesson.change_summary ?? null,
+	languageServed: lesson.languageServed,
+	isTranslation: lesson.isTranslation,
+	isFallback: lesson.isFallback,
+	isStale: lesson.isStale,
+	translatorAddress: lesson.translatorAddress ?? null,
 })
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -203,18 +230,23 @@ async function fetchJson<T>(url: string): Promise<T> {
 	return response.json() as Promise<T>
 }
 
-export async function fetchCourses(): Promise<CourseSummary[]> {
-	const response = await fetchJson<CourseListResponse | ApiCourse[]>(
-		"/api/courses",
-	)
+export async function fetchCourses(
+	contentLanguage?: ContentLanguageCode,
+): Promise<CourseSummary[]> {
+	const params = new URLSearchParams()
+	if (contentLanguage && contentLanguage !== "en") {
+		params.set("lang", contentLanguage)
+	}
+	const url = `/api/courses${params.toString() ? `?${params.toString()}` : ""}`
+	const response = await fetchJson<CourseListResponse | ApiCourse[]>(url)
 	const courses = Array.isArray(response) ? response : (response.data ?? [])
 	return courses.map(normalizeCourse)
 }
 
-export function useCourses() {
+export function useCourses(contentLanguage?: ContentLanguageCode) {
 	const query = useQuery({
-		queryKey: ["courses"],
-		queryFn: fetchCourses,
+		queryKey: ["courses", contentLanguage ?? "en"],
+		queryFn: () => fetchCourses(contentLanguage),
 		staleTime: 60 * 1000,
 	})
 
@@ -298,12 +330,16 @@ export function useEnrolledCourses() {
 export function useCourseDetail(
 	idOrSlug: string | undefined,
 	learnerAddress?: string,
+	contentLanguage?: ContentLanguageCode,
 ) {
 	const query = useQuery({
-		queryKey: ["course", idOrSlug, learnerAddress],
+		queryKey: ["course", idOrSlug, learnerAddress, contentLanguage ?? "en"],
 		queryFn: async (): Promise<CourseDetail> => {
 			const params = new URLSearchParams()
 			if (learnerAddress) params.set("learner_address", learnerAddress)
+			if (contentLanguage && contentLanguage !== "en") {
+				params.set("lang", contentLanguage)
+			}
 			const url = `/api/courses/${idOrSlug}${params.toString() ? `?${params.toString()}` : ""}`
 			const response = await fetchJson<
 				ApiCourse & {

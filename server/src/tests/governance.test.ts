@@ -67,6 +67,7 @@ jest.mock("../lib/request-context", () => ({
 }))
 
 import { governanceRouter } from "../routes/governance.routes"
+import { stellarContractService as stellarContractServiceMock } from "../services/stellar-contract.service"
 
 const app = express()
 app.use(express.json())
@@ -592,5 +593,85 @@ describe("DELETE /api/proposals/:id", () => {
 		expect(response.status).toBe(409)
 		expect(response.body.error).toBe("Proposal is already cancelled")
 		expect(stellarContractService.cancelProposal).not.toHaveBeenCalled()
+	})
+})
+
+describe("GET /api/governance/delegation/:address", () => {
+	const stellarContractService = jest.mocked(stellarContractServiceMock)
+
+	beforeEach(() => {
+		jest.clearAllMocks()
+	})
+
+	it("returns delegation state for a valid address with received delegation", async () => {
+		stellarContractService.getGovernanceVotingPower.mockResolvedValue(
+			"1500000000",
+		)
+		stellarContractService.getGovernanceTokenBalance.mockResolvedValue(
+			"1000000000",
+		)
+		stellarContractService.getGovernanceDelegation.mockResolvedValue(null)
+
+		const response = await request(app).get(
+			"/api/governance/delegation/GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBFUKJQ2K5RQDDXYZ",
+		)
+
+		expect(response.status).toBe(200)
+		expect(response.body.address).toBe(
+			"GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBFUKJQ2K5RQDDXYZ",
+		)
+		expect(response.body.is_delegating).toBe(false)
+		expect(response.body.own_balance).toBe("1000000000")
+		expect(response.body.voting_power).toBe("1500000000")
+		expect(response.body.delegated_to_me).toBe("500000000")
+		expect(
+			stellarContractService.getGovernanceVotingPower,
+		).toHaveBeenCalledWith(
+			"GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBFUKJQ2K5RQDDXYZ",
+		)
+	})
+
+	it("returns delegation state when address is delegating to another", async () => {
+		stellarContractService.getGovernanceVotingPower.mockResolvedValue("0")
+		stellarContractService.getGovernanceTokenBalance.mockResolvedValue(
+			"1000000000",
+		)
+		stellarContractService.getGovernanceDelegation.mockResolvedValue(
+			"GDELEGATEEXAMPLE456789ABCDEFGHIJKLMNOPQRSTUVWXYZ1234",
+		)
+
+		const response = await request(app).get(
+			"/api/governance/delegation/GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBFUKJQ2K5RQDDXYZ",
+		)
+
+		expect(response.status).toBe(200)
+		expect(response.body.is_delegating).toBe(true)
+		expect(response.body.delegatee).toBe(
+			"GDELEGATEEXAMPLE456789ABCDEFGHIJKLMNOPQRSTUVWXYZ1234",
+		)
+		expect(response.body.voting_power).toBe("0")
+		expect(response.body.delegated_to_me).toBe("0")
+	})
+
+	it("returns 400 for invalid address", async () => {
+		const response = await request(app).get(
+			"/api/governance/delegation/INVALID",
+		)
+
+		expect(response.status).toBe(400)
+		expect(response.body.error).toBe("Invalid Stellar address")
+	})
+
+	it("returns 500 when service fails", async () => {
+		stellarContractService.getGovernanceVotingPower.mockRejectedValue(
+			new Error("RPC unavailable"),
+		)
+
+		const response = await request(app).get(
+			"/api/governance/delegation/GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBFUKJQ2K5RQDDXYZ",
+		)
+
+		expect(response.status).toBe(500)
+		expect(response.body.error).toBe("Failed to fetch delegation state")
 	})
 })

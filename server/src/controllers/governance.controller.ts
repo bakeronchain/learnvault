@@ -1,3 +1,4 @@
+import { StrKey } from "@stellar/stellar-sdk"
 import { type Request, type Response } from "express"
 import sanitizeHtml from "sanitize-html"
 import { z } from "zod"
@@ -13,11 +14,7 @@ import { stellarContractService } from "../services/stellar-contract.service"
 
 type ProposalStatus = "pending" | "approved" | "queued" | "rejected"
 type ProposalPublicState =
-	| "open"
-	| "queued"
-	| "closed"
-	| "cancelled"
-	| "executed"
+	"open" | "queued" | "closed" | "cancelled" | "executed"
 
 const stellarAddressSchema = z.string().min(56).max(56).startsWith("G")
 
@@ -648,14 +645,14 @@ export async function getDelegation(
 	res: Response,
 ): Promise<void> {
 	const { address } = req.params
-	if (!address || address.length < 50) {
+	if (!address || !StrKey.isValidEd25519PublicKey(address)) {
 		res.status(400).json({ error: "Invalid Stellar address" })
 		return
 	}
 
 	try {
 		const [rawVotingPower, rawOwnBalance, delegatee] = await Promise.all([
-			stellarContractService.getGovernanceTokenBalance(address),
+			stellarContractService.getGovernanceVotingPower(address),
 			stellarContractService.getGovernanceTokenBalance(address),
 			stellarContractService.getGovernanceDelegation(address),
 		])
@@ -673,7 +670,7 @@ export async function getDelegation(
 			voting_power: rawVotingPower,
 		})
 	} catch (err) {
-		console.error("[governance] getDelegation error:", err)
+		log.error({ err, address }, "getDelegation failed")
 		res.status(500).json({ error: "Failed to fetch delegation state" })
 	}
 }

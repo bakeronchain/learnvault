@@ -1,6 +1,10 @@
 import { Router } from "express"
 
 import {
+	createDeposit,
+	getDepositsForAddress,
+} from "../controllers/treasury-deposits.controller"
+import {
 	getTreasuryStats,
 	getTreasuryActivity,
 	getTreasuryAllocations,
@@ -134,6 +138,87 @@ treasuryRouter.get("/treasury/activity", getTreasuryActivity)
  *       recent allocation lifecycle event trail (allocated, deallocated,
  *       harvested, emergency_withdraw).
  *     parameters:
+ * /api/treasury/deposit:
+ *   post:
+ *     tags: [Treasury]
+ *     summary: Record a sponsor deposit
+ *     description: Validates and records a donor deposit after on-chain verification. Calculates GOV tokens issued (amount * 100) and returns updated balance.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - donor_address
+ *               - amount
+ *               - tx_hash
+ *             properties:
+ *               donor_address:
+ *                 type: string
+ *                 description: Stellar address of the donor
+ *                 example: "GABC..."
+ *               amount:
+ *                 type: number
+ *                 description: Deposit amount in USDC (up to 7 decimals)
+ *                 example: 100.5
+ *               tx_hash:
+ *                 type: string
+ *                 description: 64-character hex transaction hash
+ *                 example: "a1b2c3..."
+ *     responses:
+ *       201:
+ *         description: Deposit recorded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 deposit:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     donor_address:
+ *                       type: string
+ *                     amount_usdc:
+ *                       type: string
+ *                     gov_issued:
+ *                       type: string
+ *                     tx_hash:
+ *                       type: string
+ *                     deposited_at:
+ *                       type: string
+ *                       format: date-time
+ *                 gov_balance:
+ *                   type: string
+ *                   description: Updated GOV token balance (atomic units)
+ *       400:
+ *         description: On-chain verification failed
+ *       409:
+ *         description: Transaction already recorded
+ *       422:
+ *         description: Validation error
+ *       500:
+ *         description: Internal server error
+ */
+treasuryRouter.post("/treasury/deposit", createDeposit)
+
+/**
+ * @openapi
+ * /api/treasury/deposits/{address}:
+ *   get:
+ *     tags: [Treasury]
+ *     summary: Get deposit history for a donor
+ *     description: Returns paginated deposit history for a specific donor address, ordered by timestamp descending
+ *     parameters:
+ *       - in: path
+ *         name: address
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Stellar address of the donor
+ *         example: "GABC..."
  *       - in: query
  *         name: limit
  *         schema:
@@ -141,44 +226,23 @@ treasuryRouter.get("/treasury/activity", getTreasuryActivity)
  *           default: 20
  *           minimum: 1
  *           maximum: 100
- *         description: Maximum number of lifecycle events to return
+ *         description: Maximum number of deposits to return
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *           minimum: 1
+ *         description: Page number for pagination
  *     responses:
  *       200:
- *         description: Allocation breakdown and venue info
+ *         description: Deposit history
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 idle_usdc:
- *                   type: string
- *                   description: Un-deployed USDC held by the treasury (stroops)
- *                   example: "750000000"
- *                 allocated_usdc:
- *                   type: string
- *                   description: USDC principal deployed to the strategy venue (stroops)
- *                   example: "250000000"
- *                 accrued_yield:
- *                   type: string
- *                   description: Unrealized yield at the venue (stroops)
- *                   example: "12500000"
- *                 total_yield:
- *                   type: string
- *                   description: Cumulative yield harvested into idle since inception (stroops)
- *                   example: "45000000"
- *                 venue:
- *                   type: object
- *                   properties:
- *                     address:
- *                       type: string
- *                       nullable: true
- *                       description: Strategy adapter contract address, null when fully idle
- *                       example: "CABC..."
- *                     name:
- *                       type: string
- *                       description: Human-readable venue name
- *                       example: "LearnVault Lending Market"
- *                 events:
+ *                 data:
  *                   type: array
  *                   items:
  *                     type: object
@@ -203,3 +267,31 @@ treasuryRouter.get(
 	apiResponseCache("treasury_allocations"),
 	getTreasuryAllocations,
 )
+ *                       id:
+ *                         type: integer
+ *                       donor_address:
+ *                         type: string
+ *                       amount_usdc:
+ *                         type: string
+ *                       gov_issued:
+ *                         type: string
+ *                       tx_hash:
+ *                         type: string
+ *                       deposited_at:
+ *                         type: string
+ *                         format: date-time
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     total:
+ *                       type: integer
+ *       422:
+ *         description: Invalid address format
+ *       500:
+ *         description: Internal server error
+ */
+treasuryRouter.get("/treasury/deposits/:address", getDepositsForAddress)

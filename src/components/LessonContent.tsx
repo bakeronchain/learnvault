@@ -1,8 +1,10 @@
 import { Button } from "@stellar/design-system"
 import React, { useEffect, useRef } from "react"
+import { useTranslation } from "react-i18next"
 import ReactMarkdown from "react-markdown"
 import { Link } from "react-router-dom"
 import { type CourseLesson as Lesson } from "../types/courses"
+import { shortenContractId } from "../util/contract"
 
 // A simple mock skeleton to match what's needed for content loading state
 export const LessonContentSkeleton = () => (
@@ -47,6 +49,7 @@ const LessonContent: React.FC<LessonContentProps> = ({
 	nextLessonId,
 	isNextLocked,
 }) => {
+	const { t } = useTranslation()
 	const sentinelRef = useRef<HTMLDivElement>(null)
 	const firedRef = useRef(false)
 
@@ -94,6 +97,27 @@ const LessonContent: React.FC<LessonContentProps> = ({
 					</span>
 				) : null}
 			</div>
+			{lesson.isFallback ? (
+				<p className="mb-4 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs text-white/60">
+					{t("contentFallbackNotice", "Showing English — not yet translated")}
+				</p>
+			) : null}
+			{lesson.isStale ? (
+				<p className="mb-4 rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-2 text-xs text-amber-200">
+					{t(
+						"contentStaleNotice",
+						"This translation may be outdated — the English source has changed since it was translated.",
+					)}
+				</p>
+			) : null}
+			{lesson.isTranslation && lesson.translatorAddress ? (
+				<p className="mb-4 text-xs text-white/45">
+					{t("contentTranslatedBy", {
+						defaultValue: "Translated by {{translator}}",
+						translator: shortenContractId(lesson.translatorAddress),
+					})}
+				</p>
+			) : null}
 			<div className="flex-1 prose prose-invert prose-brand max-w-none">
 				<ReactMarkdown>{lesson.content}</ReactMarkdown>
 			</div>

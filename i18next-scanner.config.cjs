@@ -1,6 +1,11 @@
 module.exports = {
 	input: ["src/**/*.{ts,tsx}"],
-	output: "./src/locales/$LOCALE.json",
+	// output is a directory, not a template — actual per-locale filenames
+	// come from options.resource.loadPath/savePath below (which do support
+	// {{lng}} interpolation). A literal "$LOCALE" here previously created a
+	// bogus src/locales/$LOCALE.json/ directory instead of writing to the
+	// real locale files.
+	output: "./",
 	options: {
 		debug: false,
 		func: {

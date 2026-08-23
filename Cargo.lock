@@ -939,6 +939,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
+name = "milestone-arbitration"
+version = "0.0.1"
+dependencies = [
+ "learnvault-shared",
+ "soroban-sdk",
+]
+
+[[package]]
 name = "milestone-escrow"
 version = "0.0.1"
 dependencies = [
@@ -1290,6 +1298,14 @@ name = "scholar-nft"
 version = "0.0.1"
 dependencies = [
  "course_milestone",
+ "learnvault-shared",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "scholarship-claim"
+version = "0.0.1"
+dependencies = [
  "learnvault-shared",
  "soroban-sdk",
 ]

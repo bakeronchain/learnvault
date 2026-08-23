@@ -8,6 +8,7 @@ import {
 	getGovernanceProposalById,
 	getGovernanceProposals,
 	getVotingPower,
+	getDelegation,
 } from "../controllers/governance.controller"
 import {
 	burnLRNForGovernance,
@@ -153,6 +154,52 @@ governanceRouter.get("/proposals/:id", (req, res) => {
  */
 governanceRouter.get("/governance/voting-power/:address", (req, res) => {
 	void getVotingPower(req, res)
+})
+
+/**
+ * @openapi
+ * /api/governance/delegation/{address}:
+ *   get:
+ *     tags: [Governance]
+ *     summary: Get delegation state for an address
+ *     description: Returns the delegation state, own token balance, and voting power for the given Stellar address.
+ *     parameters:
+ *       - in: path
+ *         name: address
+ *         required: true
+ *         schema:
+ *           type: string
+ *           minLength: 56
+ *           maxLength: 56
+ *         description: Stellar wallet address
+ *     responses:
+ *       200:
+ *         description: Delegation state details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 address:
+ *                   type: string
+ *                 delegatee:
+ *                   type: string
+ *                   nullable: true
+ *                 is_delegating:
+ *                   type: boolean
+ *                 own_balance:
+ *                   type: string
+ *                 delegated_to_me:
+ *                   type: string
+ *                 voting_power:
+ *                   type: string
+ *       400:
+ *         $ref: '#/components/responses/BadRequestError'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+governanceRouter.get("/governance/delegation/:address", (req, res) => {
+	void getDelegation(req, res)
 })
 
 governanceRouter.post("/governance/vote", (req, res) => {

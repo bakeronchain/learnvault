@@ -2,6 +2,7 @@ import { BookOpen } from "lucide-react"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import CatalogCourseCard from "../components/CatalogCourseCard"
+import { ContentLanguageSelector } from "../components/ContentLanguageSelector"
 import { CourseFilter } from "../components/CourseFilter"
 import Pagination from "../components/Pagination"
 import RecommendationsCarousel from "../components/RecommendationsCarousel"
@@ -9,6 +10,7 @@ import { CourseCardSkeleton } from "../components/skeletons/CourseCardSkeleton"
 import { EmptyState } from "../components/states/emptyState"
 import { ErrorState } from "../components/states/errorState"
 import { useCourses } from "../hooks/useCourses"
+import { useContentLanguage } from "../providers/ContentLanguageProvider"
 
 const ITEMS_PER_PAGE = 4
 
@@ -18,7 +20,8 @@ function trackSlug(track: string): string {
 
 const Courses: React.FC = () => {
 	const [searchParams, setSearchParams] = useSearchParams()
-	const { courses, isLoading, error } = useCourses()
+	const { contentLanguage } = useContentLanguage()
+	const { courses, isLoading, error } = useCourses(contentLanguage)
 
 	const [searchInput, setSearchInput] = useState(
 		() => searchParams.get("q") ?? "",
@@ -26,6 +29,7 @@ const Courses: React.FC = () => {
 
 	const difficulty = searchParams.get("difficulty") ?? ""
 	const track = searchParams.get("track") ?? ""
+	const language = searchParams.get("lang") ?? ""
 	const parsedPage = parseInt(searchParams.get("page") || "1", 10)
 	const currentPage =
 		Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
@@ -79,6 +83,22 @@ const Courses: React.FC = () => {
 		[setSearchParams],
 	)
 
+	const handleLanguageChange = useCallback(
+		(value: string) => {
+			setSearchParams(
+				(prev) => {
+					const next = new URLSearchParams(prev)
+					if (value) next.set("lang", value)
+					else next.delete("lang")
+					next.delete("page")
+					return next
+				},
+				{ replace: true },
+			)
+		},
+		[setSearchParams],
+	)
+
 	const handleClear = useCallback(() => {
 		setSearchInput("")
 		setSearchParams({}, { replace: true })
@@ -96,7 +116,9 @@ const Courses: React.FC = () => {
 		window.scrollTo({ top: 0, behavior: "smooth" })
 	}
 
-	const hasActiveFilters = Boolean(searchInput || difficulty || track)
+	const hasActiveFilters = Boolean(
+		searchInput || difficulty || track || language,
+	)
 
 	const filtered = useMemo(() => {
 		const q = searchInput.toLowerCase()
@@ -107,9 +129,13 @@ const Courses: React.FC = () => {
 				course.description.toLowerCase().includes(q)
 			const matchesDifficulty = !difficulty || course.difficulty === difficulty
 			const matchesTrack = !track || trackSlug(course.track) === track
-			return matchesSearch && matchesDifficulty && matchesTrack
+			const matchesLanguage =
+				!language || (course.availableLanguages ?? []).includes(language)
+			return (
+				matchesSearch && matchesDifficulty && matchesTrack && matchesLanguage
+			)
 		})
-	}, [courses, searchInput, difficulty, track])
+	}, [courses, searchInput, difficulty, track, language])
 
 	const trackOptions = useMemo(() => {
 		const seen = new Set<string>()
@@ -148,6 +174,9 @@ const Courses: React.FC = () => {
 					Every LearnVault track is designed to move new learners from setup to
 					hands-on progress with a clear first milestone.
 				</p>
+				<div className="mt-6 flex justify-center">
+					<ContentLanguageSelector />
+				</div>
 			</header>
 
 			<div className="mb-12">
@@ -162,6 +191,8 @@ const Courses: React.FC = () => {
 				track={track}
 				trackOptions={trackOptions}
 				onTrackChange={handleTrackChange}
+				language={language}
+				onLanguageChange={handleLanguageChange}
 				onClear={handleClear}
 				hasActiveFilters={hasActiveFilters}
 			/>

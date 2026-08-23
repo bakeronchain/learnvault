@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCallback } from "react"
 import { useToast } from "../components/Toast/ToastProvider"
+import { networkPassphrase, rpcUrl } from "../contracts/util"
+import { delegate } from "../util/governance-token"
+import { useContractIds } from "./useContractIds"
 import { useWallet } from "./useWallet"
 
 const API_BASE = import.meta.env.VITE_SERVER_URL ?? "http://localhost:4000"
@@ -29,6 +32,7 @@ export function useDelegation() {
 	const { address, signTransaction } = useWallet()
 	const queryClient = useQueryClient()
 	const { showSuccess, showError, showInfo } = useToast()
+	const { governanceToken } = useContractIds()
 
 	const queryKey = ["delegation", address]
 
@@ -61,35 +65,23 @@ export function useDelegation() {
 			if (delegatee === address)
 				throw new Error("You cannot delegate to yourself.")
 
-			const client = await loadClient()
-			if (!client)
+			if (!governanceToken)
 				throw new Error(
 					"Governance token contract not available on this network.",
 				)
 
-			const delegateFn = client.delegate as
-				| ((...args: unknown[]) => Promise<unknown>)
-				| undefined
-			if (typeof delegateFn !== "function")
-				throw new Error(
-					"delegate() method not found — contract client may be a stub.",
-				)
+			if (typeof signTransaction !== "function")
+				throw new Error("Wallet does not support signing")
 
-			const tx = await delegateFn(
-				{ delegator: address, delegatee },
-				{ publicKey: address },
-			)
-
-			if (
-				tx &&
-				typeof tx === "object" &&
-				typeof (tx as Record<string, unknown>).signAndSend === "function"
-			) {
-				showInfo("Waiting for wallet approval…")
-				await (
-					tx as { signAndSend: (opts: unknown) => Promise<unknown> }
-				).signAndSend({ signTransaction })
-			}
+			showInfo("Waiting for wallet approval…")
+			await delegate({
+				contractId: governanceToken,
+				delegator: address,
+				delegatee,
+				networkPassphrase,
+				rpcUrl,
+				signTransaction,
+			})
 		},
 		onSuccess: (_: void, delegatee: string) => {
 			showSuccess(
@@ -123,8 +115,7 @@ export function useDelegation() {
 				)
 
 			const undelegateFn = client.undelegate as
-				| ((...args: unknown[]) => Promise<unknown>)
-				| undefined
+				((...args: unknown[]) => Promise<unknown>) | undefined
 			if (typeof undelegateFn !== "function")
 				throw new Error(
 					"undelegate() method not found — contract client may be a stub.",

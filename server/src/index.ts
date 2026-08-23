@@ -34,14 +34,15 @@ import { buildOpenApiSpec } from "./openapi"
 import { adminMilestonesRouter } from "./routes/admin-milestones.routes"
 import { adminProviderKeysRouter } from "./routes/admin-provider-keys.routes"
 import { adminRouter } from "./routes/admin.routes"
+import { createAnchorsRouter } from "./routes/anchors.routes"
 import { antiSybilRouter } from "./routes/anti-sybil.routes"
 import { createAuthRouter } from "./routes/auth.routes"
 import { createBountyRouter } from "./routes/bounty.routes"
-import { createAnchorsRouter } from "./routes/anchors.routes"
 import { createCommentsRouter } from "./routes/comments.routes"
 import { communityRouter } from "./routes/community.routes"
-import { coursesRouter } from "./routes/courses.routes"
+import { createCoursesRouter } from "./routes/courses.routes"
 import { createCredentialsRouter } from "./routes/credentials.routes"
+import { createDisputeRouter } from "./routes/dispute.routes"
 import { createEnrollmentsRouter } from "./routes/enrollments.routes"
 import { eventsRouter } from "./routes/events.routes"
 import { createForumRouter } from "./routes/forum.routes"
@@ -53,18 +54,19 @@ import { mentorBookingRouter } from "./routes/mentor-booking.routes"
 import { createMilestoneAppealRouter } from "./routes/milestone-appeal.routes"
 import { moderationRouter } from "./routes/moderation.routes"
 import { notificationsRouter } from "./routes/notifications.routes"
+import { onboardingRouter } from "./routes/onboarding.routes"
 import { createPeerReviewRouter } from "./routes/peer-review.routes"
 import { qfRouter } from "./routes/qf.routes"
 import { createRecommendationsRouter } from "./routes/recommendations.routes"
-import { onboardingRouter } from "./routes/onboarding.routes"
-import { createRelayRouter } from "./routes/relay.routes"
 import { referralRouter } from "./routes/referral.routes"
+import { createRelayRouter } from "./routes/relay.routes"
 import { createReviewsRouter } from "./routes/reviews.routes"
 import { createScholarsRouter } from "./routes/scholars.routes"
 import { scholarshipsRouter } from "./routes/scholarships.routes"
 import { createSep10Router } from "./routes/sep10.routes"
 import { stellarTomlRouter } from "./routes/stellar-toml.routes"
 import { createStreaksRouter } from "./routes/streaks.routes"
+import { createTranslationsRouter } from "./routes/translations.routes"
 import { treasuryRouter } from "./routes/treasury.routes"
 import { createUploadRouter } from "./routes/upload.routes"
 import { createUserProfileRouter } from "./routes/user-profile.routes"
@@ -297,7 +299,8 @@ app.use("/api/auth", createAuthRouter(authService, jwtService))
 app.use("/api/auth/sep10", createSep10Router(sep10Service))
 app.use("/", stellarTomlRouter)
 app.use("/api", createMeRouter(jwtService))
-app.use("/api", coursesRouter)
+app.use("/api", createCoursesRouter(jwtService))
+app.use("/api", createTranslationsRouter(jwtService))
 app.use("/api", createEnrollmentsRouter(jwtService))
 app.use("/api", createScholarsRouter(jwtService))
 app.use("/api", scholarshipsRouter)
@@ -331,7 +334,7 @@ app.use("/api", createStreaksRouter(jwtService))
 app.use("/api", onboardingRouter)
 app.use("/api", createRelayRouter(jwtService))
 app.use("/api", createAnchorsRouter(jwtService))
-
+app.use("/api", createDisputeRouter(jwtService))
 
 if (process.env.NODE_ENV !== "test") {
 	void import("./workers/escrow-timeout-worker").then(

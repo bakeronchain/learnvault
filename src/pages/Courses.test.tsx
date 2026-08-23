@@ -1,8 +1,10 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+import { ContentLanguageProvider } from "../providers/ContentLanguageProvider"
 import { type CourseSummary } from "../types/courses"
 
 vi.mock("../hooks/useCourses", () => ({
@@ -36,6 +38,7 @@ const makeCourses = (): CourseSummary[] => [
 		updatedAt: "2024-01-01",
 		accentClassName: "from-brand-cyan/25 via-brand-blue/20 to-transparent",
 		coverImage: null,
+		availableLanguages: ["sw"],
 	},
 	{
 		id: "2",
@@ -100,10 +103,20 @@ const makeCourses = (): CourseSummary[] => [
 ]
 
 const renderCourses = (initialEntries: string[] = ["/courses"]) => {
+	// CatalogCourseCard -> useEnrollment reads useQueryClient(); this file
+	// never wrapped one, which pre-dates this feature (fails identically on
+	// main). Add it so the enrollment hook doesn't throw during render.
+	const queryClient = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	})
 	return render(
-		<MemoryRouter initialEntries={initialEntries}>
-			<CoursesPage />
-		</MemoryRouter>,
+		<QueryClientProvider client={queryClient}>
+			<ContentLanguageProvider>
+				<MemoryRouter initialEntries={initialEntries}>
+					<CoursesPage />
+				</MemoryRouter>
+			</ContentLanguageProvider>
+		</QueryClientProvider>,
 	)
 }
 
@@ -267,6 +280,17 @@ describe("Courses page", () => {
 
 		expect(screen.getByText("Stellar Basics")).toBeInTheDocument()
 		expect(screen.queryByText("DeFi Advanced")).not.toBeInTheDocument()
+		expect(screen.queryByText("Stellar Advanced")).not.toBeInTheDocument()
+	})
+
+	it("filters the catalogue to only courses with a published translation in the selected language", () => {
+		// Only "Stellar Basics" carries availableLanguages: ["sw"] in the fixture.
+		renderCourses(["/courses?lang=sw"])
+
+		expect(screen.getByText("Stellar Basics")).toBeInTheDocument()
+		expect(screen.queryByText("DeFi Advanced")).not.toBeInTheDocument()
+		expect(screen.queryByText("Web3 Intro")).not.toBeInTheDocument()
+		expect(screen.queryByText("Smart Contracts 101")).not.toBeInTheDocument()
 		expect(screen.queryByText("Stellar Advanced")).not.toBeInTheDocument()
 	})
 

@@ -12,6 +12,7 @@ import "@stellar/design-system/build/styles.min.css"
 import "./index.css"
 import App from "./App.tsx"
 import { initSentry } from "./lib/sentry"
+import { ContentLanguageProvider } from "./providers/ContentLanguageProvider.tsx"
 import { NotificationProvider } from "./providers/NotificationProvider.tsx"
 import { WalletProvider } from "./providers/WalletProvider.tsx"
 import "./i18n"
@@ -105,11 +106,13 @@ createRoot(document.getElementById("root") as HTMLElement).render(
 	<StrictMode>
 		<NotificationProvider>
 			<QueryClientProvider client={queryClient}>
-				<WalletProvider>
-					<BrowserRouter>
-						<App />
-					</BrowserRouter>
-				</WalletProvider>
+				<ContentLanguageProvider>
+					<WalletProvider>
+						<BrowserRouter>
+							<App />
+						</BrowserRouter>
+					</WalletProvider>
+				</ContentLanguageProvider>
 			</QueryClientProvider>
 		</NotificationProvider>
 	</StrictMode>,

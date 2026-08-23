@@ -7,6 +7,7 @@ export const CONTRACT_IDS = {
 	scholarshipTreasury: process.env.SCHOLARSHIP_TREASURY_CONTRACT_ID!,
 	milestoneEscrow: process.env.MILESTONE_ESCROW_CONTRACT_ID!,
 	scholarNft: process.env.SCHOLAR_NFT_CONTRACT_ID!,
+	milestoneArbitration: process.env.MILESTONE_ARBITRATION_CONTRACT_ID!,
 } as const
 
 export type ContractName = keyof typeof CONTRACT_IDS
@@ -17,7 +18,8 @@ export const EVENT_TOPICS = {
 	CourseMilestone_MilestoneComplete: "CourseMilestone::MilestoneComplete",
 	ScholarshipTreasury_Deposit: "ScholarshipTreasury::Deposit",
 	ScholarshipTreasury_ProposalCreated: "ScholarshipTreasury::ProposalCreated",
-	ScholarshipTreasury_ProposalExecuted: "ScholarshipTreasury::proposal_executed",
+	ScholarshipTreasury_ProposalExecuted:
+		"ScholarshipTreasury::proposal_executed",
 	ScholarshipTreasury_VoteCastEvent: "ScholarshipTreasury::VoteCastEvent",
 	// Strategy allocation lifecycle (emitted by scholarship_treasury)
 	ScholarshipTreasury_Allocated: "ScholarshipTreasury::allocated",
@@ -25,8 +27,17 @@ export const EVENT_TOPICS = {
 	ScholarshipTreasury_Harvested: "ScholarshipTreasury::harvested",
 	ScholarshipTreasury_EmergencyWithdrawal: "ScholarshipTreasury::emergency_withdraw",
 	MilestoneEscrow_FundsDisbursed: "MilestoneEscrow::FundsDisbursed",
+	MilestoneEscrow_TrancheReleasedViaArbitration:
+		"MilestoneEscrow::arb_released",
 	ScholarNft_Minted: "ScholarNFT::minted",
 	ScholarNft_Revoked: "ScholarNFT::revoked",
+	MilestoneArbitration_DisputeOpened: "MilestoneArbitration::dispute_opened",
+	MilestoneArbitration_VoteCommitted: "MilestoneArbitration::vote_committed",
+	MilestoneArbitration_VoteRevealed: "MilestoneArbitration::vote_revealed",
+	MilestoneArbitration_DisputeResolved:
+		"MilestoneArbitration::dispute_resolved",
+	MilestoneArbitration_JurorJoined: "MilestoneArbitration::juror_joined",
+	MilestoneArbitration_JurorLeft: "MilestoneArbitration::juror_left",
 } as const
 
 export type EventTopic = keyof typeof EVENT_TOPICS
@@ -46,8 +57,19 @@ export const EVENTS_TO_INDEX: Record<ContractName, EventTopic[]> = {
 		"ScholarshipTreasury_Harvested",
 		"ScholarshipTreasury_EmergencyWithdrawal",
 	],
-	milestoneEscrow: ["MilestoneEscrow_FundsDisbursed"],
+	milestoneEscrow: [
+		"MilestoneEscrow_FundsDisbursed",
+		"MilestoneEscrow_TrancheReleasedViaArbitration",
+	],
 	scholarNft: ["ScholarNft_Minted", "ScholarNft_Revoked"],
+	milestoneArbitration: [
+		"MilestoneArbitration_DisputeOpened",
+		"MilestoneArbitration_VoteCommitted",
+		"MilestoneArbitration_VoteRevealed",
+		"MilestoneArbitration_DisputeResolved",
+		"MilestoneArbitration_JurorJoined",
+		"MilestoneArbitration_JurorLeft",
+	],
 } as const
 
 // Zod schemas for event data parsing (extend as needed)
@@ -92,6 +114,36 @@ export const EVENT_DATA_SCHEMAS: Partial<Record<EventTopicValue, z.ZodSchema>> =
 			strategy: z.string(),
 			amount: z.string().regex(/^-?\d+$/),
 		}),
+		"MilestoneArbitration::dispute_opened": z.object({
+			dispute_id: z.string().regex(/^\d+$/),
+			scholar: z.string(),
+			proposal_id: z.string().regex(/^\d+$/),
+			milestone_id: z.string().regex(/^\d+$/),
+			evidence_hash: z.string(),
+			panel: z.array(z.string()),
+			commit_deadline: z.string().regex(/^\d+$/),
+			reveal_deadline: z.string().regex(/^\d+$/),
+		}),
+		"MilestoneArbitration::vote_committed": z.object({
+			dispute_id: z.string().regex(/^\d+$/),
+			juror: z.string(),
+		}),
+		"MilestoneArbitration::vote_revealed": z.object({
+			dispute_id: z.string().regex(/^\d+$/),
+			juror: z.string(),
+			vote: z.boolean(),
+		}),
+		"MilestoneArbitration::dispute_resolved": z.object({
+			dispute_id: z.string().regex(/^\d+$/),
+			proposal_id: z.string().regex(/^\d+$/),
+			milestone_id: z.string().regex(/^\d+$/),
+			outcome: z.boolean().nullable(),
+			votes_for: z.number(),
+			votes_against: z.number(),
+			revealed_count: z.number(),
+			quorum_met: z.boolean(),
+		}),
+		// Add others...
 	}
 
 // DB Event row

@@ -31,12 +31,17 @@ tags:
     description: Event stream endpoints
   - name: Leaderboard
     description: Learner ranking endpoints
+  - name: Streaks
+    description: Learning streak and daily goal endpoints
   - name: Comments
     description: Proposal comment endpoints
   - name: Treasury
     description: Treasury statistics and activity endpoints
   - name: Upload
     description: IPFS file upload endpoints
+  - name: Translations
+    description: Course/lesson content translation, translator workspace, and
+      glossary endpoints
 components:
   securitySchemes:
     bearerAuth:
@@ -350,6 +355,61 @@ components:
         updatedAt:
           type: string
           format: date-time
+        studentsCount:
+          type: integer
+        prerequisites:
+          type: array
+          items:
+            type: integer
+        avgRating:
+          type: number
+          nullable: true
+        reviewCount:
+          type: integer
+        languageServed:
+          type: string
+          enum:
+            - en
+            - es
+            - fr
+            - sw
+          description: The content language actually returned.
+        isTranslation:
+          type: boolean
+          description: True when languageServed is a published translation, not English.
+        isFallback:
+          type: boolean
+          description: True when a non-English language was requested but no published
+            translation exists, so English was served instead.
+        isStale:
+          type: boolean
+          description: True when the served translation was made from an older revision of
+            the English source. Still served — never silently hidden.
+        translatorAddress:
+          type: string
+          nullable: true
+          description: Wallet address credited for the served translation, or null for
+            English/no translation.
+        availableLanguages:
+          type: array
+          items:
+            type: string
+            enum:
+              - es
+              - fr
+              - sw
+          description: Languages with at least one published translation for this course
+            (course- or lesson-level), regardless of staleness.
+        translationCoverage:
+          type: object
+          properties:
+            totalLessons:
+              type: integer
+            translatedLessons:
+              type: integer
+          description: How many of the course's lessons have a published translation in
+            the requested language — lets a learner see partial coverage before
+            committing.
       required:
         - id
         - slug
@@ -370,6 +430,17 @@ components:
           type: string
         order:
           type: integer
+        estimatedMinutes:
+          type: integer
+        isMilestone:
+          type: boolean
+        version:
+          type: integer
+        isLatest:
+          type: boolean
+        changeSummary:
+          type: string
+          nullable: true
         quiz:
           type: array
           items:
@@ -389,12 +460,198 @@ components:
         updatedAt:
           type: string
           format: date-time
+        languageServed:
+          type: string
+          enum:
+            - en
+            - es
+            - fr
+            - sw
+        isTranslation:
+          type: boolean
+        isFallback:
+          type: boolean
+        isStale:
+          type: boolean
+        translatorAddress:
+          type: string
+          nullable: true
       required:
         - id
         - courseId
         - title
         - content
         - order
+    CourseTranslation:
+      type: object
+      properties:
+        id:
+          type: integer
+        courseId:
+          type: integer
+        languageCode:
+          type: string
+          enum:
+            - es
+            - fr
+            - sw
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum:
+            - draft
+            - in_review
+            - published
+        translatorAddress:
+          type: string
+        reviewedByAddress:
+          type: string
+          nullable: true
+        sourceVersion:
+          type: integer
+        isStale:
+          type: boolean
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+    LessonTranslation:
+      type: object
+      properties:
+        id:
+          type: integer
+        courseId:
+          type: integer
+        orderIndex:
+          type: integer
+        languageCode:
+          type: string
+          enum:
+            - es
+            - fr
+            - sw
+        title:
+          type: string
+        content:
+          type: string
+        status:
+          type: string
+          enum:
+            - draft
+            - in_review
+            - published
+        translatorAddress:
+          type: string
+        reviewedByAddress:
+          type: string
+          nullable: true
+        sourceVersion:
+          type: integer
+        isStale:
+          type: boolean
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+    GlossaryTerm:
+      type: object
+      properties:
+        id:
+          type: integer
+        term:
+          type: string
+        note:
+          type: string
+          nullable: true
+      required:
+        - id
+        - term
+    TranslatorGrant:
+      type: object
+      properties:
+        id:
+          type: integer
+        wallet_address:
+          type: string
+        language_code:
+          type: string
+          enum:
+            - es
+            - fr
+            - sw
+        granted_by:
+          type: string
+        granted_at:
+          type: string
+          format: date-time
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+    TranslatorQueue:
+      type: object
+      properties:
+        untranslated:
+          type: array
+          items:
+            type: object
+            properties:
+              courseSlug:
+                type: string
+              courseTitle:
+                type: string
+              orderIndex:
+                type: integer
+              lessonTitle:
+                type: string
+        inReview:
+          type: array
+          items:
+            type: object
+            properties:
+              kind:
+                type: string
+                enum:
+                  - course
+                  - lesson
+              courseSlug:
+                type: string
+              orderIndex:
+                type: integer
+                nullable: true
+              title:
+                type: string
+              submittedAt:
+                type: string
+                format: date-time
+        stale:
+          type: array
+          items:
+            type: object
+            properties:
+              kind:
+                type: string
+                enum:
+                  - course
+                  - lesson
+              courseSlug:
+                type: string
+              orderIndex:
+                type: integer
+                nullable: true
+              title:
+                type: string
+              staleSinceVersion:
+                type: integer
     GovernanceProposalInput:
       type: object
       properties:
@@ -940,6 +1197,212 @@ paths:
           $ref: "#/components/responses/UnauthorizedError"
         "403":
           $ref: "#/components/responses/ForbiddenError"
+  /api/anchors:
+    get:
+      tags:
+        - Anchors
+      summary: List allowlisted anchors, optionally filtered by country
+      parameters:
+        - in: query
+          name: country
+          schema:
+            type: string
+          description: ISO 3166-1 alpha-2 country code
+      responses:
+        "200":
+          description: Allowlisted anchors serving the given country (or all, if omitted)
+  /api/anchors/{domain}/auth-challenge:
+    get:
+      tags:
+        - Anchors
+      summary: Fetch a SEP-10 challenge from the anchor for the learner's wallet to sign
+      description: >
+        Proxies the anchor's own WEB_AUTH_ENDPOINT. The learner signs the
+        returned transaction locally (their wallet, never this server) and
+        submits it via POST /api/anchors/{domain}/auth.
+      parameters:
+        - in: path
+          name: domain
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: account
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Challenge transaction XDR
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "404":
+          description: Anchor domain is not on the allowlist
+  /api/anchors/{domain}/auth:
+    post:
+      tags:
+        - Anchors
+      summary: Submit the learner-signed SEP-10 challenge to the anchor
+      parameters:
+        - in: path
+          name: domain
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - signedTransactionXdr
+              properties:
+                signedTransactionXdr:
+                  type: string
+      responses:
+        "200":
+          description: Anchor's SEP-10 token
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "404":
+          description: Anchor domain is not on the allowlist
+  /api/anchors/{domain}/quote:
+    get:
+      tags:
+        - Anchors
+      summary: Get a price quote from the anchor's SEP-38 quote server
+      description: >
+        Returns an indicative price if no anchor auth token is supplied, or a
+        firm, expiring quote (SEP-38 POST /quote) when an `Authorization: Bearer
+        <anchor token>` header is present.
+      parameters:
+        - in: path
+          name: domain
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: sell
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: buy
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: amount
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Indicative price or firm quote
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "404":
+          description: Anchor domain is not on the allowlist
+  /api/anchors/{domain}/withdraw:
+    post:
+      tags:
+        - Anchors
+      summary: Start an interactive SEP-24 withdrawal
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: domain
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - assetCode
+                - assetOut
+                - amount
+                - anchorToken
+              properties:
+                assetCode:
+                  type: string
+                  description: e.g. USDC
+                assetOut:
+                  type: string
+                  description: e.g. NGN
+                amount:
+                  type: string
+                quoteId:
+                  type: string
+                  description: SEP-38 firm quote id, if one was obtained
+                anchorToken:
+                  type: string
+                  description: Anchor's own SEP-10 token
+      responses:
+        "201":
+          description: Interactive withdrawal started
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Anchor domain is not on the allowlist
+  /api/anchors/{domain}/withdrawals/{transactionId}/reconcile:
+    post:
+      tags:
+        - Anchors
+      summary: Re-poll the anchor for a withdrawal's current status and persist it
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: domain
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: transactionId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - anchorToken
+              properties:
+                anchorToken:
+                  type: string
+      responses:
+        "200":
+          description: Reconciled withdrawal row
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Withdrawal not found for this learner, or anchor domain not
+            allowlisted
+  /api/anchors/withdrawals:
+    get:
+      tags:
+        - Anchors
+      summary: The authenticated learner's anchor withdrawal history
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Withdrawal rows for this learner, most recent first
+        "401":
+          description: Unauthorized
   /api/me/bookmarks:
     get:
       tags:
@@ -1172,6 +1635,185 @@ paths:
           $ref: "#/components/responses/BadRequestError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/courses:
+    get:
+      tags:
+        - Courses
+      summary: List courses
+      description: >
+        Returns paginated, published courses. Every course states which content
+        language was actually served: `lang`/`Accept-Language` resolve a
+        published translation when one exists, and the response is honest when
+        it falls back to English or when the served translation is stale (its
+        source has since changed).
+      parameters:
+        - in: query
+          name: lang
+          schema:
+            type: string
+            enum:
+              - en
+              - es
+              - fr
+              - sw
+          description: >
+            Requested content language. Falls back to the Accept-Language
+            header, then to English. Independent of any UI locale.
+        - in: query
+          name: track
+          schema:
+            type: string
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: difficulty
+          schema:
+            type: string
+            enum:
+              - beginner
+              - intermediate
+              - advanced
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+        - in: query
+          name: includeUnpublished
+          schema:
+            type: boolean
+          description: Admin-only; requires bearer auth or x-api-key.
+      responses:
+        "200":
+          description: Paginated course list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CourseDetail"
+                  pagination:
+                    type: object
+                    properties:
+                      page:
+                        type: integer
+                      limit:
+                        type: integer
+                      total:
+                        type: integer
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/courses/{idOrSlug}:
+    get:
+      tags:
+        - Courses
+      summary: Get a course with its lessons
+      description: >
+        Returns course metadata and its version-pinned lessons. Content language
+        resolves the same way as the course list: a published translation for
+        `lang`, falling back to English with `isFallback: true` when none
+        exists. `translationCoverage` reports how many of the course's lessons
+        are available in the requested language, so a learner can see partial
+        coverage before committing.
+      parameters:
+        - in: path
+          name: idOrSlug
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: lang
+          schema:
+            type: string
+            enum:
+              - en
+              - es
+              - fr
+              - sw
+        - in: query
+          name: learner_address
+          schema:
+            type: string
+          description: Pins lesson content to the learner's enrolled content_version.
+      responses:
+        "200":
+          description: Course with nested, language-resolved lessons
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/CourseDetail"
+                  - type: object
+                    properties:
+                      enrollmentContentVersion:
+                        type: integer
+                        nullable: true
+                      latestContentVersion:
+                        type: integer
+                      hasUpdatedContent:
+                        type: boolean
+                      lessons:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Lesson"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/courses/{idOrSlug}/lessons/{id}:
+    get:
+      tags:
+        - Courses
+      summary: Get a single lesson
+      description: Returns one lesson by its numeric id, language-resolved the same
+        way as course lessons.
+      parameters:
+        - in: path
+          name: idOrSlug
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: lang
+          schema:
+            type: string
+            enum:
+              - en
+              - es
+              - fr
+              - sw
+      responses:
+        "200":
+          description: Lesson content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lesson"
         "404":
           $ref: "#/components/responses/NotFoundError"
         "500":
@@ -1756,62 +2398,6 @@ paths:
           description: Alerts reset successfully
         "500":
           $ref: "#/components/responses/InternalServerError"
-  /api/leaderboard:
-    get:
-      tags:
-        - Leaderboard
-      summary: List top learners
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 50
-            default: 10
-          description: Max number of learners to return
-        - in: query
-          name: offset
-          schema:
-            type: integer
-            minimum: 0
-            default: 0
-          description: Pagination offset
-      responses:
-        "200":
-          description: Leaderboard fetched successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        rank:
-                          type: integer
-                        address:
-                          type: string
-                        fullAddress:
-                          type: string
-                        balance:
-                          type: string
-                        completedCourses:
-                          type: integer
-                  total:
-                    type: integer
-                  limit:
-                    type: integer
-                  offset:
-                    type: integer
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
   /api/lrn/burn:
     post:
       tags:
@@ -2200,6 +2786,97 @@ paths:
           $ref: "#/components/responses/UnauthorizedError"
         "404":
           $ref: "#/components/responses/NotFoundError"
+  /api/onboarding/sponsor-account:
+    post:
+      tags:
+        - Onboarding
+      summary: Build a sponsored account-creation transaction for a zero-XLM learner
+      description: >
+        Builds a transaction that sponsors the reserve for a brand-new Stellar
+        account (begin_sponsoring_future_reserves / create_account with
+        startingBalance "0" / optional change_trust /
+        end_sponsoring_future_reserves), signed by the platform sponsor. The
+        learner must countersign the returned XDR in their own wallet before it
+        can be submitted — the server never sees or holds the learner's secret
+        key.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - learnerAddress
+              properties:
+                learnerAddress:
+                  type: string
+                  description: The Stellar public key (G...) of a keypair the learner generated or
+                    connected locally.
+                withUsdcTrustline:
+                  type: boolean
+                  description: Include a sponsored USDC trustline. Defaults to true when a classic
+                    USDC asset is configured.
+      responses:
+        "200":
+          description: Sponsor-signed XDR ready for the learner to countersign
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  xdr:
+                    type: string
+                  networkPassphrase:
+                    type: string
+                  reservesLockedStroops:
+                    type: string
+                  includesUsdcTrustline:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          description: Sponsor account not configured
+  /api/onboarding/sponsor-status:
+    get:
+      tags:
+        - Onboarding
+      summary: Sponsor treasury status (admin)
+      description: Sponsor account balance, accounts sponsored, reserves locked, and
+        today's spend — for the admin panel's low-balance warning.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Sponsor status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sponsorAddress:
+                    type: string
+                    nullable: true
+                  sponsorBalanceStroops:
+                    type: string
+                    nullable: true
+                  accountsSponsored:
+                    type: integer
+                  reservesLockedStroops:
+                    type: string
+                  spendTodayStroops:
+                    type: string
+                  dailySpendCapStroops:
+                    type: string
+                  lowBalanceWarning:
+                    type: boolean
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   /api/profiles/{address}:
     get:
       tags:
@@ -2258,6 +2935,205 @@ paths:
           description: Display name already taken
         "500":
           description: Internal server error
+  /api/qf/rounds:
+    get:
+      tags:
+        - QuadraticFunding
+      summary: List quadratic-funding rounds
+      responses:
+        "200":
+          description: List of QF rounds with their effective status
+    post:
+      tags:
+        - QuadraticFunding
+      summary: Create a quadratic-funding round (admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - matching_pool
+                - start_ts
+                - end_ts
+              properties:
+                name:
+                  type: string
+                matching_pool:
+                  type: number
+                  description: Total matching pool in USDC
+                start_ts:
+                  type: string
+                  format: date-time
+                end_ts:
+                  type: string
+                  format: date-time
+      responses:
+        "201":
+          description: Round created
+        "400":
+          description: Invalid round data
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+  /api/qf/rounds/{id}/standings:
+    get:
+      tags:
+        - QuadraticFunding
+      summary: Live quadratic-funding standings / match estimator
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Per-proposal raised amount, unique contributors and estimated match
+        "404":
+          description: Round not found
+  /api/qf/rounds/{id}/contribute:
+    post:
+      tags:
+        - QuadraticFunding
+      summary: Record a tx-verified contribution to a proposal in a round
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - proposal_id
+                - amount_usdc
+                - tx_hash
+              properties:
+                proposal_id:
+                  type: integer
+                amount_usdc:
+                  type: number
+                tx_hash:
+                  type: string
+      responses:
+        "201":
+          description: Contribution recorded
+        "400":
+          description: Invalid data or transaction verification failed
+        "403":
+          description: Identity verification required (anti-sybil gate)
+        "404":
+          description: Round not found
+        "409":
+          description: Round not open or transaction already recorded
+  /api/qf/rounds/{id}/finalize:
+    post:
+      tags:
+        - QuadraticFunding
+      summary: Finalize a round and produce a disbursement plan (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Disbursement plan bounded by the matching pool
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          description: Round not found
+        "409":
+          description: Round already finalized
+  /api/recommendations/{address}:
+    get:
+      tags:
+        - Recommendations
+      summary: Get personalized course recommendations for a learner
+      description: Returns a ranked list of recommended next courses with a
+        human-readable reason per item, based on completed courses, path rules,
+        and co-occurrence with similar learners.
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Ranked recommendations
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/relay/fee-bump:
+    post:
+      tags:
+        - Relay
+      summary: Relay a learner-signed transaction sponsored by the platform
+      description: >
+        Accepts a learner-signed inner transaction envelope, validates it
+        against the LearnVault contract-call allowlist (enroll,
+        submit_milestone), wraps it in a fee-bump transaction paid by the
+        sponsor account, submits it, and returns the hash. Used when the
+        learner's own XLM balance is below the fee threshold. Every operation
+        outside the allowlist is rejected outright.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - innerTxXdr
+              properties:
+                innerTxXdr:
+                  type: string
+                  description: Base64 XDR of the learner-signed inner transaction envelope.
+      responses:
+        "200":
+          description: Relayed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hash:
+                    type: string
+        "400":
+          description: Rejected — invalid envelope, non-allowlisted operation, wrong
+            source account, or fee over the sponsor's cap
+        "401":
+          description: Unauthorized
+        "429":
+          description: Relay rate limit exceeded
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          description: Relayer not configured
   /api/courses/{idOrSlug}/reviews:
     get:
       tags:
@@ -2569,6 +3445,826 @@ paths:
                     description: Field-level validation errors
         "500":
           $ref: "#/components/responses/InternalServerError"
+  /api/scholarships/{id}/contribute:
+    post:
+      tags:
+        - Scholarships
+      summary: Co-fund an approved scholarship proposal
+      description: |
+        Records a verified on-chain USDC deposit against an approved or queued
+        proposal. The Stellar transaction is confirmed via Horizon before any
+        database write occurs.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Proposal ID to co-fund
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - donor_address
+                - amount
+                - tx_hash
+              properties:
+                donor_address:
+                  type: string
+                  description: Stellar G-address of the donor (must match JWT)
+                amount:
+                  type: number
+                  description: USDC amount contributed
+                tx_hash:
+                  type: string
+                  description: 64-character hex hash of the on-chain deposit transaction
+      responses:
+        "200":
+          description: Contribution recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current_funding:
+                    type: number
+                  fully_funded:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: Transaction already recorded or proposal not co-fundable
+        "422":
+          description: On-chain verification failed
+  /api/scholarships/{id}/contributors:
+    get:
+      tags:
+        - Scholarships
+      summary: List verified contributors for a proposal
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Contributor list with funding totals
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+  /api/streaks/{address}:
+    get:
+      tags:
+        - Streaks
+      summary: Get a learner's streak and daily goal state
+      description: Returns the learner's current/longest streak, daily goal, today's
+        progress, and a 7-day activity window.
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Streak state
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/streaks/{address}/goal:
+    put:
+      tags:
+        - Streaks
+      summary: Set a learner's daily activity goal
+      description: Updates the authenticated learner's daily goal (1-20
+        milestones/day). The address must match the authenticated wallet.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - dailyGoal
+              properties:
+                dailyGoal:
+                  type: integer
+                  minimum: 1
+                  maximum: 20
+      responses:
+        "200":
+          description: Updated streak record
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          description: Cannot update another learner's daily goal
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/admin/translators:
+    get:
+      tags:
+        - Translations
+      summary: List translator grants
+      description: Course-admin only. Every wallet granted as a translator for a
+        language, active and revoked.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Translator grants
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TranslatorGrant"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+    post:
+      tags:
+        - Translations
+      summary: Grant a wallet translator access to a language
+      description: Course-admin only. Scoped per language — a grant for "sw" never
+        authorizes "fr".
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - walletAddress
+                - languageCode
+              properties:
+                walletAddress:
+                  type: string
+                languageCode:
+                  type: string
+                  enum:
+                    - es
+                    - fr
+                    - sw
+      responses:
+        "201":
+          description: Grant created (or reactivated if previously revoked)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranslatorGrant"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+  /api/admin/translators/{id}:
+    delete:
+      tags:
+        - Translations
+      summary: Revoke a translator grant
+      description: Course-admin only.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Grant revoked
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+  /api/courses/{idOrSlug}/glossary:
+    get:
+      tags:
+        - Translations
+      summary: List a course's do-not-translate glossary
+      description: Protocol nouns (e.g. LRN, Soroban, Stellar, escrow, wallet,
+        testnet) that must survive a translation untouched.
+      parameters:
+        - in: path
+          name: idOrSlug
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Glossary terms
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/GlossaryTerm"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+    post:
+      tags:
+        - Translations
+      summary: Add a glossary term
+      description: Course-admin only.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: idOrSlug
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - term
+              properties:
+                term:
+                  type: string
+                note:
+                  type: string
+                  nullable: true
+      responses:
+        "201":
+          description: Term created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GlossaryTerm"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: Term already exists for this course
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/courses/{idOrSlug}/glossary/{termId}:
+    patch:
+      tags:
+        - Translations
+      summary: Update a glossary term
+      description: Course-admin only.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: idOrSlug
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: termId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                term:
+                  type: string
+                note:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: Term updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GlossaryTerm"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+    delete:
+      tags:
+        - Translations
+      summary: Delete a glossary term
+      description: Course-admin only.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: idOrSlug
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: termId
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Term deleted
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+  /api/courses/{idOrSlug}/translations/{languageCode}:
+    get:
+      tags:
+        - Translations
+      summary: Get the course translation editor state
+      description: >
+        Translator (granted for languageCode) or course-admin only. Returns the
+        English source, any existing translation at any status, and the course's
+        do-not-translate glossary — everything the side-by-side editor needs in
+        one call.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: idOrSlug
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: languageCode
+          required: true
+          schema:
+            type: string
+            enum:
+              - es
+              - fr
+              - sw
+      responses:
+        "200":
+          description: Editor state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  source:
+                    type: object
+                    properties:
+                      title:
+                        type: string
+                      description:
+                        type: string
+                      contentVersion:
+                        type: integer
+                  translation:
+                    type: object
+                    nullable: true
+                    allOf:
+                      - $ref: "#/components/schemas/CourseTranslation"
+                  glossary:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/GlossaryTerm"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+    put:
+      tags:
+        - Translations
+      summary: Save a course translation draft
+      description: >
+        Translator (granted for languageCode) or course-admin only. Upserts
+        title/description as a draft and stamps source_version to the course's
+        current content_version. Never changes an existing in_review/published
+        status — only submit/publish do that.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: idOrSlug
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: languageCode
+          required: true
+          schema:
+            type: string
+            enum:
+              - es
+              - fr
+              - sw
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - description
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+      responses:
+        "200":
+          description: Saved translation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseTranslation"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+  /api/courses/{idOrSlug}/translations/{languageCode}/submit:
+    post:
+      tags:
+        - Translations
+      summary: Submit a course translation for review
+      description: Translator (granted for languageCode) or course-admin only. Moves
+        draft (or stale) to in_review.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: idOrSlug
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: languageCode
+          required: true
+          schema:
+            type: string
+            enum:
+              - es
+              - fr
+              - sw
+      responses:
+        "200":
+          description: Submitted for review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseTranslation"
+        "400":
+          description: No draft or stale translation available to submit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+  /api/courses/{idOrSlug}/translations/{languageCode}/publish:
+    post:
+      tags:
+        - Translations
+      summary: Publish a course translation
+      description: >
+        Course-admin only — never a translator, regardless of language grant.
+        Moves in_review to published, making it servable to learners. This is
+        what guarantees a translator scoped to one language can never publish
+        any language, including their own.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: idOrSlug
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: languageCode
+          required: true
+          schema:
+            type: string
+            enum:
+              - es
+              - fr
+              - sw
+      responses:
+        "200":
+          description: Published
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseTranslation"
+        "400":
+          description: No in_review translation available to publish
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+  /api/courses/{idOrSlug}/lessons/{orderIndex}/translations/{languageCode}:
+    get:
+      tags:
+        - Translations
+      summary: Get the lesson translation editor state
+      description: >
+        Translator (granted for languageCode) or course-admin only. Lesson
+        identity is (courseId, orderIndex) — stable across content-version edits
+        — not the lesson's row id, which changes on every edit.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: idOrSlug
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: orderIndex
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: languageCode
+          required: true
+          schema:
+            type: string
+            enum:
+              - es
+              - fr
+              - sw
+      responses:
+        "200":
+          description: Editor state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  source:
+                    type: object
+                    properties:
+                      title:
+                        type: string
+                      content:
+                        type: string
+                      sourceVersion:
+                        type: integer
+                  translation:
+                    type: object
+                    nullable: true
+                    allOf:
+                      - $ref: "#/components/schemas/LessonTranslation"
+                  glossary:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/GlossaryTerm"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+    put:
+      tags:
+        - Translations
+      summary: Save a lesson translation draft
+      description: >
+        Translator (granted for languageCode) or course-admin only. content is
+        stored byte-for-byte — never run through HTML sanitization — so
+        headings, fenced code blocks, and links survive a save/load round trip
+        untouched.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: idOrSlug
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: orderIndex
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: languageCode
+          required: true
+          schema:
+            type: string
+            enum:
+              - es
+              - fr
+              - sw
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - content
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                  description: Markdown, stored verbatim
+      responses:
+        "200":
+          description: Saved translation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonTranslation"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+  /api/courses/{idOrSlug}/lessons/{orderIndex}/translations/{languageCode}/submit:
+    post:
+      tags:
+        - Translations
+      summary: Submit a lesson translation for review
+      description: Translator (granted for languageCode) or course-admin only. Moves
+        draft (or stale) to in_review.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: idOrSlug
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: orderIndex
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: languageCode
+          required: true
+          schema:
+            type: string
+            enum:
+              - es
+              - fr
+              - sw
+      responses:
+        "200":
+          description: Submitted for review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonTranslation"
+        "400":
+          description: No draft or stale translation available to submit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+  /api/courses/{idOrSlug}/lessons/{orderIndex}/translations/{languageCode}/publish:
+    post:
+      tags:
+        - Translations
+      summary: Publish a lesson translation
+      description: >
+        Course-admin only — never a translator, regardless of language grant.
+        Moves in_review to published, making it servable to learners.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: idOrSlug
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: orderIndex
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: languageCode
+          required: true
+          schema:
+            type: string
+            enum:
+              - es
+              - fr
+              - sw
+      responses:
+        "200":
+          description: Published
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonTranslation"
+        "400":
+          description: No in_review translation available to publish
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+  /api/translations/queue:
+    get:
+      tags:
+        - Translations
+      summary: Translator queue for one language
+      description: >
+        Translator (granted for the requested language) or course-admin only.
+        Three buckets: lessons with no translation row yet, submissions awaiting
+        publish, and published/draft translations flagged stale because their
+        English source changed. This is how a translator finds out a lesson they
+        translated has gone stale — there is no push notification yet, so
+        checking this queue is the supported workflow today.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: language
+          required: true
+          schema:
+            type: string
+            enum:
+              - es
+              - fr
+              - sw
+      responses:
+        "200":
+          description: Queue contents
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranslatorQueue"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
   /api/treasury/stats:
     get:
       tags:
@@ -2884,6 +4580,90 @@ paths:
           $ref: "#/components/responses/BadRequestError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/wallet/deploy:
+    post:
+      tags:
+        - Wallet
+      summary: Deploy a sponsored passkey smart wallet
+      description: Deploys a PasskeyWallet contract instance controlled by the given
+        secp256r1 WebAuthn public key. The learner pays nothing — the platform
+        sponsors deployment. Returns a session token for the new wallet address,
+        same as a wallet-connect login.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - credentialId
+                - publicKey
+              properties:
+                credentialId:
+                  type: string
+                  description: Base64url-encoded WebAuthn credential ID
+                publicKey:
+                  type: string
+                  description: Base64url-encoded 65-byte uncompressed SEC1 P-256 public key
+                deviceLabel:
+                  type: string
+      responses:
+        "201":
+          description: Wallet deployed
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/wallet/{address}/signers/prepare:
+    post:
+      tags:
+        - Wallet
+      summary: Prepare a sponsored add_signer transaction
+      description: Builds and simulates an add_signer call for the given wallet,
+        returning a challenge that an already-registered passkey must sign to
+        authorize enrolling the new device.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Challenge to sign
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "403":
+          description: Forbidden
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/wallet/{address}/signers/confirm:
+    post:
+      tags:
+        - Wallet
+      summary: Confirm and submit a prepared add_signer transaction
+      description: Attaches a WebAuthn assertion (signed against the challenge from
+        /prepare) to the pending transaction, submits it sponsored, and records
+        the new device.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Signer added
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "403":
+          description: Forbidden
         "500":
           $ref: "#/components/responses/InternalServerError"
   /api/webhooks/horizon:

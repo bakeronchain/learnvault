@@ -180,5 +180,28 @@
 	"translatorLessonPane": "[[Lesson {{order}}]]",
 	"translatorEdit": "[[Edit]]",
 	"translatorPreview": "[[Preview]]",
-	"translatorContentPlaceholder": "[[Translated markdown content]]"
+	"translatorContentPlaceholder": "[[Translated markdown content]]",
+	"search": {
+		"placeholder": "[[Search LearnVault…]]",
+		"results_aria": "[[Search results]]",
+		"recent_title": "[[Recent searches]]",
+		"recent_clear": "[[Clear]]",
+		"recent_aria": "[[Recent searches]]",
+		"see_all": "[[See all results]]",
+		"no_results": "[[No results for \"{{query}}\"]]",
+		"no_results_hint": "[[Try different keywords or browse popular courses.]]",
+		"browse_courses": "[[Browse courses]]",
+		"page_title": "[[Search]]",
+		"page_results_for": "[[Results for \"{{query}}\"]]",
+		"page_empty_title": "[[Search LearnVault]]",
+		"type_filter_aria": "[[Filter by content type]]",
+		"filter_all": "[[All]]",
+		"type_course": "[[Courses]]",
+		"type_lesson": "[[Lessons]]",
+		"type_wiki": "[[Wiki]]",
+		"type_forum": "[[Forum]]",
+		"type_profile": "[[Scholars]]",
+		"load_more": "[[Load more results]]",
+		"error_description": "[[Something went wrong while searching. Please try again.]]"
+	}
 }

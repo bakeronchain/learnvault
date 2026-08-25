@@ -56,6 +56,7 @@ export type AuthService = {
 export function createAuthService(
 	nonceStore: NonceStore,
 	jwtService: JwtService,
+	onAuthenticated: (address: string) => Promise<void> = async () => {},
 ): AuthService {
 	return {
 		async createChallenge(address: string): Promise<{
@@ -131,6 +132,7 @@ export function createAuthService(
 			}
 
 			await nonceStore.deleteNonce(address)
+			await onAuthenticated(address)
 			return jwtService.issueTokenPair(address)
 		},
 
@@ -171,6 +173,7 @@ export function createAuthService(
 			}
 
 			await nonceStore.deleteNonce(address)
+			await onAuthenticated(address)
 			return jwtService.issueTokenPair(address)
 		},
 		async refreshSession(refreshToken: string): Promise<{

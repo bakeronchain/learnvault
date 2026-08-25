@@ -1,4 +1,4 @@
-import { createPublicKey } from "node:crypto"
+import { createPublicKey, randomBytes } from "node:crypto"
 import path from "path"
 import cors from "cors"
 import dotenv from "dotenv"
@@ -76,6 +76,9 @@ import { createWalletRouter } from "./routes/wallet.routes"
 import { webhooksRouter } from "./routes/webhooks.routes"
 import { wikiRouter } from "./routes/wiki.routes"
 import { createAuthService } from "./services/auth.service"
+import { createPostgresDataRightsStore } from "./services/data-rights-store"
+import { createDataRightsService } from "./services/data-rights.service"
+import { createEmailService } from "./services/email.service"
 import {
 	createJwtService,
 	generateEphemeralDevJwtKeys,
@@ -90,6 +93,7 @@ const envSchema = z.object({
 	REDIS_URL: z.string().optional(),
 	JWT_PRIVATE_KEY: z.string().optional(),
 	JWT_PUBLIC_KEY: z.string().optional(),
+	DATA_EXPORT_SIGNING_SECRET: z.string().min(32).optional(),
 	SEP10_SIGNING_SECRET: z.string().optional(),
 	// When "true" the CSP is sent as Content-Security-Policy-Report-Only so
 	// violations are logged but not blocked. Enabled automatically in staging
@@ -137,7 +141,24 @@ if (!keyDetails?.modulusLength || keyDetails.modulusLength < 2048) {
 const nonceStore = createNonceStore(env.REDIS_URL)
 const tokenStore = createTokenStore(env.REDIS_URL)
 const jwtService = createJwtService(jwtPrivateKey, jwtPublicKey, tokenStore)
-const authService = createAuthService(nonceStore, jwtService)
+if (isProduction && !env.DATA_EXPORT_SIGNING_SECRET) {
+	throw new Error("DATA_EXPORT_SIGNING_SECRET is required in production")
+}
+const dataRightsService = createDataRightsService(
+	createPostgresDataRightsStore(),
+	{
+		signingSecret:
+			env.DATA_EXPORT_SIGNING_SECRET ?? randomBytes(32).toString("hex"),
+		emailService: createEmailService(),
+	},
+)
+const authService = createAuthService(
+	nonceStore,
+	jwtService,
+	async (address) => {
+		await dataRightsService.cancelDeletion(address)
+	},
+)
 
 // SEP-10 signing key: generate ephemeral key in dev if not provided
 if (!env.SEP10_SIGNING_SECRET) {
@@ -298,7 +319,7 @@ app.use("/api", healthRouter)
 app.use("/api/auth", createAuthRouter(authService, jwtService))
 app.use("/api/auth/sep10", createSep10Router(sep10Service))
 app.use("/", stellarTomlRouter)
-app.use("/api", createMeRouter(jwtService))
+app.use("/api", createMeRouter(jwtService, authService, dataRightsService))
 app.use("/api", createCoursesRouter(jwtService))
 app.use("/api", createTranslationsRouter(jwtService))
 app.use("/api", createEnrollmentsRouter(jwtService))
@@ -352,6 +373,12 @@ if (process.env.NODE_ENV !== "test") {
 	void import("./workers/bounty-expiry-worker").then(
 		({ startBountyExpiryWorker }) => {
 			void startBountyExpiryWorker().catch(console.error)
+		},
+	)
+
+	void import("./workers/data-rights-worker").then(
+		({ startDataRightsWorker }) => {
+			void startDataRightsWorker(dataRightsService).catch(console.error)
 		},
 	)
 }

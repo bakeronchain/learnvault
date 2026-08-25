@@ -180,5 +180,32 @@
 	"translatorLessonPane": "Leçon {{order}}",
 	"translatorEdit": "Modifier",
 	"translatorPreview": "Aperçu",
-	"translatorContentPlaceholder": "Contenu markdown traduit"
+	"translatorContentPlaceholder": "Contenu markdown traduit",
+	"dataRights": {
+		"title": "Vos données",
+		"description": "Téléchargez les données personnelles conservées par LearnVault ou programmez la suppression de votre compte.",
+		"requestExport": "Demander une exportation",
+		"deleteAccount": "Supprimer le compte",
+		"download": "Télécharger l’archive",
+		"pending": "La suppression du compte est prévue pour le {{date}}.",
+		"cancelDeletion": "Annuler la suppression du compte",
+		"exportStatus": {
+			"pending": "Exportation en attente",
+			"processing": "Préparation de l’exportation",
+			"ready": "Exportation prête",
+			"failed": "Échec de l’exportation"
+		},
+		"dialog": {
+			"title": "Programmer la suppression définitive du compte ?",
+			"description": "Vos données personnelles hors chaîne seront effacées après 30 jours. Le contenu du forum restera anonymisé pour préserver le contexte. Les transferts LRN, les ScholarNFT créés et les transactions de trésorerie sont des registres publics permanents qui ne peuvent pas être supprimés.",
+			"confirm": "Programmer la suppression",
+			"cancel": "Conserver le compte"
+		},
+		"errors": {
+			"status": "Impossible de charger l’état de suppression.",
+			"export": "Impossible de préparer votre exportation.",
+			"deletion": "Impossible de programmer la suppression.",
+			"cancel": "Impossible d’annuler la suppression."
+		}
+	}
 }

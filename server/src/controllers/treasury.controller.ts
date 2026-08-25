@@ -6,8 +6,9 @@ import { stellarRpcCircuitBreaker } from "../services/stellar-contract.service"
 const log = logger.child({ module: "treasury" })
 
 const STELLAR_NETWORK = process.env.STELLAR_NETWORK ?? "testnet"
-const SCHOLARSHIP_TREASURY_CONTRACT_ID =
-	process.env.SCHOLARSHIP_TREASURY_CONTRACT_ID ?? ""
+function getTreasuryContractId(): string {
+	return process.env.SCHOLARSHIP_TREASURY_CONTRACT_ID ?? ""
+}
 
 // Known asset contract IDs → symbol/USD rate mapping.
 // Rates are approximate fixed values for display normalization; a production
@@ -57,7 +58,7 @@ export const getTreasuryStats = async (
 	_req: Request,
 	res: Response,
 ): Promise<void> => {
-	if (!SCHOLARSHIP_TREASURY_CONTRACT_ID) {
+	if (!getTreasuryContractId()) {
 		res.status(503).json({
 			error: "Treasury contract not configured",
 		})
@@ -72,7 +73,7 @@ export const getTreasuryStats = async (
 		)
 
 		const response = await server.getEvents({
-			filters: [{ contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] }],
+			filters: [{ contractIds: [getTreasuryContractId()] }],
 			startLedger: parseInt(process.env.STARTING_LEDGER || "460000000", 10),
 			limit: 1000,
 		})
@@ -159,7 +160,7 @@ export const getTreasuryActivity = async (
 	req: Request,
 	res: Response,
 ): Promise<void> => {
-	if (!SCHOLARSHIP_TREASURY_CONTRACT_ID) {
+	if (!getTreasuryContractId()) {
 		res.status(503).json({
 			error: "Treasury contract not configured",
 		})
@@ -183,7 +184,7 @@ export const getTreasuryActivity = async (
 		)
 
 		const response = await server.getEvents({
-			filters: [{ contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] }],
+			filters: [{ contractIds: [getTreasuryContractId()] }],
 			startLedger: parseInt(process.env.STARTING_LEDGER || "460000000", 10),
 			limit: 1000,
 		})
@@ -270,7 +271,7 @@ async function callTreasuryRead(
 				scValToNative,
 			} = await import("@stellar/stellar-sdk")
 
-			const contract = new Contract(SCHOLARSHIP_TREASURY_CONTRACT_ID)
+			const contract = new Contract(getTreasuryContractId())
 			const dummy = new Account(
 				"GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBF3UKJQ2K5RQDD",
 				"0",
@@ -335,7 +336,7 @@ export const getTreasuryAllocations = async (
 	req: Request,
 	res: Response,
 ): Promise<void> => {
-	if (!SCHOLARSHIP_TREASURY_CONTRACT_ID) {
+	if (!getTreasuryContractId()) {
 		res.status(503).json({
 			error: "Treasury contract not configured",
 		})
@@ -368,11 +369,13 @@ export const getTreasuryAllocations = async (
 				? value.toString()
 				: typeof value === "number"
 					? String(value)
-					: "0"
+					: typeof value === "string"
+						? value
+						: "0"
 
 		// Recent allocation lifecycle events for the trail.
 		const response = await server.getEvents({
-			filters: [{ contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] }],
+			filters: [{ contractIds: [getTreasuryContractId()] }],
 			startLedger: parseInt(process.env.STARTING_LEDGER || "460000000", 10),
 			limit: 1000,
 		})

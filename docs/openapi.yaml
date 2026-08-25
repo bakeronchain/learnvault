@@ -923,6 +923,74 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
 paths:
+  /api/search:
+    get:
+      summary: Platform-wide full-text search
+      description: |
+        Ranked search across courses, lessons, wiki pages, forum threads and
+        public scholar profiles using Postgres full-text search. Results are
+        weighted title > body and include a <mark>-delimited snippet.
+        Visibility rules apply: unpublished courses, unpublished wiki pages
+        and profiles without a display name are never returned.
+      tags:
+        - Search
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            maxLength: 200
+          description: Search query (Postgres websearch syntax)
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [course, lesson, wiki, forum, profile]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Opaque keyset cursor from a previous page's nextCursor
+      responses:
+        "200":
+          description: Ranked results with an optional next-page cursor
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          enum: [course, lesson, wiki, forum, profile]
+                        id:
+                          type: string
+                        title:
+                          type: string
+                        snippet:
+                          type: string
+                          description: Excerpt with <mark>…</mark> around matches
+                        url:
+                          type: string
+                  nextCursor:
+                    type: string
+                    nullable: true
+        "400":
+          description: Missing/oversized query or invalid type filter
+        "429":
+          description: Rate limited (30 requests per minute)
+
   /api/admin/rotate-key:
     post:
       summary: Rotate admin API key

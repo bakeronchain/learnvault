@@ -51,6 +51,7 @@ const SponsorCheckoutPage = lazy(() => import("./pages/SponsorCheckoutPage"))
 const Tracks = lazy(() => import("./pages/Tracks"))
 const Treasury = lazy(() => import("./pages/Treasury"))
 const Wiki = lazy(() => import("./pages/Wiki"))
+const SearchPage = lazy(() => import("./pages/SearchPage"))
 const WikiPage = lazy(() => import("./pages/WikiPage"))
 const BountyBoard = lazy(() => import("./pages/BountyBoard"))
 const BountyDetail = lazy(() => import("./pages/BountyDetail"))
@@ -118,6 +119,7 @@ function App() {
 						element={renderRoute(<TranslatorWorkspace />)}
 					/>
 					<Route path="/wiki" element={renderRoute(<Wiki />)} />
+					<Route path="/search" element={renderRoute(<SearchPage />)} />
 					<Route path="/wiki/:slug" element={renderRoute(<WikiPage />)} />
 					<Route path="/tracks" element={renderRoute(<Tracks />)} />
 					<Route path="/treasury" element={renderRoute(<Treasury />)} />

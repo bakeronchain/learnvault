@@ -181,31 +181,27 @@
 	"translatorEdit": "[[Edit]]",
 	"translatorPreview": "[[Preview]]",
 	"translatorContentPlaceholder": "[[Translated markdown content]]",
-	"dataRights": {
-		"title": "[[Your data]]",
-		"description": "[[Download the personal data LearnVault holds about you or schedule account deletion.]]",
-		"requestExport": "[[Request export]]",
-		"deleteAccount": "[[Delete account]]",
-		"download": "[[Download archive]]",
-		"pending": "[[Account deletion is scheduled for {{date}}.]]",
-		"cancelDeletion": "[[Cancel account deletion]]",
-		"exportStatus": {
-			"pending": "[[Export queued]]",
-			"processing": "[[Preparing export]]",
-			"ready": "[[Export ready]]",
-			"failed": "[[Export failed]]"
-		},
-		"dialog": {
-			"title": "[[Schedule permanent account deletion?]]",
-			"description": "[[Your off-chain personal data will be erased after 30 days. Forum content will remain anonymously for context. LRN transfers, minted ScholarNFTs, and treasury transactions are permanent public ledger records and cannot be removed.]]",
-			"confirm": "[[Schedule deletion]]",
-			"cancel": "[[Keep account]]"
-		},
-		"errors": {
-			"status": "[[Could not load account deletion status.]]",
-			"export": "[[Could not prepare your data export.]]",
-			"deletion": "[[Could not schedule account deletion.]]",
-			"cancel": "[[Could not cancel account deletion.]]"
-		}
+	"search": {
+		"placeholder": "[[Search LearnVault…]]",
+		"results_aria": "[[Search results]]",
+		"recent_title": "[[Recent searches]]",
+		"recent_clear": "[[Clear]]",
+		"recent_aria": "[[Recent searches]]",
+		"see_all": "[[See all results]]",
+		"no_results": "[[No results for \"{{query}}\"]]",
+		"no_results_hint": "[[Try different keywords or browse popular courses.]]",
+		"browse_courses": "[[Browse courses]]",
+		"page_title": "[[Search]]",
+		"page_results_for": "[[Results for \"{{query}}\"]]",
+		"page_empty_title": "[[Search LearnVault]]",
+		"type_filter_aria": "[[Filter by content type]]",
+		"filter_all": "[[All]]",
+		"type_course": "[[Courses]]",
+		"type_lesson": "[[Lessons]]",
+		"type_wiki": "[[Wiki]]",
+		"type_forum": "[[Forum]]",
+		"type_profile": "[[Scholars]]",
+		"load_more": "[[Load more results]]",
+		"error_description": "[[Something went wrong while searching. Please try again.]]"
 	}
 }

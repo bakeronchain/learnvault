@@ -7,6 +7,7 @@ import {
 import {
 	getTreasuryStats,
 	getTreasuryActivity,
+	getTreasuryAllocations,
 } from "../controllers/treasury.controller"
 import { apiResponseCache } from "../middleware/api-response-cache.middleware"
 
@@ -124,6 +125,87 @@ treasuryRouter.get(
  *         description: Treasury contract not configured
  */
 treasuryRouter.get("/treasury/activity", getTreasuryActivity)
+/**
+ * @openapi
+ * /api/treasury/allocations:
+ *   get:
+ *     tags: [Treasury]
+ *     summary: Get strategy allocation breakdown
+ *     description: >
+ *       Returns the idle / allocated / yield breakdown sourced from on-chain
+ *       treasury state, the venue currently holding allocated funds, and a
+ *       recent allocation lifecycle event trail (allocated, deallocated,
+ *       harvested, emergency_withdraw).
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *           minimum: 1
+ *           maximum: 100
+ *         description: Maximum number of lifecycle events to return
+ *     responses:
+ *       200:
+ *         description: Allocation breakdown and venue info
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 idle_usdc:
+ *                   type: string
+ *                   description: Un-deployed USDC held by the treasury (stroops)
+ *                   example: "750000000"
+ *                 allocated_usdc:
+ *                   type: string
+ *                   description: USDC principal deployed to the strategy venue (stroops)
+ *                   example: "250000000"
+ *                 accrued_yield:
+ *                   type: string
+ *                   description: Unrealized yield at the venue (stroops)
+ *                   example: "12500000"
+ *                 total_yield:
+ *                   type: string
+ *                   description: Cumulative yield harvested into idle since inception (stroops)
+ *                   example: "45000000"
+ *                 venue:
+ *                   type: object
+ *                   properties:
+ *                     address:
+ *                       type: string
+ *                       nullable: true
+ *                       description: Strategy adapter contract address, null when fully idle
+ *                       example: "CABC..."
+ *                     name:
+ *                       type: string
+ *                       description: Human-readable venue name
+ *                       example: "LearnVault Lending Market"
+ *                 events:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       type:
+ *                         type: string
+ *                         enum: [allocated, deallocated, harvested, emergency_withdraw]
+ *                       amount:
+ *                         type: string
+ *                       tx_hash:
+ *                         type: string
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *       500:
+ *         description: Internal server error
+ *       503:
+ *         description: Treasury contract not configured
+ */
+treasuryRouter.get(
+	"/treasury/allocations",
+	apiResponseCache("treasury_allocations"),
+	getTreasuryAllocations,
+)
 
 /**
  * @openapi

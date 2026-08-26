@@ -2,7 +2,7 @@ extern crate std;
 
 use soroban_sdk::{
     Address, Env, IntoVal, String, Val, Vec, contract, contractimpl,
-    testutils::{Address as _, Events as _, Ledger, MockAuth, MockAuthInvoke},
+    testutils::{Address as _, Ledger, MockAuth, MockAuthInvoke},
     token::{StellarAssetClient, TokenClient},
 };
 
@@ -30,6 +30,121 @@ impl MockGovernance {
     pub fn get_voting_power(env: Env, address: Address) -> i128 {
         // For mock, just return balance. We'll manually mint to simulate delegated power in tests if needed.
         Self::balance(env, address)
+    }
+}
+
+// ============================================================================
+// Adversarial mock strategy adapter
+//
+// Simulates a lending venue that can also fail: partial withdrawals, a
+// withdrawal failure mode, and a write-down (loss). The treasury test-suite
+// should exercise all of these so the safety story is never only tested
+// against a cooperative counterparty.
+// ============================================================================
+
+#[contract]
+pub struct MockStrategy;
+
+#[contractimpl]
+impl MockStrategy {
+    pub fn initialize(env: Env) {
+        let bal = soroban_sdk::Symbol::new(&env, "BAL");
+        env.storage().instance().set(&bal, &0_i128);
+        let max = soroban_sdk::Symbol::new(&env, "WMAX");
+        env.storage().instance().set(&max, &1_000_000_000_i128);
+        let fail = soroban_sdk::Symbol::new(&env, "WFAIL");
+        env.storage().instance().set(&fail, &false);
+    }
+
+    pub fn deposit(env: Env, amount: i128) {
+        let bal = soroban_sdk::Symbol::new(&env, "BAL");
+        let current = env.storage().instance().get::<_, i128>(&bal).unwrap_or(0);
+        let next = current + amount;
+        env.storage().instance().set(&bal, &next);
+    }
+
+    // The treasury deposits real atomic units by first transferring the underlying
+    // token to this contract and then calling `deposit`. For the mock to behave
+    // like a faithful venue it must hand those tokens back on `withdraw`, so the
+    // adapter-stored balance and the on-chain token balance stay in lock-step.
+    // `to` is the treasury, which `strategy_withdraw` passes as the recipient.
+    pub fn withdraw(env: Env, amount: i128, to: Address) -> i128 {
+        let bal = soroban_sdk::Symbol::new(&env, "BAL");
+        let fail = soroban_sdk::Symbol::new(&env, "WFAIL");
+        let is_failing: bool = env.storage().instance().get(&fail).unwrap_or(false);
+        if is_failing {
+            return 0;
+        }
+        let current = env.storage().instance().get::<_, i128>(&bal).unwrap_or(0);
+        let max = env.storage().instance().get::<_, i128>(&soroban_sdk::Symbol::new(&env, "WMAX")).unwrap_or(0);
+
+        let mut returned = amount;
+        if max < returned {
+            returned = max;
+        }
+        if current < returned {
+            returned = current;
+        }
+        if returned < 0 {
+            returned = 0;
+        }
+
+        if returned > 0 {
+            if let Some(token) = env.storage().instance().get::<_, Address>(&soroban_sdk::Symbol::new(&env, "TKN")) {
+                soroban_sdk::token::TokenClient::new(&env, &token)
+                    .transfer(&env.current_contract_address(), &to, &returned);
+            }
+        }
+
+        env.storage().instance().set(&bal, &(current - returned));
+        returned
+    }
+
+    /// Record the underlying token contract so `withdraw` can return real funds.
+    pub fn set_token(env: Env, token: Address) {
+        env.storage().instance().set(&soroban_sdk::Symbol::new(&env, "TKN"), &token);
+    }
+
+    pub fn balance_of(env: Env) -> i128 {
+        let bal = soroban_sdk::Symbol::new(&env, "BAL");
+        env.storage().instance().get::<_, i128>(&bal).unwrap_or(0)
+    }
+
+    pub fn max_withdrawable(env: Env) -> i128 {
+        let current = env.storage().instance().get::<_, i128>(&soroban_sdk::Symbol::new(&env, "BAL")).unwrap_or(0);
+        let limit = env.storage().instance().get::<_, i128>(&soroban_sdk::Symbol::new(&env, "WMAX")).unwrap_or(0);
+        if current < limit {
+            current
+        } else {
+            limit
+        }
+    }
+
+    // ---- test knobs --------------------------------------------------------
+
+    /// Simulate accruing `amount` of yield at the strategy.
+    pub fn accrue_yield(env: Env, amount: i128) {
+        let bal = soroban_sdk::Symbol::new(&env, "BAL");
+        let current = env.storage().instance().get::<_, i128>(&bal).unwrap_or(0);
+        env.storage().instance().set(&bal, &(current + amount));
+    }
+
+    /// Simulate a loss / write-off of `amount` at the strategy.
+    pub fn write_off(env: Env, amount: i128) {
+        let bal = soroban_sdk::Symbol::new(&env, "BAL");
+        let current = env.storage().instance().get::<_, i128>(&bal).unwrap_or(0);
+        let next = if current < amount { 0 } else { current - amount };
+        env.storage().instance().set(&bal, &next);
+    }
+
+    /// Restrict the maximum withdrawable amount (partial withdrawal).
+    pub fn set_withdraw_limit(env: Env, limit: i128) {
+        env.storage().instance().set(&soroban_sdk::Symbol::new(&env, "WMAX"), &limit);
+    }
+
+    /// Force withdrawals to return 0 (withdrawal failure mode).
+    pub fn set_fail_withdraw(env: Env, fail: bool) {
+        env.storage().instance().set(&soroban_sdk::Symbol::new(&env, "WFAIL"), &fail);
     }
 }
 
@@ -1712,6 +1827,104 @@ fn setup_with_admin<'a>(
     )
 }
 
+/// Like `setup_with_admin` but returns a treasury with a registered strategy:
+/// (client, strategy_addr, strategy_client, donor, admin, token_id, gov_client).
+fn setup_with_strategy<'a>(
+    env: &'a Env,
+) -> (
+    ScholarshipTreasuryClient<'a>,
+    Address,
+    MockStrategyClient<'a>,
+    Address,
+    Address,
+    Address,
+    MockGovernanceClient<'a>,
+) {
+    let admin = Address::generate(env);
+    let donor = Address::generate(env);
+
+    let contract_id = env.register(ScholarshipTreasury, ());
+    let client = ScholarshipTreasuryClient::new(env, &contract_id);
+
+    let gov_contract_id = env.register(MockGovernance, ());
+    let gov_client = MockGovernanceClient::new(env, &gov_contract_id);
+
+    let strategy_id = env.register(MockStrategy, ());
+    let strategy_client = MockStrategyClient::new(env, &strategy_id);
+
+    env.mock_all_auths();
+    env.as_contract(&contract_id, || token::register(env, &admin));
+    let token_id = env.as_contract(&contract_id, || token::contract_id(env));
+    let sac = StellarAssetClient::new(env, &token_id);
+    sac.mint(&donor, &1_000_000_000);
+
+    gov_client.initialize(&contract_id);
+    strategy_client.initialize();
+    strategy_client.set_token(&token_id);
+    client.initialize(
+        &admin,
+        &token_id,
+        &gov_contract_id,
+        &DEFAULT_QUORUM,
+        &DEFAULT_APPROVAL_BPS,
+    );
+    client.set_strategy(&strategy_id);
+    env.set_auths(&[]);
+
+    (
+        client,
+        strategy_id,
+        strategy_client,
+        donor,
+        admin,
+        token_id,
+        gov_client,
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Treasury yield strategy tests
+// ---------------------------------------------------------------------------
+
+/// Drive an allocation/deallocation proposal through vote -> finalize ->
+/// timelock -> execute and return. `kind` selects which submit method.
+#[allow(clippy::too_many_arguments)]
+fn run_strategy_proposal(
+    env: &Env,
+    client: &ScholarshipTreasuryClient<'_>,
+    gov: &MockGovernanceClient<'_>,
+    donor: &Address,
+    admin: &Address,
+    strategy: &Address,
+    amount: i128,
+    kind: crate::ProposalKind,
+) -> u32 {
+    env.mock_all_auths();
+    let proposal_id = match kind {
+        crate::ProposalKind::Allocation => {
+            client.submit_allocation_proposal(donor, strategy, &amount)
+        }
+        crate::ProposalKind::Deallocation => {
+            client.submit_deallocation_proposal(donor, strategy, &amount)
+        }
+        _ => panic!("unsupported kind"),
+    };
+
+    gov.mint(&donor, &100_000);
+    client.vote(&donor, &proposal_id, &true);
+
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger().set_sequence_number(proposal.deadline_ledger + 1);
+    client.finalize_proposal(admin, &proposal_id);
+
+    let timelock = client.get_timelock_delay();
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1 + timelock);
+
+    client.execute_proposal(&proposal_id);
+    proposal_id
+}
+
 #[test]
 fn finalize_proposal_before_deadline_panics() {
     let env = Env::default();
@@ -2321,4 +2534,388 @@ fn benchmark_costs() {
     std::println!("deposit: instr={}, mem={}", dep_instr, dep_mem);
     std::println!("submit_proposal: instr={}, mem={}", sub_instr, sub_mem);
     std::println!("vote: instr={}, mem={}", vote_instr, vote_mem);
+}
+// ============================================================================
+// TREASURY YIELD STRATEGY TESTS
+// ============================================================================
+
+/// Queue an allocation/deallocation proposal (submit -> vote -> finalize ->
+/// advance past timelock) but do NOT execute. Returns the proposal_id so the
+/// caller can drive execution (or assert it fails) themselves.
+fn queue_strategy_proposal(
+    env: &Env,
+    client: &ScholarshipTreasuryClient<'_>,
+    gov: &MockGovernanceClient<'_>,
+    donor: &Address,
+    admin: &Address,
+    strategy: &Address,
+    amount: i128,
+    kind: crate::ProposalKind,
+) -> u32 {
+    env.mock_all_auths();
+    let proposal_id = match kind {
+        crate::ProposalKind::Allocation => {
+            client.submit_allocation_proposal(donor, strategy, &amount)
+        }
+        crate::ProposalKind::Deallocation => {
+            client.submit_deallocation_proposal(donor, strategy, &amount)
+        }
+        _ => panic!("unsupported kind"),
+    };
+    gov.mint(&donor, &100_000);
+    client.vote(&donor, &proposal_id, &true);
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger().set_sequence_number(proposal.deadline_ledger + 1);
+    client.finalize_proposal(admin, &proposal_id);
+    let timelock = client.get_timelock_delay();
+    env.ledger()
+        .set_sequence_number(proposal.deadline_ledger + 1 + timelock);
+    proposal_id
+}
+
+#[test]
+fn allocation_via_executed_proposal_moves_funds() {
+    let env = Env::default();
+    let (client, strategy, strategy_client, donor, admin, token_id, gov_client) =
+        setup_with_strategy(&env);
+
+    env.mock_all_auths();
+    client.deposit(&donor, &2_000, &token_id);
+
+    run_strategy_proposal(
+        &env,
+        &client,
+        &gov_client,
+        &donor,
+        &admin,
+        &strategy,
+        500,
+        crate::ProposalKind::Allocation,
+    );
+
+    assert_eq!(strategy_client.balance_of(), 500);
+    assert_eq!(client.get_idle(), 1_500);
+    assert_eq!(client.get_allocated(), 500);
+    // Total value is preserved across the move.
+    assert_eq!(client.get_total_value(), 2_000);
+}
+
+#[test]
+fn allocation_beyond_max_allocation_bps_is_rejected() {
+    let env = Env::default();
+    let (client, strategy, _strategy_client, donor, admin, token_id, gov_client) =
+        setup_with_strategy(&env);
+
+    env.mock_all_auths();
+    client.deposit(&donor, &2_000, &token_id);
+    // 10% ceiling -> at most 200 of 2000 can be allocated.
+    client.set_max_allocation_bps(&1_000);
+
+    let proposal_id = queue_strategy_proposal(
+        &env,
+        &client,
+        &gov_client,
+        &donor,
+        &admin,
+        &strategy,
+        500,
+        crate::ProposalKind::Allocation,
+    );
+    let result = client.try_execute_proposal(&proposal_id);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::AllocationCapExceeded as u32
+        )))
+    );
+}
+
+#[test]
+fn allocation_breaching_liquidity_buffer_is_rejected() {
+    let env = Env::default();
+    let (client, strategy, _strategy_client, donor, admin, token_id, gov_client) =
+        setup_with_strategy(&env);
+
+    env.mock_all_auths();
+    client.deposit(&donor, &2_000, &token_id);
+    // Approved-but-unpaid disbursement proposal of 1500: submit, vote and
+    // finalize (which commits the obligation) but do NOT execute it, so the
+    // 1500 remains an outstanding liquidity-buffer obligation while the full
+    // 2000 still sits idle.
+    let applicant = Address::generate(&env);
+    let disp_proposal_id = submit_sample_proposal(&env, &client, &applicant, 1_500);
+    gov_client.mint(&donor, &100_000);
+    client.vote(&donor, &disp_proposal_id, &true);
+    let disp = client.get_proposal(&disp_proposal_id).unwrap();
+    env.ledger()
+        .set_sequence_number(disp.deadline_ledger + 1);
+    client.finalize_proposal(&admin, &disp_proposal_id);
+
+    // Any allocation that would leave idle below the buffer floor must be
+    // rejected. With 1500 committed and a 20% buffer the floor is 1800; idle
+    // is 2000, so allocating more than 200 breaches it.
+    let proposal_id = queue_strategy_proposal(
+        &env,
+        &client,
+        &gov_client,
+        &donor,
+        &admin,
+        &strategy,
+        300,
+        crate::ProposalKind::Allocation,
+    );
+    let result = client.try_execute_proposal(&proposal_id);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::LiquidityBufferBreached as u32
+        )))
+    );
+}
+
+#[test]
+fn allocation_before_timelock_is_rejected() {
+    let env = Env::default();
+    let (client, strategy, _strategy_client, donor, admin, token_id, gov_client) =
+        setup_with_strategy(&env);
+
+    env.mock_all_auths();
+    client.deposit(&donor, &2_000, &token_id);
+
+    // Submit + vote + finalize but do NOT advance the ledger past the timelock.
+    env.mock_all_auths();
+    let proposal_id = client.submit_allocation_proposal(&donor, &strategy, &100);
+    gov_client.mint(&donor, &100_000);
+    client.vote(&donor, &proposal_id, &true);
+    let proposal = client.get_proposal(&proposal_id).unwrap();
+    env.ledger().set_sequence_number(proposal.deadline_ledger + 1);
+    client.finalize_proposal(&admin, &proposal_id);
+
+    // Timelock has not elapsed -> execution is rejected.
+    let result = client.try_execute_proposal(&proposal_id);
+    assert_eq!(
+        result.err(),
+        Some(Ok(soroban_sdk::Error::from_contract_error(
+            Error::TimelockNotExpired as u32
+        )))
+    );
+}
+
+#[test]
+fn deallocate_returns_funds_and_favours_treasury_on_round_trip() {
+    let env = Env::default();
+    let (client, strategy, strategy_client, donor, admin, token_id, gov_client) =
+        setup_with_strategy(&env);
+
+    env.mock_all_auths();
+    client.deposit(&donor, &2_000, &token_id);
+    run_strategy_proposal(
+        &env,
+        &client,
+        &gov_client,
+        &donor,
+        &admin,
+        &strategy,
+        500,
+        crate::ProposalKind::Allocation,
+    );
+    assert_eq!(client.get_idle(), 1_500);
+    assert_eq!(strategy_client.balance_of(), 500);
+
+    // Round-trip an odd amount to verify no value is bled by rounding.
+    run_strategy_proposal(
+        &env,
+        &client,
+        &gov_client,
+        &donor,
+        &admin,
+        &strategy,
+        333,
+        crate::ProposalKind::Deallocation,
+    );
+
+    // Deallocation credits the returned funds back; total value unchanged.
+    assert_eq!(strategy_client.balance_of(), 500 - 333);
+    assert_eq!(client.get_total_value(), 2_000);
+}
+
+#[test]
+fn emergency_withdraw_works_while_paused_and_partially() {
+    let env = Env::default();
+    let (client, strategy, strategy_client, donor, admin, token_id, gov_client) =
+        setup_with_strategy(&env);
+
+    env.mock_all_auths();
+    client.deposit(&donor, &2_000, &token_id);
+    run_strategy_proposal(
+        &env,
+        &client,
+        &gov_client,
+        &donor,
+        &admin,
+        &strategy,
+        500,
+        crate::ProposalKind::Allocation,
+    );
+
+    // Strategy can only return a fraction (partial withdrawal).
+    strategy_client.set_withdraw_limit(&300);
+    // Treasury is paused; emergency withdraw must still work.
+    client.pause();
+    let result = client.try_emergency_withdraw(&strategy);
+    assert!(result.is_ok());
+
+    // Only the recoverable 300 returned; 200 remains frozen at the venue.
+    assert_eq!(client.get_idle(), 1_500 + 300);
+    assert_eq!(strategy_client.balance_of(), 200);
+    assert_eq!(client.get_allocated(), 200);
+}
+
+#[test]
+fn emergency_withdraw_reconciles_loss_without_panic() {
+    let env = Env::default();
+    let (client, strategy, strategy_client, donor, admin, token_id, gov_client) =
+        setup_with_strategy(&env);
+
+    env.mock_all_auths();
+    client.deposit(&donor, &2_000, &token_id);
+    run_strategy_proposal(
+        &env,
+        &client,
+        &gov_client,
+        &donor,
+        &admin,
+        &strategy,
+        500,
+        crate::ProposalKind::Allocation,
+    );
+
+    // The venue loses everything.
+    strategy_client.write_off(&2_000);
+    assert_eq!(strategy_client.balance_of(), 0);
+
+    let result = client.try_emergency_withdraw(&strategy);
+    // Must NOT panic; it reconciles the position to zero and reports the loss.
+    assert!(result.is_ok());
+
+    // Principal is written down to the (empty) strategy value, no panic.
+    assert_eq!(client.get_allocated(), 0);
+    // Total value reflects the loss: only the idle 1500 remains of the 2000.
+    assert_eq!(client.get_total_value(), 1_500);
+    assert_eq!(client.get_idle(), 1_500);
+}
+
+#[test]
+fn harvest_moves_accrued_yield_to_idle_and_tracks_total_yield() {
+    let env = Env::default();
+    let (client, strategy, strategy_client, donor, admin, token_id, gov_client) =
+        setup_with_strategy(&env);
+
+    env.mock_all_auths();
+    client.deposit(&donor, &2_000, &token_id);
+    run_strategy_proposal(
+        &env,
+        &client,
+        &gov_client,
+        &donor,
+        &admin,
+        &strategy,
+        500,
+        crate::ProposalKind::Allocation,
+    );
+    assert_eq!(client.get_allocated(), 500);
+    assert_eq!(client.get_idle(), 1_500);
+
+        // Strategy reports yield it has earned.
+    strategy_client.accrue_yield(&100);
+    assert_eq!(strategy_client.balance_of(), 600);
+
+    // Harvest pulls the yield back into the idle balance.
+    client.harvest();
+
+    // Principal unchanged; yield credited to idle and tracked cumulatively.
+    assert_eq!(client.get_total_yield(), 100);
+    assert_eq!(client.get_accrued_yield(), 0);
+    assert_eq!(client.get_allocated(), 500);
+    assert_eq!(client.get_idle(), 1_600);
+    assert_eq!(strategy_client.balance_of(), 500);
+    // Total value grew by the harvested yield.
+    assert_eq!(client.get_total_value(), 2_100);
+}
+
+#[test]
+fn harvest_when_strategy_impaired_is_a_noop() {
+    let env = Env::default();
+    let (client, strategy, strategy_client, donor, admin, token_id, gov_client) =
+        setup_with_strategy(&env);
+
+    env.mock_all_auths();
+    client.deposit(&donor, &2_000, &token_id);
+    run_strategy_proposal(
+        &env,
+        &client,
+        &gov_client,
+        &donor,
+        &admin,
+        &strategy,
+        500,
+        crate::ProposalKind::Allocation,
+    );
+
+    // The venue is under water: value < principal. There is nothing to harvest.
+    strategy_client.write_off(&200);
+    assert_eq!(strategy_client.balance_of(), 300);
+    client.harvest();
+
+    assert_eq!(client.get_total_yield(), 0);
+    assert_eq!(client.get_idle(), 1_500);
+    // No tokens were moved by the no-op harvest.
+    assert_eq!(strategy_client.balance_of(), 300);
+}
+
+#[test]
+fn allocate_deallocate_cycles_never_bleed_value() {
+    let env = Env::default();
+    let (client, strategy, strategy_client, donor, admin, token_id, gov_client) =
+        setup_with_strategy(&env);
+
+    env.mock_all_auths();
+    client.deposit(&donor, &1_000_000, &token_id);
+    // Raise the cap so repeated cycles are never rejected by the ceiling.
+    client.set_max_allocation_bps(&10_000);
+    let initial_total = client.get_total_value();
+
+    // Each iteration is a full round-trip: allocate an awkward odd amount, then
+    // reclaim it in-full. A faithful adapter (the mock now returns real tokens)
+    // must leave idle and total value unchanged, so there is no place for
+    // rounding or off-by-one arithmetic to bleed value across cycles.
+    for _ in 0..20 {
+        run_strategy_proposal(
+            &env,
+            &client,
+            &gov_client,
+            &donor,
+            &admin,
+            &strategy,
+            333_333,
+            crate::ProposalKind::Allocation,
+        );
+        assert_eq!(client.get_idle(), 1_000_000 - 333_333);
+        run_strategy_proposal(
+            &env,
+            &client,
+            &gov_client,
+            &donor,
+            &admin,
+            &strategy,
+            333_333,
+            crate::ProposalKind::Deallocation,
+        );
+    }
+
+    // The treasury must not have bled any value across the cycles: it took back
+    // exactly what it sent (the mock returns everything recoverable).
+    assert_eq!(client.get_total_value(), initial_total);
+    assert_eq!(strategy_client.balance_of(), client.get_allocated());
+    assert_eq!(client.get_idle(), client.get_total_value() - client.get_allocated());
 }

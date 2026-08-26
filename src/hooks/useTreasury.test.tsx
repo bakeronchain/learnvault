@@ -42,11 +42,36 @@ beforeEach(() => {
 			} as Response
 		}
 
+		if (url.includes("/treasury/allocations")) {
+			return {
+				ok: true,
+				json: async () => ({
+					idle_usdc: "7500000",
+					allocated_usdc: "2500000",
+					accrued_yield: "1250000",
+					total_yield: "5000000",
+					venue: {
+						address: "CAFKXZCE4LYBELT24RAT2VCS4SJ2JO7Y26H54QHMBO3P5VG2OQ5VLYU3",
+						name: "LearnVault Lending Market",
+					},
+					events: [
+						{
+							type: "allocated",
+							strategy: "CAFKXZCE4LYBELT24RAT2VCS4SJC4SJ2JO7Y26H54QHMBO3P5VG2OQ5VLYU3",
+							amount: "2500000",
+							tx_hash: "tx1",
+							created_at: "2026-05-01T00:00:00Z",
+						},
+					],
+				}),
+			} as Response
+		}
+
 		if (url.includes("/treasury/activity")) {
 			return {
 				ok: true,
 				json: async () => ({
-					events: [
+					data: [
 						{
 							type: "deposit",
 							amount: "10000000",
@@ -54,6 +79,7 @@ beforeEach(() => {
 							created_at: "2026-05-01T00:00:00Z",
 						},
 					],
+					pagination: { page: 1, limit: 10, total: 1 },
 				}),
 			} as Response
 		}
@@ -74,6 +100,22 @@ describe("useTreasury", () => {
 		expect(result.current.stats?.total_deposited_usdc).toBe("10000000")
 		expect(result.current.activity.length).toBeGreaterThan(0)
 		expect(result.current.isError).toBe(false)
+	})
+
+	it("returns the idle/allocated/yield breakdown and venue", async () => {
+		const { result } = renderHook(() => useTreasury(), {
+			wrapper: createWrapper(),
+		})
+
+		await waitFor(() => expect(result.current.isAllocationsLoading).toBe(false))
+
+		expect(result.current.allocations).toBeDefined()
+		expect(result.current.allocations?.idle_usdc).toBe("7500000")
+		expect(result.current.allocations?.allocated_usdc).toBe("2500000")
+		expect(result.current.allocations?.accrued_yield).toBe("1250000")
+		expect(result.current.allocations?.total_yield).toBe("5000000")
+		expect(result.current.allocations?.venue.name).toBe("LearnVault Lending Market")
+		expect(result.current.allocations?.events[0].type).toBe("allocated")
 	})
 
 	it("polls for updates at configured interval", async () => {

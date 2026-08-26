@@ -924,6 +924,13 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
 paths:
   /api/search:
     get:
@@ -992,6 +999,72 @@ paths:
           description: Missing/oversized query or invalid type filter
         "429":
           description: Rate limited (30 requests per minute)
+
+  /api/v1/public/courses:
+    get:
+      summary: Public course catalog (Open Data API)
+      tags: [Open Data]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: offset, in: query, schema: { type: integer, default: 0 } }
+      responses:
+        "200":
+          description: Paginated published course catalog
+        "401": { description: Missing/malformed/revoked API key }
+        "429": { description: Daily tier quota exceeded }
+
+  /api/v1/public/stats:
+    get:
+      summary: Aggregate platform stats (k-anonymity suppressed)
+      tags: [Open Data]
+      security:
+        - ApiKeyAuth: []
+      responses:
+        "200":
+          description: Learners, completions, LRN distributed, scholarships funded. Buckets with <5 subjects are null.
+        "401": { description: Unauthorized }
+        "429": { description: Quota exceeded }
+
+  /api/v1/public/leaderboard:
+    get:
+      summary: Top learners by public handle
+      tags: [Open Data]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, default: 25, maximum: 100 } }
+      responses:
+        "200":
+          description: Ranked handles; raw wallet addresses never exposed. Suppressed when fewer than 5 learners.
+        "401": { description: Unauthorized }
+
+  /api/v1/public/treasury:
+    get:
+      summary: Aggregate treasury inflows/outflows by day
+      tags: [Open Data]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - { name: days, in: query, schema: { type: integer, default: 30, maximum: 365 } }
+      responses:
+        "200":
+          description: Daily aggregates; days touching <5 subjects are dropped.
+        "401": { description: Unauthorized }
+
+  /api/v1/public/credentials/{id}/verify:
+    get:
+      summary: Credential validity check (no holder identity returned)
+      tags: [Open Data]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Validity flag plus the credential's course slug and issue date
+        "404": { description: Unknown credential }
 
   /api/admin/rotate-key:
     post:

@@ -22,12 +22,14 @@ import Redis from "ioredis"
 export type ApiCacheType =
 	| "leaderboard"
 	| "treasury_stats"
+	| "treasury_allocations"
 	| "courses"
 	| "recommendations"
 
 export const API_RESPONSE_CACHE_TTLS: Record<ApiCacheType, number> = {
 	leaderboard: 300,
 	treasury_stats: 60,
+	treasury_allocations: 60,
 	courses: 600,
 	recommendations: 60,
 }

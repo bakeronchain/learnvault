@@ -10,13 +10,27 @@ import { treasuryRouter } from "../routes/treasury.routes"
 
 // Mock @stellar/stellar-sdk
 const mockGetEvents = jest.fn()
+const mockSimulateTransaction = jest.fn()
 jest.mock("@stellar/stellar-sdk", () => ({
 	rpc: {
 		Server: jest.fn().mockImplementation(() => ({
 			getEvents: mockGetEvents,
+			simulateTransaction: mockSimulateTransaction,
 		})),
+		Api: {
+			isSimulationError: jest.fn().mockReturnValue(false),
+		},
 	},
-	scValToNative: (val: unknown) => val,
+	scValToNative: (val: any) => val, // Simple mock
+	Contract: jest.fn().mockImplementation(() => ({ call: jest.fn() })),
+	TransactionBuilder: jest.fn().mockImplementation(() => ({
+		addOperation: jest.fn().mockReturnThis(),
+		setTimeout: jest.fn().mockReturnThis(),
+		build: jest.fn().mockReturnValue({}),
+	})),
+	Account: jest.fn(),
+	Networks: { TESTNET: "testnet", PUBLIC: "public" },
+	nativeToScVal: (val: any) => val,
 	StrKey: {
 		isValidEd25519PublicKey: (val: string) =>
 			val.startsWith("G") && val.length === 56,
@@ -28,14 +42,17 @@ jest.mock("@stellar/stellar-sdk", () => ({
 // Mock horizon-verify service
 const mockVerifyDepositTx = jest.fn()
 jest.mock("../services/horizon-verify.service", () => ({
-	verifyDepositTx: mockVerifyDepositTx,
+	verifyDepositTx: (...args: any[]) => mockVerifyDepositTx(...args),
 }))
 
 // Mock stellar-contract service
 const mockGetGovernanceTokenBalance = jest.fn()
 jest.mock("../services/stellar-contract.service", () => ({
 	stellarContractService: {
-		getGovernanceTokenBalance: mockGetGovernanceTokenBalance,
+		getGovernanceTokenBalance: (...args: any[]) => mockGetGovernanceTokenBalance(...args),
+	},
+	stellarRpcCircuitBreaker: {
+		call: (fn: () => unknown) => fn(),
 	},
 }))
 
@@ -43,7 +60,7 @@ jest.mock("../services/stellar-contract.service", () => ({
 const mockPoolQuery = jest.fn()
 jest.mock("../db/index", () => ({
 	pool: {
-		query: mockPoolQuery,
+		query: (...args: any[]) => mockPoolQuery(...args),
 	},
 }))
 
@@ -124,6 +141,55 @@ describe("Treasury Routes", () => {
 		})
 	})
 
+	describe("GET /api/treasury/allocations", () => {
+		it("returns idle/allocated/yield breakdown, venue and event trail", async () => {
+			// On-chain read returns a value for every simulated getter.
+			mockSimulateTransaction.mockResolvedValue({
+				result: { retval: "7500000" },
+			})
+
+			mockGetEvents.mockResolvedValue({
+				events: [
+					{
+						value: { strategy: "CSTRAT", amount: "2500000" },
+						topic: ["allocated"],
+						txHash: "hash1",
+						ledgerClosedAt: "2026-01-01T00:00:00Z",
+					},
+					{
+						value: { strategy: "CSTRAT", amount: "1000000", yield_amount: "500000" },
+						topic: ["harvested"],
+						txHash: "hash2",
+						ledgerClosedAt: "2026-01-02T00:00:00Z",
+					},
+				],
+			})
+
+			const res = await request(buildApp()).get("/api/treasury/allocations")
+
+			expect(res.status).toBe(200)
+			expect(res.body).toEqual({
+				idle_usdc: "7500000",
+				allocated_usdc: "7500000",
+				accrued_yield: "7500000",
+				total_yield: "7500000",
+				venue: { address: "7500000", name: "LearnVault Lending Market" },
+				events: [
+					expect.objectContaining({ type: "harvested" }),
+					expect.objectContaining({ type: "allocated" }),
+				],
+				pagination: { limit: 20, total: 2 },
+			})
+		})
+
+		it("returns 503 when the treasury contract is not configured", async () => {
+			const original = process.env.SCHOLARSHIP_TREASURY_CONTRACT_ID
+			delete process.env.SCHOLARSHIP_TREASURY_CONTRACT_ID
+			const res = await request(buildApp()).get("/api/treasury/allocations")
+			expect(res.status).toBe(503)
+			process.env.SCHOLARSHIP_TREASURY_CONTRACT_ID = original as string
+		})
+	})
 	describe("POST /api/treasury/deposit", () => {
 		it("rejects invalid donor_address", async () => {
 			const res = await request(buildApp())
@@ -140,7 +206,7 @@ describe("Treasury Routes", () => {
 
 		it("rejects invalid tx_hash (not 64 hex chars)", async () => {
 			const res = await request(buildApp()).post("/api/treasury/deposit").send({
-				donor_address: "GABC123456789012345678901234567890123456789012345678",
+				donor_address: "GABC1234567890123456789012345678901234567890123456780000",
 				amount: 100,
 				tx_hash: "tooshort",
 			})
@@ -153,7 +219,7 @@ describe("Treasury Routes", () => {
 			const res = await request(buildApp())
 				.post("/api/treasury/deposit")
 				.send({
-					donor_address: "GABC123456789012345678901234567890123456789012345678",
+					donor_address: "GABC1234567890123456789012345678901234567890123456780000",
 					amount: -50,
 					tx_hash: "a".repeat(64),
 				})
@@ -172,7 +238,7 @@ describe("Treasury Routes", () => {
 			const res = await request(buildApp())
 				.post("/api/treasury/deposit")
 				.send({
-					donor_address: "GABC123456789012345678901234567890123456789012345678",
+					donor_address: "GABC1234567890123456789012345678901234567890123456780000",
 					amount: 100,
 					tx_hash: "a".repeat(64),
 				})
@@ -188,7 +254,7 @@ describe("Treasury Routes", () => {
 			const res = await request(buildApp())
 				.post("/api/treasury/deposit")
 				.send({
-					donor_address: "GABC123456789012345678901234567890123456789012345678",
+					donor_address: "GABC1234567890123456789012345678901234567890123456780000",
 					amount: 100.5,
 					tx_hash: "b".repeat(64),
 				})
@@ -206,7 +272,7 @@ describe("Treasury Routes", () => {
 						{
 							id: 1,
 							donor_address:
-								"GABC123456789012345678901234567890123456789012345678",
+								"GABC1234567890123456789012345678901234567890123456780000",
 							amount_usdc: "100.5000000",
 							gov_issued: "10050.0000000",
 							tx_hash: "c".repeat(64),
@@ -220,7 +286,7 @@ describe("Treasury Routes", () => {
 			const res = await request(buildApp())
 				.post("/api/treasury/deposit")
 				.send({
-					donor_address: "GABC123456789012345678901234567890123456789012345678",
+					donor_address: "GABC1234567890123456789012345678901234567890123456780000",
 					amount: 100.5,
 					tx_hash: "c".repeat(64),
 				})
@@ -232,7 +298,7 @@ describe("Treasury Routes", () => {
 			expect(mockVerifyDepositTx).toHaveBeenCalledWith(
 				"c".repeat(64),
 				100.5,
-				"GABC123456789012345678901234567890123456789012345678",
+				"GABC1234567890123456789012345678901234567890123456780000",
 			)
 		})
 
@@ -240,7 +306,7 @@ describe("Treasury Routes", () => {
 			const res = await request(buildApp())
 				.post("/api/treasury/deposit")
 				.send({
-					donor_address: "GABC123456789012345678901234567890123456789012345678",
+					donor_address: "GABC1234567890123456789012345678901234567890123456780000",
 					amount: 100.12345678,
 					tx_hash: "d".repeat(64),
 				})
@@ -253,12 +319,14 @@ describe("Treasury Routes", () => {
 			mockVerifyDepositTx.mockResolvedValue(true)
 			mockPoolQuery
 				.mockResolvedValueOnce({ rows: [], rowCount: 0 })
-				.mockRejectedValueOnce({ code: "23505", message: "duplicate key" })
+				.mockRejectedValueOnce(
+			Object.assign(new Error("duplicate key"), { code: "23505" }),
+		)
 
 			const res = await request(buildApp())
 				.post("/api/treasury/deposit")
 				.send({
-					donor_address: "GABC123456789012345678901234567890123456789012345678",
+					donor_address: "GABC1234567890123456789012345678901234567890123456780000",
 					amount: 100,
 					tx_hash: "e".repeat(64),
 				})
@@ -276,7 +344,7 @@ describe("Treasury Routes", () => {
 						{
 							id: 2,
 							donor_address:
-								"GABC123456789012345678901234567890123456789012345678",
+								"GABC1234567890123456789012345678901234567890123456780000",
 							amount_usdc: "0.0000001",
 							gov_issued: "0.0000100",
 							tx_hash: "f".repeat(64),
@@ -290,7 +358,7 @@ describe("Treasury Routes", () => {
 			const res = await request(buildApp())
 				.post("/api/treasury/deposit")
 				.send({
-					donor_address: "GABC123456789012345678901234567890123456789012345678",
+					donor_address: "GABC1234567890123456789012345678901234567890123456780000",
 					amount: 0.0000001,
 					tx_hash: "f".repeat(64),
 				})
@@ -303,32 +371,34 @@ describe("Treasury Routes", () => {
 
 	describe("GET /api/treasury/deposits/:address", () => {
 		it("returns paginated deposits for an address", async () => {
-			mockPoolQuery.mockResolvedValue({
-				rows: [
-					{
-						id: 1,
-						donor_address:
-							"GABC123456789012345678901234567890123456789012345678",
-						amount_usdc: "100.0000000",
-						gov_issued: "10000.0000000",
-						tx_hash: "a".repeat(64),
-						created_at: new Date("2026-08-20T10:00:00Z"),
-					},
-					{
-						id: 2,
-						donor_address:
-							"GABC123456789012345678901234567890123456789012345678",
-						amount_usdc: "50.5000000",
-						gov_issued: "5050.0000000",
-						tx_hash: "b".repeat(64),
-						created_at: new Date("2026-08-19T10:00:00Z"),
-					},
-				],
-				rowCount: 2,
-			})
+			mockPoolQuery
+				.mockResolvedValueOnce({
+					rows: [
+						{
+							id: 1,
+							donor_address:
+								"GABC1234567890123456789012345678901234567890123456780000",
+							amount_usdc: "100.0000000",
+							gov_issued: "10000.0000000",
+							tx_hash: "a".repeat(64),
+							created_at: new Date("2026-08-20T10:00:00Z"),
+						},
+						{
+							id: 2,
+							donor_address:
+								"GABC1234567890123456789012345678901234567890123456780000",
+							amount_usdc: "50.5000000",
+							gov_issued: "5050.0000000",
+							tx_hash: "b".repeat(64),
+							created_at: new Date("2026-08-19T10:00:00Z"),
+						},
+					],
+					rowCount: 2,
+				})
+				.mockResolvedValueOnce({ rows: [{ total: 2 }] })
 
 			const res = await request(buildApp()).get(
-				"/api/treasury/deposits/GABC123456789012345678901234567890123456789012345678?limit=10&page=1",
+				"/api/treasury/deposits/GABC1234567890123456789012345678901234567890123456780000?limit=10&page=1",
 			)
 
 			expect(res.status).toBe(200)
@@ -341,7 +411,7 @@ describe("Treasury Routes", () => {
 			mockPoolQuery.mockResolvedValue({ rows: [], rowCount: 0 })
 
 			const res = await request(buildApp()).get(
-				"/api/treasury/deposits/GDEF123456789012345678901234567890123456789012345678",
+				"/api/treasury/deposits/GDEF1234567890123456789012345678901234567890123456780000",
 			)
 
 			expect(res.status).toBe(200)

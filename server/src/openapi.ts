@@ -53,6 +53,10 @@ export const buildOpenApiSpec = () => {
 					description:
 						"Course/lesson content translation, translator workspace, and glossary endpoints",
 				},
+				{
+					name: "Data Rights",
+					description: "Learner export and account deletion endpoints",
+				},
 			],
 			components: {
 				securitySchemes: {

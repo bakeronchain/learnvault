@@ -1,12 +1,14 @@
 import { rpc } from "@stellar/stellar-sdk"
 import { type Request, type Response } from "express"
 import { logger } from "../lib/logger"
+import { stellarRpcCircuitBreaker } from "../services/stellar-contract.service"
 
 const log = logger.child({ module: "treasury" })
 
 const STELLAR_NETWORK = process.env.STELLAR_NETWORK ?? "testnet"
-const SCHOLARSHIP_TREASURY_CONTRACT_ID =
-	process.env.SCHOLARSHIP_TREASURY_CONTRACT_ID ?? ""
+function getTreasuryContractId(): string {
+	return process.env.SCHOLARSHIP_TREASURY_CONTRACT_ID ?? ""
+}
 
 // Known asset contract IDs → symbol/USD rate mapping.
 // Rates are approximate fixed values for display normalization; a production
@@ -56,7 +58,7 @@ export const getTreasuryStats = async (
 	_req: Request,
 	res: Response,
 ): Promise<void> => {
-	if (!SCHOLARSHIP_TREASURY_CONTRACT_ID) {
+	if (!getTreasuryContractId()) {
 		res.status(503).json({
 			error: "Treasury contract not configured",
 		})
@@ -71,7 +73,7 @@ export const getTreasuryStats = async (
 		)
 
 		const response = await server.getEvents({
-			filters: [{ contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] }],
+			filters: [{ contractIds: [getTreasuryContractId()] }],
 			startLedger: parseInt(process.env.STARTING_LEDGER || "460000000", 10),
 			limit: 1000,
 		})
@@ -158,7 +160,7 @@ export const getTreasuryActivity = async (
 	req: Request,
 	res: Response,
 ): Promise<void> => {
-	if (!SCHOLARSHIP_TREASURY_CONTRACT_ID) {
+	if (!getTreasuryContractId()) {
 		res.status(503).json({
 			error: "Treasury contract not configured",
 		})
@@ -182,7 +184,7 @@ export const getTreasuryActivity = async (
 		)
 
 		const response = await server.getEvents({
-			filters: [{ contractIds: [SCHOLARSHIP_TREASURY_CONTRACT_ID] }],
+			filters: [{ contractIds: [getTreasuryContractId()] }],
 			startLedger: parseInt(process.env.STARTING_LEDGER || "460000000", 10),
 			limit: 1000,
 		})
@@ -237,7 +239,7 @@ export const getTreasuryActivity = async (
 		const paginatedEvents = events.slice(offset, offset + limit)
 		const total = events.length
 
-		res.status(200).json({
+			res.status(200).json({
 			data: paginatedEvents,
 			pagination: { page, limit, total },
 		})
@@ -245,6 +247,196 @@ export const getTreasuryActivity = async (
 		log.error({ err }, "Failed to fetch activity")
 		res.status(500).json({
 			error: "Failed to fetch treasury activity",
+		})
+	}
+}
+
+/**
+ * Read-only contract call helper: simulates an invocation from a funded dummy
+ * account so no signature is required, and returns the native return value.
+ */
+async function callTreasuryRead(
+	server: rpc.Server,
+	fnName: string,
+	args: unknown[] = [],
+): Promise<unknown | null> {
+	try {
+		return await stellarRpcCircuitBreaker.call(async () => {
+			const {
+				Contract,
+				TransactionBuilder,
+				Account,
+				Networks,
+				nativeToScVal,
+				scValToNative,
+			} = await import("@stellar/stellar-sdk")
+
+			const contract = new Contract(getTreasuryContractId())
+			const dummy = new Account(
+				"GDGQVOKHW4VEJRU2TETD6DBRKEO5ERCNF353LW5JBF3UKJQ2K5RQDD",
+				"0",
+			)
+			const scArgs = args.map((a) => nativeToScVal(a, { type: "u32" }))
+			const tx = new TransactionBuilder(dummy, {
+				fee: "100",
+				networkPassphrase:
+					STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
+			})
+				.addOperation(contract.call(fnName, ...scArgs))
+				.setTimeout(30)
+				.build()
+
+			const sim = await server.simulateTransaction(tx)
+			if ((rpc.Api as unknown as { isSimulationError: (s: unknown) => boolean }).isSimulationError(sim)) {
+				return null
+			}
+			const retval = (sim as { result?: { retval?: unknown } }).result?.retval
+			if (!retval) return null
+			return scValToNative(retval as never)
+		})
+	} catch (err) {
+		log.error({ err, fnName }, "treasury read failed")
+		return null
+	}
+}
+
+/** Human-readable name for the venue holding allocated funds. */
+function venueNameForStrategy(strategyAddress: string | null): string {
+	if (!strategyAddress) return "None (fully idle)"
+	const configured = process.env.STRATEGY_VENUE_NAME
+	if (configured) return configured
+	// Default label for the strategy-lending adapter deployment.
+	return "LearnVault Lending Market"
+}
+
+interface AllocationEventItem {
+	type: "allocated" | "deallocated" | "harvested" | "emergency_withdraw"
+	strategy?: string
+	amount?: string
+	returned?: string
+	yield_amount?: string
+	tx_hash: string
+	created_at: string
+}
+
+const STRATEGY_EVENT_TYPES = [
+	"allocated",
+	"deallocated",
+	"harvested",
+	"emergency_withdraw",
+] as const
+
+/**
+ * GET /api/treasury/allocations
+ * Returns the idle / allocated / yield breakdown plus the venue currently
+ * holding allocated treasury funds, sourced from on-chain state, with a recent
+ * allocation event trail.
+ */
+export const getTreasuryAllocations = async (
+	req: Request,
+	res: Response,
+): Promise<void> => {
+	if (!getTreasuryContractId()) {
+		res.status(503).json({
+			error: "Treasury contract not configured",
+		})
+		return
+	}
+
+	const limit = Math.max(1, Math.min(parsePositiveInt(req.query.limit, 20), 100))
+
+	try {
+		const server = new rpc.Server(
+			STELLAR_NETWORK === "mainnet"
+				? "https://soroban-rpc.stellar.org"
+				: "https://soroban-testnet.stellar.org",
+		)
+
+		const [idleRaw, allocatedRaw, accruedYieldRaw, totalYieldRaw, strategy] =
+			await Promise.all([
+				callTreasuryRead(server, "get_idle"),
+				callTreasuryRead(server, "get_allocated"),
+				callTreasuryRead(server, "get_accrued_yield"),
+				callTreasuryRead(server, "get_total_yield"),
+				callTreasuryRead(server, "get_strategy"),
+			])
+
+		const strategyAddress =
+			typeof strategy === "string" && strategy.length > 0 ? strategy : null
+
+		const asAtomicString = (value: unknown): string =>
+			typeof value === "bigint"
+				? value.toString()
+				: typeof value === "number"
+					? String(value)
+					: typeof value === "string"
+						? value
+						: "0"
+
+		// Recent allocation lifecycle events for the trail.
+		const response = await server.getEvents({
+			filters: [{ contractIds: [getTreasuryContractId()] }],
+			startLedger: parseInt(process.env.STARTING_LEDGER || "460000000", 10),
+			limit: 1000,
+		})
+
+		const { scValToNative } = await import("@stellar/stellar-sdk")
+		const events: AllocationEventItem[] = []
+
+		for (const event of response.events) {
+			const topics = event.topic.map((t) => scValToNative(t))
+			const eventType = topics[0]
+			if (
+				typeof eventType !== "string" ||
+				!(STRATEGY_EVENT_TYPES as readonly string[]).includes(eventType)
+			) {
+				continue
+			}
+			const eventData = scValToNative(event.value) as Record<string, unknown>
+			events.push({
+				type: eventType as AllocationEventItem["type"],
+				strategy:
+					typeof eventData.strategy === "string"
+						? eventData.strategy
+						: undefined,
+				amount:
+					eventData.amount !== undefined
+						? String(eventData.amount)
+						: undefined,
+				returned:
+					eventData.returned !== undefined
+						? String(eventData.returned)
+						: undefined,
+				yield_amount:
+					eventData.yield_amount !== undefined
+						? String(eventData.yield_amount)
+						: undefined,
+				tx_hash: event.txHash ?? "",
+				created_at: event.ledgerClosedAt ?? new Date().toISOString(),
+			})
+		}
+
+		events.sort(
+			(a, b) =>
+				new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+		)
+
+		res.status(200).json({
+			idle_usdc: asAtomicString(idleRaw),
+			allocated_usdc: asAtomicString(allocatedRaw),
+			accrued_yield: asAtomicString(accruedYieldRaw),
+			total_yield: asAtomicString(totalYieldRaw),
+			venue: {
+				address: strategyAddress,
+				name: venueNameForStrategy(strategyAddress),
+			},
+			events: events.slice(0, limit),
+			pagination: { limit, total: events.length },
+		})
+	} catch (err) {
+		log.error({ err }, "Failed to fetch allocations")
+		res.status(500).json({
+			error: "Failed to fetch treasury allocations",
 		})
 	}
 }

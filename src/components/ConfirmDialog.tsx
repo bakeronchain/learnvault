@@ -1,4 +1,4 @@
-import React, { useEffect } from "react"
+import React, { useEffect, useState } from "react"
 
 interface ConfirmDialogProps {
 	title: string
@@ -8,6 +8,7 @@ interface ConfirmDialogProps {
 	onConfirm: () => void
 	onCancel: () => void
 	isDestructive?: boolean
+	confirmationPhrase?: string
 }
 
 /**
@@ -26,7 +27,10 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 	onConfirm,
 	onCancel,
 	isDestructive = true,
+	confirmationPhrase,
 }) => {
+	const [confirmation, setConfirmation] = useState("")
+	const isConfirmed = !confirmationPhrase || confirmation === confirmationPhrase
 	// Handle Escape key
 	useEffect(() => {
 		const handleEsc = (event: KeyboardEvent) => {
@@ -73,15 +77,35 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 					{description}
 				</p>
 
+				{confirmationPhrase && (
+					<div className="mb-6">
+						<label
+							htmlFor="confirm-dialog-phrase"
+							className="block text-sm text-white/80 mb-2"
+						>
+							Type {confirmationPhrase} to continue
+						</label>
+						<input
+							id="confirm-dialog-phrase"
+							type="text"
+							value={confirmation}
+							onChange={(event) => setConfirmation(event.target.value)}
+							autoComplete="off"
+							className="w-full rounded-xl border border-white/20 bg-black/30 px-4 py-3 text-white"
+						/>
+					</div>
+				)}
+
 				<div className="flex flex-row gap-3">
 					<button
 						type="button"
 						onClick={onConfirm}
+						disabled={!isConfirmed}
 						className={`flex-1 px-6 py-3 font-black uppercase tracking-widest rounded-xl hover:scale-105 active:scale-95 transition-all ${
 							isDestructive
 								? "text-red-400 border border-red-500/20 hover:bg-red-500/5"
 								: "text-brand-cyan border border-brand-cyan/20 hover:bg-brand-cyan/5"
-						}`}
+						} disabled:cursor-not-allowed disabled:opacity-40`}
 					>
 						{confirmLabel}
 					</button>

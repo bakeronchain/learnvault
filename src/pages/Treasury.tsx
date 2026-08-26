@@ -122,6 +122,8 @@ const Treasury: React.FC = () => {
 
 	const {
 		stats,
+		allocations,
+		isAllocationsLoading,
 		activity,
 		isLoading,
 		isError,
@@ -350,6 +352,81 @@ const Treasury: React.FC = () => {
 					</div>
 				</div>
 			)}
+
+			{/* Idle / allocated / yield breakdown with the holding venue */}
+			<div className="mb-8">
+				<div className="glass-card rounded-[3rem] border border-white/5 p-8">
+					<div className="flex justify-between items-center mb-6">
+						<h3 className="text-lg font-black uppercase tracking-widest text-white/60">
+							Strategy Allocation
+						</h3>
+						{isAllocationsLoading ? (
+							<span className="text-xs text-white/30">Loading…</span>
+						) : allocations ? (
+							<span className="text-xs font-black uppercase tracking-widest text-brand-cyan">
+								Held at {allocations.venue.name}
+							</span>
+						) : null}
+					</div>
+
+					{allocations ? (
+						<>
+							<div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
+								<div className="rounded-2xl border border-white/5 bg-white/5 p-5">
+									<p className="text-xs font-black uppercase tracking-widest text-white/40">
+										Idle (liquidity)
+									</p>
+									<p className="text-2xl font-black tracking-tight text-brand-emerald mt-1">
+										{formatAmount(allocations.idle_usdc)} USDC
+									</p>
+								</div>
+								<div className="rounded-2xl border border-white/5 bg-white/5 p-5">
+									<p className="text-xs font-black uppercase tracking-widest text-white/40">
+										Allocated (principal)
+									</p>
+									<p className="text-2xl font-black tracking-tight text-brand-blue mt-1">
+										{formatAmount(allocations.allocated_usdc)} USDC
+									</p>
+								</div>
+								<div className="rounded-2xl border border-white/5 bg-white/5 p-5">
+									<p className="text-xs font-black uppercase tracking-widest text-white/40">
+										Accrued Yield
+									</p>
+									<p className="text-2xl font-black tracking-tight text-brand-cyan mt-1">
+										+{formatAmount(allocations.accrued_yield)} USDC
+									</p>
+								</div>
+							</div>
+
+							<div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-white/50">
+								<span>
+									Lifetime harvested:{" "}
+									<span className="text-white/80 font-bold">
+										{formatAmount(allocations.total_yield)} USDC
+									</span>
+								</span>
+								{allocations.venue.address && (
+									<span className="inline-flex items-center gap-2">
+										<svg width="8" height="8" viewBox="0 0 8 8" className="text-brand-cyan fill-brand-cyan">
+											<circle cx="4" cy="4" r="4" />
+										</svg>
+										Venue:{" "}
+										<span className="font-mono text-white/80">
+											{formatAddress(allocations.venue.address)}
+										</span>
+									</span>
+								)}
+							</div>
+						</>
+					) : (
+						<p className="text-white/40 text-sm">
+							{isError
+								? "Unable to load allocation breakdown."
+								: "No allocation data yet."}
+						</p>
+					)}
+				</div>
+			</div>
 
 			<div className="mb-20">
 				<div className="glass-card p-10 rounded-[3rem] relative overflow-hidden">

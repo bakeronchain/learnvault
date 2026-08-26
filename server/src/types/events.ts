@@ -21,6 +21,11 @@ export const EVENT_TOPICS = {
 	ScholarshipTreasury_ProposalExecuted:
 		"ScholarshipTreasury::proposal_executed",
 	ScholarshipTreasury_VoteCastEvent: "ScholarshipTreasury::VoteCastEvent",
+	// Strategy allocation lifecycle (emitted by scholarship_treasury)
+	ScholarshipTreasury_Allocated: "ScholarshipTreasury::allocated",
+	ScholarshipTreasury_Deallocated: "ScholarshipTreasury::deallocated",
+	ScholarshipTreasury_Harvested: "ScholarshipTreasury::harvested",
+	ScholarshipTreasury_EmergencyWithdrawal: "ScholarshipTreasury::emergency_withdraw",
 	MilestoneEscrow_FundsDisbursed: "MilestoneEscrow::FundsDisbursed",
 	MilestoneEscrow_TrancheReleasedViaArbitration:
 		"MilestoneEscrow::arb_released",
@@ -47,6 +52,10 @@ export const EVENTS_TO_INDEX: Record<ContractName, EventTopic[]> = {
 		"ScholarshipTreasury_ProposalCreated",
 		"ScholarshipTreasury_ProposalExecuted",
 		"ScholarshipTreasury_VoteCastEvent",
+		"ScholarshipTreasury_Allocated",
+		"ScholarshipTreasury_Deallocated",
+		"ScholarshipTreasury_Harvested",
+		"ScholarshipTreasury_EmergencyWithdrawal",
 	],
 	milestoneEscrow: [
 		"MilestoneEscrow_FundsDisbursed",
@@ -82,6 +91,28 @@ export const EVENT_DATA_SCHEMAS: Partial<Record<EventTopicValue, z.ZodSchema>> =
 		"ScholarNFT::revoked": z.object({
 			token_id: z.string().regex(/^\d+$/),
 			reason: z.string(),
+		}),
+		// Strategy allocation lifecycle events.
+		// Payload shapes mirror the #[contractevent] structs in
+		// contracts/scholarship_treasury/src/lib.rs; amounts are u128/i128
+		// serialized as strings by the RPC layer.
+		"ScholarshipTreasury::allocated": z.object({
+			strategy: z.string(),
+			amount: z.string().regex(/^-?\d+$/),
+		}),
+		"ScholarshipTreasury::deallocated": z.object({
+			strategy: z.string(),
+			amount: z.string().regex(/^-?\d+$/),
+			returned: z.string().regex(/^-?\d+$/),
+		}),
+		"ScholarshipTreasury::harvested": z.object({
+			strategy: z.string(),
+			amount: z.string().regex(/^-?\d+$/),
+			yield_amount: z.string().regex(/^-?\d+$/),
+		}),
+		"ScholarshipTreasury::emergency_withdraw": z.object({
+			strategy: z.string(),
+			amount: z.string().regex(/^-?\d+$/),
 		}),
 		"MilestoneArbitration::dispute_opened": z.object({
 			dispute_id: z.string().regex(/^\d+$/),

@@ -180,5 +180,32 @@
 	"translatorLessonPane": "Somo {{order}}",
 	"translatorEdit": "Hariri",
 	"translatorPreview": "Onyesho la awali",
-	"translatorContentPlaceholder": "Maudhui ya markdown yaliyotafsiriwa"
+	"translatorContentPlaceholder": "Maudhui ya markdown yaliyotafsiriwa",
+	"dataRights": {
+		"title": "Data yako",
+		"description": "Pakua data binafsi ambayo LearnVault inahifadhi kukuhusu au panga kufutwa kwa akaunti yako.",
+		"requestExport": "Omba data",
+		"deleteAccount": "Futa akaunti",
+		"download": "Pakua kumbukumbu",
+		"pending": "Akaunti imepangwa kufutwa tarehe {{date}}.",
+		"cancelDeletion": "Ghairi kufutwa kwa akaunti",
+		"exportStatus": {
+			"pending": "Ombi la data limepangwa",
+			"processing": "Data inaandaliwa",
+			"ready": "Data iko tayari",
+			"failed": "Uandaaji wa data umeshindwa"
+		},
+		"dialog": {
+			"title": "Upange kufuta akaunti kabisa?",
+			"description": "Data yako binafsi iliyo nje ya blockchain itafutwa baada ya siku 30. Maudhui ya mijadala yatabaki bila utambulisho ili kuhifadhi muktadha. Uhamisho wa LRN, ScholarNFT zilizotengenezwa na miamala ya hazina ni rekodi za kudumu za umma na haziwezi kuondolewa.",
+			"confirm": "Panga kufutwa",
+			"cancel": "Hifadhi akaunti"
+		},
+		"errors": {
+			"status": "Hali ya kufutwa haikuweza kupakiwa.",
+			"export": "Data yako haikuweza kuandaliwa.",
+			"deletion": "Kufutwa kwa akaunti hakukuweza kupangwa.",
+			"cancel": "Kufutwa kwa akaunti hakukuweza kughairiwa."
+		}
+	}
 }

@@ -6,6 +6,7 @@ import { Link, useParams } from "react-router-dom"
 import { ActivityFeed } from "../components/ActivityFeed"
 import AddressDisplay from "../components/AddressDisplay"
 
+import { DataRightsSettings } from "../components/DataRightsSettings"
 import IdenticonAvatar from "../components/IdenticonAvatar"
 import LRNHistoryChart from "../components/LRNHistoryChart"
 import PasskeyDeviceManager from "../components/PasskeyDeviceManager"
@@ -428,6 +429,7 @@ const Profile: React.FC = () => {
 
 			{walletAddress && !paramAddress && <ReferralCard />}
 			<ProfileLinkedWallets />
+			{isOwnProfile && <DataRightsSettings />}
 
 			<section>
 				<div className="flex items-center gap-4 mb-12">

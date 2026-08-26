@@ -180,5 +180,32 @@
 	"translatorLessonPane": "Lesson {{order}}",
 	"translatorEdit": "Edit",
 	"translatorPreview": "Preview",
-	"translatorContentPlaceholder": "Translated markdown content"
+	"translatorContentPlaceholder": "Translated markdown content",
+	"dataRights": {
+		"title": "Your data",
+		"description": "Download the personal data LearnVault holds about you or schedule account deletion.",
+		"requestExport": "Request export",
+		"deleteAccount": "Delete account",
+		"download": "Download archive",
+		"pending": "Account deletion is scheduled for {{date}}.",
+		"cancelDeletion": "Cancel account deletion",
+		"exportStatus": {
+			"pending": "Export queued",
+			"processing": "Preparing export",
+			"ready": "Export ready",
+			"failed": "Export failed"
+		},
+		"dialog": {
+			"title": "Schedule permanent account deletion?",
+			"description": "Your off-chain personal data will be erased after 30 days. Forum content will remain anonymously for context. LRN transfers, minted ScholarNFTs, and treasury transactions are permanent public ledger records and cannot be removed.",
+			"confirm": "Schedule deletion",
+			"cancel": "Keep account"
+		},
+		"errors": {
+			"status": "Could not load account deletion status.",
+			"export": "Could not prepare your data export.",
+			"deletion": "Could not schedule account deletion.",
+			"cancel": "Could not cancel account deletion."
+		}
+	}
 }

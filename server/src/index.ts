@@ -34,6 +34,7 @@ import { buildOpenApiSpec } from "./openapi"
 import { adminMilestonesRouter } from "./routes/admin-milestones.routes"
 import { adminProviderKeysRouter } from "./routes/admin-provider-keys.routes"
 import { adminRouter } from "./routes/admin.routes"
+import { createOpenDataRouter } from "./routes/open-data.routes"
 import { createSearchRouter } from "./routes/search.routes"
 import { createAnchorsRouter } from "./routes/anchors.routes"
 import { antiSybilRouter } from "./routes/anti-sybil.routes"
@@ -351,6 +352,7 @@ app.use("/api", createUserProfileRouter(jwtService))
 app.use("/api", createUploadRouter(jwtService))
 app.use("/api", referralRouter)
 app.use("/api", createSearchRouter())
+app.use("/api", createOpenDataRouter())
 app.use("/api", createReviewsRouter(jwtService))
 app.use("/api", notificationsRouter)
 app.use("/api", createStreaksRouter(jwtService))

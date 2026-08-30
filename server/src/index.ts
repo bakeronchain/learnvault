@@ -413,7 +413,13 @@ async function start() {
 		logger.info({ port: env.PORT }, "Server listening")
 	})
 
-	if (process.env.NODE_ENV !== "production") {
+	// The poller drives the scholar LRN balance projection behind the leaderboard,
+	// so production deployments that do not receive events through the Horizon
+	// webhook relay have to opt in explicitly.
+	if (
+		process.env.NODE_ENV !== "production" ||
+		process.env.ENABLE_EVENT_POLLER === "true"
+	) {
 		void import("./workers/event-poller").then(({ startEventPoller }) => {
 			void startEventPoller().catch((err) =>
 				logger.error({ err }, "Event poller failed"),

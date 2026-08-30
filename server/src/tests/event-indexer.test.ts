@@ -41,6 +41,7 @@ jest.mock("../lib/leaderboard-emitter", () => ({
 
 jest.mock("../lib/event-config", () => ({
 	SOROBAN_RPC_URL: "http://localhost:8000/soroban/rpc",
+	CONTRACT_IDS: { learnToken: "C123" },
 	INDEXER_CONFIG: {
 		startingLedger: 100,
 		batchSize: 50,
@@ -58,7 +59,12 @@ describe("Event Indexer & Poller Integration Tests", () => {
 		mockQuery.mockResolvedValue({ rowCount: 0, rows: [] })
 		mockGetEvents.mockResolvedValue({ events: [] })
 		mockGetNetwork.mockResolvedValue({ passphrase: "Test" })
-		mockGetLatestLedger.mockResolvedValue(1000)
+		// getLatestLedger resolves to Api.GetLatestLedgerResponse, not a bare number.
+		mockGetLatestLedger.mockResolvedValue({
+			id: "ledger-hash",
+			sequence: 1000,
+			protocolVersion: "23",
+		})
 	})
 
 	afterEach(() => {
@@ -180,8 +186,8 @@ describe("Event Indexer & Poller Integration Tests", () => {
 		it("should start poller and fetch batches correctly", async () => {
 			const logSpy = jest.spyOn(console, "log").mockImplementation(() => {})
 
-			mockGetLatestLedger.mockResolvedValueOnce(100) // Initial latest
-			mockGetLatestLedger.mockResolvedValueOnce(200) // Next latest
+			mockGetLatestLedger.mockResolvedValueOnce({ sequence: 100 }) // Initial latest
+			mockGetLatestLedger.mockResolvedValueOnce({ sequence: 200 }) // Next latest
 
 			jest.useFakeTimers()
 

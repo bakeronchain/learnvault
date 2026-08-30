@@ -1,10 +1,8 @@
-import { rpc } from "@stellar/stellar-sdk" // dynamic later
-import { INDEXER_CONFIG, getPollingTargets } from "../lib/event-config"
+import { rpc } from "@stellar/stellar-sdk"
+import { INDEXER_CONFIG, SOROBAN_RPC_URL } from "../lib/event-config"
 import { logger } from "../lib/logger"
-import {
-	indexEventsBatch,
-	getLastIndexedLedger,
-} from "../services/event-indexer.service"
+import { indexEventsBatch } from "../services/event-indexer.service"
+import { syncLrnBalances } from "../services/scholar-balance-indexer.service"
 
 const log = logger.child({ module: "poller" })
 
@@ -13,15 +11,19 @@ let pollInterval: NodeJS.Timeout | null = null
 export async function startEventPoller(): Promise<void> {
 	log.info("Starting event indexer")
 
-	// Get global latest ledger
-	const network = new rpc.Server(process.env.SOROBAN_RPC_URL!)
-	const info = await network.getNetwork()
-	let currentLedger = Number(await network.getLatestLedger())
+	const network = new rpc.Server(SOROBAN_RPC_URL)
+	let currentLedger = (await network.getLatestLedger()).sequence
 
 	pollInterval = setInterval(async () => {
 		try {
-			const newInfo = await network.getNetwork()
-			const latestLedger = Number(await network.getLatestLedger())
+			const latestLedger = (await network.getLatestLedger()).sequence
+
+			// The LRN balance projection resumes from its own persisted checkpoint
+			// rather than from `currentLedger`, so a restart replays whatever the
+			// process missed while it was down instead of starting at the head.
+			await syncLrnBalances(latestLedger).catch((err) =>
+				log.error({ err }, "LRN balance sync failed"),
+			)
 
 			if (currentLedger >= latestLedger) return
 

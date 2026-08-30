@@ -15,6 +15,7 @@
     "migrate:verify": "ts-node scripts/verify-migrations.ts",
     "db:migrate": "npm run migrate",
     "db:seed": "ts-node scripts/seed.ts",
+    "db:backfill:balances": "ts-node scripts/backfill-scholar-balances.ts",
     "seed:swahili-course": "ts-node scripts/seed-swahili-course.ts",
     "db:query:analyze": "ts-node scripts/query-analysis.ts",
     "test:coverage": "jest --runInBand --testPathPatterns=\"src/tests/(auth|bookmarks|comments|csrf|upload)\\.test\\.ts\""

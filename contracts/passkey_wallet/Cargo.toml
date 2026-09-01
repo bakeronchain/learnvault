@@ -18,4 +18,4 @@ serde-json-core = { version = "0.6", default-features = false }
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 p256 = { version = "0.13", default-features = false, features = ["ecdsa", "std"] }
-base64 = { version = "0.22", default-features = false }
+base64 = { version = "0.23", default-features = false }

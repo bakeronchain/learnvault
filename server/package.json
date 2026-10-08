@@ -3,9 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
+    "dev": "node init && ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "node init && tsc -p tsconfig.json",
+    "start": "node init && node dist/index.js",
     "docs:generate": "ts-node scripts/generate-openapi.ts",
     "openapi:lint": "npm run docs:generate && redocly lint ../docs/openapi.yaml --config ../.redocly.yaml",
     "openapi:check": "npm run openapi:lint && git diff --exit-code -- ../docs/openapi.yaml",
